@@ -1,0 +1,22 @@
+{% load static %}
+<html lang="en">
+
+
+<head>
+    <meta charset="UTF-8">
+        <title> shop : {% block title %}  {% endblock %}</title>
+        {% block head %} {% endblock %}
+    <link rel="stylesheet" type="text/css" href="{% static 'css/base.css' %}">
+</head>
+
+
+
+<body>
+    {% include 'Shop/parchers/header.html' %}
+        {% include 'Shop/parchers/navigation.html' %}
+        {% block body %} {% endblock %}
+    {% include 'Shop/parchers/fother.html' %}
+</body>
+
+
+</html>
