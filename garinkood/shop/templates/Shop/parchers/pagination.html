@@ -59,13 +59,14 @@
             {% if page.has_next %}
                 <a href="?page={{ page.next_page_number }}">&raquo;</a>
             {% endif %}
-      <br>
 
       </span>
-                  <span>
-                    page{{ page.number }} of {{ page.paginator.num_pages }}
-                </span>
   </div>
+        <br>
+      <span>
+          page <a href="?page={{ page.number }}">{{ page.number }}</a>
+          of <a href="?page={{ page.paginator.num_pages }}">{{ page.paginator.num_pages }}</a>
+      </span>
 </div>
 
 </body>
