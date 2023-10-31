@@ -7,16 +7,30 @@
         <title> shop : {% block title %}  {% endblock %}</title>
         {% block head %} {% endblock %}
     <link rel="stylesheet" type="text/css" href="{% static 'css/base.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'css/footer.css' %}">
 </head>
 
 
 
 <body>
-    {% include 'Shop/parchers/header.html' %}
-        {% include 'Shop/parchers/navigation.html' %}
-        {% block body %} {% endblock %}
-    {% include 'Shop/parchers/fother.html' %}
+    <div>
+        <div>
+            {% include 'Shop/parchers/header.html' %}
+            {% include 'Shop/parchers/navigation.html' %}
+        </div>
+        <div>
+            {% block body %}
+            {% endblock %}
+        </div>
+    </div>
+    <br><br><br><br><br><br><br><br><br><br><br><br><br>
+    <div>
+        <section>
+            <footer>
+                 {% include 'Shop/parchers/fother.html' %}
+             </footer>
+        </section>
+    </div>
 </body>
-
 
 </html>

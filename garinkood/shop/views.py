@@ -5,7 +5,7 @@ from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 # Create your views here.
 
 def home(request):
-    return HttpResponse("بخش خرید")
+    return render(request, 'shop/parent/base.html')
 def ItemsList(request):
     Items = Item.objects.filter(status='published')
     paginator = Paginator(Items, 1)
