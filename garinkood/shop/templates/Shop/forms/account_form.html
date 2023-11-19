@@ -1,0 +1,39 @@
+{% extends 'Shop/parent/base.html' %}
+{% load static %}
+{% block title%}
+    UserAccount
+{% endblock %}
+{% block body %}
+    <h1 style="color: #006b1b;margin-left:auto">فرم اطلعات شخصی کاربر</h1>
+        <form method="post">
+
+                {% csrf_token %}
+            نام:
+        <br>
+            <input type="text" name="name" required {% if form.name.value %} value="{{ form.name.value }}"
+                    {% else %} value="{{ account.user.first_name|default:'' }}"{% endif %}>
+        <br>
+            نام خانوادگی:
+        <br>
+            <input type="text" name="last_name" required {% if form.last_name.value %} value="{{ form.last_name.value }}"
+                    {% else %} value="{{ account.user.last_name|default:'' }}"{% endif %}>
+        <br>
+        شماره همره:
+        <br>
+        <input type="text" disabled value="{{ account.phone|default:'' }}">
+        <br>
+
+            جنسیت:
+        <br>
+        اقا:
+        <input type="radio" name="gender" value="اقا" {% if account.gender == 'اقا' %} checked {% endif %}>
+            <br>
+        خانم:
+        <input type="radio" name="gender" value="خانم" {% if account.gender == 'خانم' %} checked {% endif %}>
+            <br>
+
+
+            <input type="submit" value=" ثبت اطلعات ">
+
+        </form>
+{% endblock %}

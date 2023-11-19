@@ -1,6 +1,7 @@
-from django.shortcuts import render,get_object_or_404
+from django.shortcuts import render,get_object_or_404,redirect
 from django.http import HttpResponse
-from .models import Item
+from .models import Item, UserAccount
+from .forms import AccountForm
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 # Create your views here.
 
@@ -27,3 +28,24 @@ def ItemsList(request):
 def post_detail (request, post, pk):
     post = get_object_or_404(Item, slug=post, id=pk)
     return render(request, 'shop/Items/detail_items.html', {'post': post})
+
+def UserAccountView(request):
+    user = request.user
+    try:
+        account = UserAccount.objects.get(user=user)
+    except:
+        account = UserAccount.objects.create(user=user)
+    if request.method == "POST":
+        form=AccountForm(data=request.POST)
+        if form.is_valid():
+            user.first_name = form.cleaned_data['name']
+            user.last_name = form.cleaned_data['last_name']
+            account.gender = form.cleaned_data['gender']
+            account.address = form.cleaned_data['address']
+            user.save()
+            account.save()
+            return redirect('shop:home')
+        else:
+            return render(request, 'shop/forms/account_form.html', {'form':form, 'account':account})
+    form = AccountForm()
+    return render(request, 'shop/forms/account_form.html', {'form':form, 'account':account})

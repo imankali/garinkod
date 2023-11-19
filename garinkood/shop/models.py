@@ -45,3 +45,17 @@ class Item(models.Model):
         return self.title
     def get_absolute_utl(self):
         return reverse('shop:post_detail', args=[self.slug, self.id])
+
+class UserAccount(models.Model):
+    GENDER_CHOICESE=(
+        ("خانم", "خانم"), ("اقا", "اقا"),
+    )
+    phone = models.CharField(max_length=11,)  # VARCHAR
+    user = models.OneToOneField(User,on_delete=models.CASCADE, related_name='account')
+    gender = models.CharField(max_length=15, choices=GENDER_CHOICESE, default="اقا")
+    address = models.TextField()
+    crated = models.DateTimeField(auto_now_add=True,)
+    update = models.DateTimeField(auto_now_add=True,)
+    # for create new fields in database (blank=True,null=True)
+    def __str__(self):
+        return self.user.first_name + " " + self.user.last_name

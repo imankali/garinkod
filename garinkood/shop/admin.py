@@ -1,5 +1,5 @@
 from django.contrib import admin
-from.models import Item
+from.models import Item,UserAccount
 # Register your models here.
 #admin.site.register(Item)
 
@@ -14,3 +14,10 @@ class AdminItem(admin.ModelAdmin):
     ordering = ('-status', '-publish',)
     list_display_links = ('slug',)
     list_editable = ('status',)
+
+
+@admin.register(UserAccount)
+class AdminUserAccount(admin.ModelAdmin):
+
+    list_display = ('user','phone','gender')
+
