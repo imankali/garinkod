@@ -1,39 +1,62 @@
 {% extends 'Shop/parent/base.html' %}
 {% load static %}
+
 {% block title%}
     UserAccount
 {% endblock %}
+
 {% block body %}
+
     <h1 style="color: #006b1b;margin-left:auto">فرم اطلعات شخصی کاربر</h1>
         <form method="post">
 
-                {% csrf_token %}
-            نام:
-        <br>
-            <input type="text" name="name" required {% if form.name.value %} value="{{ form.name.value }}"
-                    {% else %} value="{{ account.user.first_name|default:'' }}"{% endif %}>
-        <br>
-            نام خانوادگی:
-        <br>
-            <input type="text" name="last_name" required {% if form.last_name.value %} value="{{ form.last_name.value }}"
-                    {% else %} value="{{ account.user.last_name|default:'' }}"{% endif %}>
-        <br>
-        شماره همره:
-        <br>
-        <input type="text" disabled value="{{ account.phone|default:'' }}">
-        <br>
+                    {% csrf_token %}
 
-            جنسیت:
-        <br>
-        اقا:
-        <input type="radio" name="gender" value="اقا" {% if account.gender == 'اقا' %} checked {% endif %}>
+                نام:
             <br>
-        خانم:
-        <input type="radio" name="gender" value="خانم" {% if account.gender == 'خانم' %} checked {% endif %}>
+                <input type="text" name="name" required {% if form.name.value %} value="{{ form.name.value }}"
+                {% else %} value="{{ account.user.first_name|default:'' }}"{% endif %}>
             <br>
 
+                نام خانوادگی:
+            <br>
+                <input type="text" name="last_name" required {% if form.last_name.value %} value="{{ form.last_name.value }}"
+                {% else %} value="{{ account.user.last_name|default:'' }}"{% endif %}>
+            <br>
 
-            <input type="submit" value=" ثبت اطلعات ">
+            شماره همره:
+            <br>
+                <input type="text" disabled value="{{ account.phone|default:'' }}">
+            <br>
+
+                جنسیت:
+            <br>
+                اقا:
+                <input type="radio" name="gender" value="اقا" {% if account.gender == 'اقا' %} checked {% endif %}>
+            <br>
+                خانم:
+                <input type="radio" name="gender" value="خانم" {% if account.gender == 'خانم' %} checked {% endif %}>
+            <br>
+
+                آدرس:
+            <br>
+                <textarea type="text" name="address"  {% if form.name.value %} value="{{ form.address.value }}"
+                {% else %} value="{{ account.address|default:'' }}"{% endif %}></textarea>
+            <br>
+
+                <input type="submit" value=" ثبت اطلعات ">
+
+            <br>
 
         </form>
+
+    {% for field in form %}
+        {% if field.errors  %}
+            {% for errors in field.errors%}
+                {{ field.label }} :
+                <br>{{ errors }}<br>
+            {% endfor %}
+        {% endif %}
+    {% endfor %}
+
 {% endblock %}

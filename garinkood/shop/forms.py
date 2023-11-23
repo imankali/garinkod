@@ -9,13 +9,59 @@ class AccountForm(forms.Form):
         ("خانم", "خانم"),
         ("اقا", "اقا"),
     )
-    name = forms.CharField(max_length=30)
+    name = forms.CharField(max_length=30, label="نام")
     last_name = forms.CharField(max_length=40)
     gender = forms.ChoiceField(choices=GENDER_CHOICESE, widget=forms.RadioSelect)
-    address = forms.CharField(max_length=250, widget=forms.Textarea)
-    phone = forms.CharField(max_length=11)
+    address = forms.CharField(max_length=250, widget=forms.Textarea, required=False)
+    #phone = forms.CharField(max_length=11)
+
+
+
+    def clean_name(self):
+        name = self.cleaned_data['name']
+        def validate_string(string):
+            allowed_chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_@'
+            for char in string:
+                if char not in allowed_chars:
+                    return False
+            return True
+        def first_string(string):
+            allowed_chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+            check = string[0]
+            if check in allowed_chars:
+                return True
+            else:
+                return False
+        if name:
+            if first_string(name):
+                if validate_string(name):
+                   return name
+                else:
+                    raise forms.ValidationError("از کاراکتر هایه مجاز استفاده شود مانند (A-Z,a-z,_,@,0-9) ")
+            else:
+                raise forms.ValidationError("کاراکتر اول باید حروف باشد")
+
+    def clean_last_name(self):
+
+        last_name = self.cleaned_data['last_name']
+        def validate_string(string):
+            allowed_chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_@.'
+            for char in string:
+                if char not in allowed_chars:
+                    return False
+            return True
+
+        if last_name:
+            if validate_string(last_name):
+                return last_name
+            else:
+                raise forms.ValidationError("از کاراکتر هایه مجاز استفاده شود مانند (A-Z,a-z,_,@,0-9,.)")
+
+
+
 
 
    #class Meta:
     #    model=UserAccount
     #    fields=('phone', )
+
