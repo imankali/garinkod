@@ -37,6 +37,7 @@ class Item(models.Model):
     status = models.CharField(max_length=15, choices=STATUS_CHOICES, default='draft',)
     objects = PostManager()
     serch = LinkSerch()
+    price = models.IntegerField(blank=True,null=True)
 
 
     class Meta:
@@ -51,10 +52,10 @@ class UserAccount(models.Model):
         ("خانم", "خانم"), ("اقا", "اقا"),
     )
     phone = models.CharField(max_length=11,)  # VARCHAR
-    user = models.OneToOneField(User,on_delete=models.CASCADE, related_name='account')
+    user = models.OneToOneField(User,on_delete=models.CASCADE, related_name='account',)
     gender = models.CharField(max_length=15, choices=GENDER_CHOICESE, default="اقا")
-    address = models.TextField(max_length=250)
-    crated = models.DateTimeField(auto_now_add=True,)
+    address = models.TextField(max_length=250,blank=True,null=True,)
+    crated = models.DateTimeField(auto_now_add=True,null=True)
     update = models.DateTimeField(auto_now_add=True,)
     # for create new fields in database (blank=True,null=True)
     def __str__(self):

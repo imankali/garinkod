@@ -1,15 +1,45 @@
 from django.shortcuts import render,get_object_or_404,redirect
 from django.http import HttpResponse
-from .models import Item, UserAccount
-from .forms import AccountForm
+from .models import *
+from .forms import *
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+#from ..garinkood.settings import send_email
 # Create your views here.
+
+
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
+def send_email(to_address, subject, body):
+    # اطلاعات اتصال به سرور ایمیل
+    email_address = 'garinkood@gmail.com'  # ایمیل شما
+    email_password = 'udmkupzpjckxkvzf'  # رمز عبور ایمیل شما
+    smtp_server = 'smtp.gmail.com'  # سرور SMTP مورد استفاده (برای گوگل ایمیل)
+
+    # تنظیمات پیام ایمیل
+    msg = MIMEMultipart()
+    msg['From'] = email_address
+    msg['To'] = to_address
+    msg['Subject'] = subject
+    msg.attach(MIMEText(body, 'plain'))
+
+    # ارسال ایمیل
+    try:
+        with smtplib.SMTP(smtp_server, 587) as server:
+            server.starttls()
+            server.login(email_address, email_password)
+            server.sendmail(email_address, to_address, msg.as_string())
+        print("ایمیل با موفقیت ارسال شد!")
+    except Exception as e:
+        print("خطا در ارسال ایمیل:", str(e))
+
 
 def home(request):
     return render(request, 'shop/parent/base.html')
 def ItemsList(request):
     Items = Item.objects.filter(status='published')
-    paginator = Paginator(Items, 1)
+    paginator = Paginator(Items, 3)
     #page = request.GET['page']
 
     try:
@@ -26,7 +56,7 @@ def ItemsList(request):
 
     return render(request, 'shop/Items/list_items.html', {'Items': Items, 'page': page})
 def post_detail (request, post, pk):
-    post = get_object_or_404(Item, slug=post, id=pk)
+    post = get_object_or_404(Item, status='published', slug=post, id=pk)
     return render(request, 'shop/Items/detail_items.html', {'post': post})
 
 def UserAccountView(request):
@@ -49,3 +79,41 @@ def UserAccountView(request):
             return render(request, 'shop/forms/account_form.html', {'form':form, 'account':account})
     form = AccountForm()
     return render(request, 'shop/forms/account_form.html', {'form':form, 'account':account})
+def Support(request):
+    sent = False
+    if request.method=='POST':
+        form = SupportForm(request.POST)
+        if form.is_valid():
+            cd = form.cleaned_data
+            email = cd['email']
+            subject = cd['subject']
+            name = cd['name']
+            phone = cd['phone']
+            massage = cd['massage']
+            msg ="name:{0}\nphone:{1}\nemail:{2}\nmassage:\n{3}".format(name, phone, email, massage,)
+            send_email(email,subject,msg)
+            sent = True
+    else:
+        
+        form = SupportForm()
+    return render(request,'shop/forms/support_form.html', {'form':form, 'sent':sent})
+
+def ShareItem(request, post_id):
+    post = get_object_or_404(Item, status='published', id=post_id)
+    sent = False
+    if request.method == 'POST':
+        form = ShareForm(request.POST)
+        if form.is_valid():
+            cd = form.cleaned_data
+            post_url = request.build_absolute_uri(post.get_absolute_utl())
+            to = cd['to']
+            #name = cd['name']
+            subject = "{0} شمارا به خواندن {1} دعوت  کرده است".format(cd['name'], post.title)
+            massage = cd['massage']
+            msg = '{0} شمارا به خواندن پست {1} در آدرس زیر دعوت کرده است {2}{3}{4}{5}'\
+                .format(cd['name'], post.title, "\n", massage, "\n", post_url)
+            send_email(to, subject, msg)
+            sent = True
+    else:
+        form = ShareForm
+    return render(request, 'shop/forms/share.html', {'form': form, 'sent': sent, 'post': post})

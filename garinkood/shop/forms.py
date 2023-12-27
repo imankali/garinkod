@@ -65,3 +65,17 @@ class AccountForm(forms.Form):
     #    model=UserAccount
     #    fields=('phone', )
 
+class SupportForm(forms.Form):
+
+    name = forms.CharField(max_length=30, label="نام")
+    massage = forms.CharField(max_length=250)
+    subject = forms.CharField(max_length=50)
+    phone = forms.CharField(max_length=11, required=False)
+    email = forms.CharField(max_length=50)
+
+class ShareForm(forms.Form):
+
+    name = forms.CharField(max_length=30, label="نام و نام خانوادگی")
+    massage = forms.CharField(max_length=250, label="پیام")
+    #subject = forms.CharField(max_length=50, label="موضوع")
+    to = forms.CharField(max_length=50, label="آدرس ایمیل")

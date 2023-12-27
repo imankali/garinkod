@@ -16,5 +16,11 @@ detail
 <h2> author : {{ post.author }} </h2>
     <h2> title : {{ post.title }} </h2>
         <h3> body : {{ post.body }} </h3>
-    <h4 class="colors"> status : {{ post.status }} </h4>
+        <h3> price : {{ post.price }} </h3>
+            <h4 class="colors"> status : {{ post.status }} </h4>
+
+
+    <a href = "{%url "shop:Share_post" post.id %}">
+        اشتراک گذاری پست
+    </a>
 {% endblock %}

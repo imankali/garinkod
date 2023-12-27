@@ -1,0 +1,31 @@
+{% extends 'Shop/parent/base.html' %}
+{% load static %}
+{% block title%}
+    شتراک گذاری پست
+{% endblock %}
+{% block body %}
+    <h1 style="direction: rtl; color: #006b1b;margin-left:auto"> شتراک گذاری پست </h1>
+    <p style="direction: rtl;">
+    {% if sent %}
+        پست {{post.title}} ارسال شد برایع {{form.cleaned_data.to}}
+    {% endif %}
+    </p>
+
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <input type="submit" value="اشتراک گذاری">
+</form>
+
+
+
+
+    {% for field in form %}
+        {% if field.errors  %}
+            {% for errors in field.errors%}
+                {{ field.label }} :
+                <br>{{ errors }}<br>
+            {% endfor %}
+        {% endif %}
+    {% endfor %}
+{% endblock %}

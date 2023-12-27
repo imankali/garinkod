@@ -1,0 +1,62 @@
+{% extends 'Shop/parent/base.html' %}
+{% load static %}
+
+{% block title%}
+    پشتیبانی
+{% endblock %}
+
+{% block body %}
+
+    <h1 style="direction: rtl; color: #006b1b;margin-left:auto"> ارسال ایمیل </h1>
+    <p style="direction: rtl;">
+    {% if sent %}
+        پیام شما ارسال شد
+    {% endif %}
+    </p>
+        <form method="post" style="direction: rtl;">
+
+                    {% csrf_token %}
+
+                نام:
+            <br>
+                <input type="text" name="name" required {% if form.name.value %} value="{{ form.name.value }}"
+                {% else %} value="{{ account.user.first_name|default:'' }}"{% endif %}>
+            <br>
+
+                ایمیل دریافت کننده:
+            <br>
+                <input type="text" name="email" required {% if form.email.value %} value="{{ form.email.value }}"
+                {% else %} value="{{ account.user.email|default:'' }}"{% endif %}>
+            <br>
+                موضوع:
+            <br>
+                <input type="text" name="subject" required {% if form.subject.value %} value="{{ form.subject.value }}"
+                {% else %} value="{{ account.user.subject|default:'' }}"{% endif %}>
+            <br>
+
+            شماره همره:
+            <br>
+                <input type="text" name="phone"  value="{{ account.phone|default:'' }}">
+            <br>
+                متن پیام:
+            <br>
+                <textarea type="text" name="massage"  {% if form.massage.value %} value="{{ form.massage.value }}"
+                {% else %} value="{{ account.massage|default:'' }}"{% endif %}></textarea>
+            <br>
+
+                <input type="submit" value=" ثبت اطلعات ">
+
+            <br>
+
+        </form>
+
+    {% for field in form %}
+        {% if field.errors  %}
+            {% for errors in field.errors%}
+                {{ field.label }} :
+                <br>{{ errors }}<br>
+            {% endfor %}
+        {% endif %}
+    {% endfor %}
+
+{% endblock %}
