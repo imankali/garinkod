@@ -1,6 +1,6 @@
 
 from django import forms
-from .models import UserAccount
+from .models import *
 #add method from
 
 # auto add (class AccountForm(forms.ModelForm):)
@@ -79,3 +79,13 @@ class ShareForm(forms.Form):
     massage = forms.CharField(max_length=250, label="پیام")
     #subject = forms.CharField(max_length=50, label="موضوع")
     to = forms.CharField(max_length=50, label="آدرس ایمیل")
+
+class CommentForm(forms.ModelForm):
+   class Meta:
+        model = Comment
+        fields = ('name', 'body',)
+
+
+
+
+

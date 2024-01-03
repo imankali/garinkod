@@ -56,8 +56,33 @@ def ItemsList(request):
 
     return render(request, 'shop/Items/list_items.html', {'Items': Items, 'page': page})
 def post_detail (request, post, pk):
+    #slug = post
     post = get_object_or_404(Item, status='published', slug=post, id=pk)
-    return render(request, 'shop/Items/detail_items.html', {'post': post})
+    comments = post.comments.filter(active=True)
+    new_comment = None
+    if request.method == 'POST':
+        form = CommentForm(request.POST)
+        if form.is_valid():
+            new_comment = form.save(commit=False)
+            new_comment.post = post
+            try:
+                comment_save = len(list(post.comments.filter(name=new_comment.name, body=new_comment.body)))
+                #print(comment_save)
+                if comment_save == 0:
+                    new_comment.save()
+            except:
+                return redirect('shop:home')
+    else:
+        form = CommentForm()
+    context = {
+        'post': post,
+        'comments': comments,
+        'form': form,
+        'new_comment': new_comment,
+
+    }
+
+    return render(request, 'shop/Items/detail_items.html', context)
 
 def UserAccountView(request):
     user = request.user

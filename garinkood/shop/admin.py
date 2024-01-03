@@ -1,5 +1,5 @@
 from django.contrib import admin
-from.models import Item,UserAccount
+from.models import *
 # Register your models here.
 #admin.site.register(Item)
 
@@ -19,5 +19,10 @@ class AdminItem(admin.ModelAdmin):
 @admin.register(UserAccount)
 class AdminUserAccount(admin.ModelAdmin):
 
-    list_display = ('user','phone','gender')
+    list_display = ('user', 'phone', 'gender')
 
+@admin.register(Comment)
+class AdminComment(admin.ModelAdmin):
+    list_display = ('name', 'post', 'crated', 'active',)
+    list_filter = ('active', 'crated')
+    list_editable = ('active',)

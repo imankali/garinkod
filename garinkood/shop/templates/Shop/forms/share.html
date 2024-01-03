@@ -10,13 +10,19 @@
         پست {{post.title}} ارسال شد برایع {{form.cleaned_data.to}}
     {% endif %}
     </p>
-
-<form method="post">
+<div id="box">
+<form method="post" >
     {% csrf_token %}
-    {{ form.as_p }}
+    <div id="box">
+        {{ form.as_p }}
+    </div>
     <input type="submit" value="اشتراک گذاری">
+    <br><br><br><br>
+    <a id="box" href = "{%url "shop:post_detail" post.slug post.id %}">
+         بازگشت
+    </a>
 </form>
-
+</div>
 
 
 

@@ -20,18 +20,15 @@
         <ul>
             {% for Item in Items %}
 
-                    <a href="{{ Item.get_absolute_utl }}">
-                       <li><h2 class="colors"> {{ Item.author }}: نویسنده</h2>
-                       <li><h2> نام محصول :{{ Item.title }}</h2>
-                       <li><h4 class="green"> {{ Item.status }} : وضعیت انتشار </h4>
+                    <a href="{{ Item.get_absolute_utl }}" >
+                        <div id="boxItems">
+                            <h2 id="boxItems" class="colors"> {{ Item.author }}: نویسنده</h2>
+                            <h2 id="boxItems"> نام محصول :{{ Item.title }}</h2>
+                            <h4 id="boxItems" class="green"> {{ Item.status }} : وضعیت انتشار </h4>
+                        </div>
                     </a>
             {% endfor %}
         </ul>
     </main>
     {% include 'Shop/parchers/pagination.html' with page=Items%}
 {% endblock %}
-{% for Item in Items %}
-
-                    <h2 class="colors"> {{ Item.author }} : {{ Item.title }} : <h4 class="green"> {{ Item.status }} </h4> </h2>
-
-            {%endfor%}

@@ -1,1 +1,11 @@
 body{background-color: papayawhip}
+#box {
+            background-color: #fff;
+            border: 1px solid #ddd;
+            margin: 5px 0;
+            margin-right: auto;
+
+            padding: 15px;
+            border-radius: 15px;
+            direction: rtl;
+}
