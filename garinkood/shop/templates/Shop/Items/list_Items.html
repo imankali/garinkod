@@ -1,6 +1,6 @@
 {% extends 'Shop/parent/base.html' %}
 {% load static %}
-
+{% load custom_tags %}
 
 {% block title %}
     Items
@@ -21,7 +21,7 @@
             {% for Item in Items %}
 
                     <a href="{{ Item.get_absolute_utl }}" >
-                        <div id="boxItems">
+                        <div id="boxItems">{% number_of_Item %}
                             <h2 id="boxItems" class="colors"> {{ Item.author }}: نویسنده</h2>
                             <h2 id="boxItems"> نام محصول :{{ Item.title }}</h2>
                             <h4 id="boxItems" class="green"> {{ Item.status }} : وضعیت انتشار </h4>
