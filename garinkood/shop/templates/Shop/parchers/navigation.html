@@ -1,10 +1,18 @@
 <!DOCTYPE html>
+{% load static %}
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>Title</title>
+    <link rel="stylesheet" type="text/css" href="{% static 'css/items.css' %}">
 </head>
 <body>
-
+<div id="boxItems" >
+<form method="post" action="{% url 'shop:search' %}">
+    {% csrf_token %}
+    <input type="text" name="text_input">
+    <input type="submit" name="search" value="serach">
+</form>
+</div>
 </body>
 </html>

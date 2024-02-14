@@ -10,4 +10,5 @@ urlpatterns = [
     path('account-forms/', views.UserAccountView, name='account_forms'),
     path('support/', views.Support, name='support'),
     path('share_post/<int:post_id>/', views.ShareItem, name='Share_post'),
+    path('search/', views.search, name='search'),
     ]

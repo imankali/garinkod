@@ -45,7 +45,7 @@ def ItemsList(request):
     try:
         page = request.GET['page']
     except Exception as e:
-        print(e)  # handle your errors
+       # print(e)  # handle your errors
         page = 1
     try:
         Items = paginator.page(page)
@@ -142,3 +142,43 @@ def ShareItem(request, post_id):
     else:
         form = ShareForm
     return render(request, 'shop/forms/share.html', {'form': form, 'sent': sent, 'post': post})
+
+def search(request):
+    if request.method == 'POST':
+        query_search = request.POST.get('text_input')
+        if query_search:
+            Items = Item.objects.filter(status='published',title__contains=query_search)
+            paginator = Paginator(Items, 3)
+            #page = request.GET['page']
+
+            try:
+                page = request.GET['page']
+            except Exception as e:
+               # print(e)  # handle your errors
+                page = 1
+            try:
+                Items = paginator.page(page)
+            except PageNotAnInteger:
+                Items = paginator.page(1)
+            except EmptyPage:
+                Items = paginator.page(paginator.num_pages)
+
+            return render(request, 'shop/Items/list_items.html', {'Items': Items, 'page': page})
+
+    Items = Item.objects.filter(status='published')
+    paginator = Paginator(Items, 3)
+    #page = request.GET['page']
+
+    try:
+        page = request.GET['page']
+    except Exception as e:
+        #print(e)  # handle your errors
+        page = 1
+    try:
+        Items = paginator.page(page)
+    except PageNotAnInteger:
+        Items = paginator.page(1)
+    except EmptyPage:
+        Items = paginator.page(paginator.num_pages)
+
+    return render(request, 'shop/Items/list_items.html', {'Items': Items, 'page': page})
