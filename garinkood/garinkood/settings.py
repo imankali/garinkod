@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'shop.apps.ShopConfig',
+    'django.contrib.postgres',
 ]
 
 MIDDLEWARE = [
@@ -84,17 +85,31 @@ WSGI_APPLICATION = 'garinkood.wsgi.application'
 
 #}
 
+
+#DATABASES = {
+#    'default': {
+#        'ENGINE': 'django.db.backends.mysql',
+#        'NAME': 'garinkood',
+#        'USER': 'garinkoodDB',
+#        'PASSWORD': 'Imannosrati1383',
+#        'HOST': 'localhost',
+#        'PORT': '3306',
+#    }
+#}
+#pip install pymysql
+#pip install mysqlclient
+
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'garinkood',
-        'USER': 'garinkoodDB',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'GARINKOOD',
+        'USER': 'postgres',
         'PASSWORD': 'Imannosrati1383',
         'HOST': 'localhost',
-        'PORT': '3306',
+        'PORT': '5432',
     }
 }
-
+#pip install psycopg2
 
 
 

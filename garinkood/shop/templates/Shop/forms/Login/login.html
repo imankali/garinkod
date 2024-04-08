@@ -1,0 +1,22 @@
+{% extends 'Shop/parent/base.html' %}
+{% load static %}
+{% block title %} صفحه ورود {% endblock %}
+{% block head %}
+
+{% endblock %}
+{% block body %}
+<form method="post">
+{% csrf_token %}
+<input type="text" name="username">
+<input type="password" name="password">
+<input type="submit" value="ورود">
+</form>
+        {% for field in form %}
+        {% if field.errors  %}
+            {% for errors in field.errors%}
+                {{ field.label }} :
+                <br>{{ errors }}<br>
+            {% endfor %}
+        {% endif %}
+    {% endfor %}
+{% endblock %}

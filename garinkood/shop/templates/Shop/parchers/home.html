@@ -1,0 +1,23 @@
+{% extends 'Shop/parent/base.html' %}
+{% load static %}
+{% block title %} خانه {% endblock %}
+{% block head %}
+        <link rel="stylesheet" type="text/css" href="{% static 'css/items.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'css/search.css' %}">
+
+{% endblock %}
+{% block body %}
+    <div id="boxItems" >
+        <form method="post" action="{% url 'shop:search' %}">
+            {% csrf_token %}
+                <div class="search_box">
+                    <div class="box-sizing: border-box;">
+                        <input type="submit" name="search" value="serach">
+                    </div>
+                    <div>
+                        <input type="text" name="text_input" value="{{ search_value }}">
+                    </div>
+                </div>
+        </form>
+    </div>
+{% endblock %}

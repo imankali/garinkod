@@ -1,0 +1,16 @@
+
+.search_box {
+  background-color: #999090;
+  border-radius: 60rem 60rem 60rem 60rem;
+  box-sizing: border-box;
+  padding-bottom: 20px;
+  padding-top: 20px;
+  padding-right: 30px;
+  align-items: center;
+  margin-left: 75rem;
+  margin-right: 20px;
+}
+.click_search{
+  box-sizing: border-box;
+
+}

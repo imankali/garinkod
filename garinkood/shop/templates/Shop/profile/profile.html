@@ -1,0 +1,35 @@
+{% extends 'Shop/parent/base.html' %}
+{% load static %}
+
+
+
+{% block title %}
+{% endblock %}
+
+
+{% block head %}
+{% endblock %}
+
+
+{% block body %}
+        نام کاربری:
+    <br>
+        {{ request.user.username }}
+    <br>
+نام:
+    <br>
+        {{ request.user.first_name }}
+    <br>
+    نام خانوادگی:
+    <br>
+        {{ request.user.last_name }}
+    <br>
+    شماره همراه:
+    <br>
+        {{ phone }}
+    <br>
+    <a href="{% url 'shop:change_password' %}">تغیر پسورد</a>
+    <br>
+    <a href="{% url 'shop:account_forms' %}">تغیر اطلعات</a>
+
+{% endblock %}

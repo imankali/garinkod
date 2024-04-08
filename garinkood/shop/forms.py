@@ -86,6 +86,14 @@ class CommentForm(forms.ModelForm):
         fields = ('name', 'body',)
 
 
+class LoginForm(forms.Form):
+    username = forms.CharField()
+    password = forms.CharField()
+
+class ChangePasswordForm(forms.Form):
+    old_password = forms.CharField(widget=forms.PasswordInput())
+    new_password1 = forms.CharField(widget=forms.PasswordInput())
+    new_password2 = forms.CharField(widget=forms.PasswordInput())
 
 
 

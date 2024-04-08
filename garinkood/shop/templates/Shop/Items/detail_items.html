@@ -7,6 +7,8 @@ detail
 
 {% block head %}
     <link rel="stylesheet" type="text/css" href="{% static 'css/detail.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'css/items.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'css/search.css' %}">
     <script>
     window.addEventListener("beforeunload", function(event) {
       var form = document.getElementById("myForm");
@@ -26,10 +28,25 @@ detail
       });
     });
     </script>
+
+
 {% endblock %}
 
 
 {% block body %}
+    <div id="boxItems" >
+        <form method="post" action="{% url 'shop:search' %}">
+            {% csrf_token %}
+                <div class="search_box">
+                    <div class="box-sizing: border-box;">
+                        <input type="submit" name="search" value="serach">
+                    </div>
+                    <div>
+                        <input type="text" name="text_input" value="{{ search_value }}">
+                    </div>
+                </div>
+        </form>
+    </div>
     <h1 style="direction: rtl; color: #006b1b;margin-left:auto; padding: 5px;">توضیحات پست</h1>
         <main>
             <div id="boxItems">

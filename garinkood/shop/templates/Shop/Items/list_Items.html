@@ -3,32 +3,48 @@
 {% load custom_tags %}
 
 {% block title %}
-    Items
+    Home
 {% endblock %}
 
 
 {% block head %}
     <link rel="stylesheet" type="text/css" href="{% static 'css/items.css' %}">
+        <link rel="stylesheet" type="text/css" href="{% static 'css/search.css' %}">
 
 {% endblock %}
 
 
 {% block body %}
-
+    <div id="boxItems" >
+        <form method="post" action="{% url 'shop:search' %}">
+            {% csrf_token %}
+                <div class="search_box">
+                    <div class="box-sizing: border-box;">
+                        <input type="submit" name="search" value="serach">
+                    </div>
+                    <div>
+                        <input type="text" name="text_input" value="{{ search_value }}">
+                    </div>
+                </div>
+        </form>
+    </div>
+    
+<form method="post">
+{% csrf_token %}
     <main>
         <h2>لیست محصولات</h2>
         <ul>
             {% for Item in Items %}
-
-                    <a href="{{ Item.get_absolute_utl }}" >
-                        <div id="boxItems">{% number_of_Item %}
-                            <h2 id="boxItems" class="colors"> {{ Item.author }}: نویسنده</h2>
+                <a href="{{ Item.get_absolute_utl }}" >
+                    <div id="boxItems">
+                        <h2 id="boxItems" class="colors"> {{ Item.author }}: نویسنده</h2>
                             <h2 id="boxItems"> نام محصول :{{ Item.title }}</h2>
-                            <h4 id="boxItems" class="green"> {{ Item.status }} : وضعیت انتشار </h4>
-                        </div>
-                    </a>
+                        <h4 id="boxItems" class="green"> {{ Item.status }} : وضعیت انتشار </h4>
+                    </div>
+                </a>
             {% endfor %}
         </ul>
     </main>
-    {% include 'Shop/parchers/pagination.html' with page=Items%}
+    {% include 'Shop/parchers/pagination.html' with page=Items %}
+</form>
 {% endblock %}
