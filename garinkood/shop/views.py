@@ -10,7 +10,7 @@ from django.db.models.functions import Greatest
 from django.contrib.postgres.search import SearchRank, SearchQuery, SearchVector, TrigramSimilarity
 from django.contrib.auth import login, authenticate,logout
 from django.contrib.auth.decorators import login_required
-
+from django.contrib.auth.models import User
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -197,6 +197,7 @@ def search(request):
 
 
 def user_login(request):
+
     if request.method == "POST":
         form = LoginForm(request.POST)
         if form.is_valid():
@@ -209,7 +210,8 @@ def user_login(request):
                 else:
                     return HttpResponse('your account not active')
             else:
-                return HttpResponse('اطلعات شما نادرست است')
+                error = "نام کاربری یا پسورد اشتباه است"
+                return render(request, 'Shop/forms/Login/login.html', {'form': form, 'error': error})
     else:
         form = LoginForm()
     return render(request, 'Shop/forms/Login/login.html', {'form': form})
@@ -251,3 +253,50 @@ def change_password(request):
         form = ChangePasswordForm()
         error_massage = None
         return render(request, "shop/profile/change_password.html", {'form': form, 'error_massage': error_massage})
+
+
+
+def SignInView(request):
+    if request.method == "POST":
+            form = SignInForm(request.POST)
+            if form.is_valid():
+                username = form.cleaned_data['username']
+                print(User.objects.filter(username=username))
+                if User.objects.filter(username=username):
+                    error_massage = "این نام کاربری از قبل وجود دارد"
+                    return render(request, "shop/forms/Login/sign_in.html",
+                              {'form': form, 'error_massage': error_massage})
+                else:
+                    first_name = form.cleaned_data['first_name']
+                    last_name = form.cleaned_data['last_name']
+                    email = form.cleaned_data['email']
+                    password1 = form.cleaned_data['password']
+                    password2 = form.cleaned_data['password2']
+
+                    if password1 == password2:
+                        user = User.objects.create_user(username=username, email=email, password=password1,
+                                                first_name=first_name,last_name=last_name,)
+                        user.save()
+                        account = UserAccount.objects.create(user=user)
+                        account.gender = form.cleaned_data['gender']
+                        account.address = form.cleaned_data['address']
+                        account.phone = form.cleaned_data['phone']
+                        account.save()
+                        user = authenticate(request, username=form.cleaned_data['username'],
+                                            password=form.cleaned_data['password'])
+                        login(request, user)
+
+                        return redirect("shop:profile")
+                    else:
+                        error_massage = "رمز شما مطابقت ندارد"
+                        return render(request, "shop/forms/Login/sign_in.html",
+                                    {'form': form, 'error_massage': error_massage})
+            else:
+                return render(request, 'shop/forms/Login/sign_in.html', {'form': form})
+    else:
+        if request.user.is_authenticated:
+            return redirect('shop:home')
+        else:
+            form = SignInForm()
+            return render(request, "shop/forms/Login/sign_in.html", {'form': form})
+

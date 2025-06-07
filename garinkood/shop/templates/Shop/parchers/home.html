@@ -7,17 +7,5 @@
 
 {% endblock %}
 {% block body %}
-    <div id="boxItems" >
-        <form method="post" action="{% url 'shop:search' %}">
-            {% csrf_token %}
-                <div class="search_box">
-                    <div class="box-sizing: border-box;">
-                        <input type="submit" name="search" value="serach">
-                    </div>
-                    <div>
-                        <input type="text" name="text_input" value="{{ search_value }}">
-                    </div>
-                </div>
-        </form>
-    </div>
+
 {% endblock %}

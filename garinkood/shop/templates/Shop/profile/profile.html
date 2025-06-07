@@ -31,5 +31,9 @@
     <a href="{% url 'shop:change_password' %}">تغیر پسورد</a>
     <br>
     <a href="{% url 'shop:account_forms' %}">تغیر اطلعات</a>
+    <br>
+     {% if request.user.is_authenticated %}
+         <a class="navbar-brand" href="{% url 'shop:logout' %}">logout</a>
+     {% endif %}
 
 {% endblock %}
