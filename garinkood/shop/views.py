@@ -67,41 +67,24 @@ def ItemsList(request, category_slug=None):
     category = None
     categories = Category.objects.all()
 
-    # دریافت query و پاک‌سازی
-    query = request.GET.get('q')
-    if query in ['None', 'none', '', None]:
-        query = ""
+    # تعیین دسته‌بندی فعلی
+    if category_slug:
+        category = get_object_or_404(Category, slug=category_slug)
+        Items = Item.objects.filter(category=category, status='published')
+    else:
+        Items = Item.objects.filter(status='published')
 
-    # فیلترهای جدید
+    # فیلترهای قیمت و موجودی
     min_price = request.GET.get('min_price')
     max_price = request.GET.get('max_price')
     in_stock = request.GET.get('in_stock') == 'on'
-    subcategory_slug = request.GET.get('subcategory')
 
-    # فیلتر دسته‌بندی اصلی
-    Items = Item.objects.filter(status='published')
-    if category_slug:
-        category = get_object_or_404(Category, slug=category_slug)
-        Items = Items.filter(category=category)
-
-    # فیلتر دسته‌بندی داخلی
-    subcategories = SubCategory.objects.filter(category=category) if category else SubCategory.objects.none()
-    if subcategory_slug:
-        Items = Items.filter(subcategory__slug=subcategory_slug)
-
-    # فیلتر قیمت
     if min_price:
         Items = Items.filter(price__gte=min_price)
     if max_price:
         Items = Items.filter(price__lte=max_price)
-
-    # فیلتر موجودی
     if in_stock:
         Items = Items.filter(stock__gt=0)
-
-    # فیلتر جستجو
-    if query:
-        Items = Items.filter(Q(title__icontains=query) | Q(body__icontains=query))
 
     # صفحه‌بندی
     paginator = Paginator(Items, 2)
@@ -116,15 +99,13 @@ def ItemsList(request, category_slug=None):
 
     return render(request, 'shop/Items/list_items.html', {
         'Items': Items,
-        'category': category,
+        'category_slug': category_slug,
         'categories': categories,
-        'query': query,
-        'page': page,
+        'category': category,
         'min_price': min_price,
         'max_price': max_price,
         'in_stock': in_stock,
-        'subcategory_slug': subcategory_slug,
-        'subcategories': subcategories
+        'subcategories': SubCategory.objects.filter(category=category) if category else SubCategory.objects.all()
     })
 
 
@@ -279,9 +260,10 @@ def search(request, category_slug=None):
     selected_category_slug = request.GET.get('category', '')
     min_price = request.GET.get('min_price')
     max_price = request.GET.get('max_price')
-    current_category = None
+    in_stock = request.GET.get('in_stock') == 'on'
 
-    # تعیین دسته‌بندی فعلی از URL یا فرم
+    # تعیین دسته فعلی از URL یا فرم
+    current_category = None
     if category_slug:
         current_category = get_object_or_404(Category, slug=category_slug)
     elif selected_category_slug:
@@ -300,6 +282,8 @@ def search(request, category_slug=None):
         Items = Items.filter(price__gte=min_price)
     if max_price:
         Items = Items.filter(price__lte=max_price)
+    if in_stock:
+        Items = Items.filter(stock__gt=0)
 
     # صفحه‌بندی
     paginator = Paginator(Items, 2)
@@ -319,6 +303,7 @@ def search(request, category_slug=None):
         'category_slug': category_slug,
         'min_price': min_price,
         'max_price': max_price,
+        'in_stock': in_stock,
         'categories': Category.objects.all(),
         'subcategories': SubCategory.objects.filter(category=current_category) if current_category else SubCategory.objects.all()
     })

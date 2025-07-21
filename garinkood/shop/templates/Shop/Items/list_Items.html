@@ -16,8 +16,8 @@
 <main>
     <!-- فرم جستجو و فیلترها -->
 <form method="get" action="{% if category_slug %}{% url 'shop:search_in_category' category_slug %}{% else %}{% url 'shop:search' %}{% endif %}">
-    {{ category_slug }}hhhhhhhhhhhhhhhhhhhhhhhhhhhh
-
+    {{ category_slug }}
+    {{ subcategory_slug }}
 <br>
     <input type="text" name="text_input" value="{{ search_value|default:'' }}" placeholder="جستجو...">
 
