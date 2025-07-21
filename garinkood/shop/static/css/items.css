@@ -1,32 +1,30 @@
-
-.colors{
-    color: sienna;
-}
-.green{
-    color: green;
-}
-.darkred{
-    color: darkred;
+.filter-form {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 30px;
 }
 
-main {
-            padding: 20px;
-        }
+.filter-form h3 {
+    margin-top: 0;
+}
 
-#ul {
-            list-style: none;
-            padding: 0;
-        }
+.filter-form input,
+.filter-form select {
+    margin: 5px 10px 15px 0;
+    padding: 8px;
+    width: 150px;
+}
 
-#boxItems {
-            background-color: #fff;
-            border: 1px solid #ddd;
-            margin: 5px 0;
-            padding: 15px;
-            border-radius: 15px;
-            margin-right: auto;
-            direction: rtl;
+.filter-form button {
+    padding: 10px 20px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
 
-
-        }
-
+.filter-form button:hover {
+    background-color: #0056b3;
+}

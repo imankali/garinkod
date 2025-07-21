@@ -3,35 +3,84 @@
 {% load custom_tags %}
 
 {% block title %}
-    Home
+    محصولات
 {% endblock %}
-
 
 {% block head %}
     <link rel="stylesheet" type="text/css" href="{% static 'css/items.css' %}">
-        <link rel="stylesheet" type="text/css" href="{% static 'css/search.css' %}">
-
+    <link rel="stylesheet" type="text/css" href="{% static 'css/search.css' %}">
 {% endblock %}
-
 
 {% block body %}
 
-<form method="post">
-{% csrf_token %}
-    <main>
-        <h2 >لیست محصولات</h2>
-        <ul>
+<main>
+    <!-- فرم جستجو و فیلترها -->
+<form method="get" action="{% if category_slug %}{% url 'shop:search_in_category' category_slug %}{% else %}{% url 'shop:search' %}{% endif %}">
+    {{ category_slug }}hhhhhhhhhhhhhhhhhhhhhhhhhhhh
+
+<br>
+    <input type="text" name="text_input" value="{{ search_value|default:'' }}" placeholder="جستجو...">
+
+    <select name="category">
+        <option value="">همه دسته‌ها</option>
+        {% for cat in categories %}
+            <option value="{{ cat.slug }}" {% if cat.slug == selected_category_slug %}selected{% endif %}>
+                {{ cat.name }}
+            </option>
+        {% endfor %}
+    </select>
+
+    <input type="number" name="min_price" value="{{ min_price|default:'' }}" placeholder="حداقل قیمت">
+    <input type="number" name="max_price" value="{{ max_price|default:'' }}" placeholder="حداکثر قیمت">
+
+    <button type="submit">اعمال فیلتر</button>
+</form>
+    <!-- لیست محصولات -->
+    <div class="product-list">
+        {% if Items %}
             {% for Item in Items %}
-                <a href="{{ Item.get_absolute_utl }}" >
-                    <div id="boxItems">
-                        <h2 id="boxItems" class="colors"> {{ Item.author }}: نویسنده</h2>
-                            <h2 id="boxItems"> نام محصول :{{ Item.title }}</h2>
-                        <h4 id="boxItems" class="green"> {{ Item.status }} : وضعیت انتشار </h4>
+                <a href="{{ Item.get_absolute_url }}" class="product-link">
+                    <div class="product-card">
+                        {% if Item.image %}
+                            <img src="{{ Item.image.url }}" alt="{{ Item.title }}" class="product-image">
+                        {% endif %}
+                        <h3 class="product-title">{{ Item.title }}</h3>
+                        <p class="product-price">قیمت: {{ Item.price }} تومان</p>
+                        <p class="product-category">دسته: {{ Item.category }}</p>
                     </div>
                 </a>
             {% endfor %}
-        </ul>
-    </main>
-    {% include 'Shop/parchers/pagination.html' with page=Items %}
-</form>
+        {% else %}
+            <p>محصولی یافت نشد.</p>
+        {% endif %}
+    </div>
+
+    <!-- صفحه‌بندی هوشمند -->
+<div class="pagination">
+    <span class="step-links">
+        {% if Items.has_previous %}
+            <a href="{% if category_slug %}{% url 'shop:search_in_category' category_slug %}{% else %}{% url 'shop:search' %}{% endif %}?text_input={{ search_value }}&category={{ selected_category_slug }}&min_price={{ min_price }}&max_price={{ max_price }}&page=1">
+                &laquo; اولین
+            </a>
+            <a href="{% if category_slug %}{% url 'shop:search_in_category' category_slug %}{% else %}{% url 'shop:search' %}{% endif %}?text_input={{ search_value }}&category={{ selected_category_slug }}&min_price={{ min_price }}&max_price={{ max_price }}&page={{ Items.previous_page_number }}">
+                قبلی
+            </a>
+        {% endif %}
+
+        <span class="current">
+            صفحه {{ Items.number }} از {{ Items.paginator.num_pages }}.
+        </span>
+
+        {% if Items.has_next %}
+            <a href="{% if category_slug %}{% url 'shop:search_in_category' category_slug %}{% else %}{% url 'shop:search' %}{% endif %}?text_input={{ search_value }}&category={{ selected_category_slug }}&min_price={{ min_price }}&max_price={{ max_price }}&page={{ Items.next_page_number }}">
+                بعدی
+            </a>
+            <a href="{% if category_slug %}{% url 'shop:search_in_category' category_slug %}{% else %}{% url 'shop:search' %}{% endif %}?text_input={{ search_value }}&category={{ selected_category_slug }}&min_price={{ min_price }}&max_price={{ max_price }}&page={{ Items.paginator.num_pages }}">
+                آخرین &raquo;
+            </a>
+        {% endif %}
+    </span>
+</div>
+</main>
+
 {% endblock %}

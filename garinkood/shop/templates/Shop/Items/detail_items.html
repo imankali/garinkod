@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block title %}
-detail
+{{ post.title }}
 {% endblock %}
 
 {% block head %}
@@ -10,115 +10,130 @@ detail
     <link rel="stylesheet" type="text/css" href="{% static 'css/items.css' %}">
     <link rel="stylesheet" type="text/css" href="{% static 'css/search.css' %}">
     <script>
-    window.addEventListener("beforeunload", function(event) {
-      var form = document.getElementById("myForm");
-      if (form.hasBeenSubmitted !== true) {
-        event.preventDefault(); // جلوگیری از بسته شدن صفحه
-        event.returnValue = ''; // برای نمایش پیام هشدار
-      }
-    });
+        window.addEventListener("beforeunload", function(event) {
+            var form = document.getElementById("myForm");
+            if (form && !form.hasBeenSubmitted) {
+                event.preventDefault();
+                event.returnValue = '';
+            }
+        });
 
-    document.addEventListener("DOMContentLoaded", function() {
-      var form = document.getElementById("myForm");
-
-      form.addEventListener("submit", function(event) {
-        form.hasBeenSubmitted = true; // نشان دادن اینکه فرم ارسال شده است
-        // ارسال داده‌ها به سرور یا انجام عملیات دیگر
-        console.log("Form submitted");
-      });
-    });
+        document.addEventListener("DOMContentLoaded", function() {
+            var form = document.getElementById("myForm");
+            if (form) {
+                form.addEventListener("submit", function(event) {
+                    form.hasBeenSubmitted = true;
+                    console.log("Form submitted");
+                });
+            }
+        });
     </script>
-
-
 {% endblock %}
 
-
 {% block body %}
-    <div id="boxItems" >
-        <form method="post" action="{% url 'shop:search' %}">
-            {% csrf_token %}
-                <div class="search_box">
-                    <div class="box-sizing: border-box;">
-                        <input type="submit" name="search" value="serach">
-                    </div>
-                    <div>
-                        <input type="text" name="text_input" value="{{ search_value }}">
-                    </div>
-                </div>
-        </form>
+
+<!-- فرم جستجو -->
+<form method="post" action="{% url 'shop:search' %}" class="search-form">
+    {% csrf_token %}
+    <div class="search_box">
+        <input type="text" name="text_input" value="{{ search_value }}" placeholder="جستجو...">
+        <input type="submit" name="search" value="جستجو">
     </div>
-    <h1 style="direction: rtl; color: #006b1b;margin-left:auto; padding: 5px;">توضیحات پست</h1>
-        <main>
-            <div id="boxItems">
+</form>
 
-                <h2 id="boxItems"> نام محصول : {{ post.title }} </h2>
-                <h3 id="boxItems"> توضیحات : {{ post.body }} </h3>
-                <h3 id="boxItems"> قیمت : {{ post.price }} </h3>
-                 <h4 id="boxItems"> نویسنده : {{ post.author }} </h4>
-                <h4 id="boxItems" class="colors"> وضعیت انتشار : {{ post.status }} </h4>
-                <div id="boxItems">
+<!-- جزئیات محصول -->
+<main>
+    <div class="product-detail">
+        <h1 style="direction: rtl; color: #006b1b; margin-left: auto; padding: 5px;">جزئیات محصول</h1>
 
-                <h1 style="direction: rtl; color: #006b1b;margin-left:auto; padding: 5px;">کامنت ها</h1>
-                    {% with comments.count as count %}
-                           تعداد کامنت ها : {{ count }}
-                            <br>
-                        <div id="boxItems">
+        <!-- تصویر و اطلاعات عمومی -->
+        <div class="product-card">
+            {% if post.image %}
+                <img src="{{ post.image.url }}" alt="{{ post.title }}" class="product-image">
+            {% endif %}
+            <h2>نام محصول: {{ post.title }}</h2>
+            <h3>نویسنده: {{ post.author }}</h3>
+            <h3>وضعیت: {{ post.status }}</h3>
+            <h3>قیمت: {{ post.price }} تومان</h3>
+            <h3>دسته: {{ post.category }}</h3>
+            <p>توضیحات: {{ post.body|linebreaks }}</p>
+        </div>
 
-                                {% for comment in comments %}
+        <!-- مشخصات اختصاصی -->
+        <div class="attributes-section">
+            {% if fertilizer %}
+                <h2>مشخصات کود</h2>
+                <ul class="attribute-list">
+                    <li>نوع کود: {{ fertilizer.fertilizer_type }}</li>
+                    <li>نیتروژن: {{ fertilizer.nitrogen }}</li>
+                    <li>فسفر: {{ fertilizer.phosphorus }}</li>
+                    <li>پتاسیم: {{ fertilizer.potassium }}</li>
+                </ul>
+            {% elif pesticide %}
+                <h2>مشخصات سم</h2>
+                <ul class="attribute-list">
+                    <li>نوع سم: {{ pesticide.pesticide_type }}</li>
+                    <li>مواد فعال: {{ pesticide.active_ingredient }}</li>
+                    <li>غلظت: {{ pesticide.concentration }}</li>
+                </ul>
+            {% elif seed %}
+                <h2>مشخصات بذر</h2>
+                <ul class="attribute-list">
+                    <li>نوع گیاه: {{ seed.crop_type }}</li>
+                    <li>رقم: {{ seed.variety }}</li>
+                    <li>وزن در کیلوگرم: {{ seed.weight_per_kg }}</li>
+                </ul>
+            {% elif equipment %}
+                <h2>مشخصات ابزار</h2>
+                <ul class="attribute-list">
+                    <li>نوع ابزار: {{ equipment.tool_type }}</li>
+                    <li>جنس: {{ equipment.material }}</li>
+                    <li>وزن: {{ equipment.weight }}</li>
+                </ul>
+            {% endif %}
+        </div>
 
-                                نام :  {{ comment.name }}
-                                    <br>
-                                        کامنت {{ forloop.counter }} : {{ comment.body }}
-                                    <br>
-                                    {% empty %}
-                                <p>کامنتی وجود ندارد!</p>
-
-                            {% endfor %}
-
+        <!-- کامنت‌ها -->
+        <div class="comments-section">
+            <h2>کامنت‌ها</h2>
+            {% with comments.count as count %}
+                <p>تعداد کامنت‌ها: {{ count }}</p>
+                <div class="comments-list">
+                    {% for comment in comments %}
+                        <div class="comment-item">
+                            <p><strong>{{ comment.name }}</strong> در {{ comment.crated }} نوشت:</p>
+                            <p>{{ comment.body }}</p>
                         </div>
-                    {% endwith %}
-                    <div id="boxItems">
-                        {% if new_comment %}
-                        <p>کامنت ارسال شد</p>
-                            <br>
-                            <form id="myForm" method="post" >
-                                <h1 style="direction: rtl; color: #006b1b;margin-left:auto; padding: 5px;">افزودن کامنت</h1>
-                                {% csrf_token %}
-                                    <P>نام:</P>
-                                    <input type="text" value="" name="name">
-                                        <br>
-                                    <P>پیام:</P>
-                                    <input class="text" type="text" value="" name="body">
-                                <br>
-                                <input id="boxItems" type="submit" value="ارسال">
-                            </form>
-                        {% else %}
-                            <form method="post" >
-                                <h1 style="direction: rtl; color: #006b1b;margin-left:auto; padding: 5px;">افزودن کامنت</h1>
-                                {% csrf_token %}
-                                    <P>نام:</P>
-                                    <input type="text" value="" name="name">
-                                        <br>
-                                    <P>پیام:</P>
-                                    <input class="text" type="text" value="" name="body">
-                                <br>
-                                <input id="boxItems" type="submit" value="ارسال">
-                            </form>
-                        {% endif %}
-                    </div>
+                    {% empty %}
+                        <p>کامنتی وجود ندارد.</p>
+                    {% endfor %}
                 </div>
-            </div>
-        </main>
-        <a id="boxItems" href = "{% url "shop:Share_post" post.id %}">
-            اشتراک گذاری پست
-        </a>
-    {% for field in form %}
-        {% if field.errors  %}
-            {% for errors in field.errors%}
-                {{ field.label }} :
+            {% endwith %}
+
+            <!-- فرم ارسال کامنت -->
+            <div class="comment-form">
+                <h2>ارسال کامنت</h2>
+                {% if new_comment %}
+                    <p>کامنت شما ارسال شد.</p>
+                {% endif %}
+                <form id="myForm" method="post">
+                    {% csrf_token %}
+                    <label for="name">نام:</label>
+                    <input type="text" id="name" name="name" required>
                     <br>
-                {{ errors }}<br>
-            {% endfor %}
-        {% endif %}
-    {% endfor %}
+                    <label for="body">پیام:</label>
+                    <input type="text" id="body" name="body" required>
+                    <br>
+                    <input type="submit" value="ارسال">
+                </form>
+            </div>
+        </div>
+
+        <!-- لینک اشتراک‌گذاری -->
+        <div class="share-link">
+            <a href="{% url 'shop:share' post.id %}">اشتراک گذاری پست</a>
+        </div>
+    </div>
+</main>
+
 {% endblock %}

@@ -26,14 +26,14 @@
     <br>
     شماره همراه:
     <br>
-        {{ phone }}
+        {{ account.phone }}
     <br>
     <a href="{% url 'shop:change_password' %}">تغیر پسورد</a>
     <br>
-    <a href="{% url 'shop:account_forms' %}">تغیر اطلعات</a>
+    <a href="{% url 'shop:account' %}">تغیر اطلعات</a>
     <br>
      {% if request.user.is_authenticated %}
-         <a class="navbar-brand" href="{% url 'shop:logout' %}">logout</a>
+         <a class="navbar-brand" href="{% url 'shop:user_logout' %}">logout</a>
      {% endif %}
 
 {% endblock %}
