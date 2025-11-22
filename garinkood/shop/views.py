@@ -87,7 +87,7 @@ def ItemsList(request, category_slug=None):
         Items = Items.filter(stock__gt=0)
 
     # صفحه‌بندی
-    paginator = Paginator(Items, 2)
+    paginator = Paginator(Items, 5)
     page = request.GET.get('page', 1)
 
     try:
@@ -260,6 +260,7 @@ def search(request, category_slug=None):
     selected_category_slug = request.GET.get('category', '')
     min_price = request.GET.get('min_price')
     max_price = request.GET.get('max_price')
+    print(min_price)
     in_stock = request.GET.get('in_stock') == 'on'
 
     # تعیین دسته فعلی از URL یا فرم
@@ -278,15 +279,24 @@ def search(request, category_slug=None):
     if query_search:
         Items = Items.filter(Q(title__icontains=query_search) | Q(body__icontains=query_search))
 
-    if min_price:
-        Items = Items.filter(price__gte=min_price)
-    if max_price:
-        Items = Items.filter(price__lte=max_price)
+    if min_price and min_price != 'None':
+        try:
+            min_price = int(min_price)
+            Items = Items.filter(price__gte=min_price)
+        except ValueError:
+            pass  # یا خطای مناسب نمایش دهید
+
+    if max_price and max_price != 'None':
+        try:
+            max_price = int(max_price)
+            Items = Items.filter(price__lte=max_price)
+        except ValueError:
+            pass  # یا خطای مناسب نمایش دهید
     if in_stock:
         Items = Items.filter(stock__gt=0)
 
     # صفحه‌بندی
-    paginator = Paginator(Items, 2)
+    paginator = Paginator(Items, 5)
     page = request.GET.get('page', 1)
 
     try:

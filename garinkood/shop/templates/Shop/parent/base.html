@@ -1,49 +1,38 @@
 {% load static %}
 <html lang="en">
-
-
 <head>
     <meta charset="UTF-8">
-        <title> {% block title %}  {% endblock %}</title>
-        {% block head %} {% endblock %}
+        <title>
+            {% block title %}
+            {% endblock %}
+        </title>
+        {% block head %}
+        {% endblock %}
+    <link rel="stylesheet" type="text/css" href="{% static 'css/items.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'css/search.css' %}">
     <link rel="stylesheet" type="text/css" href="{% static 'css/base.css' %}">
     <link rel="stylesheet" type="text/css" href="{% static 'css/footer.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'css/detail.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'css/header.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'css/log_in.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'css/pagination.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'css/sign_in.css' %}">
 </head>
 
 
 
 <body>
-    <div>
-        <div>
-            {% include 'Shop/parchers/header.html' %}
-                {% include 'Shop/parchers/navigation.html' %}
-        </div>
-        <div>
+
             {% block body %}
 
+
             {% endblock %}
-        </div>
-    </div>
-    <br>
-        <br>
-            <br>
-                <br>
-                    <br>
-                        <br>
-                            <br>
-                        <br>
-                    <br>
-                <br>
-            <br>
-        <br>
-    <br>
-    <div>
+
         <section >
             <footer>
                  {% include 'Shop/parchers/fother.html' %}
              </footer>
         </section>
-    </div>
 </body>
 
 </html>

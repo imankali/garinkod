@@ -7,53 +7,106 @@
 {% endblock %}
 
 {% block head %}
-    <link rel="stylesheet" type="text/css" href="{% static 'css/items.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'css/items.css' %}" xmlns="http://www.w3.org/1999/html">
     <link rel="stylesheet" type="text/css" href="{% static 'css/search.css' %}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 {% endblock %}
 
 {% block body %}
 
+
+<!-- بنر اصلی / هدر -->
+<header>
+    <div class="header-container">
+        <a href="/" class="logo">🌱 GARINKOD</a>
+
+        <nav class="main-nav">
+            <ul>
+                <li><a href="/">خانه</a></li>
+                <li><a href="/shop/">فروشگاه</a></li>
+                <li><a href="/tutorials/">آموزش‌ها</a></li>
+                <li><a href="/contact/">تماس</a></li>
+            </ul>
+        </nav>
+
+        <!-- فرم جستجو و فیلتر -->
+        <div class="search-box">
+            <form method="get" action="{% if category_slug %}{% url 'shop:search_in_category' category_slug %}{% else %}{% url 'shop:search' %}{% endif %}">
+                <!-- جستجوی اصلی -->
+                <div class="search-main">
+                    <input type="text"
+                           name="text_input"
+                           value="{{ search_value|default:'' }}"
+                           placeholder="جستجوی محصول...">
+                    <button type="submit" class="search-icon-btn" title="جستجو">
+                        🔍
+                    </button>
+                    <button type="button" id="toggle-filters" class="filter-toggle-btn" title="فیلترها">
+                        ⚙️
+                    </button>
+                </div>
+
+                <!-- فیلترها (به‌صورت پیش‌فرض پنهان) -->
+                <div id="filters-section" class="filters-section hidden">
+                    <div class="filter-row">
+                        <select name="category" class="filter-select">
+                            <option value="">همه دسته‌ها</option>
+                            {% for cat in categories %}
+                                <option value="{{ cat.slug }}" {% if cat.slug == selected_category_slug %}selected{% endif %}>
+                                    {{ cat.name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+
+                        <input type="number" name="min_price" value="{{ min_price|default:'' }}" placeholder="قیمت از">
+                        <span class="filter-separator">—</span>
+                        <input type="number" name="max_price" value="{{ max_price|default:'' }}" placeholder="قیمت تا">
+
+                        <button type="submit" class="apply-filter-btn">اعمال فیلتر</button>
+                    </div>
+                </div>
+            </form>
+            <div id="suggestions" class="suggestions-dropdown"></div>
+        </div>
+    {% if user.is_authenticated %}
+    <a href="{% url 'shop:profile' %}">
+    <i class="fas fa-user-circle">
+
+
+    </i>
+        <br>
+     {{ user.username }}
+    </a>
+{% else %}
+  <a href="{% url 'shop:user_login' %}">
+    <i class="fas fa-right-to-bracket"></i> ورود
+  </a>
+{% endif %}
+    </div>
+</header>
+
 <main>
-    <!-- فرم جستجو و فیلترها -->
-<form method="get" action="{% if category_slug %}{% url 'shop:search_in_category' category_slug %}{% else %}{% url 'shop:search' %}{% endif %}">
-    {{ category_slug }}
-    {{ subcategory_slug }}
-<br>
-    <input type="text" name="text_input" value="{{ search_value|default:'' }}" placeholder="جستجو...">
-
-    <select name="category">
-        <option value="">همه دسته‌ها</option>
-        {% for cat in categories %}
-            <option value="{{ cat.slug }}" {% if cat.slug == selected_category_slug %}selected{% endif %}>
-                {{ cat.name }}
-            </option>
-        {% endfor %}
-    </select>
-
-    <input type="number" name="min_price" value="{{ min_price|default:'' }}" placeholder="حداقل قیمت">
-    <input type="number" name="max_price" value="{{ max_price|default:'' }}" placeholder="حداکثر قیمت">
-
-    <button type="submit">اعمال فیلتر</button>
-</form>
     <!-- لیست محصولات -->
-    <div class="product-list">
+<ul class="product-grid">
         {% if Items %}
             {% for Item in Items %}
                 <a href="{{ Item.get_absolute_url }}" class="product-link">
-                    <div class="product-card">
+                <li class="product-card">
                         {% if Item.image %}
-                            <img src="{{ Item.image.url }}" alt="{{ Item.title }}" class="product-image">
+                                <img src="{{ Item.image.url }}" alt="{{ Item.title }}"  class="product-image">
                         {% endif %}
+                    <div class="product-info">
                         <h3 class="product-title">{{ Item.title }}</h3>
                         <p class="product-price">قیمت: {{ Item.price }} تومان</p>
                         <p class="product-category">دسته: {{ Item.category }}</p>
                     </div>
+                </li>
                 </a>
             {% endfor %}
         {% else %}
             <p>محصولی یافت نشد.</p>
         {% endif %}
-    </div>
+</ul>
 
     <!-- صفحه‌بندی هوشمند -->
 <div class="pagination">
@@ -82,5 +135,23 @@
     </span>
 </div>
 </main>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const toggleBtn = document.getElementById('toggle-filters');
+    const filtersSection = document.getElementById('filters-section');
 
+    toggleBtn.addEventListener('click', function () {
+        filtersSection.classList.toggle('hidden');
+    });
+
+    // بستن فیلترها با کلیک بیرون (اختیاری)
+    document.addEventListener('click', function (e) {
+        if (!filtersSection.contains(e.target) &&
+            e.target !== toggleBtn &&
+            !toggleBtn.contains(e.target)) {
+            // فیلترها فقط با دکمه باز/بسته می‌شوند → این خط را برای نگه‌داشتن حالت فعلی حذف کنید
+        }
+    });
+});
+</script>
 {% endblock %}

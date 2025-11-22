@@ -7,6 +7,19 @@ urlpatterns = [
     # ۱. صفحه اصلی
     path('', views.home, name='home'),
 
+    # ۷. پشتیبانی و اشتراک‌گذاری
+    path('support/', views.Support, name='support'),
+    path('share/<int:post_id>/', views.ShareItem, name='share'),
+
+    # ۸. کاربران
+    path('login/', views.user_login, name='user_login'),
+    path('logout/', views.user_logout, name='user_logout'),
+    path('signin/', views.SignInView, name='signin'),
+    path('profile/', views.profile_user, name='profile'),
+    path('change-password/', views.change_password, name='change_password'),
+    path('account/', views.UserAccountView, name='account'),
+
+
     # ۲. جستجوی عمومی (بدون دسته)
     path('search/', views.search, name='search'),
 
@@ -22,15 +35,5 @@ urlpatterns = [
     # ۶. جزئیات محصول
     path('product/<str:post>/<int:pk>/', views.post_detail, name='product_detail'),
 
-    # ۷. پشتیبانی و اشتراک‌گذاری
-    path('support/', views.Support, name='support'),
-    path('share/<int:post_id>/', views.ShareItem, name='share'),
 
-    # ۸. کاربران
-    path('login/', views.user_login, name='user_login'),
-    path('logout/', views.user_logout, name='user_logout'),
-    path('signin/', views.SignInView, name='signin'),
-    path('profile/', views.profile_user, name='profile'),
-    path('change-password/', views.change_password, name='change_password'),
-    path('account/', views.UserAccountView, name='account'),
 ]

@@ -1,0 +1,169 @@
+        :root {
+            --primary-lightest: #F1F3E0;
+            --primary-light: #D2DCB6;
+            --primary-mid: #A1BC98;
+            --primary-dark: #778873;
+            --text-dark: #333;
+            --text-light: #fff;
+            --border-color: #ccc;
+            --shadow: rgba(0,0,0,0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Vazirmatn', Tahoma, sans-serif;
+            background-color: var(--primary-lightest);
+            color: var(--text-dark);
+            line-height: 1.6;
+        }
+
+
+        /* Main */
+        main {
+            padding: 30px 20px;
+        }
+
+        .section {
+            margin: 40px 0;
+            padding: 20px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px var(--shadow);
+        }
+
+        .section-title {
+            color: var(--primary-dark);
+            border-bottom: 3px solid var(--primary-mid);
+            padding-bottom: 8px;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+        }
+
+        .product-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .product-card {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .product-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px var(--shadow);
+        }
+
+        .product-image {
+            width: 100%;
+            height: 200px;
+            background-color: var(--primary-light);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .product-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .product-info {
+            padding: 15px;
+            text-align: center;
+        }
+
+        .product-title {
+            font-size: 1.1rem;
+            margin-bottom: 8px;
+            color: var(--primary-dark);
+        }
+
+        .product-price {
+            font-weight: bold;
+            color: var(--primary-mid);
+            margin-bottom: 10px;
+        }
+
+        .btn-add {
+            display: inline-block;
+            padding: 8px 15px;
+            background-color: var(--primary-mid);
+            color: var(--text-light);
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            transition: background-color 0.3s;
+        }
+
+        .btn-add:hover {
+            background-color: var(--primary-dark);
+        }
+
+        .tutorial-list {
+            list-style: none;
+        }
+
+        .tutorial-item {
+            padding: 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            margin-bottom: 10px;
+            background-color: var(--primary-light);
+            transition: background-color 0.3s;
+        }
+
+        .tutorial-item:hover {
+            background-color: var(--primary-lightest);
+        }
+
+        .tutorial-item a {
+            color: var(--primary-dark);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .tutorial-item a:hover {
+            color: var(--primary-mid);
+            text-decoration: underline;
+        }
+
+
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header-container {
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            nav ul {
+                justify-content: center;
+            }
+
+            .search-box {
+                max-width: 100%;
+            }
+
+            .search-box input {
+                max-width: 100%;
+            }
+
+            .section {
+                padding: 15px;
+            }
+
+            .section-title {
+                font-size: 1.3rem;
+            }
+        }

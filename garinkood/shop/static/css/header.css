@@ -1,0 +1,209 @@
+/* === هدر === */
+header {
+    background-color: var(--primary-mid);
+    color: var(--text-light);
+    padding: 12px 20px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+
+.header-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.logo {
+    font-size: 1.6rem;
+    font-weight: bold;
+    color: white;
+    text-decoration: none;
+}
+
+.main-nav ul {
+    display: flex;
+    list-style: none;
+    gap: 16px;
+    margin: 0;
+    flex-wrap: wrap;
+}
+
+.main-nav a {
+    color: white;
+    text-decoration: none;
+    padding: 6px 10px;
+    border-radius: 4px;
+    font-size: 0.95rem;
+}
+
+.main-nav a:hover {
+    background-color: rgba(255,255,255,0.2);
+}
+
+/* === جستجو اصلی === */
+.search-box {
+    position: relative;
+    width: 100%;
+    max-width: 500px;
+}
+
+.search-main {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.search-main input {
+    width: 100%;
+    padding: 12px 50px 12px 16px;
+    border: 2px solid #ddd;
+    border-radius: 30px;
+    font-size: 0.95rem;
+    outline: none;
+    transition: border-color 0.3s;
+}
+
+.search-main input:focus {
+    border-color: var(--primary-mid);
+}
+
+.search-icon-btn,
+.filter-toggle-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 36px;
+    height: 36px;
+    border: none;
+    background: none;
+    font-size: 1.1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: background-color 0.2s;
+}
+
+.search-icon-btn {
+    right: 45px;
+}
+
+.filter-toggle-btn {
+    right: 8px;
+    color: #778873;
+}
+
+.filter-toggle-btn:hover,
+.search-icon-btn:hover {
+    background-color: rgba(255,255,255,0.2);
+}
+
+/* === فیلترها (حالت پنهان/نمایش) === */
+.filters-section {
+    margin-top: 12px;
+    padding: 14px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.hidden {
+    display: none !important;
+}
+
+.filter-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    justify-content: flex-start;
+}
+
+.filter-select,
+.filter-row input {
+    padding: 8px 12px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 0.9rem;
+}
+
+.filter-separator {
+    color: var(--primary-dark);
+    font-weight: bold;
+}
+
+.apply-filter-btn {
+    padding: 8px 16px;
+    background-color: var(--primary-mid);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+
+.apply-filter-btn:hover {
+    background-color: var(--primary-dark);
+}
+
+/* === پیشنهادهای جستجو === */
+.suggestions-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    background: white;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    z-index: 1000;
+    display: none;
+    max-height: 200px;
+    overflow-y: auto;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.suggestions-dropdown.show {
+    display: block;
+}
+
+/* === ریسپانسیو === */
+@media (max-width: 768px) {
+    .header-container {
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .main-nav ul {
+        justify-content: center;
+    }
+
+    .search-box {
+        max-width: 100%;
+    }
+
+    .filter-row {
+        justify-content: center;
+    }
+}
+
+.user-profile {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.user-profile i {
+    color: #4a90e2;
+}
