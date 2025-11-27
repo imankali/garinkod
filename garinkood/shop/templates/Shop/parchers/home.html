@@ -2,22 +2,20 @@
 {% load static %}
 {% block title %} garinkod {% endblock %}
 {% block head %}
-<link rel="stylesheet" type="text/css" href="{% static 'css/search.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'css/items.css' %}">
 {% endblock %}
 {% block body %}
     <header>
         {% include 'Shop/parchers/navigation.html' %}
         {% include 'Shop/parchers/header.html' %}
-
     </header>
-
-<!-- بنر اصلی -->
-
-        <!-- Products Section -->
-        <section class="section">
-            <h2 class="section-title">محصولات پیشنهادی</h2>
-            <div class="product-grid">
-                {% for product in products %}
+<main>
+    <!-- بنر اصلی -->
+    <!-- Products Section -->
+    <section class="section">
+        <h2 class="section-title">محصولات پیشنهادی</h2>
+        <div class="product-grid">
+            {% for product in products %}
                 <div class="product-card">
                     <div class="product-image">
                         <img src="{{ product.image_url }}" alt="{{ product.name }}">
@@ -28,125 +26,118 @@
                         <a href="{{ item.get_absolute_url }}" class="btn-add">مشاهده محصول</a>
                     </div>
                 </div>
-                {% empty %}
+            {% empty %}
                 <p style="grid-column: 1 / -1; text-align: center; padding: 30px;">هیچ محصولی یافت نشد.</p>
-                {% endfor %}
+            {% endfor %}
+        </div>
+    </section>
+    <!-- بخش کود -->
+    <section class="section">
+        <h2 class="section-title">کودها</h2>
+            <div class="product-grid">
+                {% if fertilizers %}
+                    <a href="{% url 'shop:product_list_by_category' 'kod' %}" class="btn-add">مشاهده همه</a>
+                {% endif %}
             </div>
-        </section>
-<!-- بخش کود -->
-<section class="section">
-    <h2 class="section-title">کودها</h2>
-        <div class="product-grid">
-            {% if fertilizers %}
-                <a href="{% url 'shop:product_list_by_category' 'kod' %}" class="btn-add">مشاهده همه</a>
-            {% endif %}
-        </div>
-    <ul class="product-grid">
-        {% for item in fertilizers %}
-            <li class="product-card">
-                <a href="{{ item.get_absolute_url }}">
-                    {% if item.image %}
-
+        <ul class="product-grid">
+            {% for item in fertilizers %}
+                <li class="product-card">
+                    <a href="{{ item.get_absolute_url }}">
+                        {% if item.image %}
                             <img src="{{ item.image.url }}" alt="{{ item.title }}" class="product-image" >
-
-                    {% endif %}
-                <div class="product-info">
-                    <h3 class="product-title">{{ item.title }}</h3>
-                    <div class="product-price">{{ item.price }}تومان</div>
-                    <a href="{{ item.get_absolute_url }}" class="btn-add">مشاهده محصول</a>
-                </div>
-                </a>
-            </li>
-        {% empty %}
-            <li><p style="grid-column: 1 / -1; text-align: center; padding: 30px;">هیچ محصولی یافت نشد.</p></li>
-        {% endfor %}
-    </ul>
-</section>
-
+                        {% endif %}
+                        <div class="product-info">
+                            <h3 class="product-title">{{ item.title }}</h3>
+                            <div class="product-price">{{ item.price }}تومان</div>
+                            <a href="{{ item.get_absolute_url }}" class="btn-add">مشاهده محصول</a>
+                        </div>
+                    </a>
+                </li>
+                    {% empty %}
+                <li><p style="grid-column: 1 / -1; text-align: center; padding: 30px;">هیچ محصولی یافت نشد.</p></li>
+            {% endfor %}
+        </ul>
+    </section>
 <!-- بخش سم -->
-<section class="section">
-    <h2 class="section-title">سم‌ها</h2>
-        <div class="product-grid">
-            {% if pesticides %}
-                <a href="{% url 'shop:product_list_by_category' 'sam' %}" class="btn-add">مشاهده همه</a>
-            {% endif %}
-        </div>
-    <ul class="product-grid">
-        {% for item in pesticides %}
-            <li class="product-card">
-                <a href="{{ item.get_absolute_url }}">
-                {% if item.image %}
-                        <img src="{{ item.image.url }}" alt="{{ item.title }}" class="product-image">
+    <section class="section">
+        <h2 class="section-title">سم‌ها</h2>
+            <div class="product-grid">
+                {% if pesticides %}
+                    <a href="{% url 'shop:product_list_by_category' 'sam' %}" class="btn-add">مشاهده همه</a>
                 {% endif %}
-
-                    <div class="product-info">
-                        <h3 class="product-title">{{ item.title }}</h3>
-                        <div class="product-price">{{ item.price }}تومان</div>
-                        <a href="{{ item.get_absolute_url }}" class="btn-add">مشاهده محصول</a>
-                    </div>
-                </a>
-            </li>
-        {% empty %}
-            <li>محصولی وجود ندارد</li>
-        {% endfor %}
-    </ul>
-</section>
-
+            </div>
+        <ul class="product-grid">
+            {% for item in pesticides %}
+                <li class="product-card">
+                    <a href="{{ item.get_absolute_url }}">
+                    {% if item.image %}
+                            <img src="{{ item.image.url }}" alt="{{ item.title }}" class="product-image">
+                    {% endif %}
+                        <div class="product-info">
+                            <h3 class="product-title">{{ item.title }}</h3>
+                            <div class="product-price">{{ item.price }}تومان</div>
+                            <a href="{{ item.get_absolute_url }}" class="btn-add">مشاهده محصول</a>
+                        </div>
+                    </a>
+                </li>
+            {% empty %}
+                <li>محصولی وجود ندارد</li>
+            {% endfor %}
+        </ul>
+    </section>
 <!-- بخش بذر -->
-<section class="section">
-    <h2 class="section-title">بذرها</h2>
-        <div class="product-grid">
-            {% if seeds %}
-                <a href="{% url 'shop:product_list_by_category' 'bazr' %}" class="btn-add">مشاهده همه</a>
-            {% endif %}
-        </div>
-    <ul class="product-grid">
-        {% for item in seeds %}
-            <li class="product-card">
-                <a href="{{ item.get_absolute_url }}">
-                {% if item.image %}
-                        <img src="{{ item.image.url }}" alt="{{ item.title }}" class="product-image">
+    <section class="section">
+        <h2 class="section-title">بذرها</h2>
+            <div class="product-grid">
+                {% if seeds %}
+                    <a href="{% url 'shop:product_list_by_category' 'bazr' %}" class="btn-add">مشاهده همه</a>
                 {% endif %}
-                    <div class="product-info">
-                        <h3 class="product-title">{{ item.title }}</h3>
-                        <div class="product-price">{{ item.price }}تومان</div>
-                        <a href="{{ item.get_absolute_url }}" class="btn-add">مشاهده محصول</a>
-                    </div>
-                </a>
-            </li>
-        {% empty %}
-            <li>محصولی وجود ندارد</li>
-        {% endfor %}
-    </ul>
-</section>
-
+            </div>
+        <ul class="product-grid">
+            {% for item in seeds %}
+                <li class="product-card">
+                    <a href="{{ item.get_absolute_url }}">
+                    {% if item.image %}
+                        <img src="{{ item.image.url }}" alt="{{ item.title }}" class="product-image">
+                    {% endif %}
+                        <div class="product-info">
+                            <h3 class="product-title">{{ item.title }}</h3>
+                            <div class="product-price">{{ item.price }}تومان</div>
+                            <a href="{{ item.get_absolute_url }}" class="btn-add">مشاهده محصول</a>
+                        </div>
+                    </a>
+                </li>
+            {% empty %}
+                <li>محصولی وجود ندارد</li>
+            {% endfor %}
+        </ul>
+    </section>
 <!-- بخش ادوات -->
-<section class="section">
-    <h2 class="section-title">ادوات کشاورزی</h2>
-        <div class="product-grid">
-            {% if equipments %}
-                <a href="{% url 'shop:product_list_by_category' 'adavat' %}" class="btn-add">مشاهده همه</a>
-            {% endif %}
-        </div>
-    <ul class="product-grid">
-        {% for item in equipments %}
-            <li class="product-card">
-                <a href="{{ item.get_absolute_url }}">
-                {% if item.image %}
-                        <img src="{{ item.image.url }}" alt="{{ item.title }}" class="product-image">
+    <section class="section">
+        <h2 class="section-title">ادوات کشاورزی</h2>
+            <div class="product-grid">
+                {% if equipments %}
+                    <a href="{% url 'shop:product_list_by_category' 'adavat' %}" class="btn-add">مشاهده همه</a>
                 {% endif %}
-                    <div class="product-info">
-                        <h3 class="product-title">{{ item.title }}</h3>
-                        <div class="product-price">{{ item.price }}تومان</div>
-                        <a href="{{ item.get_absolute_url }}" class="btn-add">مشاهده محصول</a>
-                    </div>
-                </a>
-            </li>
-        {% empty %}
-            <li>محصولی وجود ندارد</li>
-        {% endfor %}
-    </ul>
-</section>
-
-
+            </div>
+        <ul class="product-grid">
+            {% for item in equipments %}
+                <li class="product-card">
+                    <a href="{{ item.get_absolute_url }}">
+                    {% if item.image %}
+                        <img src="{{ item.image.url }}" alt="{{ item.title }}" class="product-image">
+                    {% endif %}
+                        <div class="product-info">
+                            <h3 class="product-title">{{ item.title }}</h3>
+                            <div class="product-price">{{ item.price }}تومان</div>
+                            <a href="{{ item.get_absolute_url }}" class="btn-add">مشاهده محصول</a>
+                        </div>
+                    </a>
+                </li>
+            {% empty %}
+                <li>محصولی وجود ندارد</li>
+            {% endfor %}
+        </ul>
+    </section>
+</main>
 {% endblock %}

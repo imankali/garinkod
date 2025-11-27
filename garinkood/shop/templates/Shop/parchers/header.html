@@ -1,16 +1,14 @@
 {% load static %}
-<head>
+{% block head %}
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" type="text/css" href="{% static 'css/search.css' %}">
-</head>
-<body>
-<!-- بنر اصلی -->
-<header>
-    <div class="header-container">
-        <a href="/" class="logo">🌱 GARINKOD</a>
-
+    <link rel="stylesheet" type="text/css" href="{% static 'css/header.css' %}">
+{% endblock %}
+<!-- بنر اصلی / هدر -->
+<div class="header-container">
+    <a href="/" class="logo">🌱 GARINKOD</a>
         <nav class="main-nav">
             <ul>
                 <li><a href="/">خانه</a></li>
@@ -19,40 +17,28 @@
                 <li><a href="/contact/">تماس</a></li>
             </ul>
         </nav>
-<!-- فرم جستجو و فیلتر -->
-            <!-- جستجوی حرفه‌ای -->
-            <div class="search-box">
-
-                <form method="get" action="{% url 'shop:search' %}">
-                    <!-- فیلد جستجو -->
-                    <div class="search-main">
-                        <input type="text" name="text_input" value="{{ search_value|default:'' }}" placeholder="جستجو کنید...">
-                            <button type="submit" class="search-icon-btn" title="جستجو">
-                            🔍
-                            </button>
-                    </div>
-                </form>
-                    <div id="suggestions" class="suggestions-dropdown"></div>
-
-            </div>
-
-<!-- در header.html -->
-{% if user.is_authenticated %}
-    <a href="{% url 'shop:profile' %}">
-    <i class="fas fa-user-circle">
-
-
-    </i>
-        <br>
-     {{ user.username }}
-    </a>
-{% else %}
-  <a href="{% url 'shop:user_login' %}">
-    <i class="fas fa-right-to-bracket"></i> ورود
-  </a>
-{% endif %}
+    <!-- فرم جستجو و فیلتر -->
+        <div class="search-box">
+            <form method="get" action="{% url 'shop:search' %}">
+                <!-- فیلد جستجو -->
+                <div class="search-main">
+                    <input type="text" name="text_input" value="{{ search_value|default:'' }}" placeholder="جستجو کنید...">
+                    <button type="submit" class="search-icon-btn" title="جستجو">
+                        🔍
+                    </button>
+                </div>
+            </form>
+            <div id="suggestions" class="suggestions-dropdown"></div>
         </div>
-
-    </header>
-
-</body>
+    {% if user.is_authenticated %}
+        <a href="{% url 'shop:profile' %}">
+            <i class="fas fa-user-circle"></i>
+            <br>
+            {{ user.username }}
+        </a>
+    {% else %}
+        <a href="{% url 'shop:user_login' %}">
+            <i class="fas fa-right-to-bracket"></i> ورود
+        </a>
+    {% endif %}
+</div>

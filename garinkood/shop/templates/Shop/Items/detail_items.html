@@ -7,8 +7,6 @@
 
 {% block head %}
     <link rel="stylesheet" type="text/css" href="{% static 'css/detail.css' %}">
-    <link rel="stylesheet" type="text/css" href="{% static 'css/items.css' %}">
-    <link rel="stylesheet" type="text/css" href="{% static 'css/search.css' %}">
     <script>
         window.addEventListener("beforeunload", function(event) {
             var form = document.getElementById("myForm");
@@ -32,14 +30,9 @@
 
 {% block body %}
 
-<!-- فرم جستجو -->
-<form method="post" action="{% url 'shop:search' %}" class="search-form">
-    {% csrf_token %}
-    <div class="search_box">
-        <input type="text" name="text_input" value="{{ search_value }}" placeholder="جستجو...">
-        <input type="submit" name="search" value="جستجو">
-    </div>
-</form>
+<header>
+ {% include 'Shop/parchers/header_for_listitems.html' %}
+</header>
 
 <!-- جزئیات محصول -->
 <main>

@@ -7,3 +7,6 @@ register = template.Library()
 def number_of_Item():
     Items = Item.objects.filter(status='published')
     return ""
+
+#@register.inclusion_tag()
+#def

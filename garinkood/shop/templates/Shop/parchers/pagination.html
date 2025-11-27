@@ -1,45 +1,33 @@
-<!DOCTYPE html>
-<html>
 {% load static %}
 <head>
     <link rel="stylesheet" type="text/css" href="{% static 'css/pagination.css' %}">
 </head>
-<body>
 
 
-<form method="post">
-{% csrf_token %}
-<div class="center" >
-  <div class="pagination">
-      <span>
+<!-- صفحه‌بندی هوشمند -->
+<div class="pagination">
+    <span class="step-links">
+        {% if Items.has_previous %}
+            <a href="{% if category_slug %}{% url 'shop:search_in_category' category_slug %}{% else %}{% url 'shop:search' %}{% endif %}?text_input={{ search_value }}&category={{ selected_category_slug }}&min_price={{ min_price }}&max_price={{ max_price }}&page=1">
+                &laquo; اولین
+            </a>
+            <a href="{% if category_slug %}{% url 'shop:search_in_category' category_slug %}{% else %}{% url 'shop:search' %}{% endif %}?text_input={{ search_value }}&category={{ selected_category_slug }}&min_price={{ min_price }}&max_price={{ max_price }}&page={{ Items.previous_page_number }}">
+                قبلی
+            </a>
+        {% endif %}
 
-          {% if page.has_previous %}
-              <a href="?page={{ page.previous_page_number }}">&laquo;</a>
-          {% endif %}
+        <span class="current">
+            صفحه {{ Items.number }} از {{ Items.paginator.num_pages }}.
+        </span>
 
-
-      {% for i in page.paginator.page_range %}
-            {% if i == page.number %}
-
-                <a href="?page={{ i }}"class="active">{{ i }}</a>
-            {% else %}
-                <a href="?page={{ i }}">{{ i|truncatewords:10 }}</a>
-            {% endif %}
-      {% endfor %}
-
-
-            {% if page.has_next %}
-                <a href="?page={{ page.next_page_number }}">&raquo;</a>
-            {% endif %}
-
-      </span>
-  </div>
-        <br>
-      <span>
-          page <a href="?page={{ page.number }}">{{ page.number }}</a>
-          of <a href="?page={{ page.paginator.num_pages }}">{{ page.paginator.num_pages }}</a>
-      </span>
+        {% if Items.has_next %}
+            <a href="{% if category_slug %}{% url 'shop:search_in_category' category_slug %}{% else %}{% url 'shop:search' %}{% endif %}?text_input={{ search_value }}&category={{ selected_category_slug }}&min_price={{ min_price }}&max_price={{ max_price }}&page={{ Items.next_page_number }}">
+                بعدی
+            </a>
+            <a href="{% if category_slug %}{% url 'shop:search_in_category' category_slug %}{% else %}{% url 'shop:search' %}{% endif %}?text_input={{ search_value }}&category={{ selected_category_slug }}&min_price={{ min_price }}&max_price={{ max_price }}&page={{ Items.paginator.num_pages }}">
+                آخرین &raquo;
+            </a>
+        {% endif %}
+    </span>
 </div>
-</form>
-</body>
-</html>
+
