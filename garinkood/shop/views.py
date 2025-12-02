@@ -470,34 +470,3 @@ def UserAccountView(request):
             'address': account.address
         })
     return render(request, 'shop/forms/account_form.html', {'form': form, 'account': account})
-
-
-def get_or_create_cart(request):
-    if request.user.is_authenticated:
-        cart, created = Cart.objects.get_or_create(user=request.user)
-        # اگر کاربر قبلاً به عنوان مهمان سبد داشته، ترکیب کن (اختیاری)
-        session_id = request.session.session_key
-        if session_id:
-            guest_cart = Cart.objects.filter(session_id=session_id).first()
-            if guest_cart:
-                for guest_item in guest_cart.items.all():
-                    cart_item, created = CartItem.objects.get_or_create(
-                        cart=cart,
-                        product=guest_item.product,
-                        defaults={'quantity': guest_item.quantity}
-                    )
-                    if not created:
-                        cart_item.quantity += guest_item.quantity
-                        cart_item.save()
-                guest_cart.delete()
-    else:
-        session_id = request.session.session_key
-        if not session_id:
-            request.session.create()
-            session_id = request.session.session_key
-        cart, created = Cart.objects.get_or_create(session_id=session_id)
-    return cart
-
-def cart_detail(request):
-    cart = get_or_create_cart(request)
-    return render(request, 'shop/cart/cart_detail.html', {'cart': cart})
