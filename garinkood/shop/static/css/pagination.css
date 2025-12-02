@@ -1,0 +1,87 @@
+/* صفحه‌بندی — هماهنگ با رنگ‌های گرین کود */
+.pagination {
+  margin: 2.5rem 0;
+  text-align: center;
+  font-family: "Vazirmatn", sans-serif;
+}
+
+.step-links {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  justify-content: center;
+  align-items: center;
+  padding: 0.5rem;
+  background: #f8f9f0;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(119, 136, 115, 0.1);
+}
+
+.step-links a,
+.step-links span {
+  display: inline-block;
+  min-width: 38px;
+  padding: 0.55rem 0.85rem;
+  text-decoration: none;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  color: #374151;
+  border: 1px solid #d2dcb6;
+  background: white;
+}
+
+.step-links a:hover {
+  background: #a1bc98;
+  color: white;
+  border-color: #a1bc98;
+  transform: translateY(-2px);
+  box-shadow: 0 3px 6px rgba(119, 136, 115, 0.15);
+}
+
+/* لینک‌های فعال (اولین، آخرین، قبلی، بعدی) */
+.step-links a:first-child,
+.step-links a:last-child {
+  background: #778873;
+  color: white;
+  border-color: #778873;
+}
+
+.step-links a:first-child:hover,
+.step-links a:last-child:hover {
+  background: #667760;
+  border-color: #667760;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(119, 136, 115, 0.2);
+}
+
+/* صفحهٔ فعلی */
+.current {
+  background: #778873;
+  color: white;
+  font-weight: 700;
+  padding: 0.55rem 1rem;
+  border-radius: 10px;
+  margin: 0 0.5rem;
+  box-shadow: 0 3px 6px rgba(119, 136, 115, 0.2);
+}
+
+/* ریسپانسیو برای موبایل */
+@media (max-width: 600px) {
+  .step-links {
+    gap: 0.3rem;
+    padding: 0.4rem;
+  }
+
+  .step-links a,
+  .step-links span {
+    padding: 0.45rem 0.7rem;
+    font-size: 0.9rem;
+    min-width: 34px;
+  }
+
+  .current {
+    padding: 0.45rem 0.9rem;
+    font-size: 0.9rem;
+  }
+}

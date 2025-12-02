@@ -1,33 +1,31 @@
 {% load static %}
-<head>
-    <link rel="stylesheet" type="text/css" href="{% static 'css/pagination.css' %}">
-</head>
-
+<link rel="stylesheet" type="text/css" href="{% static 'css/pagination.css' %}">
 
 <!-- صفحه‌بندی هوشمند -->
+{% if product.has_other_pages %}
 <div class="pagination">
     <span class="step-links">
-        {% if Items.has_previous %}
-            <a href="{% if category_slug %}{% url 'shop:search_in_category' category_slug %}{% else %}{% url 'shop:search' %}{% endif %}?text_input={{ search_value }}&category={{ selected_category_slug }}&min_price={{ min_price }}&max_price={{ max_price }}&page=1">
+        {% if product.has_previous %}
+            <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page=1">
                 &laquo; اولین
             </a>
-            <a href="{% if category_slug %}{% url 'shop:search_in_category' category_slug %}{% else %}{% url 'shop:search' %}{% endif %}?text_input={{ search_value }}&category={{ selected_category_slug }}&min_price={{ min_price }}&max_price={{ max_price }}&page={{ Items.previous_page_number }}">
+            <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ product.previous_page_number }}">
                 قبلی
             </a>
         {% endif %}
 
         <span class="current">
-            صفحه {{ Items.number }} از {{ Items.paginator.num_pages }}.
+            صفحه {{ product.number }} از {{ product.paginator.num_pages }}.
         </span>
 
-        {% if Items.has_next %}
-            <a href="{% if category_slug %}{% url 'shop:search_in_category' category_slug %}{% else %}{% url 'shop:search' %}{% endif %}?text_input={{ search_value }}&category={{ selected_category_slug }}&min_price={{ min_price }}&max_price={{ max_price }}&page={{ Items.next_page_number }}">
+        {% if product.has_next %}
+            <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ product.next_page_number }}">
                 بعدی
             </a>
-            <a href="{% if category_slug %}{% url 'shop:search_in_category' category_slug %}{% else %}{% url 'shop:search' %}{% endif %}?text_input={{ search_value }}&category={{ selected_category_slug }}&min_price={{ min_price }}&max_price={{ max_price }}&page={{ Items.paginator.num_pages }}">
+            <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ product.paginator.num_pages }}">
                 آخرین &raquo;
             </a>
         {% endif %}
     </span>
 </div>
-
+{% endif %}

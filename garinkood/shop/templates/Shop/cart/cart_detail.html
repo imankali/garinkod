@@ -1,0 +1,15 @@
+<h2>سبد خرید شما</h2>
+{% if cart.items.exists %}
+  <ul>
+  {% for item in cart.items.all %}
+    <li>
+      {{ item.quantity }} × {{ item.product.title }}
+      (قیمت واحد: {{ item.product.price }} تومان)
+      <strong>جمع: {{ item.total_price }} تومان</strong>
+    </li>
+  {% endfor %}
+  </ul>
+  <h3>مجموع کل: {{ cart.total_price }} تومان</h3>
+{% else %}
+  <p>سبد خرید شما خالی است.</p>
+{% endif %}

@@ -18,7 +18,8 @@ urlpatterns = [
     path('profile/', views.profile_user, name='profile'),
     path('change-password/', views.change_password, name='change_password'),
     path('account/', views.UserAccountView, name='account'),
-
+    path('cart/add/<int:product_id>/', views.add_to_cart, name='add_to_cart'),
+    path('cart/', views.cart_detail, name='cart_detail'),
 
     # ۲. جستجوی عمومی (بدون دسته)
     path('search/', views.search, name='search'),

@@ -7,25 +7,22 @@
             {% endblock %}
         </title>
         {% block head %}
+
         {% endblock %}
-    <link rel="stylesheet" type="text/css" href="{% static 'css/items.css' %}">
     <link rel="stylesheet" type="text/css" href="{% static 'css/base.css' %}">
-    <link rel="stylesheet" type="text/css" href="{% static 'css/pagination.css' %}">
 </head>
 
 
 <body>
-
             {% block body %}
 
 
             {% endblock %}
 
         <section >
-            <footer>
                  {% include 'Shop/parchers/fother.html' %}
-             </footer>
         </section>
+<script src="{% static 'javascripts/home.js' %}"></script>
 </body>
 
 </html>

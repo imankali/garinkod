@@ -1,0 +1,59 @@
+{% extends 'Shop/parent/base.html' %}
+{% load static  %}
+
+{% block title %}محصولات{% endblock %}
+
+{% block head %}
+    <link rel="stylesheet" type="text/css" href="{% static 'css/prudact_card.css' %}">
+{% endblock %}
+
+{% block body %}
+    <header>
+        {% include 'Shop/parchers/header_for_listitems.html' %}
+    </header>
+    <!-- Products Section -->
+<!-- Products Section -->
+<section class="products-section" id="products-section">
+    <div class="container">
+        <!-- عنوان دسته/جستجو -->
+        <div class="category-section">
+            <div class="category-header">
+                <div class="category-title-wrapper">
+                    <div class="category-bar"></div>
+                    <h2 class="category-title">
+                        {% if search_value %}
+                            نتایج جستجو برای:{{ search_value }}
+                        {% elif category %}
+                            دسته: {{ category.name }}
+                        {% else %}
+                            همه محصولات
+                        {% endif %}
+                    </h2>
+                </div>
+            </div>
+
+            <!-- لیست محصولات -->
+            {% if product %}
+                <div class="products-grid" id="products-grid">
+                    {% for item in product %}
+                        <div class="product-card" data-id="{{ item.id }}" data-name="{{ item.title }}" data-price="{{ item.price }}" data-image="{{ item.image_url }}">
+                            <img src="{{ item.image_url }}" alt="{{ item.title }}" class="product-image">
+                            <div class="product-info">
+                                <h3 class="product-name">{{ item.title }}</h3>
+                                <div class="product-price">{{ item.price }} تومان</div>
+                                <button class="add-to-cart-btn">افزودن</button>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+                <!-- صفحه‌بندی -->
+                {% include 'Shop/parchers/pagination.html' %}
+            {% else %}
+                <p class="no-results" style="text-align: center; padding: 2rem; font-size: 1.1rem;">
+                    متأسفانه محصولی یافت نشد.
+                </p>
+            {% endif %}
+        </div>
+    </div>
+</section>
+{% endblock %}
