@@ -2,7 +2,7 @@ from django.db import models
 from django.utils import timezone
 from django.contrib.auth.models import User
 from django.urls import reverse
-
+from django.conf import settings
 
 # --- Managers ---
 class LinkSerch(models.Manager):
@@ -68,6 +68,19 @@ class Item(models.Model):
 
     def get_absolute_url(self):
         return reverse('shop:product_detail', args=[self.slug, self.id])
+
+
+
+    @property
+    def image_url(self):
+        """
+        URL ایمن تصویر محصول.
+        اگر تصویر وجود داشت → URL آن
+        اگر نبود → URL یک تصویر پیش‌فرض از static
+        """
+        if self.image and hasattr(self.image, 'url') and self.image.name:
+            return self.image.url
+        return f"{settings.STATIC_URL}images/default-product.png"
 
 
 # --- مشخصات اختصاصی برای هر دسته ---
