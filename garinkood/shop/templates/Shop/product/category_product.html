@@ -36,14 +36,20 @@
             {% if product %}
                 <div class="products-grid" id="products-grid">
                     {% for item in product %}
+                        <a href="{% url 'shop:product_detail' item.slug %}">
                         <div class="product-card" data-id="{{ item.id }}" data-name="{{ item.title }}" data-price="{{ item.price }}" data-image="{{ item.image_url }}">
                             <img src="{{ item.image_url }}" alt="{{ item.title }}" class="product-image">
                             <div class="product-info">
                                 <h3 class="product-name">{{ item.title }}</h3>
                                 <div class="product-price">{{ item.price }} تومان</div>
-                                <button class="add-to-cart-btn">افزودن</button>
+                                <form method="post" action="{% url 'shop:add_to_cart' item.id %}">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="quantity" value="1">
+                                    <button type="submit" class="add-to-cart-btn">افزودن</button>
+                                </form>
                             </div>
                         </div>
+                        </a>
                     {% endfor %}
                 </div>
                 <!-- صفحه‌بندی -->

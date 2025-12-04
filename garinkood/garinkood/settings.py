@@ -102,9 +102,9 @@ WSGI_APPLICATION = 'garinkood.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'GARINKOOD',
+        'NAME': 'garinkood',
         'USER': 'postgres',
-        'PASSWORD': 'Imannosrati1383',
+        'PASSWORD': 'Iman1383',
         'HOST': 'localhost',
         'PORT': '5432',
     }

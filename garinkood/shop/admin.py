@@ -73,8 +73,8 @@ class AdminUserAccount(admin.ModelAdmin):
 # --- Admin Comment ---
 @admin.register(Comment)
 class AdminComment(admin.ModelAdmin):
-    list_display = ('name', 'post', 'crated', 'active',)
-    list_filter = ('active', 'crated')
+    list_display = ('name', 'post', 'created', 'active')  # ✅ 'crated' → 'created'
+    list_filter = ('active', 'created')                   # ✅ 'crated' → 'created'
     list_editable = ('active',)
     search_fields = ('name', 'email', 'body')
 

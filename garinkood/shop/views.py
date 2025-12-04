@@ -12,7 +12,11 @@ from django.contrib.auth.models import User
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-
+from django.shortcuts import render, get_object_or_404, redirect
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
+from django.contrib.auth.decorators import login_required
+from .models import Item, Cart, CartItem  # ← اضافه شود
 
 # --- تابع ارسال ایمیل ---
 def send_email(to_address, subject, body):
@@ -39,10 +43,10 @@ def send_email(to_address, subject, body):
 def home(request):
     # دریافت دسته‌ها
     try:
-        category_fertilizer = Category.objects.get(name="کود")
-        category_pesticide = Category.objects.get(name="سم")
-        category_seed = Category.objects.get(name="بذر")
-        category_equipment = Category.objects.get(name="ادوات")
+        category_fertilizer = Category.objects.get(slug="kod")
+        category_pesticide = Category.objects.get(slug="sam")
+        category_seed = Category.objects.get(slug="bazr")
+        category_equipment = Category.objects.get(slug="adavat")
     except Category.DoesNotExist:
         category_fertilizer = category_pesticide = category_seed = category_equipment = None
 
@@ -109,9 +113,9 @@ def ItemsList(request, category_slug=None):
     })
 
 
-# --- جزئیات محصول با مشخصات اختصاصی ---
-def post_detail(request, post, pk):
-    post = get_object_or_404(Item, status='published', slug=post, id=pk)
+# shop/views.py
+def product_detail(request, slug):
+    post = get_object_or_404(Item, status='published', slug=slug)
     comments = post.comments.filter(active=True)
     new_comment = None
 
@@ -150,23 +154,18 @@ def post_detail(request, post, pk):
     else:
         form = CommentForm()
 
-    search_value = request.session.get('query_se', '')
-
     context = {
         'post': post,
         'comments': comments,
         'form': form,
         'new_comment': new_comment,
-        'search_value': search_value,
         'fertilizer': fertilizer,
         'pesticide': pesticide,
         'seed': seed,
-        'equipment': equipment
+        'equipment': equipment,
     }
 
     return render(request, 'shop/product/detail_product.html', context)
-
-
 # --- فرم پشتیبانی ---
 def Support(request):
     sent = False
@@ -470,3 +469,105 @@ def UserAccountView(request):
             'address': account.address
         })
     return render(request, 'shop/forms/account_form.html', {'form': form, 'account': account})
+
+
+
+# shop/views.py — انتهای فایل
+
+def get_or_create_cart(request):
+    """سبد فعلی کاربر یا مهمان را برمی‌گرداند."""
+    if request.user.is_authenticated:
+        cart, created = Cart.objects.get_or_create(user=request.user)
+        # ادغام سبد مهمان (اختیاری)
+        session_id = request.session.session_key
+        if session_id:
+            guest_cart = Cart.objects.filter(session_id=session_id).first()
+            if guest_cart:
+                for guest_item in guest_cart.items.all():
+                    cart_item, created = CartItem.objects.get_or_create(
+                        cart=cart,
+                        product=guest_item.product,
+                        defaults={'quantity': guest_item.quantity}
+                    )
+                    if not created:
+                        cart_item.quantity += guest_item.quantity
+                        if cart_item.quantity > guest_item.product.stock:
+                            cart_item.quantity = guest_item.product.stock
+                        cart_item.save()
+                guest_cart.delete()
+        return cart
+    else:
+        if not request.session.session_key:
+            request.session.create()
+        session_id = request.session.session_key
+        cart, created = Cart.objects.get_or_create(session_id=session_id)
+        return cart
+
+
+@require_POST
+def add_to_cart(request, product_id):
+    product = get_object_or_404(Item, id=product_id, status='published')
+    cart = get_or_create_cart(request)
+    try:
+        quantity = int(request.POST.get('quantity', 1))
+    except (ValueError, TypeError):
+        quantity = 1
+
+    if quantity < 1:
+        quantity = 1
+    if quantity > product.stock:
+        quantity = product.stock
+
+    cart_item, created = CartItem.objects.get_or_create(
+        cart=cart,
+        product=product,
+        defaults={'quantity': quantity}
+    )
+    if not created:
+        cart_item.quantity += quantity
+        if cart_item.quantity > product.stock:
+            cart_item.quantity = product.stock
+        cart_item.save()
+
+    # برگرداندن به AJAX یا redirect
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        return JsonResponse({
+            'success': True,
+            'total_items': cart.total_items,
+            'message': f"«{product.title}» به سبد خرید اضافه شد."
+        })
+    return redirect('shop:cart_detail')
+
+
+def cart_detail(request):
+    cart = get_or_create_cart(request)
+    return render(request, 'shop/cart/cart_detail.html', {'cart': cart})
+
+
+@require_POST
+def update_cart(request, item_id):
+    cart = get_or_create_cart(request)
+    cart_item = get_object_or_404(CartItem, id=item_id, cart=cart)
+    try:
+        quantity = int(request.POST.get('quantity', 1))
+    except (ValueError, TypeError):
+        quantity = 1
+
+    if quantity < 1:
+        cart_item.delete()
+    elif quantity > cart_item.product.stock:
+        cart_item.quantity = cart_item.product.stock
+        cart_item.save()
+    else:
+        cart_item.quantity = quantity
+        cart_item.save()
+
+    return redirect('shop:cart_detail')
+
+
+@require_POST
+def remove_from_cart(request, item_id):
+    cart = get_or_create_cart(request)
+    cart_item = get_object_or_404(CartItem, id=item_id, cart=cart)
+    cart_item.delete()
+    return redirect('shop:cart_detail')

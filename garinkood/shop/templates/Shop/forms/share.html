@@ -18,7 +18,7 @@
     </div>
     <input type="submit" value="اشتراک گذاری">
     <br><br><br><br>
-    <a id="box" href = "{%url "shop:product_detail" post.slug post.id %}">
+    <a id="box" href="{% url 'shop:product_detail' post.slug %}">
          بازگشت
     </a>
 </form>

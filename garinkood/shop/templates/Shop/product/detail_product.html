@@ -21,7 +21,6 @@
             if (form) {
                 form.addEventListener("submit", function(event) {
                     form.hasBeenSubmitted = true;
-                    console.log("Form submitted");
                 });
             }
         });
@@ -31,100 +30,118 @@
 {% block body %}
 
 <header>
- {% include 'Shop/parchers/header_for_listitems.html' %}
+    {% include 'Shop/parchers/header_for_listitems.html' %}
 </header>
 
-<!-- جزئیات محصول -->
-<main>
-    <div class="product-detail">
-        <h1 style="direction: rtl; color: #006b1b; margin-left: auto; padding: 5px;">جزئیات محصول</h1>
+<main class="product-detail-main">
+    <div class="container">
+        <div class="product-detail-container">
+            <!-- تصویر محصول -->
+            <div class="product-gallery">
+                <div class="main-image">
+                    {% if post.image %}
+                        <img src="{{ post.image.url }}" alt="{{ post.title }}" />
+                    {% else %}
+                        <div class="placeholder-image">تصویری موجود نیست</div>
+                    {% endif %}
+                </div>
+            </div>
 
-        <!-- تصویر و اطلاعات عمومی -->
-        <div class="product-card">
-            {% if post.image %}
-                <img src="{{ post.image.url }}" alt="{{ post.title }}" class="product-image">
-            {% endif %}
-            <h2>نام محصول: {{ post.title }}</h2>
-            <h3>نویسنده: {{ post.author }}</h3>
-            <h3>وضعیت: {{ post.status }}</h3>
-            <h3>قیمت: {{ post.price }} تومان</h3>
-            <h3>دسته: {{ post.category }}</h3>
-            <p>توضیحات: {{ post.body|linebreaks }}</p>
-        </div>
+            <!-- اطلاعات محصول -->
+            <div class="product-info">
+                <div class="product-category">{{ post.category }}</div>
+                <h1 class="product-name">{{ post.title }}</h1>
 
-        <!-- مشخصات اختصاصی -->
-        <div class="attributes-section">
-            {% if fertilizer %}
-                <h2>مشخصات کود</h2>
-                <ul class="attribute-list">
-                    <li>نوع کود: {{ fertilizer.fertilizer_type }}</li>
-                    <li>نیتروژن: {{ fertilizer.nitrogen }}</li>
-                    <li>فسفر: {{ fertilizer.phosphorus }}</li>
-                    <li>پتاسیم: {{ fertilizer.potassium }}</li>
-                </ul>
-            {% elif pesticide %}
-                <h2>مشخصات سم</h2>
-                <ul class="attribute-list">
-                    <li>نوع سم: {{ pesticide.pesticide_type }}</li>
-                    <li>مواد فعال: {{ pesticide.active_ingredient }}</li>
-                    <li>غلظت: {{ pesticide.concentration }}</li>
-                </ul>
-            {% elif seed %}
-                <h2>مشخصات بذر</h2>
-                <ul class="attribute-list">
-                    <li>نوع گیاه: {{ seed.crop_type }}</li>
-                    <li>رقم: {{ seed.variety }}</li>
-                    <li>وزن در کیلوگرم: {{ seed.weight_per_kg }}</li>
-                </ul>
-            {% elif equipment %}
-                <h2>مشخصات ابزار</h2>
-                <ul class="attribute-list">
-                    <li>نوع ابزار: {{ equipment.tool_type }}</li>
-                    <li>جنس: {{ equipment.material }}</li>
-                    <li>وزن: {{ equipment.weight }}</li>
-                </ul>
-            {% endif %}
+                <div class="product-meta">
+                    <span class="author">نویسنده: {{ post.author }}</span>
+                    <span class="status">وضعیت: {{ post.status }}</span>
+                </div>
+
+                <div class="product-price-section">
+                    <span class="product-price">{{ post.price|default:"قیمت توافقی" }} تومان</span>
+                </div>
+
+                <!-- فرم افزودن به سبد خرید (فقط در دسکتاپ نمایش داده می‌شود در هدر، اما اینجا همیشه نمایش داده می‌شود چون ضروری است) -->
+                <form method="post" action="{% url 'shop:add_to_cart' post.id %}" class="product-actions">
+                    {% csrf_token %}
+                    <input type="hidden" name="quantity" value="1" />
+                    <button type="submit" class="add-to-cart-btn">افزودن به سبد خرید</button>
+                </form>
+
+                <div class="product-description">
+                    {{ post.body|linebreaks }}
+                </div>
+
+                <!-- مشخصات اختصاصی -->
+                <div class="product-specs">
+                    <h3>مشخصات فنی</h3>
+                    <ul>
+                        {% if fertilizer %}
+                            <li><span>نوع کود:</span> {{ fertilizer.fertilizer_type }}</li>
+                            <li><span>نیتروژن (N):</span> {{ fertilizer.nitrogen }}</li>
+                            <li><span>فسفر (P):</span> {{ fertilizer.phosphorus }}</li>
+                            <li><span>پتاسیم (K):</span> {{ fertilizer.potassium }}</li>
+                        {% elif pesticide %}
+                            <li><span>نوع سم:</span> {{ pesticide.pesticide_type }}</li>
+                            <li><span>مواد فعال:</span> {{ pesticide.active_ingredient }}</li>
+                            <li><span>غلظت:</span> {{ pesticide.concentration }}</li>
+                        {% elif seed %}
+                            <li><span>نوع گیاه:</span> {{ seed.crop_type }}</li>
+                            <li><span>رقم:</span> {{ seed.variety }}</li>
+                            <li><span>وزن بذر در کیلوگرم:</span> {{ seed.weight_per_kg }}</li>
+                        {% elif equipment %}
+                            <li><span>نوع ابزار:</span> {{ equipment.tool_type }}</li>
+                            <li><span>جنس:</span> {{ equipment.material }}</li>
+                            <li><span>وزن:</span> {{ equipment.weight }}</li>
+                        {% else %}
+                            <li>مشخصات فنی در دسترس نیست.</li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
         </div>
 
         <!-- کامنت‌ها -->
         <div class="comments-section">
-            <h2>کامنت‌ها</h2>
-            {% with comments.count as count %}
-                <p>تعداد کامنت‌ها: {{ count }}</p>
-                <div class="comments-list">
-                    {% for comment in comments %}
-                        <div class="comment-item">
-                            <p><strong>{{ comment.name }}</strong> در {{ comment.crated }} نوشت:</p>
-                            <p>{{ comment.body }}</p>
+            <h2 class="section-title">کامنت‌ها ({{ comments.count }})</h2>
+            <div class="comments-list">
+                {% for comment in comments %}
+                    <div class="comment-item">
+                        <div class="comment-header">
+                            <strong>{{ comment.name }}</strong>
+                            <span class="comment-date">{{ comment.created|date:"Y/m/d H:i" }}</span>
                         </div>
-                    {% empty %}
-                        <p>کامنتی وجود ندارد.</p>
-                    {% endfor %}
-                </div>
-            {% endwith %}
+                        <p class="comment-body">{{ comment.body }}</p>
+                    </div>
+                {% empty %}
+                    <p class="no-comments">در حال حاضر کامنتی برای این محصول ثبت نشده است.</p>
+                {% endfor %}
+            </div>
 
-            <!-- فرم ارسال کامنت -->
+            <!-- فرم کامنت -->
             <div class="comment-form">
-                <h2>ارسال کامنت</h2>
+                <h3>ارسال نظر</h3>
                 {% if new_comment %}
-                    <p>کامنت شما ارسال شد.</p>
+                    <div class="success-message">نظر شما با موفقیت ارسال شد و پس از تأیید نمایش داده می‌شود.</div>
                 {% endif %}
                 <form id="myForm" method="post">
                     {% csrf_token %}
-                    <label for="name">نام:</label>
-                    <input type="text" id="name" name="name" required>
-                    <br>
-                    <label for="body">پیام:</label>
-                    <input type="text" id="body" name="body" required>
-                    <br>
-                    <input type="submit" value="ارسال">
+                    <div class="form-group">
+                        <label for="name">نام شما:</label>
+                        <input type="text" id="name" name="name" required />
+                    </div>
+                    <div class="form-group">
+                        <label for="body">متن نظر:</label>
+                        <textarea id="body" name="body" rows="4" required></textarea>
+                    </div>
+                    <button type="submit" class="submit-comment-btn">ارسال نظر</button>
                 </form>
             </div>
         </div>
 
-        <!-- لینک اشتراک‌گذاری -->
-        <div class="share-link">
-            <a href="{% url 'shop:share' post.id %}">اشتراک گذاری پست</a>
+        <!-- اشتراک‌گذاری -->
+        <div class="share-section">
+            <a href="{% url 'shop:share' post.id %}" class="share-link">🔗 اشتراک‌گذاری این محصول</a>
         </div>
     </div>
 </main>
