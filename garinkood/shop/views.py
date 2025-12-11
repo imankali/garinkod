@@ -439,36 +439,49 @@ def SignInView(request):
 
 
 # --- ویرایش پروفایل ---
+# shop/views.py — UserAccountView
 @login_required(login_url='shop:home')
 def UserAccountView(request):
     user = request.user
-    try:
-        account = UserAccount.objects.get(user=user)
-    except UserAccount.DoesNotExist:
-        account = UserAccount.objects.create(user=user)
+    account, created = UserAccount.objects.get_or_create(user=user)
 
     if request.method == "POST":
+        print("=== DEBUG: POST received ===")
+        print("Raw POST:", request.POST)
+
         form = AccountForm(request.POST, instance=account)
+        print("Form valid?", form.is_valid())
+        if not form.is_valid():
+            print("Form errors:", form.errors)
+
         if form.is_valid():
+            print("Cleaned data:", form.cleaned_data)
+
+            # ذخیره User
             user.first_name = form.cleaned_data['first_name']
             user.last_name = form.cleaned_data['last_name']
-            account.gender = form.cleaned_data['gender']
-            account.address = form.cleaned_data['address']
-            account.phone = form.cleaned_data['phone']
             user.save()
-            account.save()
+
+            # ذخیره Account
+            saved_account = form.save()
+            print("Saved gender:", saved_account.gender)
+
+            # تأیید ذخیره‌سازی
+            saved_account.refresh_from_db()
+            print("DB gender after save:", saved_account.gender)
+
             return redirect('shop:profile')
-        else:
-            return render(request, 'shop/forms/account_form.html', {'form': form, 'account': account})
+
     else:
-        form = AccountForm(instance=account, initial={
-            'first_name': user.first_name,
-            'last_name': user.last_name,
-            'phone': account.phone,
-            'gender': account.gender,
-            'address': account.address
-        })
-    return render(request, 'shop/forms/account_form.html', {'form': form, 'account': account})
+        form = AccountForm(instance=account)
+        form.fields['first_name'].initial = user.first_name
+        form.fields['last_name'].initial = user.last_name
+        form.fields['phone'].initial = account.phone  # ← این خط جدید
+
+    return render(request, 'shop/forms/account_form.html', {
+        'form': form,
+        'account': account
+    })
 
 
 

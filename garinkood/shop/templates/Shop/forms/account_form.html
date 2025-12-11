@@ -1,62 +1,83 @@
 {% extends 'Shop/parent/base.html' %}
 {% load static %}
 
-{% block title%}
-    UserAccount
+{% block title %}ویرایش اطلاعات کاربری{% endblock %}
+
+{% block head %}
+  <link rel="stylesheet" type="text/css" href="{% static 'css/account_form.css' %}">
 {% endblock %}
 
 {% block body %}
+<div class="form-wrapper">
+  <div class="form-card">
+    <h1 class="form-title">ویرایش اطلاعات کاربری</h1>
 
-    <h1 style="color: #006b1b;margin-left:auto">فرم اطلعات شخصی کاربر</h1>
-        <form method="post">
+    <form method="post" novalidate>
+      {% csrf_token %}
 
-                    {% csrf_token %}
-
-                نام:
-            <br>
-                <input type="text" name="name" required {% if form.name.value %} value="{{ form.name.value }}"
-                {% else %} value="{{ account.user.first_name|default:'' }}"{% endif %}>
-            <br>
-
-                نام خانوادگی:
-            <br>
-                <input type="text" name="last_name" required {% if form.last_name.value %} value="{{ form.last_name.value }}"
-                {% else %} value="{{ account.user.last_name|default:'' }}"{% endif %}>
-            <br>
-
-            شماره همره:
-            <br>
-                <input type="text" disabled value="{{ account.phone|default:'' }}">
-            <br>
-
-                جنسیت:
-            <br>
-                اقا:
-                <input type="radio" name="gender" value="اقا" {% if account.gender == 'اقا' %} checked {% endif %}>
-            <br>
-                خانم:
-                <input type="radio" name="gender" value="خانم" {% if account.gender == 'خانم' %} checked {% endif %}>
-            <br>
-
-                آدرس:
-            <br>
-                <textarea type="text" name="address"  {% if form.name.value %} value="{{ form.address.value }}"
-                {% else %} value="{{ account.address|default:'' }}"{% endif %}></textarea>
-            <br>
-
-                <input type="submit" value=" ثبت اطلعات ">
-
-            <br>
-
-        </form>
-
-    {% for field in form %}
-        {% if field.errors  %}
-            {% for errors in field.errors%}
-                {{ field.label }} :
-                <br>{{ errors }}<br>
-            {% endfor %}
+      <!-- نام -->
+      <div class="form-group">
+        <label for="{{ form.first_name.id_for_label }}">نام</label>
+        <div class="form-control-wrapper">
+          {{ form.first_name }}
+        </div>
+        {% if form.first_name.errors %}
+          <div id="{{ form.first_name.id_for_label }}-error" class="error-message" role="alert">
+            {{ form.first_name.errors }}
+          </div>
         {% endif %}
-    {% endfor %}
+      </div>
 
+      <!-- نام خانوادگی -->
+      <div class="form-group">
+        <label for="{{ form.last_name.id_for_label }}">نام خانوادگی</label>
+        <div class="form-control-wrapper">
+          {{ form.last_name }}
+        </div>
+        {% if form.last_name.errors %}
+          <div id="{{ form.last_name.id_for_label }}-error" class="error-message" role="alert">
+            {{ form.last_name.errors }}
+          </div>
+        {% endif %}
+      </div>
+
+<!-- شماره همراه -->
+<div class="form-group">
+  <label for="{{ form.phone.id_for_label }}">شماره همراه</label>
+  <div class="form-control-wrapper">
+    {{ form.phone }}
+  </div>
+  {% if form.phone.errors %}
+    <div class="error-message">{{ form.phone.errors }}</div>
+  {% endif %}
+</div>
+
+<!-- جنسیت -->
+<div class="form-group">
+  <label>جنسیت</label>
+  <div class="form-control-wrapper">
+    {{ form.gender }}
+  </div>
+  {% if form.gender.errors %}
+    <div class="error-message" role="alert">{{ form.gender.errors }}</div>
+  {% endif %}
+</div>
+
+      <!-- آدرس -->
+      <div class="form-group">
+        <label for="{{ form.address.id_for_label }}">آدرس</label>
+        <div class="form-control-wrapper">
+          {{ form.address }}
+        </div>
+        {% if form.address.errors %}
+          <div id="{{ form.address.id_for_label }}-error" class="error-message" role="alert">
+            {{ form.address.errors }}
+          </div>
+        {% endif %}
+      </div>
+
+      <button type="submit" class="btn btn-primary">ثبت اطلاعات</button>
+    </form>
+  </div>
+</div>
 {% endblock %}

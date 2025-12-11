@@ -1,28 +1,28 @@
 {% load static %}
-<html lang="en">
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
 <head>
     <meta charset="UTF-8">
-        <title>
-            {% block title %}
-            {% endblock %}
-        </title>
-        {% block head %}
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}فروشگاه گرین کود{% endblock %}</title>
 
-        {% endblock %}
+    <!-- Vazirmatn Font (ضروری برای نمایش صحیح فارسی) -->
+    <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet">
+
+    <!-- Base Styles -->
     <link rel="stylesheet" type="text/css" href="{% static 'css/base.css' %}">
+
+    <!-- Block for extra CSS -->
+    {% block head %}{% endblock %}
 </head>
-
-
 <body>
-            {% block body %}
+    {% block body %}{% endblock %}
 
+    <section>
+        {% include 'Shop/parchers/fother.html' %}
+    </section>
 
-            {% endblock %}
-
-        <section >
-                 {% include 'Shop/parchers/fother.html' %}
-        </section>
-<script src="{% static 'javascripts/home.js' %}"></script>
+    <!-- Optional: Global JS -->
+    <script src="{% static 'javascripts/home.js' %}"></script>
 </body>
-
 </html>

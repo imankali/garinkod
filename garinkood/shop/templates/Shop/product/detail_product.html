@@ -1,149 +1,215 @@
 {% extends 'Shop/parent/base.html' %}
 {% load static %}
 
-{% block title %}
-{{ post.title }}
-{% endblock %}
+{% block title %}{{ post.title }}{% endblock %}
 
 {% block head %}
-    <link rel="stylesheet" type="text/css" href="{% static 'css/detail.css' %}">
-    <script>
-        window.addEventListener("beforeunload", function(event) {
-            var form = document.getElementById("myForm");
-            if (form && !form.hasBeenSubmitted) {
-                event.preventDefault();
-                event.returnValue = '';
-            }
-        });
-
-        document.addEventListener("DOMContentLoaded", function() {
-            var form = document.getElementById("myForm");
-            if (form) {
-                form.addEventListener("submit", function(event) {
-                    form.hasBeenSubmitted = true;
-                });
-            }
-        });
-    </script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" type="text/css" href="{% static 'css/header_for_listitems.css' %}">
+  <link rel="stylesheet" type="text/css" href="{% static 'css/detail.css' %}">
+  <link rel="stylesheet" type="text/css" href="{% static 'css/mobile_bottom_nav.css' %}">
+  <link rel="stylesheet" type="text/css" href="{% static 'css/footer.css' %}">
 {% endblock %}
 
 {% block body %}
+  {% include 'Shop/parchers/header_for_listitems.html' %}
 
-<header>
-    {% include 'Shop/parchers/header_for_listitems.html' %}
-</header>
+  <!-- Toast Notification Container -->
+  <div id="toast-container"></div>
 
-<main class="product-detail-main">
+  <main class="product-detail-main">
     <div class="container">
-        <div class="product-detail-container">
-            <!-- تصویر محصول -->
-            <div class="product-gallery">
-                <div class="main-image">
-                    {% if post.image %}
-                        <img src="{{ post.image.url }}" alt="{{ post.title }}" />
-                    {% else %}
-                        <div class="placeholder-image">تصویری موجود نیست</div>
-                    {% endif %}
-                </div>
-            </div>
-
-            <!-- اطلاعات محصول -->
-            <div class="product-info">
-                <div class="product-category">{{ post.category }}</div>
-                <h1 class="product-name">{{ post.title }}</h1>
-
-                <div class="product-meta">
-                    <span class="author">نویسنده: {{ post.author }}</span>
-                    <span class="status">وضعیت: {{ post.status }}</span>
-                </div>
-
-                <div class="product-price-section">
-                    <span class="product-price">{{ post.price|default:"قیمت توافقی" }} تومان</span>
-                </div>
-
-                <!-- فرم افزودن به سبد خرید (فقط در دسکتاپ نمایش داده می‌شود در هدر، اما اینجا همیشه نمایش داده می‌شود چون ضروری است) -->
-                <form method="post" action="{% url 'shop:add_to_cart' post.id %}" class="product-actions">
-                    {% csrf_token %}
-                    <input type="hidden" name="quantity" value="1" />
-                    <button type="submit" class="add-to-cart-btn">افزودن به سبد خرید</button>
-                </form>
-
-                <div class="product-description">
-                    {{ post.body|linebreaks }}
-                </div>
-
-                <!-- مشخصات اختصاصی -->
-                <div class="product-specs">
-                    <h3>مشخصات فنی</h3>
-                    <ul>
-                        {% if fertilizer %}
-                            <li><span>نوع کود:</span> {{ fertilizer.fertilizer_type }}</li>
-                            <li><span>نیتروژن (N):</span> {{ fertilizer.nitrogen }}</li>
-                            <li><span>فسفر (P):</span> {{ fertilizer.phosphorus }}</li>
-                            <li><span>پتاسیم (K):</span> {{ fertilizer.potassium }}</li>
-                        {% elif pesticide %}
-                            <li><span>نوع سم:</span> {{ pesticide.pesticide_type }}</li>
-                            <li><span>مواد فعال:</span> {{ pesticide.active_ingredient }}</li>
-                            <li><span>غلظت:</span> {{ pesticide.concentration }}</li>
-                        {% elif seed %}
-                            <li><span>نوع گیاه:</span> {{ seed.crop_type }}</li>
-                            <li><span>رقم:</span> {{ seed.variety }}</li>
-                            <li><span>وزن بذر در کیلوگرم:</span> {{ seed.weight_per_kg }}</li>
-                        {% elif equipment %}
-                            <li><span>نوع ابزار:</span> {{ equipment.tool_type }}</li>
-                            <li><span>جنس:</span> {{ equipment.material }}</li>
-                            <li><span>وزن:</span> {{ equipment.weight }}</li>
-                        {% else %}
-                            <li>مشخصات فنی در دسترس نیست.</li>
-                        {% endif %}
-                    </ul>
-                </div>
-            </div>
+      <div class="product-detail-container">
+        <!-- تصویر محصول -->
+        <div class="product-gallery">
+          <div class="main-image">
+            {% if post.image %}
+              <img src="{{ post.image.url }}"
+                   alt="{% if post.image_alt %}{{ post.image_alt }}{% else %}تصویر محصول {{ post.title }}{% endif %}" />
+            {% else %}
+              <div class="placeholder-image">تصویری موجود نیست</div>
+            {% endif %}
+          </div>
         </div>
 
-        <!-- کامنت‌ها -->
-        <div class="comments-section">
-            <h2 class="section-title">کامنت‌ها ({{ comments.count }})</h2>
-            <div class="comments-list">
-                {% for comment in comments %}
-                    <div class="comment-item">
-                        <div class="comment-header">
-                            <strong>{{ comment.name }}</strong>
-                            <span class="comment-date">{{ comment.created|date:"Y/m/d H:i" }}</span>
-                        </div>
-                        <p class="comment-body">{{ comment.body }}</p>
-                    </div>
-                {% empty %}
-                    <p class="no-comments">در حال حاضر کامنتی برای این محصول ثبت نشده است.</p>
-                {% endfor %}
-            </div>
+        <!-- اطلاعات محصول -->
+        <div class="product-info">
+          <div class="product-category">{{ post.category }}</div>
+          <h1 class="product-name">{{ post.title }}</h1>
 
-            <!-- فرم کامنت -->
-            <div class="comment-form">
-                <h3>ارسال نظر</h3>
-                {% if new_comment %}
-                    <div class="success-message">نظر شما با موفقیت ارسال شد و پس از تأیید نمایش داده می‌شود.</div>
-                {% endif %}
-                <form id="myForm" method="post">
-                    {% csrf_token %}
-                    <div class="form-group">
-                        <label for="name">نام شما:</label>
-                        <input type="text" id="name" name="name" required />
-                    </div>
-                    <div class="form-group">
-                        <label for="body">متن نظر:</label>
-                        <textarea id="body" name="body" rows="4" required></textarea>
-                    </div>
-                    <button type="submit" class="submit-comment-btn">ارسال نظر</button>
-                </form>
+          <div class="product-meta">
+            <span class="author">نویسنده: {{ post.author }}</span>
+            <span class="status">وضعیت: {{ post.status }}</span>
+          </div>
+
+          <!-- قیمت -->
+          <div class="product-price-section">
+            <span class="product-price">
+              {% if post.price %}
+                {{ post.price }} تومان
+              {% else %}
+                قیمت توافقی
+              {% endif %}
+            </span>
+          </div>
+
+          <!-- موجودی انبار -->
+          <div class="product-stock-section">
+            {% if post.stock > 0 %}
+              <span class="product-stock in-stock">موجود در انبار ({{ post.stock }} عدد)</span>
+            {% else %}
+              <span class="product-stock out-of-stock">ناموجود</span>
+            {% endif %}
+          </div>
+
+          <!-- فرم افزودن به سبد خرید -->
+          <form method="post" action="{% url 'shop:add_to_cart' post.id %}"
+                class="product-actions" data-product-id="{{ post.id }}"
+                data-product-title="{{ post.title }}">
+            {% csrf_token %}
+            <input type="hidden" name="quantity" value="1" />
+            <button type="submit" class="add-to-cart-btn">افزودن به سبد خرید</button>
+          </form>
+
+          <div class="product-description">
+            {{ post.body|linebreaks }}
+          </div>
+
+          <!-- مشخصات اختصاصی -->
+          <div class="product-specs">
+            <h3>مشخصات فنی</h3>
+            <ul>
+              {% if fertilizer %}
+                <li><span>نوع کود:</span> {{ fertilizer.fertilizer_type }}</li>
+                <li><span>نیتروژن (N):</span> {{ fertilizer.nitrogen }}</li>
+                <li><span>فسفر (P):</span> {{ fertilizer.phosphorus }}</li>
+                <li><span>پتاسیم (K):</span> {{ fertilizer.potassium }}</li>
+              {% elif pesticide %}
+                <li><span>نوع سم:</span> {{ pesticide.pesticide_type }}</li>
+                <li><span>مواد فعال:</span> {{ pesticide.active_ingredient }}</li>
+                <li><span>غلظت:</span> {{ pesticide.concentration }}</li>
+              {% elif seed %}
+                <li><span>نوع گیاه:</span> {{ seed.crop_type }}</li>
+                <li><span>رقم:</span> {{ seed.variety }}</li>
+                <li><span>وزن بذر در کیلوگرم:</span> {{ seed.weight_per_kg }}</li>
+              {% elif equipment %}
+                <li><span>نوع ابزار:</span> {{ equipment.tool_type }}</li>
+                <li><span>جنس:</span> {{ equipment.material }}</li>
+                <li><span>وزن:</span> {{ equipment.weight }}</li>
+              {% else %}
+                <li>مشخصات فنی در دسترس نیست.</li>
+              {% endif %}
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- کامنت‌ها -->
+      <div class="comments-section">
+        <h2 class="section-title">کامنت‌ها ({{ comments.count }})</h2>
+        <div class="comments-list">
+          {% for comment in comments %}
+            <div class="comment-item">
+              <div class="comment-header">
+                <strong>{{ comment.name }}</strong>
+                <span class="comment-date">{{ comment.created|date:"Y/m/d H:i" }}</span>
+              </div>
+              <p class="comment-body">{{ comment.body }}</p>
             </div>
+          {% empty %}
+            <p class="no-comments">در حال حاضر کامنتی برای این محصول ثبت نشده است.</p>
+          {% endfor %}
         </div>
 
-        <!-- اشتراک‌گذاری -->
-        <div class="share-section">
-            <a href="{% url 'shop:share' post.id %}" class="share-link">🔗 اشتراک‌گذاری این محصول</a>
+        <!-- فرم کامنت -->
+        <div class="comment-form">
+          <h3>ارسال نظر</h3>
+          {% if new_comment %}
+            <div class="success-message" aria-live="polite">
+              نظر شما با موفقیت ارسال شد و پس از تأیید نمایش داده می‌شود.
+            </div>
+          {% endif %}
+          <form id="myForm" method="post" class="auth-form">
+            {% csrf_token %}
+            <div class="form-group">
+              <label for="id_name">نام شما:</label>
+              {{ form.name }}
+            </div>
+            <div class="form-group">
+              <label for="id_body">متن نظر:</label>
+              {{ form.body }}
+            </div>
+            <button type="submit" class="btn btn-primary">ارسال نظر</button>
+          </form>
         </div>
+      </div>
+
+      <!-- اشتراک‌گذاری -->
+      <div class="share-section">
+        <a href="{% url 'shop:share' post.id %}" class="auth-link">🔗 اشتراک‌گذاری این محصول</a>
+      </div>
     </div>
-</main>
+  </main>
 
+  {% include 'Shop/parchers/mobile_bottom_nav.html' %}
+
+  <!-- Toast Notification Script -->
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // افزودن به سبد خرید با AJAX
+      const forms = document.querySelectorAll('form[data-product-id]');
+      forms.forEach(form => {
+        form.addEventListener('submit', function(e) {
+          e.preventDefault();
+
+          const productId = this.dataset.productId;
+          const productTitle = this.dataset.productTitle;
+
+          fetch(this.action, {
+            method: 'POST',
+            headers: {
+              'X-CSRFToken': this.querySelector('[name=csrfmiddlewaretoken]').value,
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams(new FormData(this))
+          })
+          .then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              showToast(`«${productTitle}» به سبد خرید اضافه شد.`);
+
+              // به‌روزرسانی آیکون سبد خرید (در صورت وجود)
+              const cartBadge = document.getElementById('cart-badge');
+              if (cartBadge) {
+                cartBadge.textContent = data.total_items;
+                if (data.total_items > 0) {
+                  cartBadge.style.display = 'flex';
+                }
+              }
+            }
+          })
+          .catch(error => {
+            console.error('Error:', error);
+            showToast('خطا در افزودن به سبد خرید.');
+          });
+        });
+      });
+
+      function showToast(message) {
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.textContent = message;
+        document.getElementById('toast-container').appendChild(toast);
+
+        setTimeout(() => {
+          toast.classList.add('show');
+        }, 100);
+
+        setTimeout(() => {
+          toast.classList.remove('show');
+          setTimeout(() => toast.remove(), 300);
+        }, 3000);
+      }
+    });
+  </script>
 {% endblock %}

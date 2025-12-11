@@ -3,17 +3,37 @@ from django.contrib.auth.models import User
 from .models import UserAccount, Comment
 
 class AccountForm(forms.ModelForm):
-    GENDER_CHOICES = (
-        ("خانم", "خانم"),
-        ("اقا", "اقا"),
-    )
+    GENDER_CHOICES = UserAccount.GENDER_CHOICES
 
-    # فیلدهایی که از مدل User هستن
-    first_name = forms.CharField(label="نام", max_length=100)
-    last_name = forms.CharField(label="نام خانوادگی", max_length=100)
-    gender = forms.ChoiceField(choices=GENDER_CHOICES, widget=forms.RadioSelect, label="جنسیت")
-    phone = forms.CharField(label="تلفن", max_length=11)
-    address = forms.CharField(label="آدرس", widget=forms.Textarea, required=False)
+    first_name = forms.CharField(
+        label="نام",
+        max_length=100,
+        widget=forms.TextInput(attrs={'placeholder': 'نام خود را وارد کنید'})
+    )
+    last_name = forms.CharField(
+        label="نام خانوادگی",
+        max_length=100,
+        widget=forms.TextInput(attrs={'placeholder': 'نام خانوادگی خود را وارد کنید'})
+    )
+    gender = forms.ChoiceField(
+        choices=GENDER_CHOICES,
+        widget=forms.RadioSelect,
+        label="جنسیت"
+    )
+    phone = forms.CharField(
+        label="شماره همراه",
+        max_length=11,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'placeholder': '09123456789',
+            'readonly': 'readonly'
+        })
+    )
+    address = forms.CharField(
+        label="آدرس",
+        widget=forms.Textarea(attrs={'placeholder': 'آدرس خود را وارد کنید'}),
+        required=False
+    )
 
     class Meta:
         model = UserAccount
@@ -21,7 +41,6 @@ class AccountForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super(AccountForm, self).__init__(*args, **kwargs)
-        # پر کردن فیلدهای نام و نام خانوادگی از User
         if self.instance and self.instance.user:
             self.fields['first_name'].initial = self.instance.user.first_name
             self.fields['last_name'].initial = self.instance.user.last_name
@@ -29,28 +48,16 @@ class AccountForm(forms.ModelForm):
     def clean_first_name(self):
         first_name = self.cleaned_data.get('first_name')
         if first_name:
-            def validate_string(string):
-                allowed_chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzپچجحخهعغفقثصضشسیبلاتنمکگؤئدذرزژطظ '
-                for char in string:
-                    if char not in allowed_chars:
-                        return False
-                return True
-
-            if not validate_string(first_name):
+            allowed_chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzپچجحخهعغفقثصضشسیبلاتنمکگؤئدذرزژطظ '
+            if not all(char in allowed_chars for char in first_name):
                 raise forms.ValidationError("نام فقط باید شامل حروف فارسی یا انگلیسی و فاصله باشد.")
         return first_name
 
     def clean_last_name(self):
         last_name = self.cleaned_data.get('last_name')
         if last_name:
-            def validate_string(string):
-                allowed_chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzپچجحخهعغفقثصضشسیبلاتنمکگؤئدذرزژطظ '
-                for char in string:
-                    if char not in allowed_chars:
-                        return False
-                return True
-
-            if not validate_string(last_name):
+            allowed_chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzپچجحخهعغفقثصضشسیبلاتنمکگؤئدذرزژطظ '
+            if not all(char in allowed_chars for char in last_name):
                 raise forms.ValidationError("نام خانوادگی فقط باید شامل حروف فارسی یا انگلیسی و فاصله باشد.")
         return last_name
 
@@ -65,104 +72,158 @@ class AccountForm(forms.ModelForm):
 
 
 class SupportForm(forms.Form):
-    name = forms.CharField(max_length=30, label="نام")
-    email = forms.EmailField(label="ایمیل")
-    subject = forms.CharField(max_length=50, label="موضوع")
-    phone = forms.CharField(max_length=11, required=False, label="تلفن")
-    massage = forms.CharField(max_length=250, widget=forms.Textarea, label="متن پیام")
+    name = forms.CharField(
+        max_length=30,
+        label="نام",
+        widget=forms.TextInput(attrs={'placeholder': 'نام کامل شما'})
+    )
+    email = forms.EmailField(
+        label="ایمیل",
+        widget=forms.EmailInput(attrs={'placeholder': 'example@email.com'})
+    )
+    subject = forms.CharField(
+        max_length=50,
+        label="موضوع",
+        widget=forms.TextInput(attrs={'placeholder': 'موضوع پیام'})
+    )
+    phone = forms.CharField(
+        max_length=11,
+        required=False,
+        label="تلفن",
+        widget=forms.TextInput(attrs={'placeholder': '09123456789'})
+    )
+    massage = forms.CharField(
+        max_length=250,
+        widget=forms.Textarea(attrs={'placeholder': 'متن پیام شما...'}),
+        label="متن پیام"
+    )
 
 
 class ShareForm(forms.Form):
-    name = forms.CharField(max_length=30, label="نام و نام خانوادگی")
-    massage = forms.CharField(max_length=250, widget=forms.Textarea, label="پیام")
-    to = forms.EmailField(label="ایمیل گیرنده")
+    name = forms.CharField(
+        max_length=30,
+        label="نام و نام خانوادگی",
+        widget=forms.TextInput(attrs={'placeholder': 'نام شما'})
+    )
+    massage = forms.CharField(
+        max_length=250,
+        widget=forms.Textarea(attrs={'placeholder': 'پیام شخصی شما...'}),
+        label="پیام"
+    )
+    to = forms.EmailField(
+        label="ایمیل گیرنده",
+        widget=forms.EmailInput(attrs={'placeholder': 'friend@email.com'})
+    )
 
 
 class CommentForm(forms.ModelForm):
     class Meta:
         model = Comment
         fields = ('name', 'body')
+        widgets = {
+            'name': forms.TextInput(attrs={'placeholder': 'نام شما'}),
+            'body': forms.Textarea(attrs={'placeholder': 'دیدگاه شما...'})
+        }
 
 
 class LoginForm(forms.Form):
-    username = forms.CharField(label="نام کاربری")
-    password = forms.CharField(widget=forms.PasswordInput(), label="رمز عبور")
+    username = forms.CharField(
+        label="نام کاربری",
+        widget=forms.TextInput(attrs={'placeholder': 'نام کاربری خود را وارد کنید'})
+    )
+    password = forms.CharField(
+        label="رمز عبور",
+        widget=forms.PasswordInput(attrs={'placeholder': '••••••••••••'})
+    )
 
 
 class ChangePasswordForm(forms.Form):
-    old_password = forms.CharField(widget=forms.PasswordInput(), label="رمز عبور فعلی")
-    new_password1 = forms.CharField(widget=forms.PasswordInput(), label="رمز جدید")
-    new_password2 = forms.CharField(widget=forms.PasswordInput(), label="تکرار رمز جدید")
+    old_password = forms.CharField(
+        widget=forms.PasswordInput(attrs={'placeholder': 'رمز عبور فعلی'}),
+        label="رمز عبور فعلی"
+    )
+    new_password1 = forms.CharField(
+        widget=forms.PasswordInput(attrs={'placeholder': 'رمز عبور جدید'}),
+        label="رمز جدید"
+    )
+    new_password2 = forms.CharField(
+        widget=forms.PasswordInput(attrs={'placeholder': 'تکرار رمز عبور جدید'}),
+        label="تکرار رمز جدید"
+    )
 
 
 class SignInForm(forms.Form):
-    GENDER_CHOICES = (
-        ("خانم", "خانم"),
-        ("اقا", "اقا"),
-    )
+    # ✅ تغییر اصلی: هماهنگی با مدل
+    GENDER_CHOICES = UserAccount.GENDER_CHOICES
 
-    username = forms.CharField(max_length=70, label="نام کاربری")
-    first_name = forms.CharField(max_length=30, label="نام")
-    last_name = forms.CharField(max_length=30, label="نام خانوادگی")
-    email = forms.EmailField(label="ایمیل")
-    gender = forms.ChoiceField(choices=GENDER_CHOICES, widget=forms.RadioSelect, label="جنسیت")
-    address = forms.CharField(max_length=250, widget=forms.Textarea, required=False, label="آدرس")
-    phone = forms.CharField(max_length=11, label="شماره تلفن")
-    password = forms.CharField(widget=forms.PasswordInput(), label="رمز عبور")
-    password2 = forms.CharField(widget=forms.PasswordInput(), label="تکرار رمز عبور")
+    username = forms.CharField(
+        max_length=70,
+        label="نام کاربری",
+        widget=forms.TextInput(attrs={'placeholder': 'نام کاربری'})
+    )
+    first_name = forms.CharField(
+        max_length=30,
+        label="نام",
+        widget=forms.TextInput(attrs={'placeholder': 'نام'})
+    )
+    last_name = forms.CharField(
+        max_length=30,
+        label="نام خانوادگی",
+        widget=forms.TextInput(attrs={'placeholder': 'نام خانوادگی'})
+    )
+    email = forms.EmailField(
+        label="ایمیل",
+        widget=forms.EmailInput(attrs={'placeholder': 'example@email.com'})
+    )
+    gender = forms.ChoiceField(
+        choices=GENDER_CHOICES,
+        widget=forms.RadioSelect,
+        label="جنسیت"
+    )
+    address = forms.CharField(
+        max_length=250,
+        widget=forms.Textarea(attrs={'placeholder': 'آدرس کامل'}),
+        required=False,
+        label="آدرس"
+    )
+    phone = forms.CharField(
+        max_length=11,
+        label="شماره تلفن",
+        widget=forms.TextInput(attrs={'placeholder': '09123456789'})
+    )
+    password = forms.CharField(
+        widget=forms.PasswordInput(attrs={'placeholder': '••••••••••••','class': 'password-input'}),
+        label="رمز عبور"
+    )
+    password2 = forms.CharField(
+        widget=forms.PasswordInput(attrs={'placeholder': '••••••••••••','class': 'password-input'}),
+        label="تکرار رمز عبور"
+    )
 
     def clean_username(self):
         username = self.cleaned_data['username']
-        def validate_string(string):
-            allowed_chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890'
-            for char in string:
-                if char not in allowed_chars:
-                    return False
-            return True
-
-        def first_string(string):
-            allowed_chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
-            check = string[0]
-            return check in allowed_chars
-
         if username:
-            if first_string(username):
-                if validate_string(username):
-                    if len(username) >= 4:
-                        return username
-                    else:
-                        raise forms.ValidationError("نام کاربری باید حداقل 4 کاراکتر باشد.")
-                else:
-                    raise forms.ValidationError("نام کاربری فقط می‌تواند شامل حروف و اعداد باشد.")
-            else:
+            if not username[0].isalpha():
                 raise forms.ValidationError("کاراکتر اول نام کاربری باید حرف باشد.")
+            if not username.isalnum():
+                raise forms.ValidationError("نام کاربری فقط می‌تواند شامل حروف و اعداد باشد.")
+            if len(username) < 4:
+                raise forms.ValidationError("نام کاربری باید حداقل 4 کاراکتر باشد.")
         return username
 
     def clean_first_name(self):
         first_name = self.cleaned_data.get('first_name')
         if first_name:
-            def validate_string(string):
-                allowed_chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzپچجحخهعغفقثصضشسیبلاتنمکگؤئدذرزژطظ '
-                for char in string:
-                    if char not in allowed_chars:
-                        return False
-                return True
-
-            if not validate_string(first_name):
+            allowed_chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzپچجحخهعغفقثصضشسیبلاتنمکگؤئدذرزژطظ '
+            if not all(char in allowed_chars for char in first_name):
                 raise forms.ValidationError("نام فقط باید شامل حروف فارسی یا انگلیسی باشد.")
         return first_name
 
     def clean_last_name(self):
         last_name = self.cleaned_data.get('last_name')
         if last_name:
-            def validate_string(string):
-                allowed_chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzپچجحخهعغفقثصضشسیبلاتنمکگؤئدذرزژطظ '
-                for char in string:
-                    if char not in allowed_chars:
-                        return False
-                return True
-
-            if not validate_string(last_name):
+            allowed_chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzپچجحخهعغفقثصضشسیبلاتنمکگؤئدذرزژطظ '
+            if not all(char in allowed_chars for char in last_name):
                 raise forms.ValidationError("نام خانوادگی فقط باید شامل حروف فارسی یا انگلیسی باشد.")
         return last_name
 

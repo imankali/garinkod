@@ -1,51 +1,45 @@
-{% load static %}
-{% block head %}
-    <link rel="stylesheet" type="text/css" href="{% static 'css/hero_slider.css' %}">
-{% endblock %}
 
-<!-- Hero Slider -->
-<section class="hero-slider" id="hero-slider">
-    <div class="hero-slide active" style="background-image: url('https://images.unsplash.com/photo-1625246333195-78d9c38ad449?q=80&w=1200&auto=format&fit=crop');">
-        <div class="hero-overlay"></div>
-        <div class="hero-content">
-            <h2 class="hero-title">پرورش یک برداشت بهتر</h2>
-            <p class="hero-subtitle">شریک مورد اعتماد شما برای تامین نهاده‌های کشاورزی. از کودهای ارگانیک تا ابزارهای حرفه‌ای.</p>
-            <button class="hero-btn">خرید کنید</button>
-        </div>
-    </div>
-    <div class="hero-slide" style="background-image: url('https://images.unsplash.com/photo-1589923188900-85dae523342b?q=80&w=1200&auto=format&fit=crop');">
-        <div class="hero-overlay"></div>
-        <div class="hero-content">
-            <h2 class="hero-title">ادوات کشاورزی مدرن</h2>
-            <p class="hero-subtitle">تجهیزات پیشرفته برای افزایش بهره‌وری و کاهش هزینه‌های مزرعه شما.</p>
-            <button class="hero-btn">مشاهده ابزارها</button>
-        </div>
-    </div>
-    <div class="hero-slide" style="background-image: url('https://images.unsplash.com/photo-1464226184884-fa280b87c399?q=80&w=1200&auto=format&fit=crop');">
-        <div class="hero-overlay"></div>
-        <div class="hero-content">
-            <h2 class="hero-title">بذرهای اصلاح شده</h2>
-            <p class="hero-subtitle">تنوع بی‌نظیر از بذرهای مقاوم و پربازده برای اقلیم‌های مختلف.</p>
-            <button class="hero-btn">کاتالوگ بذر</button>
-        </div>
-    </div>
-
-    <!-- Slider Controls -->
-    <button class="slider-btn slider-btn-prev" onclick="prevSlide()">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="15 18 9 12 15 6"></polyline>
-        </svg>
-    </button>
-    <button class="slider-btn slider-btn-next" onclick="nextSlide()">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="9 18 15 12 9 6"></polyline>
-        </svg>
-    </button>
-
-    <!-- Slider Dots -->
-    <div class="slider-dots">
-        <span class="dot active" onclick="goToSlide(0)"></span>
-        <span class="dot" onclick="goToSlide(1)"></span>
-        <span class="dot" onclick="goToSlide(2)"></span>
-    </div>
-</section>
+        <!-- Hero Slider -->
+        <section class="hero-slider" id="hero-slider">
+            <div class="hero-slide active" style="background-image: url('https://images.unsplash.com/photo-1625246333195-78d9c38ad449?q=80&w=1200&auto=format&fit=crop');">
+                <div class="hero-overlay"></div>
+                <div class="hero-content">
+                    <h2 class="hero-title">پرورش یک برداشت بهتر</h2>
+                    <p class="hero-subtitle">شریک مورد اعتماد شما برای تامین نهاده‌های کشاورزی. از کودهای ارگانیک تا ابزارهای حرفه‌ای.</p>
+                    <button class="hero-btn">خرید کنید</button>
+                </div>
+            </div>
+            <div class="hero-slide" style="background-image: url('https://images.unsplash.com/photo-1589923188900-85dae523342b?q=80&w=1200&auto=format&fit=crop');">
+                <div class="hero-overlay"></div>
+                <div class="hero-content">
+                    <h2 class="hero-title">ادوات کشاورزی مدرن</h2>
+                    <p class="hero-subtitle">تجهیزات پیشرفته برای افزایش بهره‌وری و کاهش هزینه‌های مزرعه شما.</p>
+                    <button class="hero-btn">مشاهده ابزارها</button>
+                </div>
+            </div>
+            <div class="hero-slide" style="background-image: url('https://images.unsplash.com/photo-1464226184884-fa280b87c399?q=80&w=1200&auto=format&fit=crop');">
+                <div class="hero-overlay"></div>
+                <div class="hero-content">
+                    <h2 class="hero-title">بذرهای اصلاح شده</h2>
+                    <p class="hero-subtitle">تنوع بی‌نظیر از بذرهای مقاوم و پربازده برای اقلیم‌های مختلف.</p>
+                    <button class="hero-btn">کاتالوگ بذر</button>
+                </div>
+            </div>
+            <!-- Slider Controls -->
+            <button class="slider-btn slider-btn-prev" onclick="prevSlide()">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+            </button>
+            <button class="slider-btn slider-btn-next" onclick="nextSlide()">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+            </button>
+            <!-- Slider Dots -->
+            <div class="slider-dots">
+                <span class="dot active" onclick="goToSlide(0)"></span>
+                <span class="dot" onclick="goToSlide(1)"></span>
+                <span class="dot" onclick="goToSlide(2)"></span>
+            </div>
+        </section>

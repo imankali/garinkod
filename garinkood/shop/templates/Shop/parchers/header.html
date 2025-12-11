@@ -1,88 +1,78 @@
-{% load static %}
-{% block head %}
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" type="text/css" href="{% static 'css/header.css' %}">
-{% endblock %}
-
 <!-- Header -->
-<header class="header">
-    <div class="container header-content">
-        <!-- Logo & Search -->
-        <div class="header-left">
-            <div class="logo">
-                <div class="logo-icon">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M7 20h10"></path>
-                        <path d="M10 20c5.5-2.5.8-6.4 3-10"></path>
-                        <path d="M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z"></path>
-                        <path d="M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z"></path>
-                    </svg>
+    <header class="header">
+        <div class="container header-content">
+            <!-- Logo & Search -->
+            <div class="header-left">
+                <div class="logo">
+                    <div class="logo-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M7 20h10"></path>
+                            <path d="M10 20c5.5-2.5.8-6.4 3-10"></path>
+                            <path d="M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z"></path>
+                            <path d="M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z"></path>
+                        </svg>
+                    </div>
+                    <h1 class="logo-text">گرین کود</h1>
                 </div>
-                <h1 class="logo-text">گرین کود</h1>
-            </div>
-
-            <!-- Mobile Search Button -->
-            <button class="mobile-search-btn" onclick="toggleMobileSearch()" type="button">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="11" cy="11" r="8"></circle>
-                    <path d="m21 21-4.35-4.35"></path>
-                </svg>
-            </button>
-
-            <!-- Desktop Search -->
-            <div class="search-box desktop-search">
-                <form method="get" action="{% url 'shop:search' %}">
-                    <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <!-- Mobile Search Button -->
+                <button class="mobile-search-btn" onclick="toggleMobileSearch()" type="button">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="11" cy="11" r="8"></circle>
                         <path d="m21 21-4.35-4.35"></path>
                     </svg>
-                    <input type="text" name="text_input" value="{{ search_value|default:'' }}" placeholder="جستجو در محصولات...">
-                    <!-- دکمهٔ مخفی برای سابمیت با Enter -->
-                    <button type="submit" style="display: none;"></button>
-                </form>
+                </button>
+                <!-- Desktop Search -->
+                <div class="search-box desktop-search">
+                    <form method="get" action="{% url 'shop:search' %}">
+                        <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <path d="m21 21-4.35-4.35"></path>
+                        </svg>
+                        <input type="text" name="text_input" value="{{ search_value|default:'' }}" placeholder="جستجو در محصولات...">
+                        <!-- دکمهٔ مخفی برای سابمیت با Enter -->
+                        <button type="submit" style="display: none;"></button>
+                    </form>
+                </div>
             </div>
-        </div>
-
-        <!-- Desktop Nav -->
-        <nav class="desktop-nav">
-            <a href="/" class="nav-link">خانه</a>
-            <a href="#products-section" class="nav-link">محصولات</a>
-            <a href="#" class="nav-link">درباره ما</a>
-            <a href="#" class="nav-link">تماس با ما</a>
-        </nav>
-
-        <!-- Desktop Actions & Mobile Menu -->
-        <div class="header-right">
-            {% if user.is_authenticated %}
-                <a href="{% url 'shop:profile' %}" class="desktop-only">
-                    <button class="icon-btn" title="پروفایل">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path>
-                            <circle cx="12" cy="7" r="4"></circle>
-                        </svg>
-                    </button>
-                </a>
-            {% else %}
-                <a href="{% url 'shop:user_login' %}" class="desktop-only">
-                    <button class="icon-btn" title="ورود">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path>
-                            <circle cx="12" cy="7" r="4"></circle>
-                        </svg>
-                    </button>
-                </a>
-            {% endif %}
-
-            <a href="{% url 'shop:cart_detail' %}" class="icon-btn cart-btn" onclick="toggleCart(); return false;">
+            <!-- Desktop Nav -->
+            <nav class="desktop-nav">
+                <a href="/" class="nav-link">خانه</a>
+                <a href="#products-section" class="nav-link">محصولات</a>
+                <a href="#" class="nav-link">درباره ما</a>
+                <a href="#" class="nav-link">تماس با ما</a>
+            </nav>
+            <!-- Desktop Actions & Mobile Menu -->
+            <div class="header-right">
+                {% if user.is_authenticated %}
+                    <a href="{% url 'shop:profile' %}" class="desktop-only">
+                        <button class="icon-btn" title="پروفایل">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="12" cy="7" r="4"></circle>
+                            </svg>
+                        </button>
+                    </a>
+                {% else %}
+                    <a href="{% url 'shop:user_login' %}" class="desktop-only">
+                        <button class="icon-btn" title="ورود">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="12" cy="7" r="4"></circle>
+                            </svg>
+                        </button>
+                    </a>
+                {% endif %}
                 {% if request.user.is_authenticated %}
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="8" cy="21" r="1"></circle>
-                        <circle cx="19" cy="21" r="1"></circle>
-                        <path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"></path>
-                    </svg>
-                    <span class="cart-badge" id="cart-badge" style="display: none;">{{ request.user.cart.total_items }}</span>
+                    <a href="{% url 'shop:cart_detail' %}" class="desktop-only" onclick="toggleCart(); return false;">
+                        <button class="icon-btn cart-btn"  title="سبد خرید" type="submit">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="8" cy="21" r="1"></circle>
+                                <circle cx="19" cy="21" r="1"></circle>
+                                <path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"></path>
+                            </svg>
+                            <span class="cart-badge" id="cart-badge" style="display: none;">{{ request.user.cart.total_items }}</span>
+                        </button>
+                    </a>
                 {% else %}
                     <!-- برای مهمان‌ها، در تمپلیت باید از context استفاده کنید -->
                     <button class="icon-btn cart-btn" onclick="toggleCart()" title="سبد خرید">
@@ -94,47 +84,42 @@
                         <span class="cart-badge" id="cart-badge" style="display: none;">0</span>
                     </button>
                 {% endif %}
-            </a>
-
-
-            <button class="icon-btn mobile-only menu-toggle" onclick="toggleMobileMenu()" type="button">
-                <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="3" y1="12" x2="21" y2="12"></line>
-                    <line x1="3" y1="6" x2="21" y2="6"></line>
-                    <line x1="3" y1="18" x2="21" y2="18"></line>
-                </svg>
-                <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
-            </button>
+                <button class="icon-btn mobile-only menu-toggle" onclick="toggleMobileMenu()" type="button">
+                    <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="3" y1="12" x2="21" y2="12"></line>
+                        <line x1="3" y1="6" x2="21" y2="6"></line>
+                        <line x1="3" y1="18" x2="21" y2="18"></line>
+                    </svg>
+                    <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
         </div>
-    </div>
-
-    <!-- Mobile Search -->
-    <div class="mobile-search-container" id="mobile-search" style="display: none;">
-        <div class="search-box">
-            <form method="get" action="{% url 'shop:search' %}">
-                <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="11" cy="11" r="8"></circle>
-                    <path d="m21 21-4.35-4.35"></path>
-                </svg>
-                <input type="text" name="text_input" value="{{ search_value|default:'' }}" placeholder="جستجو در محصولات...">
-                <button type="submit" style="display: none;"></button>
-            </form>
+        <!-- Mobile Search -->
+        <div class="mobile-search-container" id="mobile-search" style="display: none;">
+            <div class="search-box">
+                <form method="get" action="{% url 'shop:search' %}">
+                    <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <path d="m21 21-4.35-4.35"></path>
+                    </svg>
+                    <input type="text" name="text_input" value="{{ search_value|default:'' }}" placeholder="جستجو در محصولات...">
+                    <button type="submit" style="display: none;"></button>
+                </form>
+            </div>
         </div>
-    </div>
-
-    <!-- Mobile Menu -->
-    <div class="mobile-menu" id="mobile-menu" style="display: none;">
-        <a href="/" class="mobile-menu-link">خانه</a>
-        <a href="#products-section" class="mobile-menu-link">محصولات</a>
-        <a href="#" class="mobile-menu-link">درباره ما</a>
-        <a href="#" class="mobile-menu-link">تماس با ما</a>
-        {% if user.is_authenticated %}
-            <a href="{% url 'shop:profile' %}" class="mobile-menu-link">پروفایل من</a>
-        {% else %}
-            <a href="{% url 'shop:user_login' %}" class="mobile-menu-link">ورود</a>
-        {% endif %}
-    </div>
-</header>
+        <!-- Mobile Menu -->
+        <div class="mobile-menu" id="mobile-menu" style="display: none;">
+            <a href="/" class="mobile-menu-link">خانه</a>
+            <a href="#products-section" class="mobile-menu-link">محصولات</a>
+            <a href="#" class="mobile-menu-link">درباره ما</a>
+            <a href="#" class="mobile-menu-link">تماس با ما</a>
+            {% if user.is_authenticated %}
+                <a href="{% url 'shop:profile' %}" class="mobile-menu-link">پروفایل من</a>
+            {% else %}
+                <a href="{% url 'shop:user_login' %}" class="mobile-menu-link">ورود</a>
+            {% endif %}
+        </div>
+    </header>

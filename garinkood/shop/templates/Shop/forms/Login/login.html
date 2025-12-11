@@ -1,69 +1,59 @@
+{% extends 'Shop/parent/base.html' %}
 {% load static %}
-{% block title %}
 
+{% block title %}ورود به حساب کاربری{% endblock %}
+
+{% block head %}
+  <link rel="stylesheet" type="text/css" href="{% static 'css/log_in.css' %}">
 {% endblock %}
 
-<head>
-
-  <meta charset="UTF-8">
-  <meta http-equiv="x-ua-compatible" content="ie=edge">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-        <link rel="stylesheet" type="text/css" href="{% static 'css/log_in.css' %}">
-</head>
-
-<body class="align">
-<div style="padding-left: 40%">
-  <div class="grid align__item">
-
-    <div class="register">
-
-      <svg xmlns="http://www.w3.org/2000/svg" class="site__logo" width="56" height="84" viewBox="77.7 214.9 274.7 412"><defs><linearGradient id="a" x1="0%" y1="0%" y2="0%"><stop offset="0%" stop-color="#8ceabb"/><stop offset="100%" stop-color="#378f7b"/></linearGradient></defs><path fill="url(#a)" d="M215 214.9c-83.6 123.5-137.3 200.8-137.3 275.9 0 75.2 61.4 136.1 137.3 136.1s137.3-60.9 137.3-136.1c0-75.1-53.7-152.4-137.3-275.9z"/></svg>
-
-      <h2>Log In</h2>
-
-      <form action="" method="post" class="form">
-
-        <div class="form__field">
-          <input type="text"  name="username" placeholder="username">
-        </div>
-
-
-        <div class="form__field">
-          <input type="password" name="password" placeholder="••••••••••••">
-        </div>
-
-        <div class="form__field">
-          <input type="submit" value="Log In">
-        </div>
-        {% csrf_token %}
-          {% if error %}
-              <span style="color: brown ">
-              خطا:
-              </span>
-
-          {{ error }}
-          {% endif %}
-      </form>
-
-      <p>No have an accout? <a style="color: #f7f7f7;" href="{% url 'shop:signin' %}">Sign Up</a></p>
-
+{% block body %}
+<div class="auth-wrapper">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="77.7 214.9 274.7 412">
+        <defs>
+          <linearGradient id="logo-gradient" x1="0%" y1="0%" y2="100%">
+            <stop offset="0%" stop-color="#8ceabb"/>
+            <stop offset="100%" stop-color="#378f7b"/>
+          </linearGradient>
+        </defs>
+        <path fill="url(#logo-gradient)" d="M215 214.9c-83.6 123.5-137.3 200.8-137.3 275.9 0 75.2 61.4 136.1 137.3 136.1s137.3-60.9 137.3-136.1c0-75.1-53.7-152.4-137.3-275.9z"/>
+      </svg>
     </div>
 
-    {% if form.errors%}
-        <p>لطفا خطاهایه زیر را اصلاح کنید!</p>
-    {% endif %}
-    {% for field in form %}
-        {% if field.errors  %}
-            {% for errors in field.errors%}
-                {{ field.label }} :
-                <br>{{ errors }}<br>
-            {% endfor %}
+    <h1 class="auth-title">ورود</h1>
+
+    <form method="post" class="auth-form">
+      {% csrf_token %}
+
+      <div class="form-group">
+        <label for="{{ form.username.id_for_label }}">نام کاربری</label>
+        {{ form.username }}
+        {% if form.username.errors %}
+          <div class="error-message">{{ form.username.errors }}</div>
         {% endif %}
-    {% endfor %}
+      </div>
+
+      <div class="form-group">
+        <label for="{{ form.password.id_for_label }}">رمز عبور</label>
+        {{ form.password }}
+        {% if form.password.errors %}
+          <div class="error-message">{{ form.password.errors }}</div>
+        {% endif %}
+      </div>
+
+      {% if error %}
+        <div class="error-message">{{ error }}</div>
+      {% endif %}
+
+      <button type="submit" class="btn btn-primary">ورود</button>
+    </form>
+
+    <p class="auth-link">
+      حساب کاربری ندارید؟
+      <a href="{% url 'shop:signin' %}">ثبت‌نام</a>
+    </p>
   </div>
 </div>
-
-
-
-
-</body>
+{% endblock %}

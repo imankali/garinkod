@@ -1,0 +1,193 @@
+.profile-wrapper {
+  display: flex;
+  justify-content: center;
+  padding: 1.5rem;
+  min-height: 100vh;
+  background-color: var(--c-1);
+}
+
+.profile-card {
+  width: 100%;
+  max-width: 580px;
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  padding: 2rem;
+}
+
+/* Header */
+.profile-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.avatar {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  background: var(--c-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+  color: white;
+  font-weight: 700;
+  font-size: 1.8rem;
+  box-shadow: 0 4px 12px rgba(119, 136, 115, 0.25);
+}
+
+.card-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--gray-900);
+  margin: 0;
+}
+
+/* Sections */
+.section {
+  margin-bottom: 2rem;
+}
+
+.section-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--c-4);
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--gray-200);
+}
+
+/* Data Rows */
+.data-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.data-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 16px;
+  font-size: 1rem;
+  color: var(--gray-800);
+}
+
+.data-label {
+  font-weight: 600;
+  color: var(--gray-700);
+  white-space: nowrap;
+  text-align: start;
+}
+
+.data-value {
+  font-weight: 500;
+  color: var(--gray-900);
+  text-align: end;
+}
+
+/* LTR content inside RTL */
+.ltr {
+  direction: ltr;
+  unicode-bidi: embed;
+  text-align: start !important;
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+/* Buttons */
+.button-group {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem 1.5rem;
+  font-weight: 600;
+  font-size: 1rem;
+  border-radius: 14px;
+  text-decoration: none;
+  min-height: 52px;
+  transition: all 0.25s ease;
+  font-family: "Vazirmatn", sans-serif;
+  text-align: center;
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--c-4);
+  outline-offset: 4px;
+}
+
+.btn-primary {
+  background: var(--c-3);
+  color: white;
+  border: 2px solid var(--c-3);
+}
+
+.btn-primary:hover {
+  background: var(--c-4);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 14px rgba(119, 136, 115, 0.35);
+}
+
+.btn-secondary {
+  background: transparent;
+  border: 2px solid var(--c-3);
+  color: var(--c-4);
+}
+
+.btn-secondary:hover {
+  background: var(--c-3);
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 5px 12px rgba(119, 136, 115, 0.3);
+}
+
+.btn-danger {
+  background: transparent;
+  border: 2px solid #e53e3e;
+  color: #e53e3e;
+}
+
+.btn-danger:hover {
+  background: #e53e3e;
+  color: white;
+  box-shadow: 0 5px 12px rgba(229, 62, 62, 0.35);
+}
+
+/* 📱 Mobile */
+@media (max-width: 768px) {
+  .profile-card {
+    padding: 1.75rem 1.25rem;
+  }
+
+  .data-row {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.35rem;
+  }
+
+  .data-label {
+    text-align: end;
+  }
+
+  .data-value {
+    text-align: start;
+  }
+
+  .button-group {
+    margin-top: 1.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .btn {
+    width: 100%;
+  }
+
+  .section {
+    margin-bottom: 2.25rem;
+  }
+}

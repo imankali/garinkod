@@ -22,34 +22,33 @@
 }
 
 body {
-  font-family: "Vazirmatn", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "Vazirmatn", "Segoe UI", Tahoma, sans-serif;
   background-color: var(--c-1);
   color: var(--gray-800);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
-  padding-bottom: 64px;
+  /* فقط اگر فوتر fixed باشه: */
+  /* padding-bottom: 64px; */
 }
 
-@media (min-width: 768px) {
+/* فقط اگر نیاز به padding-bottom در موبایل داشته باشی */
+@media (max-width: 767px) {
   body {
-    padding-bottom: 0;
+    padding-bottom: 64px;
   }
 }
 
-/* Scrollbar */
+/* Scrollbar (اختیاری ولی زیبا) */
 ::-webkit-scrollbar {
   width: 8px;
 }
-
 ::-webkit-scrollbar-track {
   background: var(--c-1);
 }
-
 ::-webkit-scrollbar-thumb {
   background: var(--c-3);
   border-radius: 4px;
 }
-
 ::-webkit-scrollbar-thumb:hover {
   background: var(--c-4);
 }
@@ -60,4 +59,3 @@ body {
   margin: 0 auto;
   padding: 0 1rem;
 }
-

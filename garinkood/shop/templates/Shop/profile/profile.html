@@ -1,39 +1,69 @@
 {% extends 'Shop/parent/base.html' %}
 {% load static %}
 
-
-
-{% block title %}
-{% endblock %}
-
+{% block title %}پروفایل کاربری{% endblock %}
 
 {% block head %}
+  <link rel="stylesheet" type="text/css" href="{% static 'css/profile.css' %}">
 {% endblock %}
 
-
 {% block body %}
-        نام کاربری:
-    <br>
-        {{ request.user.username }}
-    <br>
-نام:
-    <br>
-        {{ request.user.first_name }}
-    <br>
-    نام خانوادگی:
-    <br>
-        {{ request.user.last_name }}
-    <br>
-    شماره همراه:
-    <br>
-        {{ account.phone }}
-    <br>
-    <a href="{% url 'shop:change_password' %}">تغیر پسورد</a>
-    <br>
-    <a href="{% url 'shop:account' %}">تغیر اطلعات</a>
-    <br>
-     {% if request.user.is_authenticated %}
-         <a class="navbar-brand" href="{% url 'shop:user_logout' %}">logout</a>
-     {% endif %}
+<div class="profile-wrapper" role="main">
+  <div class="profile-card">
+    <!-- Header -->
+    <div class="profile-header">
+      <div class="avatar">
+        <span>{{ request.user.username|slice:":1"|upper }}</span>
+      </div>
+      <h1 class="card-title">پروفایل کاربری</h1>
+    </div>
 
+    <!-- Personal Info Section -->
+    <section class="section">
+      <h2 class="section-title">اطلاعات شخصی</h2>
+      <div class="data-list">
+        <div class="data-row">
+          <span class="data-label">نام کاربری</span>
+          <span class="data-value ltr">{{ request.user.username }}</span>
+        </div>
+        <div class="data-row">
+          <span class="data-label">نام</span>
+          <span class="data-value">{{ request.user.first_name|default:"—" }}</span>
+        </div>
+        <div class="data-row">
+          <span class="data-label">نام خانوادگی</span>
+          <span class="data-value">{{ request.user.last_name|default:"—" }}</span>
+        </div>
+        <div class="data-row">
+          <span class="data-label">شماره همراه</span>
+          <span class="data-value ltr">{{ account.phone|default:"—" }}</span>
+        </div>
+        {% if request.user.date_joined %}
+        <div class="data-row">
+          <span class="data-label">عضو از</span>
+          <span class="data-value">{{ request.user.date_joined|date:"Y/m/d" }}</span>
+        </div>
+        {% endif %}
+      </div>
+    </section>
+
+    <!-- Account Actions -->
+    <section class="section">
+      <h2 class="section-title">مدیریت حساب</h2>
+      <div class="button-group">
+        <a href="{% url 'shop:account' %}" class="btn btn-primary">ویرایش اطلاعات</a>
+        <a href="{% url 'shop:change_password' %}" class="btn btn-secondary">تغییر رمز عبور</a>
+      </div>
+    </section>
+
+    <!-- Logout -->
+    {% if request.user.is_authenticated %}
+    <section class="section">
+      <div class="button-group">
+        <a href="{% url 'shop:user_logout' %}" class="btn btn-danger">خروج از حساب</a>
+      </div>
+    </section>
+    {% endif %}
+  </div>
+</div>
 {% endblock %}
