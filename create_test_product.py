@@ -1,6 +1,6 @@
 
 from django.contrib.auth import get_user_model
-from shop.models import Category, Item
+from .garinkood.shop.models import Category, Item
 
 User = get_user_model()
 
