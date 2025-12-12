@@ -16,7 +16,9 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.contrib.auth.decorators import login_required
-from .models import Item, Cart, CartItem  # ← اضافه شود
+from django.views.decorators.csrf import ensure_csrf_cookie
+import json
+from .models import Item, Cart, CartItem
 
 # --- تابع ارسال ایمیل ---
 def send_email(to_address, subject, body):
@@ -63,10 +65,11 @@ def home(request):
         'equipments': equipments,
     }
 
-    return render(request, 'shop/parchers/home.html', context)
+    return render(request, 'Shop/parchers/home.html', context)
 
 
 # --- لیست محصولات با فیلتر و جستجو ---
+@ensure_csrf_cookie
 def ItemsList(request, category_slug=None):
     category = None
     categories = Category.objects.all()
@@ -101,7 +104,7 @@ def ItemsList(request, category_slug=None):
     except EmptyPage:
         Items = paginator.page(paginator.num_pages)
 
-    return render(request, 'shop/product/category_product.html', {
+    return render(request, 'Shop/product/category_product.html', {
         'product': Items,
         'category_slug': category_slug,
         'categories': categories,
@@ -113,7 +116,7 @@ def ItemsList(request, category_slug=None):
     })
 
 
-# shop/views.py
+# Shop/views.py
 def product_detail(request, slug):
     post = get_object_or_404(Item, status='published', slug=slug)
     comments = post.comments.filter(active=True)
@@ -165,7 +168,7 @@ def product_detail(request, slug):
         'equipment': equipment,
     }
 
-    return render(request, 'shop/product/detail_product.html', context)
+    return render(request, 'Shop/product/detail_product.html', context)
 # --- فرم پشتیبانی ---
 def Support(request):
     sent = False
@@ -190,7 +193,7 @@ def Support(request):
     else:
         form = SupportForm()
 
-    return render(request, 'shop/forms/support_form.html', {
+    return render(request, 'Shop/forms/support_form.html', {
         'form': form,
         'sent': sent
     })
@@ -242,7 +245,7 @@ def ShareItem(request, post_id):
     else:
         form = ShareForm()
 
-    return render(request, 'shop/forms/share.html', {
+    return render(request, 'Shop/forms/share.html', {
         'form': form,
         'sent': sent,
         'post': post,
@@ -305,7 +308,7 @@ def search(request, category_slug=None):
     except EmptyPage:
         Items = paginator.page(paginator.num_pages)
 
-    return render(request, 'shop/product/category_product.html', {
+    return render(request, 'Shop/product/category_product.html', {
         'product': Items,
         'search_value': query_search,
         'selected_category_slug': current_category.slug if current_category else '',
@@ -330,20 +333,20 @@ def user_login(request):
                     return redirect('shop:home')
                 else:
                     error = "حساب شما غیرفعال است."
-                    return render(request, 'shop/forms/Login/login.html', {'form': form, 'error': error})
+                    return render(request, 'Shop/forms/Login/login.html', {'form': form, 'error': error})
             else:
                 error = "نام کاربری یا رمز عبور اشتباه است."
-                return render(request, 'shop/forms/Login/login.html', {'form': form, 'error': error})
+                return render(request, 'Shop/forms/Login/login.html', {'form': form, 'error': error})
     else:
         form = LoginForm()
-    return render(request, 'shop/forms/Login/login.html', {'form': form})
+    return render(request, 'Shop/forms/Login/login.html', {'form': form})
 
 
 # --- پروفایل کاربر ---
 @login_required(login_url='shop:home')
 def profile_user(request):
     account = UserAccount.objects.get(user=request.user)
-    return render(request, 'shop/profile/profile.html', {
+    return render(request, 'Shop/profile/profile.html', {
         'account': account
     })
 
@@ -368,12 +371,12 @@ def change_password(request):
 
             if not user.check_password(old_password):
                 error_massage = "رمز قدیمی نادرست است."
-                return render(request, "shop/profile/change_password.html",
+                return render(request, "Shop/profile/change_password.html",
                               {'form': form, 'error_massage': error_massage})
 
             if new_password1 != new_password2:
                 error_massage = "رمز جدید مطابقت ندارد."
-                return render(request, "shop/profile/change_password.html",
+                return render(request, "Shop/profile/change_password.html",
                               {'form': form, 'error_massage': error_massage})
 
             user.set_password(new_password1)
@@ -382,7 +385,7 @@ def change_password(request):
             return redirect("shop:home")
     else:
         form = ChangePasswordForm()
-    return render(request, "shop/profile/change_password.html", {'form': form})
+    return render(request, "Shop/profile/change_password.html", {'form': form})
 
 
 # --- ثبت‌نام کاربر ---
@@ -393,7 +396,7 @@ def SignInView(request):
             username = form.cleaned_data['username']
             if User.objects.filter(username=username).exists():
                 error_massage = "این نام کاربری از قبل وجود دارد."
-                return render(request, "shop/forms/Login/sign_in.html", {'form': form, 'error_massage': error_massage})
+                return render(request, "Shop/forms/Login/sign_in.html", {'form': form, 'error_massage': error_massage})
             else:
                 first_name = form.cleaned_data['first_name']
                 last_name = form.cleaned_data['last_name']
@@ -403,7 +406,7 @@ def SignInView(request):
 
                 if password1 != password2:
                     error_massage = "رمز عبور مطابقت ندارد."
-                    return render(request, "shop/forms/Login/sign_in.html", {'form': form, 'error_massage': error_massage})
+                    return render(request, "Shop/forms/Login/sign_in.html", {'form': form, 'error_massage': error_massage})
 
                 try:
                     user = User.objects.create_user(
@@ -427,19 +430,19 @@ def SignInView(request):
 
                 except Exception as e:
                     error_massage = f"خطا در ثبت‌نام: {str(e)}"
-                    return render(request, "shop/forms/Login/sign_in.html", {'form': form, 'error_massage': error_massage})
+                    return render(request, "Shop/forms/Login/sign_in.html", {'form': form, 'error_massage': error_massage})
         else:
-            return render(request, 'shop/forms/Login/sign_in.html', {'form': form})
+            return render(request, 'Shop/forms/Login/sign_in.html', {'form': form})
     else:
         if request.user.is_authenticated:
             return redirect('shop:home')
         else:
             form = SignInForm()
-            return render(request, "shop/forms/Login/sign_in.html", {'form': form})
+            return render(request, "Shop/forms/Login/sign_in.html", {'form': form})
 
 
 # --- ویرایش پروفایل ---
-# shop/views.py — UserAccountView
+# Shop/views.py — UserAccountView
 @login_required(login_url='shop:home')
 def UserAccountView(request):
     user = request.user
@@ -478,14 +481,14 @@ def UserAccountView(request):
         form.fields['last_name'].initial = user.last_name
         form.fields['phone'].initial = account.phone  # ← این خط جدید
 
-    return render(request, 'shop/forms/account_form.html', {
+    return render(request, 'Shop/forms/account_form.html', {
         'form': form,
         'account': account
     })
 
 
 
-# shop/views.py — انتهای فایل
+# Shop/views.py — انتهای فایل
 
 def get_or_create_cart(request):
     """سبد فعلی کاربر یا مهمان را برمی‌گرداند."""
@@ -522,8 +525,9 @@ def add_to_cart(request, product_id):
     product = get_object_or_404(Item, id=product_id, status='published')
     cart = get_or_create_cart(request)
     try:
-        quantity = int(request.POST.get('quantity', 1))
-    except (ValueError, TypeError):
+        data = json.loads(request.body)
+        quantity = int(data.get('quantity', 1))
+    except (json.JSONDecodeError, ValueError, TypeError):
         quantity = 1
 
     if quantity < 1:
@@ -554,7 +558,25 @@ def add_to_cart(request, product_id):
 
 def cart_detail(request):
     cart = get_or_create_cart(request)
-    return render(request, 'shop/cart/cart_detail.html', {'cart': cart})
+    return render(request, 'Shop/cart/cart_detail.html', {'cart': cart})
+
+def get_cart_data(request):
+    cart = get_or_create_cart(request)
+    total_price = sum(item.product.price * item.quantity for item in cart.items.all())
+    cart_data = {
+        'total_items': cart.total_items,
+        'total_price': total_price,
+        'items': [
+            {
+                'id': item.product.id,
+                'name': item.product.title,
+                'price': item.product.price,
+                'quantity': item.quantity,
+                'image_url': item.product.image_url() if hasattr(item.product, 'image_url') else ''
+            } for item in cart.items.all()
+        ]
+    }
+    return JsonResponse(cart_data)
 
 
 @require_POST

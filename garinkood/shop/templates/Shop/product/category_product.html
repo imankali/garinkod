@@ -8,6 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" type="text/css" href="{% static 'css/header_for_listitems.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'css/header.css' %}">
     <!-- all_category_product.css -->
     <link rel="stylesheet" type="text/css" href="{% static 'css/prudact_card.css' %}">
     <!-- mobile_bottom_nav.css -->
@@ -46,11 +47,7 @@
                                         <div class="product-info">
                                             <h3 class="product-name">{{ item.title }}</h3>
                                             <div class="product-price">{{ item.price }} تومان</div>
-                                            <form method="post" action="{% url 'shop:add_to_cart' item.id %}">
-                                                {% csrf_token %}
-                                                <input type="hidden" name="quantity" value="1">
-                                                <button type="submit" class="add-to-cart-btn">افزودن</button>
-                                            </form>
+                                            <button type="button" class="add-to-cart-btn" data-product-id="{{ item.id }}">افزودن</button>
                                         </div>
                                     </div>
                                 </a>
