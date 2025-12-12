@@ -1,0 +1,30 @@
+{% extends 'shop/parent/base.html' %}
+{% load static %}
+
+{% block title %}
+    garinkod
+{% endblock %}
+
+{% block head %}
+
+
+{% endblock %}
+
+
+{% block body %}
+
+    {% include 'shop/parchers/header.html' %}
+    <main>
+        <!-- بنر اصلی -->
+        {% include 'shop/parchers/hero_slider.html' %}
+
+        <!-- Products Section -->
+        {% include 'shop/product/all_category_product.html' %}
+
+
+</main>
+
+
+    {% include 'shop/parchers/mobile_bottom_nav.html' %}
+
+{% endblock %}

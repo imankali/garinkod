@@ -1,0 +1,23 @@
+Performing system checks...
+
+System check identified no issues (0 silenced).
+December 11, 2025 - 23:02:23
+Django version 6.0, using settings 'garinkood.settings'
+Starting development server at http://127.0.0.1:8000/
+Quit the server with CONTROL-C.
+
+WARNING: This is a development server. Do not use it in a production setting. Use a production WSGI or ASGI server instead.
+For more information on production servers see: https://docs.djangoproject.com/en/6.0/howto/deployment/
+Watching for file changes with StatReloader
+[12/Dec/2025 00:27:58] "GET / HTTP/1.1" 200 19174
+[12/Dec/2025 00:27:58] "GET /media/products/dummy_image_s4rPglk.png HTTP/1.1" 200 12
+[12/Dec/2025 00:27:58] "GET /static/css/base.css HTTP/1.1" 200 1024
+[12/Dec/2025 00:27:58] "GET /static/css/header.css HTTP/1.1" 200 4075
+[12/Dec/2025 00:27:58] "GET /static/css/hero_slider.css HTTP/1.1" 200 2466
+[12/Dec/2025 00:27:58] "GET /static/css/mobile_bottom_nav.css HTTP/1.1" 200 3806
+[12/Dec/2025 00:27:59] "GET /static/css/prudact_card.css HTTP/1.1" 200 3718
+[12/Dec/2025 00:27:59] "GET /static/css/footer.css HTTP/1.1" 200 807
+[12/Dec/2025 00:27:59] "GET /static/javascripts/home.js HTTP/1.1" 200 6141
+[12/Dec/2025 00:27:59] "POST /cart/add/1/ HTTP/1.1" 302 0
+[12/Dec/2025 00:27:59] "GET /cart/ HTTP/1.1" 200 4094
+[12/Dec/2025 00:28:00] "GET /cart/ HTTP/1.1" 200 4094

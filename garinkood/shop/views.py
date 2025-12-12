@@ -548,21 +548,34 @@ def cart_detail(request):
 def update_cart(request, item_id):
     cart = get_or_create_cart(request)
     cart_item = get_object_or_404(CartItem, id=item_id, cart=cart)
+    original_quantity = cart_item.quantity
     try:
         quantity = int(request.POST.get('quantity', 1))
     except (ValueError, TypeError):
-        quantity = 1
+        return JsonResponse({'success': False, 'error': 'تعداد نامعتبر است.'})
 
     if quantity < 1:
-        cart_item.delete()
-    elif quantity > cart_item.product.stock:
+        return JsonResponse({'success': False, 'error': 'تعداد نمی‌تواند کمتر از ۱ باشد.'})
+
+    if quantity > cart_item.product.stock:
         cart_item.quantity = cart_item.product.stock
         cart_item.save()
-    else:
-        cart_item.quantity = quantity
-        cart_item.save()
+        return JsonResponse({
+            'success': False,
+            'error': f'موجودی محصول فقط {cart_item.product.stock} عدد است.',
+            'item_total_price': cart_item.total_price,
+            'cart_total_price': cart.total_price,
+            'original_quantity': cart_item.quantity
+        })
 
-    return redirect('shop:cart_detail')
+    cart_item.quantity = quantity
+    cart_item.save()
+
+    return JsonResponse({
+        'success': True,
+        'item_total_price': cart_item.total_price,
+        'cart_total_price': cart.total_price
+    })
 
 
 @require_POST
@@ -570,4 +583,9 @@ def remove_from_cart(request, item_id):
     cart = get_or_create_cart(request)
     cart_item = get_object_or_404(CartItem, id=item_id, cart=cart)
     cart_item.delete()
-    return redirect('shop:cart_detail')
+
+    return JsonResponse({
+        'success': True,
+        'cart_total_price': cart.total_price,
+        'cart_item_count': cart.items.count()
+    })
