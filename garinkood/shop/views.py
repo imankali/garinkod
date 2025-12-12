@@ -572,7 +572,7 @@ def get_cart_data(request):
                 'name': item.product.title,
                 'price': item.product.price,
                 'quantity': item.quantity,
-                'image_url': item.product.image_url() if hasattr(item.product, 'image_url') else ''
+                'image_url': item.product.image_url if hasattr(item.product, 'image_url') else ''
             } for item in cart.items.all()
         ]
     }
