@@ -88,7 +88,7 @@
                         </svg>
                     </a>
                 {% endif %}
-                <button class="icon-btn" onclick="toggleCart()" title="سبد خرید" aria-label="سبد خرید">
+                <button class="icon-btn cart-icon-btn" title="سبد خرید" aria-label="سبد خرید">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="8" cy="21" r="1"></circle>
                         <circle cx="19" cy="21" r="1"></circle>
@@ -173,3 +173,22 @@
             </ul>
         </div>
         <div class="mobile-menu-overlay" id="mobile-menu-overlay"></div>
+
+        <!-- Cart Sidebar -->
+        <div class="cart-overlay" id="cart-overlay"></div>
+        <div class="cart-sidebar" id="cart-sidebar">
+            <div class="cart-header">
+                <h2>سبد خرید</h2>
+                <button class="cart-close-btn" aria-label="بستن سبد خرید">&times;</button>
+            </div>
+            <div class="cart-items" id="cart-items">
+                <!-- Cart items will be injected here by JavaScript -->
+            </div>
+            <div class="cart-footer" id="cart-footer">
+                <div class="cart-total">
+                    <span>جمع کل:</span>
+                    <span id="cart-total-price">0 تومان</span>
+                </div>
+                <a href="{% url 'shop:cart_detail' %}" class="checkout-btn">مشاهده سبد خرید</a>
+            </div>
+        </div>
