@@ -1,172 +1,151 @@
-
-        <!-- Products Section -->
-        <section class="products-section" id="products-section">
-            <div class="container">
-                <!-- Search Results (برای جستجوی زنده — اختیاری) -->
-                <div id="search-results" style="display: none;">
-                    <h2 class="section-title">نتایج جستجو برای "<span id="search-query-text"></span>"</h2>
-                    <div class="products-grid" id="search-products-grid"></div>
-                    <p class="no-results" id="no-results" style="display: none;">محصولی یافت نشد.</p>
+<!-- Products Section -->
+<section class="products-section" id="products-section">
+    <div class="container">
+        <!-- Category Sections -->
+        <div id="category-sections">
+            <!-- کودها -->
+            <div class="category-section">
+                <div class="category-header">
+                    <div class="category-title-wrapper">
+                        <div class="category-bar"></div>
+                        <h2 class="category-title">کودها</h2>
+                    </div>
+                    {% if fertilizers %}
+                        <a href="{% url 'shop:product_list_by_category' 'kod' %}" class="view-more-btn desktop-only">مشاهده بیشتر
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                        </a>
+                        <a href="{% url 'shop:product_list_by_category' 'kod' %}" class="view-more-btn-small mobile-only">بیشتر
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                        </a>
+                    {% endif %}
                 </div>
-
-                <!-- Category Sections -->
-                <div id="category-sections">
-                    <!-- کودها -->
-                    <div class="category-section">
-                        <div class="category-header">
-                            <div class="category-title-wrapper">
-                                <div class="category-bar"></div>
-                                <h2 class="category-title">کودها</h2>
+                <div class="products-grid" id="fertilizers-grid">
+                    {% for item in fertilizers %}
+                        <a href="{% url 'shop:product_detail' item.slug %}">
+                            <div class="product-card" data-id="{{ item.id }}" data-name="{{ item.title }}" data-price="{{ item.price }}" data-image="{{ item.image.url }}">
+                                <img src="{{ item.image.url }}" alt="{{ item.title }}" class="product-image">
+                                <div class="product-info">
+                                    <h3 class="product-name">{{ item.title }}</h3>
+                                    <p><div class="product-price">{{ item.price }}تومان</div></p>
+                                    <button type="button" class="add-to-cart-btn" data-product-id="{{ item.id }}">افزودن</button>
+                                </div>
                             </div>
-                            {% if fertilizers %}
-                                <a href="{% url 'shop:product_list_by_category' 'kod' %}" class="view-more-btn desktop-only">مشاهده بیشتر
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <polyline points="9 18 15 12 9 6"></polyline>
-                                    </svg>
-                                </a>
-                                <a href="{% url 'shop:product_list_by_category' 'kod' %}" class="view-more-btn-small mobile-only">بیشتر
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <polyline points="9 18 15 12 9 6"></polyline>
-                                    </svg>
-                                </a>
-                            {% endif %}
-                        </div>
-                        <div class="products-grid" id="fertilizers-grid">
-                            {% for item in fertilizers %}
-                                <a href="{% url 'shop:product_detail' item.slug %}">
-                                    <div class="product-card" data-id="{{ item.id }}" data-name="{{ item.title }}" data-price="{{ item.price }}" data-image="{{ item.image.url }}">
-                                        <img src="{{ item.image.url }}" alt="{{ item.title }}" class="product-image">
-                                        <div class="product-info">
-                                            <h3 class="product-name">{{ item.title }}</h3>
-                                            <div class="product-price">{{ item.price }} تومان</div>
-                                            <form method="post" action="{% url 'shop:add_to_cart' item.id %}">
-                                                {% csrf_token %}
-                                                <input type="hidden" name="quantity" value="1">
-                                                <button type="submit" class="add-to-cart-btn">افزودن</button>
-                                            </form>
-                                        </div>
-                                    </div>
-                                </a>
-                            {% endfor %}
-                        </div>
-                    </div>
-                    <!-- سموم -->
-                    <div class="category-section">
-                        <div class="category-header">
-                            <div class="category-title-wrapper">
-                                <div class="category-bar"></div>
-                                <h2 class="category-title">سموم</h2>
-                            </div>
-                            {% if pesticides %}
-                                <a href="{% url 'shop:product_list_by_category' 'sam' %}" class="view-more-btn desktop-only">مشاهده بیشتر
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <polyline points="9 18 15 12 9 6"></polyline>
-                                    </svg>
-                                </a>
-                                <a href="{% url 'shop:product_list_by_category' 'sam' %}" class="view-more-btn-small mobile-only">بیشتر
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <polyline points="9 18 15 12 9 6"></polyline>
-                                    </svg>
-                                </a>
-                            {% endif %}
-                        </div>
-                        <div class="products-grid" id="pesticides-grid">
-                            {% for item in pesticides %}
-                                <a href="{% url 'shop:product_detail' item.slug %}">
-                                    <div class="product-card" data-id="{{ item.id }}" data-name="{{ item.title }}" data-price="{{ item.price }}" data-image="{{ item.image.url }}">
-                                        <img src="{{ item.image.url }}" alt="{{ item.title }}" class="product-image">
-                                        <div class="product-info">
-                                            <h3 class="product-name">{{ item.title }}</h3>
-                                            <div class="product-price">{{ item.price }} تومان</div>
-                                            <form method="post" action="{% url 'shop:add_to_cart' item.id %}">
-                                                {% csrf_token %}
-                                                <input type="hidden" name="quantity" value="1">
-                                                <button type="submit" class="add-to-cart-btn">افزودن</button>
-                                            </form>
-                                        </div>
-                                    </div>
-                                </a>
-                            {% endfor %}
-                        </div>
-                    </div>
-                    <!-- بذرها -->
-                    <div class="category-section">
-                        <div class="category-header">
-                            <div class="category-title-wrapper">
-                                <div class="category-bar"></div>
-                                <h2 class="category-title">بذرها</h2>
-                            </div>
-                            {% if seeds %}
-                                <a href="{% url 'shop:product_list_by_category' 'bazr' %}" class="view-more-btn desktop-only">مشاهده بیشتر
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <polyline points="9 18 15 12 9 6"></polyline>
-                                    </svg>
-                                </a>
-                                <a href="{% url 'shop:product_list_by_category' 'bazr' %}" class="view-more-btn-small mobile-only">بیشتر
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <polyline points="9 18 15 12 9 6"></polyline>
-                                    </svg>
-                                </a>
-                            {% endif %}
-                        </div>
-                        <div class="products-grid" id="seeds-grid">
-                            {% for item in seeds %}
-                                <a href="{% url 'shop:product_detail' item.slug %}">
-                                    <div class="product-card" data-id="{{ item.id }}" data-name="{{ item.title }}" data-price="{{ item.price }}" data-image="{{ item.image.url }}">
-                                        <img src="{{ item.image.url }}" alt="{{ item.title }}" class="product-image">
-                                        <div class="product-info">
-                                            <h3 class="product-name">{{ item.title }}</h3>
-                                            <div class="product-price">{{ item.price }} تومان</div>
-                                            <form method="post" action="{% url 'shop:add_to_cart' item.id %}">
-                                                {% csrf_token %}
-                                                <input type="hidden" name="quantity" value="1">
-                                                <button type="submit" class="add-to-cart-btn">افزودن</button>
-                                            </form>
-                                        </div>
-                                    </div>
-                                </a>
-                            {% endfor %}
-                        </div>
-                    </div>
-                    <!-- ادوات -->
-                    <div class="category-section">
-                        <div class="category-header">
-                            <div class="category-title-wrapper">
-                                <div class="category-bar"></div>
-                                <h2 class="category-title">ادوات</h2>
-                            </div>
-                            {% if equipments %}
-                                <a href="{% url 'shop:product_list_by_category' 'adavat' %}" class="view-more-btn desktop-only">مشاهده بیشتر
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <polyline points="9 18 15 12 9 6"></polyline>
-                                    </svg>
-                                </a>
-                                <a href="{% url 'shop:product_list_by_category' 'adavat' %}" class="view-more-btn-small mobile-only">بیشتر
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <polyline points="9 18 15 12 9 6"></polyline>
-                                    </svg>
-                                </a>
-                            {% endif %}
-                        </div>
-                        <div class="products-grid" id="tools-grid">
-                            {% for item in equipments %}
-                                <a href="{% url 'shop:product_detail' item.slug %}">
-                                    <div class="product-card" data-id="{{ item.id }}" data-name="{{ item.title }}" data-price="{{ item.price }}" data-image="{{ item.image.url }}">
-                                        <img src="{{ item.image.url }}" alt="{{ item.title }}" class="product-image">
-                                        <div class="product-info">
-                                            <h3 class="product-name">{{ item.title }}</h3>
-                                            <div class="product-price">{{ item.price }} تومان</div>
-                                            <form method="post" action="{% url 'shop:add_to_cart' item.id %}">
-                                                {% csrf_token %}
-                                                <input type="hidden" name="quantity" value="1">
-                                                <button type="submit" class="add-to-cart-btn">افزودن</button>
-                                            </form>
-                                        </div>
-                                    </div>
-                                </a>
-                            {% endfor %}
-                        </div>
-                    </div>
+                        </a>
+                    {% endfor %}
                 </div>
             </div>
-        </section>
+
+            <!-- سموم -->
+            <div class="category-section">
+                <div class="category-header">
+                    <div class="category-title-wrapper">
+                        <div class="category-bar"></div>
+                        <h2 class="category-title">سموم</h2>
+                    </div>
+                    {% if pesticides %}
+                        <a href="{% url 'shop:product_list_by_category' 'sam' %}" class="view-more-btn desktop-only">مشاهده بیشتر
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                        </a>
+                        <a href="{% url 'shop:product_list_by_category' 'sam' %}" class="view-more-btn-small mobile-only">بیشتر
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                        </a>
+                    {% endif %}
+                </div>
+                <div class="products-grid" id="pesticides-grid">
+                    {% for item in pesticides %}
+                        <a href="{% url 'shop:product_detail' item.slug %}">
+                            <div class="product-card" data-id="{{ item.id }}" data-name="{{ item.title }}" data-price="{{ item.price }}" data-image="{{ item.image.url }}">
+                                <img src="{{ item.image.url }}" alt="{{ item.title }}" class="product-image">
+                                <div class="product-info">
+                                    <h3 class="product-name">{{ item.title }}</h3>
+                                    <div class="product-price">{{ item.price }} تومان</div>
+                                    <button type="button" class="add-to-cart-btn" data-product-id="{{ item.id }}">افزودن</button>
+                                </div>
+                            </div>
+                        </a>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- بذرها -->
+            <div class="category-section">
+                <div class="category-header">
+                    <div class="category-title-wrapper">
+                        <div class="category-bar"></div>
+                        <h2 class="category-title">بذرها</h2>
+                    </div>
+                    {% if seeds %}
+                        <a href="{% url 'shop:product_list_by_category' 'bazr' %}" class="view-more-btn desktop-only">مشاهده بیشتر
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                        </a>
+                        <a href="{% url 'shop:product_list_by_category' 'bazr' %}" class="view-more-btn-small mobile-only">بیشتر
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                        </a>
+                    {% endif %}
+                </div>
+                <div class="products-grid" id="seeds-grid">
+                    {% for item in seeds %}
+                        <a href="{% url 'shop:product_detail' item.slug %}">
+                            <div class="product-card" data-id="{{ item.id }}" data-name="{{ item.title }}" data-price="{{ item.price }}" data-image="{{ item.image.url }}">
+                                <img src="{{ item.image.url }}" alt="{{ item.title }}" class="product-image">
+                                <div class="product-info">
+                                    <h3 class="product-name">{{ item.title }}</h3>
+                                    <div class="product-price">{{ item.price }} تومان</div>
+                                    <button type="button" class="add-to-cart-btn" data-product-id="{{ item.id }}">افزودن</button>
+                                </div>
+                            </div>
+                        </a>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- ادوات -->
+            <div class="category-section">
+                <div class="category-header">
+                    <div class="category-title-wrapper">
+                        <div class="category-bar"></div>
+                        <h2 class="category-title">ادوات</h2>
+                    </div>
+                    {% if equipments %}
+                        <a href="{% url 'shop:product_list_by_category' 'adavat' %}" class="view-more-btn desktop-only">مشاهده بیشتر
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                        </a>
+                        <a href="{% url 'shop:product_list_by_category' 'adavat' %}" class="view-more-btn-small mobile-only">بیشتر
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                        </a>
+                    {% endif %}
+                </div>
+                <div class="products-grid" id="tools-grid">
+                    {% for item in equipments %}
+                        <a href="{% url 'shop:product_detail' item.slug %}">
+                            <div class="product-card" data-id="{{ item.id }}" data-name="{{ item.title }}" data-price="{{ item.price }}" data-image="{{ item.image.url }}">
+                                <img src="{{ item.image.url }}" alt="{{ item.title }}" class="product-image">
+                                <div class="product-info">
+                                    <h3 class="product-name">{{ item.title }}</h3>
+                                    <div class="product-price">{{ item.price }} تومان</div>
+                                    <button type="button" class="add-to-cart-btn" data-product-id="{{ item.id }}">افزودن</button>
+                                </div>
+                            </div>
+                        </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</section>

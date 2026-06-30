@@ -1,0 +1,30 @@
+{% extends 'Shop/parent/base.html' %}
+{% load static %}
+
+{% block title %}فروشگاه گرین کود{% endblock %}
+
+{% block extra_css %}
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="{% static 'css/header.css' %}">
+    <link rel="stylesheet" href="{% static 'css/hero_slider.css' %}">
+    <link rel="stylesheet" href="{% static 'css/prudact_card.css' %}">
+    <link rel="stylesheet" href="{% static 'css/mobile_bottom_nav.css' %}">
+    <link rel="stylesheet" href="{% static 'css/footer.css' %}">
+{% endblock %}
+
+{% block content %}
+    <main>
+        {% include 'Shop/partials/hero_slider.html' %}
+        {% include 'Shop/product/all_category_product.html' %}
+    </main>
+
+    {% include 'Shop/partials/mobile_bottom_nav.html' %}
+{% endblock %}
+
+{% block extra_js %}
+    <!-- Optional: Page-specific JS -->
+    <script src="{% static 'javascripts/home.js' %}"></script>
+{% endblock %}

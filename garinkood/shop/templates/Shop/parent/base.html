@@ -4,25 +4,57 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}فروشگاه گرین کود{% endblock %}</title>
+    <meta name="description" content="فروشگاه تخصصی کود، سم، بذر و ادوات کشاورزی گرین کود">
+    <meta name="keywords" content="کود, سم, بذر, ادوات کشاورزی, محصولات باغبانی">
+    <meta name="author" content="گرین کود">
+    <meta name="theme-color" content="#2e7d32">
 
-    <!-- Vazirmatn Font (ضروری برای نمایش صحیح فارسی) -->
+    <!-- Open Graph -->
+    <meta property="og:title" content="فروشگاه گرین کود">
+    <meta property="og:description" content="فروشگاه تخصصی محصولات کشاورزی و باغبانی">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="{{ request.build_absolute_uri }}">
+    <meta property="og:image" content="{% static 'images/logo.png' %}">
+
+    <!-- Icons -->
+    <link rel="icon" type="image/png" href="{% static 'images/favicon.png' %}">
+    <link rel="apple-touch-icon" href="{% static 'images/apple-touch-icon.png' %}">
+
+    <!-- Preconnect for fonts -->
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
+    <link rel="preload" href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/fonts/webfonts/Vazirmatn-Regular.woff2" as="font" type="font/woff2" crossorigin>
+
+    <!-- Vazirmatn Font (بدون فاصله اضافه!) -->
     <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet">
 
+    <title>{% block title %}فروشگاه گرین کود{% endblock %}</title>
+
     <!-- Base Styles -->
-    <link rel="stylesheet" type="text/css" href="{% static 'css/base.css' %}">
+    <link rel="stylesheet" href="{% static 'css/base.css' %}">
 
     <!-- Block for extra CSS -->
-    {% block head %}{% endblock %}
+    {% block extra_css %}{% endblock %}
 </head>
 <body>
-    {% block body %}{% endblock %}
+    {% include 'Shop/partials/header.html' %}
 
-    <section>
-        {% include 'Shop/parchers/fother.html' %}
-    </section>
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
 
-    <!-- Optional: Global JS -->
+    {% include 'Shop/partials/fother.html' %}
+
+    <!-- jQuery (اگر نیاز دارید) -->
+    <!-- <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script> -->
+
+    <!-- Base JS -->
     <script src="{% static 'javascripts/home.js' %}"></script>
+    <script>
+        window.CSRF_TOKEN = "{{ csrf_token }}";
+        window.STATIC_URL = "{% static '' %}";
+    </script>
+
+    <!-- Block for page-specific JS -->
+    {% block extra_js %}{% endblock %}
 </body>
 </html>

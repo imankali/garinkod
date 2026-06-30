@@ -2,6 +2,7 @@ from django import forms
 from django.contrib.auth.models import User
 from .models import UserAccount, Comment
 
+
 class AccountForm(forms.ModelForm):
     GENDER_CHOICES = UserAccount.GENDER_CHOICES
 
@@ -119,9 +120,10 @@ class ShareForm(forms.Form):
 class CommentForm(forms.ModelForm):
     class Meta:
         model = Comment
-        fields = ('name', 'body')
+        fields = ('name', 'email', 'body')  # ✅ اضافه کردن email
         widgets = {
             'name': forms.TextInput(attrs={'placeholder': 'نام شما'}),
+            'email': forms.EmailInput(attrs={'placeholder': 'ایمیل شما'}),
             'body': forms.Textarea(attrs={'placeholder': 'دیدگاه شما...'})
         }
 
@@ -143,17 +145,18 @@ class ChangePasswordForm(forms.Form):
         label="رمز عبور فعلی"
     )
     new_password1 = forms.CharField(
+        min_length=8,  # ✅ حداقل 8 کاراکتر
         widget=forms.PasswordInput(attrs={'placeholder': 'رمز عبور جدید'}),
         label="رمز جدید"
     )
     new_password2 = forms.CharField(
+        min_length=8,  # ✅ حداقل 8 کاراکتر
         widget=forms.PasswordInput(attrs={'placeholder': 'تکرار رمز عبور جدید'}),
         label="تکرار رمز جدید"
     )
 
 
 class SignInForm(forms.Form):
-    # ✅ تغییر اصلی: هماهنگی با مدل
     GENDER_CHOICES = UserAccount.GENDER_CHOICES
 
     username = forms.CharField(
@@ -192,16 +195,20 @@ class SignInForm(forms.Form):
         widget=forms.TextInput(attrs={'placeholder': '09123456789'})
     )
     password = forms.CharField(
+        min_length=8,  # ✅ حداقل 8 کاراکتر
         widget=forms.PasswordInput(attrs={'placeholder': '••••••••••••','class': 'password-input'}),
         label="رمز عبور"
     )
     password2 = forms.CharField(
+        min_length=8,  # ✅ حداقل 8 کاراکتر
         widget=forms.PasswordInput(attrs={'placeholder': '••••••••••••','class': 'password-input'}),
         label="تکرار رمز عبور"
     )
 
     def clean_username(self):
         username = self.cleaned_data['username']
+        if User.objects.filter(username=username).exists():  # ✅ بررسی تکراری بودن
+            raise forms.ValidationError("این نام کاربری قبلاً ثبت شده است.")
         if username:
             if not username[0].isalpha():
                 raise forms.ValidationError("کاراکتر اول نام کاربری باید حرف باشد.")

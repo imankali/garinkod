@@ -16,7 +16,7 @@
     <!-- footer.css -->
     <link rel="stylesheet" type="text/css" href="{% static 'css/footer.css' %}">
 {% endblock %}
-{% block body %}    {% include 'Shop/parchers/header_for_listitems.html' %}
+{% block body %}    {% include 'Shop/partials/header_for_listitems.html' %}
     <main>
         <!-- Products Section -->
         <section class="products-section" id="products-section">
@@ -53,7 +53,7 @@
                                 </a>
                             {% endfor %}
                         </div>
-                        {% include 'Shop/parchers/pagination.html' %}
+                        {% include 'Shop/partials/pagination.html' %}
                     {% else %}
                         <p class="no-results" style="text-align: center; padding: 2rem; font-size: 1.1rem;">متأسفانه محصولی یافت نشد.</p>
                     {% endif %}
@@ -61,5 +61,5 @@
             </div>
         </section>
     </main>
-    {% include 'Shop/parchers/mobile_bottom_nav.html' %}
+    {% include 'Shop/partials/mobile_bottom_nav.html' %}
 {% endblock %}

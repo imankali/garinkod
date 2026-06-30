@@ -1,49 +1,75 @@
 from django.shortcuts import render, get_object_or_404, redirect
-from django.http import HttpResponse
-from .models import *
+from django.http import JsonResponse
 from django.db.models import Q
+from .models import *
 from .forms import *
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from django.db.models.functions import Greatest
-from django.contrib.postgres.search import SearchRank, SearchQuery, SearchVector, TrigramSimilarity
 from django.contrib.auth import login, authenticate, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from django.shortcuts import render, get_object_or_404, redirect
-from django.http import JsonResponse
+from django.contrib import messages
+from django.core.mail import send_mail
 from django.views.decorators.http import require_POST
-from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import ensure_csrf_cookie
+from django.views.decorators.cache import cache_page
 import json
-from .models import Item, Cart, CartItem
+
+
+# --- تابع کمکی: دریافت مشخصات محصول ---
+def get_product_details(product):
+    """دریافت مشخصات اختصاصی محصول"""
+    details = {
+        'fertilizer': None,
+        'pesticide': None,
+        'seed': None,
+        'equipment': None
+    }
+
+    try:
+        details['fertilizer'] = product.fertilizerdetail
+    except FertilizerDetail.DoesNotExist:
+        pass
+
+    try:
+        details['pesticide'] = product.pesticidedetail
+    except PesticideDetail.DoesNotExist:
+        pass
+
+    try:
+        details['seed'] = product.seeddetail
+    except SeedDetail.DoesNotExist:
+        pass
+
+    try:
+        details['equipment'] = product.equipmentdetail
+    except EquipmentDetail.DoesNotExist:
+        pass
+
+    return details
+
 
 # --- تابع ارسال ایمیل ---
 def send_email(to_address, subject, body):
-    email_address = 'garinkood@gmail.com'
-    email_password = 'udmkupzpjckxkvzf'
-    smtp_server = 'smtp.gmail.com'
-
-    msg = MIMEMultipart()
-    msg['From'] = email_address
-    msg['To'] = to_address
-    msg['Subject'] = subject
-    msg.attach(MIMEText(body, 'plain'))
+    """ارسال ایمیل با استفاده از Django Email Backend"""
+    from django.conf import settings
 
     try:
-        with smtplib.SMTP(smtp_server, 587) as server:
-            server.starttls()
-            server.login(email_address, email_password)
-            server.sendmail(email_address, to_address, msg.as_string())
+        send_mail(
+            subject=subject,
+            message=body,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[to_address],
+            fail_silently=False,
+        )
+        return True
     except Exception as e:
         print("خطا در ارسال ایمیل:", str(e))
+        return False
 
 
 # --- صفحه اصلی ---
+@cache_page(60 * 15)  # کش 15 دقیقه
 def home(request):
-    # دریافت دسته‌ها
     try:
         category_fertilizer = Category.objects.get(slug="kod")
         category_pesticide = Category.objects.get(slug="sam")
@@ -52,11 +78,12 @@ def home(request):
     except Category.DoesNotExist:
         category_fertilizer = category_pesticide = category_seed = category_equipment = None
 
-    # دریافت محصولات هر دسته (حداکثر ۴ عدد)
-    fertilizers = Item.objects.filter(category=category_fertilizer, status='published')[:4] if category_fertilizer else []
-    pesticides = Item.objects.filter(category=category_pesticide, status='published')[:4] if category_pesticide else []
-    seeds = Item.objects.filter(category=category_seed, status='published')[:4] if category_seed else []
-    equipments = Item.objects.filter(category=category_equipment, status='published')[:4] if category_equipment else []
+    # نمایش 6 محصول به جای 4
+    fertilizers = Product.objects.filter(category=category_fertilizer, status='published')[
+                  :6] if category_fertilizer else []
+    pesticides = Product.objects.filter(category=category_pesticide, status='published')[:6] if category_pesticide else []
+    seeds = Product.objects.filter(category=category_seed, status='published')[:6] if category_seed else []
+    equipments = Product.objects.filter(category=category_equipment, status='published')[:6] if category_equipment else []
 
     context = {
         'fertilizers': fertilizers,
@@ -64,48 +91,44 @@ def home(request):
         'seeds': seeds,
         'equipments': equipments,
     }
+    return render(request, 'Shop/partials/home.html', context)
 
-    return render(request, 'Shop/parchers/home.html', context)
 
-
-# --- لیست محصولات با فیلتر و جستجو ---
+# --- لیست محصولات ---
 @ensure_csrf_cookie
-def ItemsList(request, category_slug=None):
+def items_list(request, category_slug=None):
     category = None
     categories = Category.objects.all()
 
-    # تعیین دسته‌بندی فعلی
     if category_slug:
         category = get_object_or_404(Category, slug=category_slug)
-        Items = Item.objects.filter(category=category, status='published')
+        items = Product.objects.filter(category=category, status='published')
     else:
-        Items = Item.objects.filter(status='published')
+        items = Product.objects.filter(status='published')
 
-    # فیلترهای قیمت و موجودی
     min_price = request.GET.get('min_price')
     max_price = request.GET.get('max_price')
     in_stock = request.GET.get('in_stock') == 'on'
 
     if min_price:
-        Items = Items.filter(price__gte=min_price)
+        items = items.filter(price__gte=min_price)
     if max_price:
-        Items = Items.filter(price__lte=max_price)
+        items = items.filter(price__lte=max_price)
     if in_stock:
-        Items = Items.filter(stock__gt=0)
+        items = items.filter(stock__gt=0)
 
-    # صفحه‌بندی
-    paginator = Paginator(Items, 5)
+    paginator = Paginator(items, 9)  # تغییر به 9
     page = request.GET.get('page', 1)
 
     try:
-        Items = paginator.page(page)
+        items = paginator.page(page)
     except PageNotAnInteger:
-        Items = paginator.page(1)
+        items = paginator.page(1)
     except EmptyPage:
-        Items = paginator.page(paginator.num_pages)
+        items = paginator.page(paginator.num_pages)
 
     return render(request, 'Shop/product/category_product.html', {
-        'product': Items,
+        'product': items,
         'category_slug': category_slug,
         'categories': categories,
         'category': category,
@@ -116,44 +139,23 @@ def ItemsList(request, category_slug=None):
     })
 
 
-# Shop/views.py
+# --- جزئیات محصول ---
 def product_detail(request, slug):
-    post = get_object_or_404(Item, status='published', slug=slug)
+    post = get_object_or_404(Product, status='published', slug=slug)
     comments = post.comments.filter(active=True)
     new_comment = None
 
-    fertilizer = pesticide = seed = equipment = None
-    try:
-        fertilizer = post.fertilizerdetail
-    except FertilizerDetail.DoesNotExist:
-        pass
-
-    try:
-        pesticide = post.pesticidedetail
-    except PesticideDetail.DoesNotExist:
-        pass
-
-    try:
-        seed = post.seeddetail
-    except SeedDetail.DoesNotExist:
-        pass
-
-    try:
-        equipment = post.equipmentdetail
-    except EquipmentDetail.DoesNotExist:
-        pass
+    # استفاده از تابع کمکی
+    details = get_product_details(post)
 
     if request.method == 'POST':
         form = CommentForm(request.POST)
         if form.is_valid():
             new_comment = form.save(commit=False)
             new_comment.post = post
-            comment_exists = post.comments.filter(
-                name=new_comment.name,
-                body=new_comment.body
-            ).exists()
-            if not comment_exists:
+            if not post.comments.filter(name=new_comment.name, body=new_comment.body).exists():
                 new_comment.save()
+                messages.success(request, "نظر شما با موفقیت ثبت شد و پس از تایید نمایش داده می‌شود.")
     else:
         form = CommentForm()
 
@@ -162,67 +164,41 @@ def product_detail(request, slug):
         'comments': comments,
         'form': form,
         'new_comment': new_comment,
-        'fertilizer': fertilizer,
-        'pesticide': pesticide,
-        'seed': seed,
-        'equipment': equipment,
+        **details,
     }
-
     return render(request, 'Shop/product/detail_product.html', context)
-# --- فرم پشتیبانی ---
-def Support(request):
+
+
+# --- پشتیبانی ---
+def support(request):
     sent = False
     if request.method == 'POST':
         form = SupportForm(request.POST)
         if form.is_valid():
             cd = form.cleaned_data
-            email = cd['email']
-            subject = cd['subject']
-            name = cd['name']
-            phone = cd['phone']
-            message = cd['massage']
             full_message = f"""
-نام: {name}
-ایمیل: {email}
-تلفن: {phone}
+نام: {cd['name']}
+ایمیل: {cd['email']}
+تلفن: {cd['phone']}
 پیام:
-{message}
+{cd['massage']}
 """
-            send_email('garinkood@gmail.com', subject, full_message)
-            sent = True
+            if send_email('garinkood@gmail.com', cd['subject'], full_message):
+                messages.success(request, "پیام شما با موفقیت ارسال شد!")
+                sent = True
+            else:
+                messages.error(request, "خطا در ارسال پیام. لطفاً دوباره تلاش کنید.")
     else:
         form = SupportForm()
-
-    return render(request, 'Shop/forms/support_form.html', {
-        'form': form,
-        'sent': sent
-    })
+    return render(request, 'Shop/forms/support_form.html', {'form': form, 'sent': sent})
 
 
-# --- اشتراک‌گذاری محصول ---
-def ShareItem(request, post_id):
-    post = get_object_or_404(Item, status='published', id=post_id)
+# --- اشتراک‌گذاری ---
+def share_item(request, post_id):
+    post = get_object_or_404(Product, status='published', id=post_id)
 
-    fertilizer = pesticide = seed = equipment = None
-    try:
-        fertilizer = post.fertilizerdetail
-    except FertilizerDetail.DoesNotExist:
-        pass
-
-    try:
-        pesticide = post.pesticidedetail
-    except PesticideDetail.DoesNotExist:
-        pass
-
-    try:
-        seed = post.seeddetail
-    except SeedDetail.DoesNotExist:
-        pass
-
-    try:
-        equipment = post.equipmentdetail
-    except EquipmentDetail.DoesNotExist:
-        pass
+    # استفاده از تابع کمکی
+    details = get_product_details(post)
 
     sent = False
     if request.method == 'POST':
@@ -230,8 +206,6 @@ def ShareItem(request, post_id):
         if form.is_valid():
             cd = form.cleaned_data
             post_url = request.build_absolute_uri(post.get_absolute_url())
-            to = cd['to']
-            subject = f"{cd['name']} شما را به مطالعه '{post.title}' دعوت کرده است"
             message = f"""
 {cd['name']} شما را به مطالعه '{post.title}' دعوت کرده است.
 
@@ -240,76 +214,55 @@ def ShareItem(request, post_id):
 لینک محصول:
 {post_url}
 """
-            send_email(to, subject, message)
-            sent = True
+            if send_email(cd['to'], f"{cd['name']} شما را به مطالعه '{post.title}' دعوت کرده است", message):
+                messages.success(request, "لینک محصول با موفقیت ارسال شد!")
+                sent = True
+            else:
+                messages.error(request, "خطا در ارسال ایمیل. لطفاً دوباره تلاش کنید.")
     else:
         form = ShareForm()
-
     return render(request, 'Shop/forms/share.html', {
-        'form': form,
-        'sent': sent,
-        'post': post,
-        'fertilizer': fertilizer,
-        'pesticide': pesticide,
-        'seed': seed,
-        'equipment': equipment
+        'form': form, 'sent': sent, 'post': post, **details
     })
 
 
-# --- جستجوی پیشرفته ---
+# --- جستجو ---
 def search(request, category_slug=None):
     query_search = request.GET.get('text_input', '')
     selected_category_slug = request.GET.get('category', '')
     min_price = request.GET.get('min_price')
     max_price = request.GET.get('max_price')
-    print(min_price)
     in_stock = request.GET.get('in_stock') == 'on'
 
-    # تعیین دسته فعلی از URL یا فرم
     current_category = None
     if category_slug:
         current_category = get_object_or_404(Category, slug=category_slug)
     elif selected_category_slug:
         current_category = get_object_or_404(Category, slug=selected_category_slug)
 
-    # شروع فیلتر محصولات
-    Items = Item.objects.filter(status='published')
-
+    items = Product.objects.filter(status='published')
     if current_category:
-        Items = Items.filter(category=current_category)
-
+        items = items.filter(category=current_category)
     if query_search:
-        Items = Items.filter(Q(title__icontains=query_search) | Q(body__icontains=query_search))
-
-    if min_price and min_price != 'None':
-        try:
-            min_price = int(min_price)
-            Items = Items.filter(price__gte=min_price)
-        except ValueError:
-            pass  # یا خطای مناسب نمایش دهید
-
-    if max_price and max_price != 'None':
-        try:
-            max_price = int(max_price)
-            Items = Items.filter(price__lte=max_price)
-        except ValueError:
-            pass  # یا خطای مناسب نمایش دهید
+        items = items.filter(Q(title__icontains=query_search) | Q(body__icontains=query_search))
+    if min_price and min_price.isdigit():
+        items = items.filter(price__gte=int(min_price))
+    if max_price and max_price.isdigit():
+        items = items.filter(price__lte=int(max_price))
     if in_stock:
-        Items = Items.filter(stock__gt=0)
+        items = items.filter(stock__gt=0)
 
-    # صفحه‌بندی
-    paginator = Paginator(Items, 5)
+    paginator = Paginator(items, 9)  # تغییر به 9
     page = request.GET.get('page', 1)
-
     try:
-        Items = paginator.page(page)
+        items = paginator.page(page)
     except PageNotAnInteger:
-        Items = paginator.page(1)
+        items = paginator.page(1)
     except EmptyPage:
-        Items = paginator.page(paginator.num_pages)
+        items = paginator.page(paginator.num_pages)
 
     return render(request, 'Shop/product/category_product.html', {
-        'product': Items,
+        'product': items,
         'search_value': query_search,
         'selected_category_slug': current_category.slug if current_category else '',
         'category_slug': category_slug,
@@ -317,188 +270,135 @@ def search(request, category_slug=None):
         'max_price': max_price,
         'in_stock': in_stock,
         'categories': Category.objects.all(),
-        'subcategories': SubCategory.objects.filter(category=current_category) if current_category else SubCategory.objects.all()
+        'subcategories': SubCategory.objects.filter(
+            category=current_category) if current_category else SubCategory.objects.all()
     })
 
-# --- لاگین کاربر ---
+
+# --- لاگین/ثبت‌نام/پروفایل ---
 def user_login(request):
     if request.method == "POST":
         form = LoginForm(request.POST)
         if form.is_valid():
             cd = form.cleaned_data
             user = authenticate(request, username=cd['username'], password=cd['password'])
-            if user is not None:
-                if user.is_active:
-                    login(request, user)
-                    return redirect('shop:home')
-                else:
-                    error = "حساب شما غیرفعال است."
-                    return render(request, 'Shop/forms/Login/login.html', {'form': form, 'error': error})
-            else:
-                error = "نام کاربری یا رمز عبور اشتباه است."
-                return render(request, 'Shop/forms/Login/login.html', {'form': form, 'error': error})
+            if user and user.is_active:
+                login(request, user)
+                messages.success(request, "با موفقیت وارد شدید!")
+                return redirect('shop:home')
+            messages.error(request, "نام کاربری یا رمز عبور اشتباه است.")
     else:
         form = LoginForm()
     return render(request, 'Shop/forms/Login/login.html', {'form': form})
 
 
-# --- پروفایل کاربر ---
-@login_required(login_url='shop:home')
-def profile_user(request):
-    account = UserAccount.objects.get(user=request.user)
-    return render(request, 'Shop/profile/profile.html', {
-        'account': account
-    })
-
-
-# --- لاگ‌اوت کاربر ---
 def user_logout(request):
     logout(request)
+    messages.success(request, "با موفقیت خارج شدید!")
     return redirect('shop:home')
 
 
-# --- تغییر رمز عبور ---
+@login_required(login_url='shop:home')
+def profile_user(request):
+    account = UserAccount.objects.get(user=request.user)
+    return render(request, 'Shop/profile/profile.html', {'account': account})
+
+
 @login_required(login_url='shop:home')
 def change_password(request):
     if request.method == "POST":
-        user = request.user
         form = ChangePasswordForm(request.POST)
         if form.is_valid():
+            user = request.user
             cd = form.cleaned_data
-            old_password = cd["old_password"]
-            new_password1 = cd["new_password1"]
-            new_password2 = cd["new_password2"]
-
-            if not user.check_password(old_password):
-                error_massage = "رمز قدیمی نادرست است."
-                return render(request, "Shop/profile/change_password.html",
-                              {'form': form, 'error_massage': error_massage})
-
-            if new_password1 != new_password2:
-                error_massage = "رمز جدید مطابقت ندارد."
-                return render(request, "Shop/profile/change_password.html",
-                              {'form': form, 'error_massage': error_massage})
-
-            user.set_password(new_password1)
+            if not user.check_password(cd["old_password"]):
+                messages.error(request, "رمز قدیمی نادرست است.")
+                return render(request, "Shop/profile/change_password.html", {'form': form})
+            if cd["new_password1"] != cd["new_password2"]:
+                messages.error(request, "رمز جدید مطابقت ندارد.")
+                return render(request, "Shop/profile/change_password.html", {'form': form})
+            user.set_password(cd["new_password1"])
             user.save()
             login(request, user)
+            messages.success(request, "رمز عبور با موفقیت تغییر کرد!")
             return redirect("shop:home")
     else:
         form = ChangePasswordForm()
     return render(request, "Shop/profile/change_password.html", {'form': form})
 
 
-# --- ثبت‌نام کاربر ---
-def SignInView(request):
+def sign_in(request):
+    if request.user.is_authenticated:
+        return redirect('shop:home')
     if request.method == "POST":
         form = SignInForm(request.POST)
         if form.is_valid():
-            username = form.cleaned_data['username']
-            if User.objects.filter(username=username).exists():
-                error_massage = "این نام کاربری از قبل وجود دارد."
-                return render(request, "Shop/forms/Login/sign_in.html", {'form': form, 'error_massage': error_massage})
-            else:
-                first_name = form.cleaned_data['first_name']
-                last_name = form.cleaned_data['last_name']
-                email = form.cleaned_data['email']
-                password1 = form.cleaned_data['password']
-                password2 = form.cleaned_data['password2']
-
-                if password1 != password2:
-                    error_massage = "رمز عبور مطابقت ندارد."
-                    return render(request, "Shop/forms/Login/sign_in.html", {'form': form, 'error_massage': error_massage})
-
-                try:
-                    user = User.objects.create_user(
-                        username=username,
-                        email=email,
-                        password=password1,
-                        first_name=first_name,
-                        last_name=last_name
-                    )
-                    user.save()
-
-                    account = UserAccount.objects.create(user=user)
-                    account.gender = form.cleaned_data['gender']
-                    account.address = form.cleaned_data['address']
-                    account.phone = form.cleaned_data['phone']
-                    account.save()
-
-                    user = authenticate(request, username=username, password=password1)
-                    login(request, user)
-                    return redirect("shop:profile")
-
-                except Exception as e:
-                    error_massage = f"خطا در ثبت‌نام: {str(e)}"
-                    return render(request, "Shop/forms/Login/sign_in.html", {'form': form, 'error_massage': error_massage})
+            cd = form.cleaned_data
+            if User.objects.filter(username=cd['username']).exists():
+                messages.error(request, "این نام کاربری از قبل وجود دارد.")
+                return render(request, "Shop/forms/Login/sign_in.html", {'form': form})
+            if cd['password'] != cd['password2']:
+                messages.error(request, "رمز عبور مطابقت ندارد.")
+                return render(request, "Shop/forms/Login/sign_in.html", {'form': form})
+            try:
+                user = User.objects.create_user(
+                    username=cd['username'],
+                    email=cd['email'],
+                    password=cd['password'],
+                    first_name=cd['first_name'],
+                    last_name=cd['last_name']
+                )
+                account = UserAccount.objects.create(
+                    user=user,
+                    gender=cd['gender'],
+                    address=cd['address'],
+                    phone=cd['phone']
+                )
+                login(request, user)
+                messages.success(request, "ثبت‌نام با موفقیت انجام شد!")
+                return redirect("shop:profile")
+            except Exception as e:
+                messages.error(request, f"خطا در ثبت‌نام: {str(e)}")
         else:
-            return render(request, 'Shop/forms/Login/sign_in.html', {'form': form})
+            messages.error(request, "لطفاً فرم را به درستی پر کنید.")
     else:
-        if request.user.is_authenticated:
-            return redirect('shop:home')
-        else:
-            form = SignInForm()
-            return render(request, "Shop/forms/Login/sign_in.html", {'form': form})
+        form = SignInForm()
+    return render(request, "Shop/forms/Login/sign_in.html", {'form': form})
 
 
-# --- ویرایش پروفایل ---
-# Shop/views.py — UserAccountView
 @login_required(login_url='shop:home')
-def UserAccountView(request):
+def user_account(request):
     user = request.user
     account, created = UserAccount.objects.get_or_create(user=user)
-
     if request.method == "POST":
-        print("=== DEBUG: POST received ===")
-        print("Raw POST:", request.POST)
-
         form = AccountForm(request.POST, instance=account)
-        print("Form valid?", form.is_valid())
-        if not form.is_valid():
-            print("Form errors:", form.errors)
-
         if form.is_valid():
-            print("Cleaned data:", form.cleaned_data)
-
-            # ذخیره User
             user.first_name = form.cleaned_data['first_name']
             user.last_name = form.cleaned_data['last_name']
             user.save()
-
-            # ذخیره Account
-            saved_account = form.save()
-            print("Saved gender:", saved_account.gender)
-
-            # تأیید ذخیره‌سازی
-            saved_account.refresh_from_db()
-            print("DB gender after save:", saved_account.gender)
-
+            form.save()
+            messages.success(request, "اطلاعات با موفقیت به‌روزرسانی شد!")
             return redirect('shop:profile')
-
     else:
         form = AccountForm(instance=account)
         form.fields['first_name'].initial = user.first_name
         form.fields['last_name'].initial = user.last_name
-        form.fields['phone'].initial = account.phone  # ← این خط جدید
-
-    return render(request, 'Shop/forms/account_form.html', {
-        'form': form,
-        'account': account
-    })
+        form.fields['phone'].initial = account.phone
+    return render(request, 'Shop/forms/account_form.html', {'form': form, 'account': account})
 
 
-
-# Shop/views.py — انتهای فایل
+# ====================================
+# سبد خرید — نسخه اصلاح‌شده و ایمن
+# ====================================
 
 def get_or_create_cart(request):
-    """سبد فعلی کاربر یا مهمان را برمی‌گرداند."""
     if request.user.is_authenticated:
         cart, created = Cart.objects.get_or_create(user=request.user)
-        # ادغام سبد مهمان (اختیاری)
+        # ادغام سبد مهمان فقط اگر session معتبر باشد و متفاوت باشد
         session_id = request.session.session_key
         if session_id:
-            guest_cart = Cart.objects.filter(session_id=session_id).first()
-            if guest_cart:
+            guest_cart = Cart.objects.filter(session_id=session_id).exclude(user__isnull=False).first()
+            if guest_cart and guest_cart.id != cart.id:
                 for guest_item in guest_cart.items.all():
                     cart_item, created = CartItem.objects.get_or_create(
                         cart=cart,
@@ -506,9 +406,8 @@ def get_or_create_cart(request):
                         defaults={'quantity': guest_item.quantity}
                     )
                     if not created:
-                        cart_item.quantity += guest_item.quantity
-                        if cart_item.quantity > guest_item.product.stock:
-                            cart_item.quantity = guest_item.product.stock
+                        new_qty = cart_item.quantity + guest_item.quantity
+                        cart_item.quantity = min(new_qty, guest_item.product.stock)
                         cart_item.save()
                 guest_cart.delete()
         return cart
@@ -522,31 +421,28 @@ def get_or_create_cart(request):
 
 @require_POST
 def add_to_cart(request, product_id):
-    product = get_object_or_404(Item, id=product_id, status='published')
-    cart = get_or_create_cart(request)
+    product = get_object_or_404(Product, id=product_id, status='published')
+    MAX_QUANTITY_PER_ITEM = min(10, product.stock)
+
     try:
         data = json.loads(request.body)
         quantity = int(data.get('quantity', 1))
     except (json.JSONDecodeError, ValueError, TypeError):
         quantity = 1
 
-    if quantity < 1:
-        quantity = 1
-    if quantity > product.stock:
-        quantity = product.stock
+    quantity = max(1, min(quantity, MAX_QUANTITY_PER_ITEM))
 
+    cart = get_or_create_cart(request)
     cart_item, created = CartItem.objects.get_or_create(
         cart=cart,
         product=product,
         defaults={'quantity': quantity}
     )
     if not created:
-        cart_item.quantity += quantity
-        if cart_item.quantity > product.stock:
-            cart_item.quantity = product.stock
+        new_qty = cart_item.quantity + quantity
+        cart_item.quantity = min(new_qty, MAX_QUANTITY_PER_ITEM)
         cart_item.save()
 
-    # برگرداندن به AJAX یا redirect
     if request.headers.get('x-requested-with') == 'XMLHttpRequest':
         return JsonResponse({
             'success': True,
@@ -556,27 +452,39 @@ def add_to_cart(request, product_id):
     return redirect('shop:cart_detail')
 
 
+def get_cart_data(request):
+    cart = get_or_create_cart(request)
+    total_price = 0
+    items = []
+
+    for item in cart.items.all():
+        price = float(item.product.price) if item.product.price else 0
+        total_price += price * item.quantity
+
+        image_url = ''
+        if item.product.image:
+            image_url = item.product.image.url
+        elif hasattr(item.product, 'image_url') and callable(getattr(item.product, 'image_url')):
+            image_url = item.product.image_url()
+
+        items.append({
+            'id': item.product.id,
+            'name': item.product.title,
+            'price': price,
+            'quantity': item.quantity,
+            'image_url': image_url
+        })
+
+    return JsonResponse({
+        'total_items': cart.total_items,
+        'total_price': total_price,
+        'items': items
+    })
+
+
 def cart_detail(request):
     cart = get_or_create_cart(request)
     return render(request, 'Shop/cart/cart_detail.html', {'cart': cart})
-
-def get_cart_data(request):
-    cart = get_or_create_cart(request)
-    total_price = sum(item.product.price * item.quantity for item in cart.items.all())
-    cart_data = {
-        'total_items': cart.total_items,
-        'total_price': total_price,
-        'items': [
-            {
-                'id': item.product.id,
-                'name': item.product.title,
-                'price': item.product.price,
-                'quantity': item.quantity,
-                'image_url': item.product.image_url() if hasattr(item.product, 'image_url') else ''
-            } for item in cart.items.all()
-        ]
-    }
-    return JsonResponse(cart_data)
 
 
 @require_POST
@@ -590,13 +498,12 @@ def update_cart(request, item_id):
 
     if quantity < 1:
         cart_item.delete()
-    elif quantity > cart_item.product.stock:
-        cart_item.quantity = cart_item.product.stock
-        cart_item.save()
+        messages.success(request, "محصول از سبد خرید حذف شد.")
     else:
+        quantity = min(quantity, cart_item.product.stock, 10)
         cart_item.quantity = quantity
         cart_item.save()
-
+        messages.success(request, "سبد خرید به‌روزرسانی شد.")
     return redirect('shop:cart_detail')
 
 
@@ -604,5 +511,7 @@ def update_cart(request, item_id):
 def remove_from_cart(request, item_id):
     cart = get_or_create_cart(request)
     cart_item = get_object_or_404(CartItem, id=item_id, cart=cart)
+    product_name = cart_item.product.title
     cart_item.delete()
+    messages.success(request, f"«{product_name}» از سبد خرید حذف شد.")
     return redirect('shop:cart_detail')

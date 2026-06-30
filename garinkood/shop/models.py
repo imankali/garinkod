@@ -6,22 +6,33 @@ from django.conf import settings
 
 
 # --- Managers ---
-class PostManager(models.Manager):
+class ProductManager(models.Manager):
     def published(self):
         return self.filter(status='published')
+
+    def available(self):
+        return self.filter(available=True, stock__gt=0)
 
 
 # --- Category ---
 class Category(models.Model):
     name = models.CharField(max_length=100, verbose_name="نام دسته")
     slug = models.SlugField(unique=True, verbose_name="اسلاگ")
+    image = models.ImageField(upload_to='categories/', blank=True, null=True)
 
     class Meta:
         verbose_name = "دسته"
         verbose_name_plural = "دسته‌ها"
+        ordering = ['name']
 
     def __str__(self):
         return self.name
+
+    def get_products(self):
+        return Product.objects.filter(category=self, status='published')
+
+    def get_product_count(self):
+        return self.product_set.filter(status='published').count()
 
 
 # --- SubCategory ---
@@ -30,34 +41,44 @@ class SubCategory(models.Model):
     name = models.CharField(max_length=100, verbose_name="نام زیردسته")
     slug = models.SlugField(unique=True)
 
+    class Meta:
+        verbose_name = "زیردسته"
+        verbose_name_plural = "زیردسته‌ها"
+
     def __str__(self):
-        return f"{self.category.name} - {self.name}"
+        return self.name
 
 
-# --- Item / Product ---
-class Item(models.Model):
+# --- Product ---
+class Product(models.Model):
     STATUS_CHOICES = (
-        ('draft', 'Draft'),
-        ('published', 'Published'),
+        ('draft', 'پیش‌نویس'),
+        ('published', 'منتشر شده'),
     )
 
-    title = models.CharField(max_length=250)
-    slug = models.SlugField(max_length=250, unique=True)  # ✅ unique=True برای URLهای تمیز
-    author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='item_posts')
+    title = models.CharField(max_length=250, verbose_name="عنوان")
+    slug = models.SlugField(max_length=250, unique=True, verbose_name="اسلاگ")
+    author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='products')
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="دسته")
-    body = models.TextField()
-    publish = models.DateTimeField(default=timezone.now)
-    created = models.DateTimeField(auto_now_add=True)
-    updated = models.DateTimeField(auto_now=True)  # ✅ تغییر نام از update به updated
-    status = models.CharField(max_length=15, choices=STATUS_CHOICES, default='draft')
-    price = models.IntegerField(blank=True, null=True)
-    stock = models.PositiveIntegerField(default=0)
-    image = models.ImageField(upload_to='products/', blank=True, null=True)
+    subcategory = models.ForeignKey(SubCategory, on_delete=models.SET_NULL, null=True, blank=True,
+                                    verbose_name="زیردسته")
+    description = models.TextField(verbose_name="توضیحات")
+    publish = models.DateTimeField(default=timezone.now, verbose_name="تاریخ انتشار")
+    created = models.DateTimeField(auto_now_add=True, verbose_name="تاریخ ایجاد")
+    updated = models.DateTimeField(auto_now=True, verbose_name="تاریخ بروزرسانی")
+    status = models.CharField(max_length=15, choices=STATUS_CHOICES, default='draft', verbose_name="وضعیت")
+    price = models.IntegerField(verbose_name="قیمت")
+    stock = models.PositiveIntegerField(default=0, verbose_name="موجودی")
+    available = models.BooleanField(default=True, verbose_name="موجود")
+    is_featured = models.BooleanField(default=False, verbose_name="ویژه")
+    image = models.ImageField(upload_to='products/', blank=True, null=True, verbose_name="تصویر")
 
-    objects = PostManager()
+    objects = ProductManager()
 
     class Meta:
         ordering = ('-publish',)
+        verbose_name = "محصول"
+        verbose_name_plural = "محصولات"
 
     def __str__(self):
         return self.title
@@ -67,14 +88,28 @@ class Item(models.Model):
 
     @property
     def image_url(self):
-        if self.image and self.image.name:
+        if self.image:
             return self.image.url
-        return f"{settings.STATIC_URL}products/default-product.png"
+        return f"{settings.STATIC_URL}images/default-product.png"
+
+    @property
+    def is_in_stock(self):
+        return self.stock > 0 and self.available
 
 
 # --- مشخصات اختصاصی برای هر دسته ---
-class FertilizerDetail(models.Model):
-    product = models.OneToOneField('Item', on_delete=models.CASCADE, verbose_name="محصول")
+class ProductDetail(models.Model):
+    """مدل پایه برای مشخصات محصولات"""
+    product = models.OneToOneField(Product, on_delete=models.CASCADE, verbose_name="محصول")
+
+    class Meta:
+        abstract = True
+
+    def __str__(self):
+        return f"{self.product.title}"
+
+
+class FertilizerDetail(ProductDetail):
     fertilizer_type = models.CharField(max_length=100, verbose_name="نوع کود")
     nitrogen = models.CharField(max_length=20, verbose_name="نیتروژن (%)")
     phosphorus = models.CharField(max_length=20, verbose_name="فسفر (%)")
@@ -84,12 +119,8 @@ class FertilizerDetail(models.Model):
         verbose_name = "مشخصات کود"
         verbose_name_plural = "مشخصات کود"
 
-    def __str__(self):
-        return f"کود {self.product.title}"
 
-
-class PesticideDetail(models.Model):
-    product = models.OneToOneField('Item', on_delete=models.CASCADE, verbose_name="محصول")
+class PesticideDetail(ProductDetail):
     pesticide_type = models.CharField(max_length=100, verbose_name="نوع سم")
     active_ingredient = models.CharField(max_length=100, verbose_name="مواد فعال")
     concentration = models.CharField(max_length=20, verbose_name="غلظت (%)")
@@ -98,26 +129,18 @@ class PesticideDetail(models.Model):
         verbose_name = "مشخصات سم"
         verbose_name_plural = "مشخصات سم"
 
-    def __str__(self):
-        return f"سم {self.product.title}"
 
-
-class SeedDetail(models.Model):
-    product = models.OneToOneField('Item', on_delete=models.CASCADE, verbose_name="محصول")
+class SeedDetail(ProductDetail):
     crop_type = models.CharField(max_length=100, verbose_name="نوع گیاه")
     variety = models.CharField(max_length=100, verbose_name="رقم")
-    weight_per_kg = models.CharField(max_length=20, verbose_name="وزن در کیلوگرم")
+    weight = models.CharField(max_length=20, verbose_name="وزن")
 
     class Meta:
         verbose_name = "مشخصات بذر"
         verbose_name_plural = "مشخصات بذر"
 
-    def __str__(self):
-        return f"بذر {self.product.title}"
 
-
-class EquipmentDetail(models.Model):
-    product = models.OneToOneField('Item', on_delete=models.CASCADE, verbose_name="محصول")
+class EquipmentDetail(ProductDetail):
     tool_type = models.CharField(max_length=100, verbose_name="نوع ابزار")
     material = models.CharField(max_length=100, verbose_name="جنس")
     weight = models.CharField(max_length=20, verbose_name="وزن")
@@ -126,9 +149,6 @@ class EquipmentDetail(models.Model):
         verbose_name = "مشخصات ابزار"
         verbose_name_plural = "مشخصات ابزار"
 
-    def __str__(self):
-        return f"ابزار {self.product.title}"
-
 
 # --- User Account ---
 class UserAccount(models.Model):
@@ -136,35 +156,51 @@ class UserAccount(models.Model):
         ('male', 'آقا'),
         ('female', 'خانم'),
     )
-    phone = models.CharField(max_length=11)
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='account')
-    gender = models.CharField(max_length=15, choices=GENDER_CHOICES, default='male')
-    address = models.TextField(max_length=250, blank=True, null=True)
+    phone = models.CharField(max_length=11, verbose_name="شماره تلفن")
+    gender = models.CharField(max_length=15, choices=GENDER_CHOICES, default='male', verbose_name="جنسیت")
+    address = models.TextField(max_length=250, blank=True, null=True, verbose_name="آدرس")
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        verbose_name = "حساب کاربری"
+        verbose_name_plural = "حساب‌های کاربری"
+
     def __str__(self):
-        return f"{self.user.first_name} {self.user.last_name}"
+        return f"{self.user.get_full_name() or self.user.username}"
 
 
 # --- Comment ---
 class Comment(models.Model):
-    post = models.ForeignKey('Item', on_delete=models.CASCADE, related_name="comments")
-    name = models.CharField(max_length=100)
-    email = models.EmailField(blank=True, null=True)
-    body = models.TextField()
-    created = models.DateTimeField(auto_now_add=True)  # ✅ اصلاح شد
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="comments")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
+    name = models.CharField(max_length=100, verbose_name="نام")
+    email = models.EmailField(blank=True, null=True, verbose_name="ایمیل")
+    body = models.TextField(verbose_name="متن")
+    parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='replies')
+    created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
-    active = models.BooleanField(default=False)
+    active = models.BooleanField(default=False, verbose_name="فعال")
 
     class Meta:
-        ordering = ('created',)  # ✅ اصلاح شد
+        ordering = ('created',)
+        verbose_name = "نظر"
+        verbose_name_plural = "نظرات"
 
     def __str__(self):
-        return f"کامنت توسط {self.name} روی پست {self.post}"
+        return f"کامنت توسط {self.name} روی {self.product}"
+
+    @property
+    def is_reply(self):
+        return self.parent is not None
+
+    @property
+    def replies_count(self):
+        return self.replies.count()
 
 
-# --- سبد خرید (Shopping Cart) ---
+# --- Shopping Cart ---
 class Cart(models.Model):
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
@@ -177,10 +213,14 @@ class Cart(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        verbose_name = "سبد خرید"
+        verbose_name_plural = "سبدهای خرید"
+
     def __str__(self):
         if self.user:
             return f"سبد {self.user.username}"
-        return "سبد مهمان"
+        return f"سبد مهمان ({self.session_id})"
 
     @property
     def total_price(self):
@@ -190,14 +230,20 @@ class Cart(models.Model):
     def total_items(self):
         return sum(item.quantity for item in self.items.all())
 
+    @property
+    def is_empty(self):
+        return self.items.count() == 0
+
 
 class CartItem(models.Model):
     cart = models.ForeignKey(Cart, related_name='items', on_delete=models.CASCADE)
-    product = models.ForeignKey('Item', on_delete=models.CASCADE)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField(default=1)
 
     class Meta:
         unique_together = ('cart', 'product')
+        verbose_name = "آیتم سبد"
+        verbose_name_plural = "آیتم‌های سبد"
 
     def __str__(self):
         return f"{self.quantity} × {self.product.title}"
@@ -205,3 +251,7 @@ class CartItem(models.Model):
     @property
     def total_price(self):
         return self.quantity * (self.product.price or 0)
+
+    @property
+    def is_in_stock(self):
+        return self.product.is_in_stock and self.quantity <= self.product.stock
