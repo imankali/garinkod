@@ -1,56 +1,70 @@
 {% extends 'Shop/parent/base.html' %}
 {% load static %}
 
-{% block title %}اشتراک‌گذاری پست{% endblock %}
+{% block title %}اشتراک‌گذاری محصول{% endblock %}
 
-{% block head %}
-  <link rel="stylesheet" type="text/css" href="{% static 'css/sign_in.css' %}">
+{% block extra_css %}
+    <link rel="stylesheet" type="text/css" href="{% static 'css/sign_in.css' %}">
 {% endblock %}
 
-{% block body %}
+{% block content %}
 <div class="auth-wrapper">
-  <div class="auth-card">
-    <h1 class="auth-title">اشتراک‌گذاری پست</h1>
+    <div class="auth-card">
+        <h1 class="auth-title">اشتراک‌گذاری محصول</h1>
 
-    {% if sent %}
-      <div class="success-message">
-        پست «{{ post.title }}» برای {{ form.cleaned_data.to }} ارسال شد.
-      </div>
-    {% endif %}
+        {% if sent %}
+            <div class="success-message">
+                {# ✅ استفاده از متغیر recipient_email به جای form.cleaned_data #}
+                محصول «{{ product.title }}» با موفقیت برای {{ recipient_email }} ارسال شد.
+            </div>
+        {% else %}
+            <form method="post" class="auth-form" novalidate>
+                {% csrf_token %}
 
-    <form method="post" class="auth-form" novalidate>
-      {% csrf_token %}
+                {# ✅ نمایش خطاهای کلی فرم #}
+                {% if form.non_field_errors %}
+                    <div class="error-messages">
+                        {% for error in form.non_field_errors %}
+                            <div class="error-message">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
 
-      <!-- نام و نام خانوادگی -->
-      <div class="form-group">
-        <label for="{{ form.name.id_for_label }}">نام و نام خانوادگی</label>
-        {{ form.name }}
-        {% if form.name.errors %}
-          <div class="error-message">{{ form.name.errors }}</div>
+                <!-- نام و نام خانوادگی -->
+                <div class="form-group">
+                    <label for="{{ form.name.id_for_label }}">نام و نام خانوادگی</label>
+                    {{ form.name }}
+                    {% if form.name.errors %}
+                        <div class="error-message">{{ form.name.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <!-- پیام -->
+                <div class="form-group">
+                    {# ✅ اصلاح: massage به message تغییر کرد #}
+                    <label for="{{ form.message.id_for_label }}">پیام</label>
+                    {{ form.message }}
+                    {% if form.message.errors %}
+                        <div class="error-message">{{ form.message.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <!-- ایمیل گیرنده -->
+                <div class="form-group">
+                    <label for="{{ form.to.id_for_label }}">ایمیل گیرنده</label>
+                    {{ form.to }}
+                    {% if form.to.errors %}
+                        <div class="error-message">{{ form.to.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <button type="submit" class="btn btn-primary">اشتراک‌گذاری</button>
+            </form>
         {% endif %}
-      </div>
 
-      <!-- پیام -->
-      <div class="form-group">
-        <label for="{{ form.massage.id_for_label }}">پیام</label>
-        {{ form.massage }}
-        {% if form.massage.errors %}
-          <div class="error-message">{{ form.massage.errors }}</div>
-        {% endif %}
-      </div>
-
-      <!-- ایمیل گیرنده -->
-      <div class="form-group">
-        <label for="{{ form.to.id_for_label }}">ایمیل گیرنده</label>
-        {{ form.to }}
-        {% if form.to.errors %}
-          <div class="error-message">{{ form.to.errors }}</div>
-        {% endif %}
-      </div>
-
-      <button type="submit" class="btn btn-primary">اشتراک‌گذاری</button>
-      <a href="{% url 'shop:product_detail' post.slug %}" class="auth-link">بازگشت به پست</a>
-    </form>
-  </div>
+        <p class="auth-link">
+            <a href="{% url 'shop:product_detail' product.slug %}">بازگشت به صفحه محصول</a>
+        </p>
+    </div>
 </div>
 {% endblock %}

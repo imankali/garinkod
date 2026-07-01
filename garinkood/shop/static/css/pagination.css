@@ -1,87 +1,226 @@
-/* صفحه‌بندی — هماهنگ با رنگ‌های گرین کود */
+/* ========================================
+   Pagination - صفحه‌بندی
+   هماهنگ با pagination.html (ساختار جدید)
+   ======================================== */
+
 .pagination {
-  margin: 2.5rem 0;
+  margin: 3rem 0;
   text-align: center;
-  font-family: "Vazirmatn", sans-serif;
+  font-family: 'Vazirmatn', 'IRANSansWeb', sans-serif;
 }
 
-.step-links {
+/* لیست صفحه‌بندی */
+.pagination-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
   display: inline-flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
   justify-content: center;
   align-items: center;
-  padding: 0.5rem;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding: 0.6rem;
   background: #f8f9f0;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(119, 136, 115, 0.1);
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(119, 136, 115, 0.1);
 }
 
-.step-links a,
-.step-links span {
+/* آیتم‌های صفحه‌بندی */
+.pagination-item {
   display: inline-block;
-  min-width: 38px;
-  padding: 0.55rem 0.85rem;
-  text-decoration: none;
-  border-radius: 8px;
-  font-weight: 600;
-  transition: all 0.2s ease;
-  color: #374151;
-  border: 1px solid #d2dcb6;
-  background: white;
 }
 
-.step-links a:hover {
+.pagination-item a,
+.pagination-item span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  height: 42px;
+  padding: 0 0.85rem;
+  border: 2px solid #d2dcb6;
+  border-radius: 10px;
+  text-decoration: none;
+  color: #374151;
+  background: white;
+  font-size: 0.95rem;
+  font-weight: 600;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  line-height: 1;
+}
+
+/* Hover State */
+.pagination-item a:hover {
   background: #a1bc98;
   color: white;
   border-color: #a1bc98;
   transform: translateY(-2px);
-  box-shadow: 0 3px 6px rgba(119, 136, 115, 0.15);
+  box-shadow: 0 4px 10px rgba(119, 136, 115, 0.25);
 }
 
-/* لینک‌های فعال (اولین، آخرین، قبلی، بعدی) */
-.step-links a:first-child,
-.step-links a:last-child {
+/* صفحه فعلی - Active */
+.pagination-item.active span {
+  background: linear-gradient(135deg, #778873, #667760);
+  color: white;
+  border-color: #778873;
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(119, 136, 115, 0.3);
+  transform: scale(1.05);
+}
+
+/* Ellipsis (سه نقطه) */
+.pagination-item.disabled span {
+  background: transparent;
+  border: none;
+  color: #9ca3af;
+  cursor: default;
+  min-width: auto;
+  padding: 0 0.5rem;
+  font-weight: 400;
+}
+
+.pagination-item.disabled span:hover {
+  background: transparent;
+  color: #9ca3af;
+  transform: none;
+  box-shadow: none;
+}
+
+/* دکمه‌های اولین/آخرین/قبلی/بعدی */
+.pagination-item:first-child a,
+.pagination-item:last-child a {
   background: #778873;
   color: white;
   border-color: #778873;
+  padding: 0 1.25rem;
+  min-width: auto;
+  font-weight: 700;
 }
 
-.step-links a:first-child:hover,
-.step-links a:last-child:hover {
+.pagination-item:first-child a:hover,
+.pagination-item:last-child a:hover {
   background: #667760;
   border-color: #667760;
   transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(119, 136, 115, 0.2);
+  box-shadow: 0 6px 16px rgba(119, 136, 115, 0.35);
 }
 
-/* صفحهٔ فعلی */
-.current {
-  background: #778873;
-  color: white;
-  font-weight: 700;
-  padding: 0.55rem 1rem;
-  border-radius: 10px;
-  margin: 0 0.5rem;
-  box-shadow: 0 3px 6px rgba(119, 136, 115, 0.2);
+/* اطلاعات صفحه (صفحه X از Y) */
+.pagination-info {
+  text-align: center;
+  margin-top: 1.25rem;
+  color: #6b7280;
+  font-size: 0.875rem;
+  font-weight: 500;
 }
 
-/* ریسپانسیو برای موبایل */
-@media (max-width: 600px) {
-  .step-links {
-    gap: 0.3rem;
+/* ========================================
+   Responsive - موبایل
+   ======================================== */
+@media (max-width: 768px) {
+  .pagination {
+    margin: 2rem 0;
+  }
+
+  .pagination-list {
+    gap: 0.35rem;
+    padding: 0.5rem;
+    border-radius: 12px;
+  }
+
+  .pagination-item a,
+  .pagination-item span {
+    min-width: 38px;
+    height: 38px;
+    padding: 0 0.65rem;
+    font-size: 0.875rem;
+    border-radius: 8px;
+    border-width: 1.5px;
+  }
+
+  .pagination-item:first-child a,
+  .pagination-item:last-child a {
+    padding: 0 0.9rem;
+    font-size: 0.85rem;
+  }
+
+  .pagination-item.active span {
+    transform: scale(1);
+  }
+
+  .pagination-info {
+    font-size: 0.8rem;
+    margin-top: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .pagination-list {
+    gap: 0.25rem;
     padding: 0.4rem;
   }
 
-  .step-links a,
-  .step-links span {
-    padding: 0.45rem 0.7rem;
-    font-size: 0.9rem;
+  .pagination-item a,
+  .pagination-item span {
     min-width: 34px;
+    height: 34px;
+    padding: 0 0.5rem;
+    font-size: 0.8rem;
   }
 
-  .current {
-    padding: 0.45rem 0.9rem;
-    font-size: 0.9rem;
+  .pagination-item:first-child a,
+  .pagination-item:last-child a {
+    padding: 0 0.7rem;
+    font-size: 0.8rem;
+  }
+
+  /* در موبایل‌های خیلی کوچک، متن "اولین" و "آخرین" کوتاه شود */
+  .pagination-item:first-child a::after {
+    content: " «";
+  }
+
+  .pagination-item:last-child a::before {
+    content: "» ";
+  }
+}
+
+/* ========================================
+   Accessibility
+   ======================================== */
+.pagination-item a:focus-visible {
+  outline: 3px solid #a1bc98;
+  outline-offset: 2px;
+}
+
+/* احترام به تنظیمات کاربر برای کاهش انیمیشن */
+@media (prefers-reduced-motion: reduce) {
+  .pagination-item a,
+  .pagination-item span {
+    transition: none;
+  }
+
+  .pagination-item a:hover,
+  .pagination-item.active span {
+    transform: none;
+  }
+}
+
+/* ========================================
+   Animation - انیمیشن ورود
+   ======================================== */
+@keyframes fadeInPagination {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .pagination {
+    animation: fadeInPagination 0.5s ease-out;
   }
 }

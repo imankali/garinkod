@@ -20,6 +20,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.humanize',  # ✅ این خط را اضافه کن
     'shop.apps.ShopConfig',
     'django.contrib.postgres',
 ]

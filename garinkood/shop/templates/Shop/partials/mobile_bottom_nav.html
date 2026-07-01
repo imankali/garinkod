@@ -1,13 +1,22 @@
+{% load static %}
+
 <!-- Mobile Bottom Nav -->
-<div class="mobile-bottom-nav">
-    <a href="{% url 'shop:home' %}" class="bottom-nav-item">
+<nav class="mobile-bottom-nav" aria-label="ناوبری موبایل">
+    {# ✅ اضافه کردن کلاس active بر اساس صفحه فعلی #}
+    <a href="{% url 'shop:home' %}"
+       class="bottom-nav-item {% if request.resolver_match.url_name == 'home' %}active{% endif %}"
+       aria-label="خانه">
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
             <polyline points="9 22 9 12 15 12 15 22"></polyline>
         </svg>
         <span>خانه</span>
     </a>
-    <a href="#products-section" class="bottom-nav-item">
+
+    {# ✅ اصلاح: تغییر #products-section به URL واقعی #}
+    <a href="{% url 'shop:product_list' %}"
+       class="bottom-nav-item {% if request.resolver_match.url_name == 'product_list' or request.resolver_match.url_name == 'product_list_by_category' %}active{% endif %}"
+       aria-label="محصولات">
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <rect x="3" y="3" width="7" height="7"></rect>
             <rect x="14" y="3" width="7" height="7"></rect>
@@ -17,32 +26,67 @@
         <span>محصولات</span>
     </a>
 
-    <!-- سبد خرید (همیشه با AJAX) -->
-    <a class="bottom-nav-item" href="{% url 'shop:cart_detail' %}" type="button" title="سبد خرید">
+    <!-- سبد خرید (با بج) -->
+    <a href="{% url 'shop:cart_detail' %}"
+       class="bottom-nav-item {% if request.resolver_match.url_name == 'cart_detail' %}active{% endif %}"
+       aria-label="سبد خرید">
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="8" cy="21" r="1"></circle>
             <circle cx="19" cy="21" r="1"></circle>
             <path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"></path>
         </svg>
         <span>سبد خرید</span>
+        {# ✅ اضافه کردن بج سبد خرید (مثل هدر) #}
+        <span class="badge" id="cart-badge-mobile" style="display: none; position: absolute; top: 4px; right: 50%; transform: translateX(50%); background: #e53e3e; color: white; font-size: 0.7rem; padding: 2px 6px; border-radius: 10px; min-width: 18px; text-align: center;">0</span>
     </a>
 
     <!-- پروفایل / ورود -->
-    {% if user.is_authenticated %}
-        <a href="{% url 'shop:profile' %}" class="bottom-nav-item">
+    {% if request.user.is_authenticated %}
+        {# ✅ استفاده از request.user به جای user برای یکپارچگی #}
+        <a href="{% url 'shop:profile' %}"
+           class="bottom-nav-item {% if request.resolver_match.url_name == 'profile' %}active{% endif %}"
+           aria-label="پروفایل">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path>
                 <circle cx="12" cy="7" r="4"></circle>
             </svg>
-            <span>{{ user.username }}</span>
+            {# ✅ اصلاح: truncatechars برای جلوگیری از شکستن UI با username طولانی #}
+            <span>{{ request.user.username|truncatechars:10 }}</span>
         </a>
     {% else %}
-        <a href="{% url 'shop:user_login' %}" class="bottom-nav-item">
+        <a href="{% url 'shop:user_login' %}"
+           class="bottom-nav-item {% if request.resolver_match.url_name == 'user_login' %}active{% endif %}"
+           aria-label="ورود">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path>
                 <circle cx="12" cy="7" r="4"></circle>
             </svg>
-            <span>پروفایل</span>
+            <span>ورود</span>
         </a>
     {% endif %}
-</div>
+</nav>
+
+{# ✅ اسکریپت برای سینک کردن بج سبد خرید موبایل با بج هدر #}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // وقتی بج هدر آپدیت می‌شود، بج موبایل هم آپدیت شود
+        const observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+                if (mutation.type === 'childList' || mutation.type === 'characterData') {
+                    const headerBadge = document.getElementById('cart-badge');
+                    const mobileBadge = document.getElementById('cart-badge-mobile');
+
+                    if (headerBadge && mobileBadge) {
+                        mobileBadge.textContent = headerBadge.textContent;
+                        mobileBadge.style.display = headerBadge.style.display;
+                    }
+                }
+            });
+        });
+
+        const headerBadge = document.getElementById('cart-badge');
+        if (headerBadge) {
+            observer.observe(headerBadge, { childList: true, characterData: true, subtree: true });
+        }
+    });
+</script>

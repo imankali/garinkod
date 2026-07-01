@@ -3,6 +3,7 @@ from django.utils import timezone
 from django.contrib.auth.models import User
 from django.urls import reverse
 from django.conf import settings
+from django.db.models import Sum, F
 
 
 # --- Managers ---
@@ -60,8 +61,7 @@ class Product(models.Model):
     slug = models.SlugField(max_length=250, unique=True, verbose_name="اسلاگ")
     author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='products')
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="دسته")
-    subcategory = models.ForeignKey(SubCategory, on_delete=models.SET_NULL, null=True, blank=True,
-                                    verbose_name="زیردسته")
+    subcategory = models.ForeignKey(SubCategory, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="زیردسته")
     description = models.TextField(verbose_name="توضیحات")
     publish = models.DateTimeField(default=timezone.now, verbose_name="تاریخ انتشار")
     created = models.DateTimeField(auto_now_add=True, verbose_name="تاریخ ایجاد")
@@ -224,11 +224,19 @@ class Cart(models.Model):
 
     @property
     def total_price(self):
-        return sum(item.total_price for item in self.items.all())
+        # ✅ بهینه‌سازی: استفاده از aggregate به جای loop
+        result = self.items.aggregate(
+            total=Sum(F('quantity') * F('product__price'))
+        )
+        return result['total'] or 0
 
     @property
     def total_items(self):
-        return sum(item.quantity for item in self.items.all())
+        # ✅ بهینه‌سازی: استفاده از aggregate به جای loop
+        result = self.items.aggregate(
+            total=Sum('quantity')
+        )
+        return result['total'] or 0
 
     @property
     def is_empty(self):

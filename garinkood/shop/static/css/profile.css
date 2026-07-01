@@ -1,193 +1,410 @@
+/* ========================================
+   Profile Page - صفحه پروفایل کاربری
+   ✅ ۴ ویژگی کلیدی:
+   1. دکمه‌ها در دسکتاپ کنار هم
+   2. انیمیشن ورود نرم
+   3. آواتار gradient زیباتر
+   4. خط‌چین بین ردیف‌ها
+   ======================================== */
+
+/* ========================================
+   Profile Wrapper & Card
+   ======================================== */
 .profile-wrapper {
   display: flex;
   justify-content: center;
-  padding: 1.5rem;
-  min-height: 100vh;
-  background-color: var(--c-1);
+  align-items: flex-start;
+  padding: 2rem 1rem;
+  min-height: calc(100vh - 200px);
+  background: linear-gradient(135deg, var(--c-1) 0%, #e8ebe0 100%);
+  position: relative;
+}
+
+/* الگوی تزئینی پس‌زمینه */
+.profile-wrapper::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 200px;
+  background: linear-gradient(135deg, var(--c-3), var(--c-4));
+  z-index: 0;
 }
 
 .profile-card {
   width: 100%;
-  max-width: 580px;
+  max-width: 600px;
   background: white;
-  border-radius: 20px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
-  padding: 2rem;
+  border-radius: 24px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+  padding: 3rem 2.5rem;
+  position: relative;
+  z-index: 1;
+  margin-top: 2rem;
+
+  /* ✅ ۲. انیمیشن ورود برای ظاهر شدن نرم */
+  animation: slideUpFade 0.7s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Header */
+/* ✅ ۲. انیمیشن ورود - ظاهر شدن نرم از پایین */
+@keyframes slideUpFade {
+  from {
+    opacity: 0;
+    transform: translateY(40px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ========================================
+   Profile Header
+   ======================================== */
 .profile-header {
   text-align: center;
-  margin-bottom: 2rem;
+  margin-bottom: 2.5rem;
+  padding-bottom: 2rem;
+  border-bottom: 2px solid var(--gray-100);
 }
 
+/* ✅ ۳. آواتار gradient زیباتر */
 .avatar {
-  width: 84px;
-  height: 84px;
+  width: 110px;
+  height: 110px;
   border-radius: 50%;
-  background: var(--c-3);
+  background: linear-gradient(135deg, #a1bc98 0%, #778873 50%, #5a6b56 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 0 auto 16px;
+  margin: 0 auto 1.25rem;
   color: white;
-  font-weight: 700;
-  font-size: 1.8rem;
-  box-shadow: 0 4px 12px rgba(119, 136, 115, 0.25);
+  font-weight: 800;
+  font-size: 2.8rem;
+  box-shadow:
+    0 8px 24px rgba(119, 136, 115, 0.35),
+    0 0 0 4px white,
+    0 0 0 6px var(--c-2);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  text-transform: uppercase;
+  position: relative;
+  overflow: hidden;
+}
+
+/* افکت درخشش روی آواتار */
+.avatar::before {
+  content: "";
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    45deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.3) 50%,
+    transparent 70%
+  );
+  animation: shimmer 3s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0%, 100% {
+    transform: translateX(-100%) translateY(-100%) rotate(45deg);
+  }
+  50% {
+    transform: translateX(100%) translateY(100%) rotate(45deg);
+  }
+}
+
+.avatar:hover {
+  transform: scale(1.08) rotate(5deg);
+  box-shadow:
+    0 12px 32px rgba(119, 136, 115, 0.45),
+    0 0 0 4px white,
+    0 0 0 6px var(--c-3);
 }
 
 .card-title {
-  font-size: 1.5rem;
-  font-weight: 700;
+  font-size: 1.6rem;
+  font-weight: 800;
   color: var(--gray-900);
   margin: 0;
+  letter-spacing: -0.5px;
 }
 
-/* Sections */
+/* ========================================
+   Sections
+   ======================================== */
 .section {
-  margin-bottom: 2rem;
+  margin-bottom: 2.5rem;
+  animation: fadeInUp 0.6s ease-out;
+  animation-fill-mode: both;
+}
+
+.section:nth-child(2) { animation-delay: 0.1s; }
+.section:nth-child(3) { animation-delay: 0.2s; }
+.section:nth-child(4) { animation-delay: 0.3s; }
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.section:last-child {
+  margin-bottom: 0;
 }
 
 .section-title {
-  font-size: 1.1rem;
+  font-size: 1.15rem;
   font-weight: 700;
   color: var(--c-4);
-  margin-bottom: 1.25rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid var(--gray-200);
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid var(--c-2);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
-/* Data Rows */
+.section-title::before {
+  content: "";
+  width: 4px;
+  height: 20px;
+  background: linear-gradient(180deg, var(--c-3), var(--c-4));
+  border-radius: 2px;
+}
+
+/* ========================================
+   Data List - نمایش اطلاعات
+   ✅ ۴. خط‌چین بین ردیف‌ها برای خوانایی بهتر
+   ======================================== */
 .data-list {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 0;
+  background: var(--gray-50);
+  padding: 1.5rem;
+  border-radius: 16px;
+  border: 1px solid var(--gray-200);
 }
 
 .data-row {
   display: flex;
-  justify-content: flex-end;
-  gap: 16px;
-  font-size: 1rem;
-  color: var(--gray-800);
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 1rem 0;
+  font-size: 0.95rem;
+  gap: 1rem;
+
+  /* ✅ ۴. خط‌چین بین ردیف‌ها */
+  border-bottom: 1px dashed var(--gray-300);
+}
+
+.data-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.data-row:first-child {
+  padding-top: 0;
 }
 
 .data-label {
   font-weight: 600;
-  color: var(--gray-700);
+  color: var(--gray-600);
   white-space: nowrap;
-  text-align: start;
+  flex-shrink: 0;
+  min-width: 120px;
 }
 
 .data-value {
   font-weight: 500;
   color: var(--gray-900);
-  text-align: end;
+  text-align: left;
+  word-break: break-word;
+  flex: 1;
 }
 
-/* LTR content inside RTL */
+/* ========================================
+   LTR Content (برای اعداد و ایمیل)
+   ======================================== */
 .ltr {
   direction: ltr;
   unicode-bidi: embed;
-  text-align: start !important;
+  text-align: left !important;
   font-family: "Segoe UI", system-ui, sans-serif;
+  letter-spacing: 0.3px;
 }
 
-/* Buttons */
+/* ========================================
+   Button Group
+   ✅ ۱. دکمه‌ها در دسکتاپ کنار هم
+   ======================================== */
 .button-group {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 1rem;
 }
 
-.btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1rem 1.5rem;
-  font-weight: 600;
-  font-size: 1rem;
-  border-radius: 14px;
-  text-decoration: none;
-  min-height: 52px;
-  transition: all 0.25s ease;
-  font-family: "Vazirmatn", sans-serif;
-  text-align: center;
+/* ✅ ۱. در دسکتاپ دکمه‌ها کنار هم باشند */
+@media (min-width: 600px) {
+  .button-group {
+    flex-direction: row;
+    gap: 1rem;
+  }
+
+  .button-group .btn {
+    flex: 1;
+  }
 }
 
-.btn:focus-visible {
-  outline: 2px solid var(--c-4);
-  outline-offset: 4px;
-}
-
-.btn-primary {
-  background: var(--c-3);
-  color: white;
-  border: 2px solid var(--c-3);
-}
-
-.btn-primary:hover {
-  background: var(--c-4);
-  transform: translateY(-2px);
-  box-shadow: 0 5px 14px rgba(119, 136, 115, 0.35);
-}
-
-.btn-secondary {
-  background: transparent;
-  border: 2px solid var(--c-3);
-  color: var(--c-4);
-}
-
-.btn-secondary:hover {
-  background: var(--c-3);
-  color: white;
-  transform: translateY(-2px);
-  box-shadow: 0 5px 12px rgba(119, 136, 115, 0.3);
-}
-
-.btn-danger {
-  background: transparent;
-  border: 2px solid #e53e3e;
-  color: #e53e3e;
-}
-
-.btn-danger:hover {
-  background: #e53e3e;
-  color: white;
-  box-shadow: 0 5px 12px rgba(229, 62, 62, 0.35);
-}
-
-/* 📱 Mobile */
+/* ========================================
+   Responsive - تبلت
+   ======================================== */
 @media (max-width: 768px) {
+  .profile-wrapper {
+    padding: 1.5rem 1rem;
+  }
+
+  .profile-wrapper::before {
+    height: 150px;
+  }
+
   .profile-card {
-    padding: 1.75rem 1.25rem;
+    padding: 2rem 1.5rem;
+    margin-top: 1.5rem;
+    border-radius: 20px;
+  }
+
+  .avatar {
+    width: 95px;
+    height: 95px;
+    font-size: 2.4rem;
+  }
+
+  .card-title {
+    font-size: 1.4rem;
+  }
+
+  .data-list {
+    padding: 1.25rem;
   }
 
   .data-row {
     flex-direction: column;
-    align-items: flex-end;
+    align-items: flex-start;
     gap: 0.35rem;
+    padding: 0.85rem 0;
   }
 
   .data-label {
-    text-align: end;
+    text-align: right;
+    width: 100%;
+    min-width: auto;
   }
 
   .data-value {
-    text-align: start;
-  }
-
-  .button-group {
-    margin-top: 1.5rem;
+    text-align: right;
+    width: 100%;
   }
 }
 
+/* ========================================
+   Responsive - موبایل
+   ======================================== */
 @media (max-width: 480px) {
-  .btn {
-    width: 100%;
+  .profile-wrapper {
+    padding: 1rem 0.75rem;
+  }
+
+  .profile-wrapper::before {
+    height: 120px;
+  }
+
+  .profile-card {
+    padding: 1.75rem 1.25rem;
+    margin-top: 1rem;
+    border-radius: 16px;
+  }
+
+  .profile-header {
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+  }
+
+  .avatar {
+    width: 85px;
+    height: 85px;
+    font-size: 2.2rem;
+    margin-bottom: 1rem;
+  }
+
+  .card-title {
+    font-size: 1.25rem;
   }
 
   .section {
-    margin-bottom: 2.25rem;
+    margin-bottom: 2rem;
   }
+
+  .section-title {
+    font-size: 1.05rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .data-list {
+    padding: 1rem;
+    border-radius: 12px;
+  }
+
+  .data-row {
+    font-size: 0.9rem;
+    padding: 0.75rem 0;
+  }
+
+  /* در موبایل دکمه‌ها زیر هم */
+  .button-group {
+    flex-direction: column;
+  }
+
+  .button-group .btn {
+    width: 100%;
+  }
+}
+
+/* ========================================
+   Accessibility
+   ======================================== */
+@media (prefers-reduced-motion: reduce) {
+  .profile-card,
+  .section,
+  .avatar {
+    animation: none;
+  }
+
+  .avatar {
+    transition: none;
+  }
+
+  .avatar:hover {
+    transform: none;
+  }
+
+  .avatar::before {
+    animation: none;
+  }
+}
+
+.profile-card:focus-visible,
+.avatar:focus-visible {
+  outline: 3px solid var(--c-3);
+  outline-offset: 2px;
 }

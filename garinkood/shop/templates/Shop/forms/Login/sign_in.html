@@ -3,99 +3,124 @@
 
 {% block title %}ثبت‌نام در گرین‌کود{% endblock %}
 
-{% block head %}
-  <link rel="stylesheet" type="text/css" href="{% static 'css/sign_in.css' %}">
+{% block extra_css %}
+    <link rel="stylesheet" type="text/css" href="{% static 'css/sign_in.css' %}">
 {% endblock %}
 
-{% block body %}
+{% block content %}
 <div class="auth-wrapper">
-  <div class="auth-card">
-    <div class="auth-logo">
-      <svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="77.7 214.9 274.7 412">
-        <defs>
-          <linearGradient id="logo-gradient" x1="0%" y1="0%" y2="100%">
-            <stop offset="0%" stop-color="#8ceabb"/>
-            <stop offset="100%" stop-color="#378f7b"/>
-          </linearGradient>
-        </defs>
-        <path fill="url(#logo-gradient)" d="M215 214.9c-83.6 123.5-137.3 200.8-137.3 275.9 0 75.2 61.4 136.1 137.3 136.1s137.3-60.9 137.3-136.1c0-75.1-53.7-152.4-137.3-275.9z"/>
-      </svg>
-    </div>
-
-    <h1 class="auth-title">ثبت‌نام</h1>
-
-    <form method="post" novalidate>
-      {% csrf_token %}
-
-      <!-- نام کاربری -->
-      <div class="form-group">
-        <label for="id_username">نام کاربری</label>
-        <input type="text" name="username" placeholder="نام کاربری" maxlength="70" required id="id_username">
-      </div>
-
-      <!-- نام -->
-      <div class="form-group">
-        <label for="id_first_name">نام</label>
-        <input type="text" name="first_name" placeholder="نام" maxlength="30" required id="id_first_name">
-      </div>
-
-      <!-- نام خانوادگی -->
-      <div class="form-group">
-        <label for="id_last_name">نام خانوادگی</label>
-        <input type="text" name="last_name" placeholder="نام خانوادگی" maxlength="30" required id="id_last_name">
-      </div>
-
-      <!-- شماره تلفن -->
-      <div class="form-group">
-        <label for="id_phone">شماره تلفن</label>
-        <input type="text" name="phone" placeholder="09123456789" maxlength="11" required id="id_phone">
-      </div>
-
-      <!-- ایمیل -->
-      <div class="form-group">
-        <label for="id_email">ایمیل</label>
-        <input type="email" name="email" placeholder="example@email.com" required id="id_email">
-      </div>
-
-      <!-- جنسیت -->
-      <div class="form-group">
-        <label>جنسیت</label>
-        <div class="radio-group">
-          <label><input type="radio" name="gender" value="male"> آقا</label>
-          <label><input type="radio" name="gender" value="female"> خانم</label>
+    <div class="auth-card">
+        <div class="auth-logo">
+            <svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="77.7 214.9 274.7 412" aria-label="لوگوی گرین کود">
+                <title>گرین کود</title>
+                <defs>
+                    <linearGradient id="logo-gradient" x1="0%" y1="0%" y2="100%">
+                        <stop offset="0%" stop-color="#8ceabb"/>
+                        <stop offset="100%" stop-color="#378f7b"/>
+                    </linearGradient>
+                </defs>
+                <path fill="url(#logo-gradient)" d="M215 214.9c-83.6 123.5-137.3 200.8-137.3 275.9 0 75.2 61.4 136.1 137.3 136.1s137.3-60.9 137.3-136.1c0-75.1-53.7-152.4-137.3-275.9z"/>
+            </svg>
         </div>
-      </div>
 
-      <!-- آدرس -->
-      <div class="form-group">
-        <label for="id_address">آدرس</label>
-        <textarea name="address" placeholder="آدرس کامل" cols="40" rows="5" id="id_address"></textarea>
-      </div>
+        <h1 class="auth-title">ثبت‌نام</h1>
 
-      <!-- رمز عبور -->
-      <div class="form-group password-container">
-        <label for="id_password">رمز عبور</label>
-        <input type="password" name="password" placeholder="••••••••••••" required id="id_password">
-        <button type="button" class="password-toggle" data-target="id_password">👁️</button>
-      </div>
+        <form method="post" class="auth-form" novalidate>
+            {% csrf_token %}
 
-      <!-- تکرار رمز عبور -->
-      <div class="form-group password-container">
-        <label for="id_password2">تکرار رمز عبور</label>
-        <input type="password" name="password2" placeholder="••••••••••••" required id="id_password2">
-        <button type="button" class="password-toggle" data-target="id_password2">👁️</button>
-        <div id="password-match-message"></div>
-      </div>
+            {# ✅ نمایش خطاهای کلی فرم #}
+            {% if form.non_field_errors %}
+                <div class="error-messages">
+                    {% for error in form.non_field_errors %}
+                        <div class="error-message">{{ error }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
 
-      <button type="submit" class="btn btn-primary" id="submit-btn" disabled>ثبت‌نام</button>
-    </form>
+            {# ✅ استفاده از Django form rendering به جای HTML خام #}
+            <div class="form-group">
+                <label for="{{ form.username.id_for_label }}">نام کاربری</label>
+                {{ form.username }}
+                {% if form.username.errors %}
+                    <div class="error-message">{{ form.username.errors }}</div>
+                {% endif %}
+            </div>
 
-    <p class="auth-link">
-      حساب کاربری دارید؟
-      <a href="{% url 'shop:user_login' %}">ورود</a>
-    </p>
-  </div>
+            <div class="form-group">
+                <label for="{{ form.first_name.id_for_label }}">نام</label>
+                {{ form.first_name }}
+                {% if form.first_name.errors %}
+                    <div class="error-message">{{ form.first_name.errors }}</div>
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                <label for="{{ form.last_name.id_for_label }}">نام خانوادگی</label>
+                {{ form.last_name }}
+                {% if form.last_name.errors %}
+                    <div class="error-message">{{ form.last_name.errors }}</div>
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                <label for="{{ form.phone.id_for_label }}">شماره تلفن</label>
+                {{ form.phone }}
+                {% if form.phone.errors %}
+                    <div class="error-message">{{ form.phone.errors }}</div>
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                <label for="{{ form.email.id_for_label }}">ایمیل</label>
+                {{ form.email }}
+                {% if form.email.errors %}
+                    <div class="error-message">{{ form.email.errors }}</div>
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                <label>جنسیت</label>
+                <div class="radio-group">
+                    {{ form.gender }}
+                </div>
+                {% if form.gender.errors %}
+                    <div class="error-message">{{ form.gender.errors }}</div>
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                <label for="{{ form.address.id_for_label }}">آدرس</label>
+                {{ form.address }}
+                {% if form.address.errors %}
+                    <div class="error-message">{{ form.address.errors }}</div>
+                {% endif %}
+            </div>
+
+            <div class="form-group password-container">
+                <label for="{{ form.password.id_for_label }}">رمز عبور</label>
+                {{ form.password }}
+                <button type="button" class="password-toggle" data-target="{{ form.password.id_for_label }}" aria-label="نمایش/مخفی کردن رمز عبور">👁️</button>
+            </div>
+
+            <div class="form-group password-container">
+                <label for="{{ form.password2.id_for_label }}">تکرار رمز عبور</label>
+                {{ form.password2 }}
+                <button type="button" class="password-toggle" data-target="{{ form.password2.id_for_label }}" aria-label="نمایش/مخفی کردن رمز عبور">👁️</button>
+                <div id="password-match-message"></div>
+            </div>
+
+            <button type="submit" class="btn btn-primary" id="submit-btn">ثبت‌نام</button>
+        </form>
+
+        <p class="auth-link">
+            حساب کاربری دارید؟
+            <a href="{% url 'shop:user_login' %}">ورود</a>
+        </p>
+    </div>
 </div>
+{% endblock %}
 
-<script src="{% static 'javascripts/profile/password.js' %}"></script>
+{% block extra_js %}
+    {# ✅ مسیر صحیح JavaScript بر اساس ساختار واقعی پروژه #}
+    <script src="{% static 'javascript/profile/password.js' %}"></script>
 {% endblock %}

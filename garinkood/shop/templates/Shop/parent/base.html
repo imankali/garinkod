@@ -7,51 +7,81 @@
     <meta name="description" content="فروشگاه تخصصی کود، سم، بذر و ادوات کشاورزی گرین کود">
     <meta name="keywords" content="کود, سم, بذر, ادوات کشاورزی, محصولات باغبانی">
     <meta name="author" content="گرین کود">
-    <meta name="theme-color" content="#2e7d32">
+    <meta name="theme-color" content="#778873">
 
     <!-- Open Graph -->
     <meta property="og:title" content="فروشگاه گرین کود">
     <meta property="og:description" content="فروشگاه تخصصی محصولات کشاورزی و باغبانی">
     <meta property="og:type" content="website">
     <meta property="og:url" content="{{ request.build_absolute_uri }}">
-    <meta property="og:image" content="{% static 'images/logo.png' %}">
+    <meta property="og:image" content="{% static 'images/favicon.png' %}">
 
     <!-- Icons -->
     <link rel="icon" type="image/png" href="{% static 'images/favicon.png' %}">
-    <link rel="apple-touch-icon" href="{% static 'images/apple-touch-icon.png' %}">
+    <link rel="apple-touch-icon" href="{% static 'images/favicon.png' %}">
 
     <!-- Preconnect for fonts -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
-    <link rel="preload" href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/fonts/webfonts/Vazirmatn-Regular.woff2" as="font" type="font/woff2" crossorigin>
-
-    <!-- Vazirmatn Font (بدون فاصله اضافه!) -->
-    <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 
     <title>{% block title %}فروشگاه گرین کود{% endblock %}</title>
 
-    <!-- Base Styles -->
+    <!-- ========================================
+         Base Styles - همیشه لود شوند
+         ======================================== -->
     <link rel="stylesheet" href="{% static 'css/base.css' %}">
 
-    <!-- Block for extra CSS -->
+    <!-- ✅ هدر و سبد خرید - همیشه لازم هستند -->
+    <link rel="stylesheet" href="{% static 'css/header.css' %}">
+    <link rel="stylesheet" href="{% static 'css/cart_sidebar.css' %}">
+    <link rel="stylesheet" href="{% static 'css/mobile_bottom_nav.css' %}">
+    <link rel="stylesheet" href="{% static 'css/footer.css' %}">
+
+    <!-- Block for page-specific CSS -->
     {% block extra_css %}{% endblock %}
 </head>
 <body>
+    <!-- هدر اصلی -->
     {% include 'Shop/partials/header.html' %}
 
+    <!-- نمایش پیام‌های Django -->
+    {% if messages %}
+        <div class="messages-container">
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <!-- محتوای اصلی صفحه -->
     <main class="container">
         {% block content %}{% endblock %}
     </main>
 
-    {% include 'Shop/partials/fother.html' %}
+    <!-- نوار ناوبری پایین موبایل -->
+    {% include 'Shop/partials/mobile_bottom_nav.html' %}
 
-    <!-- jQuery (اگر نیاز دارید) -->
-    <!-- <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script> -->
+    <!-- فوتر -->
+    {% include 'Shop/partials/footer.html' %}
 
-    <!-- Base JS -->
-    <script src="{% static 'javascripts/home.js' %}"></script>
+    <!-- ========================================
+         JavaScript Files
+         ✅ اصلاح مسیر: javascripts → javascript
+         ======================================== -->
+
+    <!-- ✅ مسیر صحیح بر اساس ساختار واقعی پروژه -->
+    <script src="{% static 'javascript/header/mobile_menu.js' %}"></script>
+    <script src="{% static 'javascript/header/search.js' %}"></script>
+    <script src="{% static 'javascript/header/shopping_cart.js' %}"></script>
+
     <script>
+        // متغیرهای سراسری برای JavaScript
         window.CSRF_TOKEN = "{{ csrf_token }}";
         window.STATIC_URL = "{% static '' %}";
+        window.MEDIA_URL = "{{ MEDIA_URL }}";
     </script>
 
     <!-- Block for page-specific JS -->

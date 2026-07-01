@@ -83,8 +83,10 @@ class AdminProduct(admin.ModelAdmin):
     list_display = ('title', 'author', 'category', 'slug', 'status', 'publish', 'price', 'stock')
     search_fields = ('title', 'description', 'author__username')
     prepopulated_fields = {'slug': ('title',)}
-    raw_id_fields = ('author',)
+
+    # ✅ رفع باگ بحرانی ۱: حذف raw_id_fields چون با autocomplete_fields تداخل دارد و باعث کرش پنل ادمین می‌شود
     autocomplete_fields = ('author',)
+
     date_hierarchy = 'publish'
     ordering = ('-publish',)
     list_display_links = ('slug',)
@@ -94,7 +96,6 @@ class AdminProduct(admin.ModelAdmin):
     show_full_result_count = False
     save_as = True
     actions = [make_published, make_draft]
-    inlines = []
 
     fieldsets = (
         ('اطلاعات اصلی', {
@@ -111,27 +112,27 @@ class AdminProduct(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
-    # اضافه کردن متد save_model
+
     def save_model(self, request, obj, form, change):
-        if not change:  # اگر محصول جدید است
-            obj.author = request.user  # تنظیم نویسنده به کاربر فعلی
+        if not change:
+            obj.author = request.user
         super().save_model(request, obj, form, change)
+
+    # ✅ رفع باگ بحرانی ۲: جلوگیری از تغییر state کلاس (self.inlines) که در سرورهای چند-thread باعث تداخل می‌شود
     def get_inline_instances(self, request, obj=None):
         if not obj:
             return super().get_inline_instances(request)
 
         if obj.category and obj.category.name == "کود":
-            self.inlines = [FertilizerDetailInline]
+            return [FertilizerDetailInline(self.model, self.admin_site)]
         elif obj.category and obj.category.name == "سم":
-            self.inlines = [PesticideDetailInline]
+            return [PesticideDetailInline(self.model, self.admin_site)]
         elif obj.category and obj.category.name == "بذر":
-            self.inlines = [SeedDetailInline]
+            return [SeedDetailInline(self.model, self.admin_site)]
         elif obj.category and obj.category.name == "ادوات":
-            self.inlines = [EquipmentDetailInline]
+            return [EquipmentDetailInline(self.model, self.admin_site)]
         else:
-            self.inlines = []
-
-        return super().get_inline_instances(request, obj)
+            return []
 
 
 # --- Admin UserAccount ---
@@ -150,7 +151,10 @@ class AdminComment(admin.ModelAdmin):
     list_display = ('name', 'product', 'created', 'active', 'email')
     list_filter = ('active', 'created', 'updated')
     list_editable = ('active',)
-    search_fields = ('name', 'email', 'description', 'post__title')
+
+    # ✅ رفع باگ بحرانی ۳: تغییر post به product و description به body (چون در مدل Comment این فیلدها وجود ندارند)
+    search_fields = ('name', 'email', 'body', 'product__title')
+
     actions = [approve_comments, disapprove_comments]
     date_hierarchy = 'created'
     ordering = ('-created',)

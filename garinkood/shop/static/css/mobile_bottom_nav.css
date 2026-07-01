@@ -1,233 +1,193 @@
-/* Mobile Bottom Nav */
+/* ========================================
+   Mobile Bottom Navigation Bar
+   نوار ناوبری پایین موبایل
+   هماهنگ با mobile_bottom_nav.html
+   ======================================== */
+
+/* فقط در موبایل نمایش داده شود */
 .mobile-bottom-nav {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
   height: 64px;
-  background: white;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border-top: 1px solid var(--gray-200);
   display: flex;
   justify-content: space-around;
   align-items: center;
-  z-index: 40;
+  z-index: 1000;
+  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.06);
+  padding: 0 0.5rem;
 }
 
+/* در دسکتاپ و تبلت مخفی شود */
 @media (min-width: 768px) {
   .mobile-bottom-nav {
     display: none;
   }
 }
 
+/* ========================================
+   Navigation Items
+   ======================================== */
 .bottom-nav-item {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 0.25rem;
-  color: var(--gray-600);
+  color: var(--gray-500);
   text-decoration: none;
-  font-size: 0.75rem;
-  transition: color 0.2s;
-  padding: 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 500;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 0.4rem 0.6rem;
+  flex: 1;
+  max-width: 80px;
+  position: relative;
+  border-radius: 12px;
 }
 
-.bottom-nav-item.active {
-  color: var(--c-4);
+.bottom-nav-item svg {
+  width: 22px;
+  height: 22px;
+  transition: all 0.3s ease;
+  stroke-width: 2;
 }
 
+.bottom-nav-item span {
+  transition: all 0.3s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* Hover State */
 .bottom-nav-item:hover {
   color: var(--c-4);
-}
-/* Cart Sidebar */
-.cart-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 50;
-  display: none;
-  backdrop-filter: blur(2px);
+  background: rgba(161, 188, 152, 0.1);
 }
 
-.cart-overlay.active {
-  display: block;
+.bottom-nav-item:hover svg {
+  transform: scale(1.1);
 }
 
-.cart-sidebar {
-  position: fixed;
-  top: 0;
-  right: -400px;
-  width: 100%;
-  max-width: 400px;
-  height: 100%;
-  background: white;
-  z-index: 51;
-  display: flex;
-  flex-direction: column;
-  transition: right 0.3s ease-in-out;
-  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15);
-}
-
-.cart-sidebar.active {
-  right: 0;
-}
-
-.cart-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1.5rem;
-  border-bottom: 1px solid var(--gray-200);
-}
-
-.cart-title {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--gray-900);
-}
-
-.cart-close {
-  padding: 0.5rem;
-  background: none;
-  border: none;
-  color: var(--gray-600);
-  cursor: pointer;
-  border-radius: 0.5rem;
-  transition: all 0.2s;
-}
-
-.cart-close:hover {
-  background: var(--gray-100);
-  color: var(--gray-900);
-}
-
-.cart-items {
-  flex: 1;
-  overflow-y: auto;
-  padding: 1rem;
-}
-
-.empty-cart {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: var(--gray-400);
-  gap: 1rem;
-}
-
-.cart-item {
-  display: flex;
-  gap: 1rem;
-  padding: 1rem;
-  background: var(--gray-50);
-  border-radius: 0.75rem;
-  margin-bottom: 1rem;
-}
-
-.cart-item-image {
-  width: 80px;
-  height: 80px;
-  border-radius: 0.5rem;
-  object-fit: cover;
-}
-
-.cart-item-info {
-  flex: 1;
-}
-
-.cart-item-name {
-  font-weight: 600;
-  color: var(--gray-900);
-  margin-bottom: 0.25rem;
-}
-
-.cart-item-price {
-  font-size: 0.875rem;
+/* Active State - صفحه فعلی */
+.bottom-nav-item.active {
   color: var(--c-4);
-  font-weight: 600;
-  margin-bottom: 0.5rem;
+  font-weight: 700;
 }
 
-.cart-item-controls {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+.bottom-nav-item.active svg {
+  stroke: var(--c-4);
+  stroke-width: 2.5;
+  transform: scale(1.15);
 }
 
-.quantity-btn {
-  width: 28px;
-  height: 28px;
+/* Indicator dot برای صفحه فعال */
+.bottom-nav-item.active::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  background: var(--c-4);
+  border-radius: 50%;
+}
+
+/* ========================================
+   Badge - بج سبد خرید
+   ======================================== */
+.bottom-nav-item .badge {
+  position: absolute;
+  top: 0;
+  right: calc(50% - 18px);
+  background: #ef4444;
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 5px;
+  border-radius: 9999px;
+  min-width: 18px;
+  height: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: white;
-  border: 1px solid var(--gray-300);
-  border-radius: 0.375rem;
-  cursor: pointer;
-  transition: all 0.2s;
+  border: 2px solid white;
+  box-shadow: 0 2px 6px rgba(239, 68, 68, 0.4);
+  line-height: 1;
+  z-index: 10;
 }
 
-.quantity-btn:hover {
-  background: var(--c-4);
-  color: white;
-  border-color: var(--c-4);
+/* انیمیشن برای بج */
+@keyframes badgePulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
 }
 
-.quantity-display {
-  min-width: 32px;
-  text-align: center;
-  font-weight: 600;
-  color: var(--gray-900);
+.bottom-nav-item .badge:not([style*="display: none"]) {
+  animation: badgePulse 2s ease-in-out infinite;
 }
 
-.remove-btn {
-  margin-right: auto;
-  padding: 0.375rem;
-  background: none;
-  border: none;
-  color: var(--gray-400);
-  cursor: pointer;
-  border-radius: 0.375rem;
-  transition: all 0.2s;
+/* ========================================
+   Safe Area - برای آیفون‌های جدید
+   ======================================== */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .mobile-bottom-nav {
+    padding-bottom: env(safe-area-inset-bottom);
+    height: calc(64px + env(safe-area-inset-bottom));
+  }
+
+  body {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom));
+  }
 }
 
-.remove-btn:hover {
-  background: #fee;
-  color: #e11d48;
+/* ========================================
+   Responsive - موبایل‌های کوچک
+   ======================================== */
+@media (max-width: 380px) {
+  .mobile-bottom-nav {
+    height: 60px;
+  }
+
+  .bottom-nav-item {
+    font-size: 0.65rem;
+    padding: 0.3rem 0.4rem;
+  }
+
+  .bottom-nav-item svg {
+    width: 20px;
+    height: 20px;
+  }
 }
 
-.cart-footer {
-  padding: 1.5rem;
-  border-top: 1px solid var(--gray-200);
+/* ========================================
+   Accessibility
+   ======================================== */
+.bottom-nav-item:focus-visible {
+  outline: 2px solid var(--c-3);
+  outline-offset: 2px;
 }
 
-.cart-total {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-  font-size: 1.125rem;
-  font-weight: 700;
-  color: var(--gray-900);
-}
+@media (prefers-reduced-motion: reduce) {
+  .bottom-nav-item,
+  .bottom-nav-item svg,
+  .bottom-nav-item span {
+    transition: none;
+  }
 
-.checkout-btn {
-  width: 100%;
-  padding: 1rem;
-  background: var(--c-4);
-  color: white;
-  border: none;
-  border-radius: 0.75rem;
-  font-weight: 600;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: all 0.3s;
-}
-
-.checkout-btn:hover {
-  background: var(--c-3);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(119, 136, 115, 0.3);
+  .bottom-nav-item .badge {
+    animation: none;
+  }
 }

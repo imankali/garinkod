@@ -1,62 +1,83 @@
 {% extends 'Shop/parent/base.html' %}
 {% load static %}
 
-{% block title%}
-    پشتیبانی
+{% block title %}پشتیبانی و تماس با ما{% endblock %}
+
+{% block extra_css %}
+    <link rel="stylesheet" type="text/css" href="{% static 'css/sign_in.css' %}">
 {% endblock %}
 
-{% block body %}
+{% block content %}
+<div class="auth-wrapper">
+    <div class="auth-card">
+        <h1 class="auth-title">تماس با پشتیبانی</h1>
 
-    <h1 style="direction: rtl; color: #006b1b;margin-left:auto"> ارسال ایمیل </h1>
-    <p style="direction: rtl;">
-    {% if sent %}
-        پیام شما ارسال شد
-    {% endif %}
-    </p>
-        <form method="post" style="direction: rtl;">
+        {% if sent %}
+            <div class="success-message">
+                پیام شما با موفقیت ارسال شد. به زودی با شما تماس خواهیم گرفت.
+            </div>
+        {% else %}
+            <form method="post" class="auth-form" novalidate>
+                {% csrf_token %}
 
-                    {% csrf_token %}
+                {# ✅ نمایش خطاهای کلی فرم #}
+                {% if form.non_field_errors %}
+                    <div class="error-messages">
+                        {% for error in form.non_field_errors %}
+                            <div class="error-message">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
 
-                نام:
-            <br>
-                <input type="text" name="name" required {% if form.name.value %} value="{{ form.name.value }}"
-                {% else %} value="{{ account.user.first_name|default:'' }}"{% endif %}>
-            <br>
+                <!-- نام -->
+                <div class="form-group">
+                    <label for="{{ form.name.id_for_label }}">نام</label>
+                    {{ form.name }}
+                    {% if form.name.errors %}
+                        <div class="error-message">{{ form.name.errors }}</div>
+                    {% endif %}
+                </div>
 
-                ایمیل دریافت کننده:
-            <br>
-                <input type="text" name="email" required {% if form.email.value %} value="{{ form.email.value }}"
-                {% else %} value="{{ account.user.email|default:'' }}"{% endif %}>
-            <br>
-                موضوع:
-            <br>
-                <input type="text" name="subject" required {% if form.subject.value %} value="{{ form.subject.value }}"
-                {% else %} value="{{ account.user.subject|default:'' }}"{% endif %}>
-            <br>
+                <!-- ایمیل -->
+                <div class="form-group">
+                    <label for="{{ form.email.id_for_label }}">ایمیل</label>
+                    {{ form.email }}
+                    {% if form.email.errors %}
+                        <div class="error-message">{{ form.email.errors }}</div>
+                    {% endif %}
+                </div>
 
-            شماره همره:
-            <br>
-                <input type="text" name="phone"  value="{{ account.phone|default:'' }}">
-            <br>
-                متن پیام:
-            <br>
-                <textarea type="text" name="massage"  {% if form.massage.value %} value="{{ form.massage.value }}"
-                {% else %} value="{{ account.massage|default:'' }}"{% endif %}></textarea>
-            <br>
+                <!-- موضوع -->
+                <div class="form-group">
+                    <label for="{{ form.subject.id_for_label }}">موضوع</label>
+                    {{ form.subject }}
+                    {% if form.subject.errors %}
+                        <div class="error-message">{{ form.subject.errors }}</div>
+                    {% endif %}
+                </div>
 
-                <input type="submit" value=" ثبت اطلعات ">
+                <!-- شماره همراه -->
+                <div class="form-group">
+                    <label for="{{ form.phone.id_for_label }}">شماره همراه (اختیاری)</label>
+                    {{ form.phone }}
+                    {% if form.phone.errors %}
+                        <div class="error-message">{{ form.phone.errors }}</div>
+                    {% endif %}
+                </div>
 
-            <br>
+                <!-- متن پیام -->
+                <div class="form-group">
+                    {# ✅ اصلاح: massage به message تغییر کرد #}
+                    <label for="{{ form.message.id_for_label }}">متن پیام</label>
+                    {{ form.message }}
+                    {% if form.message.errors %}
+                        <div class="error-message">{{ form.message.errors }}</div>
+                    {% endif %}
+                </div>
 
-        </form>
-
-    {% for field in form %}
-        {% if field.errors  %}
-            {% for errors in field.errors%}
-                {{ field.label }} :
-                <br>{{ errors }}<br>
-            {% endfor %}
+                <button type="submit" class="btn btn-primary">ارسال پیام</button>
+            </form>
         {% endif %}
-    {% endfor %}
-
+    </div>
+</div>
 {% endblock %}
