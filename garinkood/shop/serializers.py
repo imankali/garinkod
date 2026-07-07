@@ -65,11 +65,12 @@ class ProductSerializer(serializers.ModelSerializer):
     image_url = serializers.SerializerMethodField()
     is_in_stock = serializers.SerializerMethodField()
 
-    # ✅ اصلاح: source با underscore (مطابق related_name در models.py)
-    fertilizer_detail = FertilizerDetailSerializer(read_only=True, source='fertilizer_detail')
-    pesticide_detail = PesticideDetailSerializer(read_only=True, source='pesticide_detail')
-    seed_detail = SeedDetailSerializer(read_only=True, source='seed_detail')
-    equipment_detail = EquipmentDetailSerializer(read_only=True, source='equipment_detail')
+    # ✅ اصلاح: وقتی نام فیلد با related_name یکی است نباید source تکراری داده شود
+    # (DRF در این حالت خطای AssertionError می‌دهد)
+    fertilizer_detail = FertilizerDetailSerializer(read_only=True)
+    pesticide_detail = PesticideDetailSerializer(read_only=True)
+    seed_detail = SeedDetailSerializer(read_only=True)
+    equipment_detail = EquipmentDetailSerializer(read_only=True)
 
     class Meta:
         model = Product
@@ -92,14 +93,20 @@ class ProductSerializer(serializers.ModelSerializer):
 class ProductListSerializer(serializers.ModelSerializer):
     """Serializer سبک‌تر برای لیست محصولات"""
     category = serializers.StringRelatedField(read_only=True)
+    category_slug = serializers.SlugField(source='category.slug', read_only=True, default=None)
+    subcategory_slug = serializers.SlugField(source='subcategory.slug', read_only=True, default=None)
     image_url = serializers.SerializerMethodField()
     is_in_stock = serializers.SerializerMethodField()
+    short_description = serializers.SerializerMethodField()
+    # ✅ از annotation در ViewSet پر می‌شود (بدون N+1)
+    reviews_count = serializers.IntegerField(read_only=True, default=0)
 
     class Meta:
         model = Product
         fields = [
-            'id', 'title', 'slug', 'category', 'price', 'stock',
-            'available', 'is_featured', 'image', 'image_url', 'is_in_stock'
+            'id', 'title', 'slug', 'category', 'category_slug', 'subcategory_slug',
+            'price', 'stock', 'available', 'is_featured', 'image', 'image_url',
+            'is_in_stock', 'short_description', 'reviews_count'
         ]
 
     def get_image_url(self, obj):
@@ -107,6 +114,11 @@ class ProductListSerializer(serializers.ModelSerializer):
 
     def get_is_in_stock(self, obj):
         return obj.is_in_stock
+
+    def get_short_description(self, obj):
+        if not obj.description:
+            return ''
+        return obj.description[:160] + ('…' if len(obj.description) > 160 else '')
 
 
 # ========================================

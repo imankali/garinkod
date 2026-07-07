@@ -61,16 +61,18 @@ function convertToMockProduct(apiProduct: ProductList): MockProduct {
   return {
     id: apiProduct.id,
     name: apiProduct.title,
-    category: typeof apiProduct.category === 'string' ? apiProduct.category : 'کود کشاورزی',
-    categoryId: 'fertilizer',
-    subCategoryId: '',
+    // ✅ داده واقعی API به‌جای مقادیر ثابت
+    category: apiProduct.category || 'بدون دسته',
+    categoryId: apiProduct.category_slug || '',
+    subCategoryId: apiProduct.subcategory_slug || '',
     brand: 'گرین کود',
     price: apiProduct.price,
+    badge: apiProduct.is_featured ? 'ویژه' : undefined,
     rating: 4.5,
-    reviews: 0,
+    reviews: apiProduct.reviews_count ?? 0,
     image: apiProduct.image_url || '/images/products/default.jpg',
     inStock: apiProduct.is_in_stock,
-    description: '',
+    description: apiProduct.short_description || '',
     features: [],
     cropTags: [],
     pestTags: [],
@@ -168,7 +170,8 @@ export default function App() {
       }
 
       if (inStockOnly) {
-        params.available = true;
+        // ✅ فیلتر واقعی موجودی (available + stock > 0) در بک‌اند
+        params.in_stock = true;
       }
 
       if (priceLimit < 10000000) {
@@ -176,11 +179,12 @@ export default function App() {
       }
 
       // Sort mapping
+      // ✅ بک‌اند فیلد rating ندارد؛ «پرامتیازترین» فعلا بر اساس جدیدترین مرتب می‌شود
       const sortMapping: Record<string, string> = {
         'popular': '-publish',
         'cheapest': 'price',
         'expensive': '-price',
-        'rating': '-rating',
+        'rating': '-publish',
       };
 
       if (sort !== 'popular') {
@@ -380,7 +384,7 @@ export default function App() {
                             محصولی یافت نشد
                           </p>
                           <p className="mt-2 text-sm text-slate-500 dark:text-emerald-300">
-                            فیلترها را تغییر دهید یا عبارت دیگری جستجو کنید
+                            فیلترها را تغییر دهید یا عبارت دیگری ��ستجو کنید
                           </p>
                         </div>
                       ) : (
@@ -429,7 +433,7 @@ export default function App() {
                     <div className="text-center">
                       <div className="text-6xl mb-4">404</div>
                       <p className="text-lg font-bold text-slate-700 dark:text-white">
-                        صفحه مورد نظر یافت نشد
+                        صفحه مورد ن��ر یافت نشد
                       </p>
                       <a
                         href="/"

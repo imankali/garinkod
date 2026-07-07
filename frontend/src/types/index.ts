@@ -90,6 +90,8 @@ export interface ProductList {
   title: string;
   slug: string;
   category: string;
+  category_slug: string | null;
+  subcategory_slug: string | null;
   price: number;
   stock: number;
   available: boolean;
@@ -97,6 +99,8 @@ export interface ProductList {
   image: string | null;
   image_url: string;
   is_in_stock: boolean;
+  short_description: string;
+  reviews_count: number;
 }
 
 // ========================================
@@ -225,10 +229,12 @@ export type SortOption = 'popular' | 'cheapest' | 'expensive' | 'rating';
 export interface ProductQueryParams {
   page?: number;
   category?: string;
+  subcategory?: string;
   search?: string;
   ordering?: string;
   is_featured?: boolean;
   available?: boolean;
+  in_stock?: boolean;
   min_price?: number;
   max_price?: number;
 }

@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.models import User
+from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
@@ -11,6 +12,7 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 from .models import (
     Category, Product, Comment, UserAccount, Cart, CartItem
 )
+from .filters import ProductFilter
 from .serializers import (
     CategorySerializer, ProductSerializer, ProductListSerializer,
     CommentSerializer, UserAccountSerializer, CartSerializer,
@@ -108,9 +110,14 @@ class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
 # Product ViewSet
 # ========================================
 class ProductViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = Product.objects.filter(status='published')
+    # ✅ select_related برای جلوگیری از N+1 + شمارش نظرات فعال با annotation
+    queryset = (
+        Product.objects.filter(status='published')
+        .select_related('category', 'subcategory')
+        .annotate(reviews_count=Count('comments', filter=Q(comments__active=True)))
+    )
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ['category__slug', 'is_featured', 'available']
+    filterset_class = ProductFilter  # ✅ فیلتر سفارشی مطابق پارامترهای فرانت‌اند
     search_fields = ['title', 'description']
     ordering_fields = ['price', 'publish', 'created']
     ordering = ['-publish']

@@ -17,8 +17,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-me-in-production')
 DEBUG = config('DEBUG', default=True, cast=bool)
 
-# ✅ اصلاح: اجازه دسترسی از همه IP ها (فقط برای development)
-ALLOWED_HOSTS = ['*']
+# ✅ در development همه هاست‌ها مجاز هستند؛ در production از env خوانده می‌شود
+# مثال در .env:  ALLOWED_HOSTS=garinkood.ir,www.garinkood.ir
+if DEBUG:
+    ALLOWED_HOSTS = ['*']
+else:
+    ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='', cast=Csv())
 
 # ========================================
 # Application definition
@@ -172,8 +176,13 @@ REST_FRAMEWORK = {
 # ========================================
 # CORS Configuration
 # ========================================
-# ✅ اصلاح: اجازه CORS از همه origins (فقط برای development)
-CORS_ALLOW_ALL_ORIGINS = True  # فقط برای development!
+# ✅ در development همه originها مجاز هستند؛ در production فقط دامنه‌های مشخص‌شده در env
+# مثال در .env:  CORS_ALLOWED_ORIGINS=https://garinkood.ir,https://www.garinkood.ir
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True
+else:
+    CORS_ALLOW_ALL_ORIGINS = False
+    CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='', cast=Csv())
 
 CORS_ALLOW_CREDENTIALS = True
 
@@ -201,11 +210,12 @@ CORS_ALLOW_HEADERS = [
 # ========================================
 # CSRF Configuration
 # ========================================
-CSRF_TRUSTED_ORIGINS = [
-    'http://localhost:5173',
-    'http://127.0.0.1:5173',
-    'http://192.168.78.6:5173',  # IP لپ‌تاپ تو
-]
+# مثال در .env:  CSRF_TRUSTED_ORIGINS=https://garinkood.ir
+CSRF_TRUSTED_ORIGINS = config(
+    'CSRF_TRUSTED_ORIGINS',
+    default='http://localhost:5173,http://127.0.0.1:5173',
+    cast=Csv()
+)
 
 # ========================================
 # Session Configuration - ✅ اضافه شد برای Guest Cart

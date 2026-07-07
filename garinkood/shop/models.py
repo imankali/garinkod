@@ -67,7 +67,7 @@ class Product(models.Model):
     created = models.DateTimeField(auto_now_add=True, verbose_name="تاریخ ایجاد")
     updated = models.DateTimeField(auto_now=True, verbose_name="تاریخ بروزرسانی")
     status = models.CharField(max_length=15, choices=STATUS_CHOICES, default='draft', verbose_name="وضعیت")
-    price = models.IntegerField(verbose_name="قیمت")
+    price = models.BigIntegerField(verbose_name="قیمت")  # ✅ BigInteger برای مبالغ بزرگ (تومان)
     stock = models.PositiveIntegerField(default=0, verbose_name="موجودی")
     available = models.BooleanField(default=True, verbose_name="موجود")
     is_featured = models.BooleanField(default=False, verbose_name="ویژه")
