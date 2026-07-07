@@ -70,8 +70,9 @@ class AdminCategory(admin.ModelAdmin):
     prepopulated_fields = {'slug': ('name',)}
     ordering = ('name',)
 
+    # ✅ اصلاح: استفاده از products به جای product_set (مطابق related_name در models.py)
     def get_product_count(self, obj):
-        return obj.product_set.filter(status='published').count()
+        return obj.products.filter(status='published').count()
 
     get_product_count.short_description = 'تعداد محصولات'
 
@@ -118,18 +119,18 @@ class AdminProduct(admin.ModelAdmin):
             obj.author = request.user
         super().save_model(request, obj, form, change)
 
-    # ✅ رفع باگ بحرانی ۲: جلوگیری از تغییر state کلاس (self.inlines) که در سرورهای چند-thread باعث تداخل می‌شود
+    # ✅ رفع باگ بحرانی ۲: استفاده از slug به جای name (چون slug ثابت است اما name ممکن است تغییر کند)
     def get_inline_instances(self, request, obj=None):
         if not obj:
             return super().get_inline_instances(request)
 
-        if obj.category and obj.category.name == "کود":
+        if obj.category and obj.category.slug == "fertilizer":
             return [FertilizerDetailInline(self.model, self.admin_site)]
-        elif obj.category and obj.category.name == "سم":
+        elif obj.category and obj.category.slug == "pesticide":
             return [PesticideDetailInline(self.model, self.admin_site)]
-        elif obj.category and obj.category.name == "بذر":
+        elif obj.category and obj.category.slug == "seed":
             return [SeedDetailInline(self.model, self.admin_site)]
-        elif obj.category and obj.category.name == "ادوات":
+        elif obj.category and obj.category.slug == "equipment":
             return [EquipmentDetailInline(self.model, self.admin_site)]
         else:
             return []

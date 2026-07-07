@@ -33,7 +33,7 @@ class Category(models.Model):
         return Product.objects.filter(category=self, status='published')
 
     def get_product_count(self):
-        return self.product_set.filter(status='published').count()
+        return self.products.filter(status='published').count()
 
 
 # --- SubCategory ---
@@ -60,7 +60,7 @@ class Product(models.Model):
     title = models.CharField(max_length=250, verbose_name="عنوان")
     slug = models.SlugField(max_length=250, unique=True, verbose_name="اسلاگ")
     author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='products')
-    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="دسته")
+    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True, related_name='products', verbose_name="دسته")
     subcategory = models.ForeignKey(SubCategory, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="زیردسته")
     description = models.TextField(verbose_name="توضیحات")
     publish = models.DateTimeField(default=timezone.now, verbose_name="تاریخ انتشار")
@@ -90,7 +90,7 @@ class Product(models.Model):
     def image_url(self):
         if self.image:
             return self.image.url
-        return f"{settings.STATIC_URL}images/default-product.png"
+        return '/images/products/default.jpg'
 
     @property
     def is_in_stock(self):
@@ -98,18 +98,10 @@ class Product(models.Model):
 
 
 # --- مشخصات اختصاصی برای هر دسته ---
-class ProductDetail(models.Model):
-    """مدل پایه برای مشخصات محصولات"""
-    product = models.OneToOneField(Product, on_delete=models.CASCADE, verbose_name="محصول")
+# ✅ اصلاح: حذف abstract class و تعریف مستقیم OneToOneField در هر کلاس
 
-    class Meta:
-        abstract = True
-
-    def __str__(self):
-        return f"{self.product.title}"
-
-
-class FertilizerDetail(ProductDetail):
+class FertilizerDetail(models.Model):
+    product = models.OneToOneField(Product, on_delete=models.CASCADE, related_name='fertilizer_detail', verbose_name="محصول")
     fertilizer_type = models.CharField(max_length=100, verbose_name="نوع کود")
     nitrogen = models.CharField(max_length=20, verbose_name="نیتروژن (%)")
     phosphorus = models.CharField(max_length=20, verbose_name="فسفر (%)")
@@ -119,8 +111,12 @@ class FertilizerDetail(ProductDetail):
         verbose_name = "مشخصات کود"
         verbose_name_plural = "مشخصات کود"
 
+    def __str__(self):
+        return f"مشخصات کود: {self.product.title}"
 
-class PesticideDetail(ProductDetail):
+
+class PesticideDetail(models.Model):
+    product = models.OneToOneField(Product, on_delete=models.CASCADE, related_name='pesticide_detail', verbose_name="محصول")
     pesticide_type = models.CharField(max_length=100, verbose_name="نوع سم")
     active_ingredient = models.CharField(max_length=100, verbose_name="مواد فعال")
     concentration = models.CharField(max_length=20, verbose_name="غلظت (%)")
@@ -129,8 +125,12 @@ class PesticideDetail(ProductDetail):
         verbose_name = "مشخصات سم"
         verbose_name_plural = "مشخصات سم"
 
+    def __str__(self):
+        return f"مشخصات سم: {self.product.title}"
 
-class SeedDetail(ProductDetail):
+
+class SeedDetail(models.Model):
+    product = models.OneToOneField(Product, on_delete=models.CASCADE, related_name='seed_detail', verbose_name="محصول")
     crop_type = models.CharField(max_length=100, verbose_name="نوع گیاه")
     variety = models.CharField(max_length=100, verbose_name="رقم")
     weight = models.CharField(max_length=20, verbose_name="وزن")
@@ -139,8 +139,12 @@ class SeedDetail(ProductDetail):
         verbose_name = "مشخصات بذر"
         verbose_name_plural = "مشخصات بذر"
 
+    def __str__(self):
+        return f"مشخصات بذر: {self.product.title}"
 
-class EquipmentDetail(ProductDetail):
+
+class EquipmentDetail(models.Model):
+    product = models.OneToOneField(Product, on_delete=models.CASCADE, related_name='equipment_detail', verbose_name="محصول")
     tool_type = models.CharField(max_length=100, verbose_name="نوع ابزار")
     material = models.CharField(max_length=100, verbose_name="جنس")
     weight = models.CharField(max_length=20, verbose_name="وزن")
@@ -148,6 +152,9 @@ class EquipmentDetail(ProductDetail):
     class Meta:
         verbose_name = "مشخصات ابزار"
         verbose_name_plural = "مشخصات ابزار"
+
+    def __str__(self):
+        return f"مشخصات ابزار: {self.product.title}"
 
 
 # --- User Account ---
@@ -202,12 +209,12 @@ class Comment(models.Model):
 
 # --- Shopping Cart ---
 class Cart(models.Model):
-    user = models.OneToOneField(
+    user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         null=True,
         blank=True,
-        related_name='cart'
+        related_name='carts'
     )
     session_id = models.CharField(max_length=100, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -224,7 +231,6 @@ class Cart(models.Model):
 
     @property
     def total_price(self):
-        # ✅ بهینه‌سازی: استفاده از aggregate به جای loop
         result = self.items.aggregate(
             total=Sum(F('quantity') * F('product__price'))
         )
@@ -232,7 +238,6 @@ class Cart(models.Model):
 
     @property
     def total_items(self):
-        # ✅ بهینه‌سازی: استفاده از aggregate به جای loop
         result = self.items.aggregate(
             total=Sum('quantity')
         )

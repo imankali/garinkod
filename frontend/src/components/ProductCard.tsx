@@ -1,0 +1,190 @@
+// frontend/src/components/ProductCard.tsx
+
+import { motion } from "framer-motion";
+import { Eye, GitCompare, Heart, PackageX, ShoppingCart, Star } from "lucide-react";
+import { formatPrice } from "../utils/formatPrice";
+import type { MockProduct } from "../types";
+
+// ========================================
+// ProductCard Props Interface
+// ========================================
+interface ProductCardProps {
+  product: MockProduct;
+  index: number;
+  isWishlisted: boolean;
+  isComparing: boolean;
+  compareDisabled: boolean;
+  onToggleWishlist: (product: MockProduct) => void;
+  onAddToCart: (product: MockProduct, e: React.MouseEvent) => void;
+  onQuickView: (product: MockProduct) => void;
+  onToggleCompare: (product: MockProduct) => void;
+}
+
+// ========================================
+// ProductCard Component
+// ========================================
+export default function ProductCard({
+  product,
+  index,
+  isWishlisted,
+  isComparing,
+  compareDisabled,
+  onToggleWishlist,
+  onAddToCart,
+  onQuickView,
+  onToggleCompare,
+}: ProductCardProps) {
+  // محاسبه درصد تخفیف
+  const discountPercent = product.oldPrice
+    ? Math.round(((product.oldPrice - product.price) / product.oldPrice) * 100)
+    : 0;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 30 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-80px" }}
+      transition={{ delay: (index % 4) * 0.06, duration: 0.4 }}
+      whileHover={{ y: -8 }}
+      className="group relative flex flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm transition-shadow duration-300 hover:shadow-2xl hover:shadow-emerald-900/10 dark:border-emerald-900/40 dark:bg-[#08392a]"
+    >
+      {/* ======================================== */}
+      {/* Badges & Wishlist Button */}
+      {/* ======================================== */}
+      <div className="absolute inset-x-3 top-3 z-10 flex items-start justify-between">
+        <div className="flex flex-col gap-1.5">
+          {product.badge && (
+            <span className="rounded-full bg-brand-orange px-2.5 py-1 text-[10px] font-bold text-white shadow-lg">
+              {product.badge}
+            </span>
+          )}
+          {discountPercent > 0 && (
+            <span className="rounded-full bg-slate-900/85 px-2.5 py-1 text-[10px] font-bold text-lime-300 backdrop-blur">
+              {discountPercent.toLocaleString("fa-IR")}٪ تخفیف
+            </span>
+          )}
+          {!product.inStock && (
+            <span className="flex items-center gap-1 rounded-full bg-slate-500/90 px-2.5 py-1 text-[10px] font-bold text-white backdrop-blur">
+              <PackageX size={10} /> ناموجود
+            </span>
+          )}
+        </div>
+
+        {/* Wishlist Toggle Button */}
+        <motion.button
+          onClick={() => onToggleWishlist(product)}
+          whileHover={{ scale: 1.15 }}
+          whileTap={{ scale: 0.85 }}
+          className={`flex h-8 w-8 items-center justify-center rounded-full shadow-md backdrop-blur transition-colors ${
+            isWishlisted ? "bg-rose-500 text-white" : "bg-white/90 text-slate-400 hover:text-rose-500"
+          }`}
+          aria-label={isWishlisted ? "حذف از علاقه‌مندی‌ها" : "افزودن به علاقه‌مندی‌ها"}
+        >
+          <Heart size={14} fill={isWishlisted ? "currentColor" : "none"} />
+        </motion.button>
+      </div>
+
+      {/* ======================================== */}
+      {/* Product Image */}
+      {/* ======================================== */}
+      <div className="relative h-40 overflow-hidden bg-gradient-to-br from-emerald-50 via-white to-[#F7F3E8] dark:from-emerald-950 dark:to-emerald-900 md:h-48">
+        <motion.img
+          src={product.image}
+          alt={product.name}
+          whileHover={{ scale: 1.1 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+          className={`h-full w-full object-cover ${!product.inStock ? "grayscale" : ""}`}
+          loading="lazy"
+          onError={(e) => {
+            (e.target as HTMLImageElement).src = '/images/products/default.jpg';
+          }}
+        />
+
+        {/* Quick View Overlay */}
+        <motion.button
+          onClick={() => onQuickView(product)}
+          className="absolute inset-x-3 bottom-3 flex translate-y-2 items-center justify-center gap-1.5 rounded-xl bg-white/95 py-2 text-xs font-bold text-slate-700 opacity-0 shadow-lg backdrop-blur transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100"
+          aria-label="نمای سریع محصول"
+        >
+          <Eye size={14} /> نمای سریع
+        </motion.button>
+      </div>
+
+      {/* ======================================== */}
+      {/* Product Info */}
+      {/* ======================================== */}
+      <div className="flex flex-1 flex-col p-4">
+        {/* Category & Brand */}
+        <div className="mb-1 flex items-center justify-between">
+          <p className="text-[11px] font-medium text-[#0F8A5F] dark:text-lime-300">{product.category}</p>
+          <p className="text-[10px] text-slate-400">{product.brand}</p>
+        </div>
+
+        {/* Product Name */}
+        <h3
+          onClick={() => onQuickView(product)}
+          className="mb-2 line-clamp-2 flex-1 cursor-pointer text-sm font-semibold text-slate-700 transition-colors hover:text-[#0F8A5F] dark:text-emerald-50"
+          title={product.name}
+        >
+          {product.name}
+        </h3>
+
+        {/* Rating & Reviews */}
+        <div className="mb-2 flex items-center gap-1 text-amber-400">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Star
+              key={i}
+              size={12}
+              fill={i < Math.round(product.rating) ? "currentColor" : "none"}
+              className={i < Math.round(product.rating) ? "" : "text-slate-200"}
+            />
+          ))}
+          <span className="mr-1 text-xs text-slate-400">
+            ({product.rating}) · {product.reviews.toLocaleString("fa-IR")} نظر
+          </span>
+        </div>
+
+        {/* Price */}
+        <div className="mb-3 flex items-baseline gap-2">
+          <span className="text-sm font-bold text-slate-800 dark:text-white">{formatPrice(product.price)}</span>
+          {product.oldPrice && (
+            <span className="text-xs text-slate-400 line-through">{formatPrice(product.oldPrice)}</span>
+          )}
+        </div>
+
+        {/* ======================================== */}
+        {/* Actions: Add to Cart & Compare */}
+        {/* ======================================== */}
+        <div className="flex items-center gap-2">
+          {/* Add to Cart Button */}
+          <motion.button
+            onClick={(e) => onAddToCart(product, e)}
+            disabled={!product.inStock}
+            whileHover={product.inStock ? { scale: 1.03 } : {}}
+            whileTap={product.inStock ? { scale: 0.97 } : {}}
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-brand-gradient-accent py-2.5 text-xs font-bold text-white shadow-md transition-shadow hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <ShoppingCart size={14} />
+            {product.inStock ? "افزودن به سبد خرید" : "اطلاع از موجودی"}
+          </motion.button>
+
+          {/* Compare Button */}
+          <motion.button
+            onClick={() => onToggleCompare(product)}
+            disabled={!isComparing && compareDisabled}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            title={isComparing ? "حذف از مقایسه" : "افزودن به مقایسه"}
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border transition-colors disabled:cursor-not-allowed disabled:opacity-30 ${
+              isComparing
+                ? "border-[#0F8A5F] bg-emerald-50 text-[#0F8A5F]"
+                : "border-slate-200 text-slate-400 hover:text-[#0F8A5F]"
+            }`}
+          >
+            <GitCompare size={15} />
+          </motion.button>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
