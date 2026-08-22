@@ -15,7 +15,7 @@ interface ProductCardProps {
   isComparing: boolean;
   compareDisabled: boolean;
   onToggleWishlist: (product: MockProduct) => void;
-  onAddToCart: (product: MockProduct, e: React.MouseEvent) => void;
+  onAddToCart: (product: MockProduct, qty: number, e?: React.MouseEvent) => void;
   onQuickView: (product: MockProduct) => void;
   onToggleCompare: (product: MockProduct) => void;
 }
@@ -158,7 +158,7 @@ export default function ProductCard({
         <div className="flex items-center gap-2">
           {/* Add to Cart Button */}
           <motion.button
-            onClick={(e) => onAddToCart(product, e)}
+            onClick={(e) => onAddToCart(product, 1, e)}
             disabled={!product.inStock}
             whileHover={product.inStock ? { scale: 1.03 } : {}}
             whileTap={product.inStock ? { scale: 0.97 } : {}}

@@ -4,7 +4,6 @@
 import { useEffect, useState, lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
-import { AnimatePresence, motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 
 // ========================================
@@ -111,7 +110,7 @@ export default function App() {
   const [cartOpen, setCartOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [wishlistOpen, setWishlistOpen] = useState(false);
-  const [compareOpen, setCompareOpen] = useState(false);
+  const [, setCompareOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<MockProduct | null>(null);
   const [activeCrop, setActiveCrop] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>("all");
@@ -501,7 +500,7 @@ export default function App() {
         <CompareModal
           items={compareItems}
           onClose={() => setCompareOpen(false)}
-          onAddToCart={(product) => handleAddToCart(product, 1)}
+          onAddToCart={(product: MockProduct, e?: React.MouseEvent) => { handleAddToCart(product, 1, e); }}
         />
 
         {/* ======================================== */}

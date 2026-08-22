@@ -6,8 +6,6 @@ import type {
   ProductList,
   Category,
   Cart,
-  User,
-  UserAccount,
   Comment,
   PaginatedResponse,
   AuthResponse,
