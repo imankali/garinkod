@@ -68,7 +68,7 @@ export default function MegaMenu() {
   // ========================================
   useEffect(() => {
     if (categories.length > 0 && !activeSlug) {
-      setActiveSlug(categories[0].slug);
+      categories[0] && setActiveSlug(categories[0].slug);
     }
   }, [categories, activeSlug]);
 

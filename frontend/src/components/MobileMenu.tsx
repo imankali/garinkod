@@ -111,7 +111,7 @@ export default function MobileMenu({ isOpen, onClose, onOpenWishlist }: MobileMe
                 <div className="flex items-center gap-3">
                   {/* Avatar */}
                   <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/20 text-lg font-bold backdrop-blur">
-                    {user.first_name?.[0] || user.username[0].toUpperCase()}
+                    {user.first_name?.[0] || user.username && user.username[0].toUpperCase()}
                   </div>
                   <div>
                     <p className="font-bold">

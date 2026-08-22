@@ -85,7 +85,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
       const products = response.data.results;
       if (products && products.length > 0) {
         const randomProduct = products[Math.floor(Math.random() * products.length)];
-        setSuggestion(convertToSuggestion(randomProduct));
+        randomProduct && setSuggestion(convertToSuggestion(randomProduct));
       }
     } catch (error) {
       console.error('Failed to load suggestion:', error);
@@ -293,7 +293,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                         {/* Product Image */}
                         <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-white shadow-inner">
                           <img
-                            src={item.product?.image_url || item.product?.image}
+                            src={item.product?.image_url}
                             alt={item.product?.title}
                             className="h-full w-full object-cover"
                             onError={(e) => {
@@ -308,7 +308,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                             {item.product?.title}
                           </p>
                           <div className="mb-2 flex items-center gap-1.5 text-[10px] text-slate-400">
-                            <span>{typeof item.product?.category === 'string' ? item.product.category : item.product?.category?.name}</span>
+                            <span>{typeof item.product?.category === 'string' ? item.product.category : 'دسته‌بندی نامشخص'}</span>
                           </div>
 
                           {/* Quantity Controls */}

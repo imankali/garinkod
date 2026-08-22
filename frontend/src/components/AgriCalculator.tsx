@@ -19,7 +19,7 @@ type Crop = "wheat" | "pistachio" | "tomato" | "citrus";
 type NeedType = "weed" | "growth" | "pest";
 
 interface CalculationResult {
-  product: ProductList | null;
+  product: ProductList | undefined;
   qty: number;
   unit: string;
   desc: string;
@@ -107,7 +107,7 @@ export default function AgriCalculator({ onAddToCart }: AgriCalculatorProps) {
   function calculateResult(): CalculationResult {
     if (products.length === 0) {
       return {
-        product: null,
+        product: undefined,
         qty: 0,
         unit: '',
         desc: 'در حال بارگذاری...',
@@ -326,7 +326,7 @@ export default function AgriCalculator({ onAddToCart }: AgriCalculatorProps) {
                 <div className="mb-4 flex items-center gap-3">
                   <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-white p-1">
                     <img
-                      src={result.product.image_url || result.product.image}
+                      src={result.product.image_url}
                       alt={result.product.title}
                       className="h-full w-full object-cover rounded-lg"
                       onError={(e) => {
