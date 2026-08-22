@@ -71,7 +71,7 @@ export default function Login() {
         });
         toast.success('ثبت‌نام با موفقیت انجام شد');
         navigate('/');
-      } catch (error) {
+      } catch {
         // خطا در store مدیریت و نمایش داده می‌شود
       }
     }
@@ -81,7 +81,7 @@ export default function Login() {
         await login(formData.username, formData.password);
         toast.success('ورود با موفقیت انجام شد');
         navigate('/');
-      } catch (error) {
+      } catch {
         // خطا در store مدیریت و نمایش داده می‌شود
       }
     }

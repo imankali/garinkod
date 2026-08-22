@@ -868,13 +868,17 @@ def _audit(actor, action: str, target, summary: str, metadata: dict | None = Non
 @api_view(['GET'])
 @permission_classes([permissions.IsAdminUser])
 def management_dashboard(request):
-    paid_revenue = Order.objects.filter(payment_status='paid').aggregate(total=Sum('total_price'))['total'] or 0
-    pending_orders = Order.objects.filter(status='awaiting_review').count()
-    open_complaints = StorefrontComplaint.objects.exclude(status__in=['resolved', 'rejected']).count()
-    pending_posts = StorefrontPost.objects.filter(status='pending_review').count()
-    pending_listings = MarketplaceListing.objects.filter(status='pending_review').count()
-    low_stock = Product.objects.filter(status='published', stock__lt=10).count()
-    recent_orders = Order.objects.prefetch_related('items').all()[:8]
+    if not request.user.is_superuser and not request.user.groups.exists():
+        return Response({'error': 'برای مرکز مدیریت باید یک نقش سازمانی داشته باشید.'}, status=status.HTTP_403_FORBIDDEN)
+    can_view_orders = _can_manage(request.user, 'view_order')
+    can_view_finance = _can_manage(request.user, 'view_financialledgerentry')
+    paid_revenue = Order.objects.filter(payment_status='paid').aggregate(total=Sum('total_price'))['total'] or 0 if can_view_finance else None
+    pending_orders = Order.objects.filter(status='awaiting_review').count() if can_view_orders else None
+    open_complaints = StorefrontComplaint.objects.exclude(status__in=['resolved', 'rejected']).count() if _can_manage(request.user, 'view_storefrontcomplaint') else None
+    pending_posts = StorefrontPost.objects.filter(status='pending_review').count() if _can_manage(request.user, 'view_storefrontpost') else None
+    pending_listings = MarketplaceListing.objects.filter(status='pending_review').count() if _can_manage(request.user, 'view_marketplacelisting') else None
+    low_stock = Product.objects.filter(status='published', stock__lt=10).count() if _can_manage(request.user, 'view_product') else None
+    recent_orders = Order.objects.prefetch_related('items').all()[:8] if can_view_orders else []
     return Response({
         'viewer': {
             'username': request.user.username,
@@ -888,8 +892,8 @@ def management_dashboard(request):
             'pending_posts': pending_posts,
             'pending_listings': pending_listings,
             'low_stock_products': low_stock,
-            'active_storefronts': Storefront.objects.filter(is_verified=True).count(),
-            'active_affiliates': AffiliateProfile.objects.filter(status='active').count(),
+            'active_storefronts': Storefront.objects.filter(is_verified=True).count() if _can_manage(request.user, 'view_storefront') else None,
+            'active_affiliates': AffiliateProfile.objects.filter(status='active').count() if _can_manage(request.user, 'view_affiliateprofile') else None,
         },
         'recent_orders': OrderSerializer(recent_orders, many=True).data,
         'alerts': [

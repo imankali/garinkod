@@ -1,6 +1,6 @@
 // frontend/src/components/MegaMenu.tsx
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, LayoutGrid } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -61,7 +61,10 @@ export default function MegaMenu() {
   });
 
   // اطمینان از اینکه categories همیشه آرایه است
-  const categories: Category[] = Array.isArray(categoriesData) ? categoriesData : [];
+  const categories: Category[] = useMemo(
+    () => (Array.isArray(categoriesData) ? categoriesData : []),
+    [categoriesData]
+  );
 
   // ========================================
   // تنظیم اولین دسته‌بندی به عنوان پیش‌فرض

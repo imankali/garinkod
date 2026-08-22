@@ -1,6 +1,7 @@
 // frontend/src/components/MobileBottomNav.tsx
 
 import { AnimatePresence, motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import { Heart, Home, LayoutGrid, ShoppingCart, User } from "lucide-react";
 
 // ========================================
@@ -53,6 +54,7 @@ export default function MobileBottomNav({
   onOpenMenu,
   onOpenWishlist,
 }: MobileBottomNavProps) {
+  const navigate = useNavigate();
   return (
     <motion.nav
       initial={{ y: 100, opacity: 0 }}
@@ -76,7 +78,7 @@ export default function MobileBottomNav({
           <NavButton
             icon={Home}
             label="خانه"
-            onClick={() => window.location.href = '/'}
+            onClick={() => navigate('/')}
           />
 
           {/* ======================================== */}
@@ -136,7 +138,7 @@ export default function MobileBottomNav({
           <NavButton
             icon={User}
             label="حساب من"
-            onClick={() => window.location.href = '/profile'}
+            onClick={() => navigate('/profile')}
           />
         </div>
       </div>

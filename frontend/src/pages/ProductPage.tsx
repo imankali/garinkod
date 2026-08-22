@@ -9,6 +9,7 @@ import { useAuthStore } from "../store/authStore";
 import { useCartStore } from "../store/cartStore";
 import type { Comment, ProductList } from "../types";
 import { formatPrice } from "../utils/formatPrice";
+import { copyText } from "../utils/copyText";
 
 const FALLBACK_IMAGE = "/images/hero-farm.jpg";
 const STICKERS = ["🌱", "🌾", "👍", "⭐", "💚", "👏"];
@@ -81,7 +82,7 @@ export default function ProductPage() {
       if (navigator.share && product) {
         await navigator.share({ title: product.title, text: product.description.slice(0, 120), url });
       } else {
-        await navigator.clipboard.writeText(url);
+        await copyText(url);
         toast.success("لینک محصول کپی شد.");
       }
     } catch {

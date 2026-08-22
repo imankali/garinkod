@@ -1,6 +1,7 @@
 // frontend/src/components/CartDrawer.tsx
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,
@@ -57,6 +58,7 @@ function convertToSuggestion(apiProduct: ProductList): SuggestedProduct {
 // ========================================
 export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
   const [suggestion, setSuggestion] = useState<SuggestedProduct | null>(null);
+  const navigate = useNavigate();
 
   // دریافت توابع و state از cartStore
   const { cart, fetchCart, addToCart, removeFromCart, updateQuantity } = useCartStore();
@@ -64,30 +66,28 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
   // ========================================
   // لود سبد خرید و محصول پیشنهادی هنگام باز شدن
   // ========================================
-  useEffect(() => {
-    if (isOpen) {
-      fetchCart();
-      loadSuggestion();
-    }
-  }, [isOpen]);
-
   // ========================================
   // لود یک محصول پیشنهادی تصادفی
   // ========================================
-  async function loadSuggestion() {
+  const loadSuggestion = useCallback(async () => {
     try {
       const response = await productsApi.getAll({ page: 1 });
       const products = response.data.results;
       if (products.length > 0) {
         const randomProduct = products[Math.floor(Math.random() * products.length)];
-        if (randomProduct) {
-          setSuggestion(convertToSuggestion(randomProduct));
-        }
+        if (randomProduct) setSuggestion(convertToSuggestion(randomProduct));
       }
     } catch (error) {
       console.error('Failed to load suggestion:', error);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchCart();
+      loadSuggestion();
+    }
+  }, [isOpen, fetchCart, loadSuggestion]);
 
   // ========================================
   // محاسبات مالی
@@ -240,7 +240,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                   <motion.button
                     onClick={() => {
                       onClose();
-                      window.location.href = '/products';
+                      navigate('/products');
                     }}
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}

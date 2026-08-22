@@ -3,14 +3,6 @@
 import { Phone, Truck } from "lucide-react";
 
 // ========================================
-// Types
-// ========================================
-interface TopBarProps {
-  isDark?: boolean;
-  onToggleDark?: () => void;
-}
-
-// ========================================
 // Messages Configuration
 // ✅ پیام‌های چرخشی در TopBar
 // ========================================
@@ -24,7 +16,7 @@ const messages = [
 // ========================================
 // TopBar Component
 // ========================================
-export default function TopBar({}: TopBarProps) {
+export default function TopBar(_props: { isDark?: boolean; onToggleDark?: () => void }) {
   // ✅ شماره تلفن از environment variable (با fallback)
   const PHONE_NUMBER = import.meta.env.VITE_PHONE_NUMBER || "02112345678";
 

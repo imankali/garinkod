@@ -475,21 +475,21 @@ export interface ProductQueryParams {
   max_price?: number;
 }
 export interface ManagementMetric {
-  paid_revenue: number;
-  pending_orders: number;
-  open_complaints: number;
-  pending_posts: number;
-  pending_listings: number;
-  low_stock_products: number;
-  active_storefronts: number;
-  active_affiliates: number;
+  paid_revenue: number | null;
+  pending_orders: number | null;
+  open_complaints: number | null;
+  pending_posts: number | null;
+  pending_listings: number | null;
+  low_stock_products: number | null;
+  active_storefronts: number | null;
+  active_affiliates: number | null;
 }
 
 export interface ManagementDashboard {
   viewer: { username: string; is_superuser: boolean; groups: string[] };
   metrics: ManagementMetric;
   recent_orders: Order[];
-  alerts: { type: string; count: number; label: string }[];
+  alerts: { type: string; count: number | null; label: string }[];
 }
 
 export interface ManagementStaffMember {

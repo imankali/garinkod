@@ -1,6 +1,7 @@
 // frontend/src/components/ProfileMenu.tsx
 
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { Gift, Landmark, LogIn, LogOut, Package, Store, User } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
@@ -13,10 +14,6 @@ interface MenuItem {
   label: string;
   desc: string;
   href: string;
-}
-
-interface ProfileMenuProps {
-  // در آینده می‌توان props اضافه کرد
 }
 
 // ========================================
@@ -46,8 +43,9 @@ function getInitials(name: string): string {
 // ========================================
 // ProfileMenu Component
 // ========================================
-export default function ProfileMenu({}: ProfileMenuProps) {
+export default function ProfileMenu() {
   const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
   const ref = useRef<HTMLDivElement>(null);
 
   // دریافت اطلاعات کاربر از auth store
@@ -79,7 +77,7 @@ export default function ProfileMenu({}: ProfileMenuProps) {
   async function handleLogout() {
     await logout();
     setOpen(false);
-    window.location.href = '/';
+    navigate('/');
   }
 
   // ========================================

@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Camera, ImagePlus, Send, Sparkles } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -17,7 +17,7 @@ export default function Studio() {
   const [sending, setSending] = useState(false);
   const imageRef = useRef<HTMLInputElement>(null);
 
-  async function load() {
+  const load = useCallback(async () => {
     if (!isAuthenticated) return;
     try {
       const [postsResponse, listingsResponse] = await Promise.all([storefrontPostsApi.mine(), agricultureApi.myListings()]);
@@ -26,8 +26,8 @@ export default function Studio() {
     } catch {
       toast.error('برای استفاده از استودیو ابتدا غرفه فعال داشته باشید.');
     }
-  }
-  useEffect(() => { load(); }, [isAuthenticated]);
+  }, [isAuthenticated]);
+  useEffect(() => { load(); }, [load]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();

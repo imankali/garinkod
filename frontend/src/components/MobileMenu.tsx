@@ -1,6 +1,7 @@
 // frontend/src/components/MobileMenu.tsx
 
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown, Heart, LogIn, LogOut, Package, Phone, User, X } from "lucide-react";
 import { categories } from "../data/shopData";
@@ -36,6 +37,7 @@ const quickLinks = [
 // ========================================
 export default function MobileMenu({ isOpen, onClose, onOpenWishlist }: MobileMenuProps) {
   const [expanded, setExpanded] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   // دریافت اطلاعات کاربر از auth store
   const { user, isAuthenticated, logout } = useAuthStore();
@@ -46,17 +48,17 @@ export default function MobileMenu({ isOpen, onClose, onOpenWishlist }: MobileMe
   async function handleLogout() {
     await logout();
     onClose();
-    window.location.href = '/';
+    navigate('/');
   }
 
   function handleCategoryClick(categorySlug: string) {
     onClose();
-    window.location.href = `/products?category=${categorySlug}`;
+    navigate(`/products?category=${categorySlug}`);
   }
 
   function handleLinkClick(href: string) {
     onClose();
-    window.location.href = href;
+    navigate(href);
   }
 
   function handleWishlistClick() {
