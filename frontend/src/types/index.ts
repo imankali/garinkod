@@ -219,6 +219,117 @@ export interface ProfileResponse {
 }
 
 // ========================================
+// Orders and agriculture platform
+// ========================================
+export interface OrderItem {
+  id: number;
+  product: number | null;
+  product_title: string;
+  product_slug: string;
+  unit_price: number;
+  quantity: number;
+  total_price: number;
+}
+
+export interface Order {
+  id: number;
+  code: string;
+  customer_name: string;
+  phone: string;
+  email: string;
+  province: string;
+  city: string;
+  address: string;
+  postal_code: string;
+  notes: string;
+  subtotal: number;
+  shipping_price: number;
+  total_price: number;
+  status: string;
+  status_label: string;
+  payment_status: string;
+  payment_status_label: string;
+  payment_method: string;
+  payment_method_label: string;
+  total_items: number;
+  items: OrderItem[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CheckoutPayload {
+  customer_name: string;
+  phone: string;
+  email?: string;
+  province: string;
+  city: string;
+  address: string;
+  postal_code?: string;
+  notes?: string;
+  payment_method: 'coordination';
+  terms_accepted: boolean;
+}
+
+export interface ServiceRequestPayload {
+  service_type: 'agronomy' | 'irrigation' | 'soil' | 'greenhouse' | 'machinery' | 'other';
+  customer_name: string;
+  phone: string;
+  province: string;
+  city: string;
+  crop?: string;
+  farm_area_hectare?: number;
+  description: string;
+}
+
+export interface ProcurementRequestPayload {
+  farmer_name: string;
+  phone: string;
+  crop_name: string;
+  variety?: string;
+  quantity: number;
+  unit?: string;
+  requested_price?: number;
+  province: string;
+  city: string;
+  harvest_date?: string;
+  description?: string;
+}
+
+export interface Storefront {
+  id: number;
+  name: string;
+  slug: string;
+  seller_type: 'farmer' | 'cooperative' | 'merchant' | 'company';
+  bio: string;
+  province: string;
+  city: string;
+  is_verified: boolean;
+  commission_rate: string;
+  owner_name: string;
+  created_at: string;
+}
+
+export interface MarketplaceListing {
+  id: number;
+  storefront: Storefront;
+  title: string;
+  slug: string;
+  crop_name: string;
+  description: string;
+  price: number;
+  unit: string;
+  quantity_available: string;
+  min_order_quantity: string;
+  harvest_date: string | null;
+  image: string | null;
+  image_url: string;
+  status: string;
+  status_label: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// ========================================
 // Helper Types
 // ========================================
 

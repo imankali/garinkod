@@ -26,6 +26,8 @@ import { useCartStore } from "../store/cartStore";
 const NAV_LINKS = [
   { label: "خانه", href: "/" },
   { label: "محصولات", href: "/products" },
+  { label: "خدمات کشاورزی", href: "/services" },
+  { label: "بازار کشاورزان", href: "/marketplace" },
   { label: "تخفیف‌ها", href: "/products?featured=true" },
 ] as const;
 

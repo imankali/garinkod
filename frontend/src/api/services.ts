@@ -11,6 +11,12 @@ import type {
   AuthResponse,
   ProfileResponse,
   ProductQueryParams,
+  Order,
+  CheckoutPayload,
+  ServiceRequestPayload,
+  ProcurementRequestPayload,
+  Storefront,
+  MarketplaceListing,
 } from '../types';
 
 // ========================================
@@ -207,4 +213,31 @@ export const authApi = {
   }>) => {
     return apiClient.patch<ProfileResponse>('/profile/', data);
   },
+};
+
+// ========================================
+// Orders — interim expert-coordination checkout
+// ========================================
+export const ordersApi = {
+  checkout: (data: CheckoutPayload) =>
+    apiClient.post<{ order: Order; message: string }>('/orders/checkout/', data),
+  lookup: (code: string, phone: string) =>
+    apiClient.get<Order>('/orders/lookup/', { params: { code, phone } }),
+  mine: () => apiClient.get<Order[]>('/orders/mine/'),
+};
+
+// ========================================
+// Agriculture services, procurement and marketplace
+// ========================================
+export const agricultureApi = {
+  requestService: (data: ServiceRequestPayload) => apiClient.post('/services/requests/', data),
+  requestProcurement: (data: ProcurementRequestPayload) => apiClient.post('/procurement/requests/', data),
+  getStorefront: () => apiClient.get<Storefront | null>('/marketplace/storefront/'),
+  createStorefront: (data: Pick<Storefront, 'name' | 'slug' | 'seller_type' | 'bio' | 'province' | 'city'>) =>
+    apiClient.post<Storefront>('/marketplace/storefront/', data),
+  listMarketplace: (params?: { search?: string; ordering?: string }) =>
+    apiClient.get<PaginatedResponse<MarketplaceListing>>('/marketplace/listings/', { params }),
+  myListings: () => apiClient.get<MarketplaceListing[]>('/marketplace/listings/mine/'),
+  createListing: (data: Partial<MarketplaceListing>) =>
+    apiClient.post<MarketplaceListing>('/marketplace/listings/', data),
 };

@@ -3,7 +3,8 @@ from django.contrib.auth.models import User
 from .models import (
     Category, SubCategory, Product,
     FertilizerDetail, PesticideDetail, SeedDetail, EquipmentDetail,
-    UserAccount, Comment, Cart, CartItem
+    UserAccount, Comment, Cart, CartItem, Order, OrderItem,
+    ServiceRequest, ProcurementRequest, Storefront, MarketplaceListing
 )
 
 
@@ -217,3 +218,126 @@ class RegisterSerializer(serializers.ModelSerializer):
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField()
     password = serializers.CharField(write_only=True)
+
+
+# ========================================
+# Orders and checkout
+# ========================================
+class OrderItemSerializer(serializers.ModelSerializer):
+    total_price = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = OrderItem
+        fields = ['id', 'product', 'product_title', 'product_slug', 'unit_price', 'quantity', 'total_price']
+        read_only_fields = fields
+
+
+class OrderSerializer(serializers.ModelSerializer):
+    items = OrderItemSerializer(many=True, read_only=True)
+    status_label = serializers.CharField(source='get_status_display', read_only=True)
+    payment_status_label = serializers.CharField(source='get_payment_status_display', read_only=True)
+    payment_method_label = serializers.CharField(source='get_payment_method_display', read_only=True)
+    total_items = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = Order
+        fields = [
+            'id', 'code', 'customer_name', 'phone', 'email', 'province', 'city',
+            'address', 'postal_code', 'notes', 'subtotal', 'shipping_price',
+            'total_price', 'status', 'status_label', 'payment_status',
+            'payment_status_label', 'payment_method', 'payment_method_label',
+            'total_items', 'items', 'created_at', 'updated_at'
+        ]
+        read_only_fields = fields
+
+
+class CheckoutSerializer(serializers.Serializer):
+    customer_name = serializers.CharField(max_length=150)
+    phone = serializers.CharField(max_length=20)
+    email = serializers.EmailField(required=False, allow_blank=True)
+    province = serializers.CharField(max_length=80)
+    city = serializers.CharField(max_length=80)
+    address = serializers.CharField(max_length=500)
+    postal_code = serializers.CharField(max_length=20, required=False, allow_blank=True)
+    notes = serializers.CharField(max_length=1000, required=False, allow_blank=True)
+    # Zarinpal is accepted only after its payment adapter is enabled. Until then
+    # all orders are recorded for expert coordination rather than pretending
+    # that a payment has been collected.
+    payment_method = serializers.ChoiceField(choices=['coordination'], default='coordination')
+    terms_accepted = serializers.BooleanField()
+
+    def validate_phone(self, value):
+        normalised = value.replace(' ', '').replace('-', '')
+        digits = ''.join(char for char in normalised if char.isdigit())
+        if len(digits) < 10 or len(digits) > 15:
+            raise serializers.ValidationError('شماره تماس معتبر نیست.')
+        return normalised
+
+    def validate_terms_accepted(self, value):
+        if not value:
+            raise serializers.ValidationError('پذیرش شرایط ثبت سفارش الزامی است.')
+        return value
+
+
+# ========================================
+# Services, procurement and marketplace foundation
+# ========================================
+class ServiceRequestSerializer(serializers.ModelSerializer):
+    status_label = serializers.CharField(source='get_status_display', read_only=True)
+    service_label = serializers.CharField(source='get_service_type_display', read_only=True)
+
+    class Meta:
+        model = ServiceRequest
+        fields = [
+            'id', 'code', 'service_type', 'service_label', 'customer_name', 'phone',
+            'province', 'city', 'crop', 'farm_area_hectare', 'description',
+            'status', 'status_label', 'created_at'
+        ]
+        read_only_fields = ['id', 'code', 'status', 'status_label', 'created_at']
+
+
+class ProcurementRequestSerializer(serializers.ModelSerializer):
+    status_label = serializers.CharField(source='get_status_display', read_only=True)
+
+    class Meta:
+        model = ProcurementRequest
+        fields = [
+            'id', 'code', 'farmer_name', 'phone', 'crop_name', 'variety',
+            'quantity', 'unit', 'requested_price', 'province', 'city',
+            'harvest_date', 'description', 'status', 'status_label', 'created_at'
+        ]
+        read_only_fields = ['id', 'code', 'status', 'status_label', 'created_at']
+
+
+class StorefrontSerializer(serializers.ModelSerializer):
+    owner_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Storefront
+        fields = [
+            'id', 'name', 'slug', 'seller_type', 'bio', 'province', 'city',
+            'is_verified', 'commission_rate', 'owner_name', 'created_at'
+        ]
+        read_only_fields = ['id', 'is_verified', 'commission_rate', 'owner_name', 'created_at']
+
+    def get_owner_name(self, obj):
+        return obj.user.get_full_name() or obj.user.username
+
+
+class MarketplaceListingSerializer(serializers.ModelSerializer):
+    storefront = StorefrontSerializer(read_only=True)
+    image_url = serializers.SerializerMethodField()
+    status_label = serializers.CharField(source='get_status_display', read_only=True)
+
+    class Meta:
+        model = MarketplaceListing
+        fields = [
+            'id', 'storefront', 'title', 'slug', 'crop_name', 'description',
+            'price', 'unit', 'quantity_available', 'min_order_quantity',
+            'harvest_date', 'image', 'image_url', 'status', 'status_label',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'storefront', 'status', 'status_label', 'image_url', 'created_at', 'updated_at']
+
+    def get_image_url(self, obj):
+        return obj.image_url

@@ -14,12 +14,15 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 
 from .filters import ProductFilter
 from .models import (
-    Category, Product, Comment, UserAccount, Cart, CartItem
+    Category, Product, Comment, UserAccount, Cart, CartItem, Order, OrderItem,
+    ServiceRequest, ProcurementRequest, Storefront, MarketplaceListing
 )
 from .serializers import (
     CategorySerializer, ProductSerializer, ProductListSerializer,
     CommentSerializer, UserAccountSerializer, CartSerializer,
-    UserSerializer, RegisterSerializer
+    UserSerializer, RegisterSerializer, CheckoutSerializer, OrderSerializer,
+    ServiceRequestSerializer, ProcurementRequestSerializer, StorefrontSerializer,
+    MarketplaceListingSerializer
 )
 
 # SQLite is used for local development only. It permits a single writer, so a
@@ -314,6 +317,205 @@ class CartViewSet(viewsets.ViewSet):
 
         serializer = CartSerializer(cart)
         return Response(serializer.data)
+
+
+# ========================================
+# Checkout and order tracking
+# ========================================
+SHIPPING_FREE_THRESHOLD = 3_000_000
+STANDARD_SHIPPING_PRICE = 45_000
+
+
+def _checkout_cart(request):
+    """Use the same guest/authenticated cart semantics as the cart API."""
+    return CartViewSet()._get_or_create_cart(request)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.AllowAny])
+def checkout(request):
+    """Create a reviewable order from the caller's cart.
+
+    No gateway is called here. Before Zarinpal is wired in, payment is clearly
+    marked unpaid and an expert coordinates the order. Stock is reserved in the
+    same transaction so two buyers cannot confirm more than what is available.
+    """
+    serializer = CheckoutSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    details = serializer.validated_data
+    sqlite_lock = _SQLITE_CART_WRITE_LOCK if connection.vendor == 'sqlite' else nullcontext()
+
+    with sqlite_lock:
+        with transaction.atomic():
+            cart = _checkout_cart(request)
+            cart_items = list(
+                CartItem.objects.select_related('product').filter(cart=cart).order_by('product_id')
+            )
+            if not cart_items:
+                return Response({'error': 'سبد خرید شما خالی است.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            product_ids = [item.product_id for item in cart_items]
+            locked_products = {
+                product.id: product
+                for product in Product.objects.select_for_update().filter(id__in=product_ids).order_by('id')
+            }
+            missing_or_unavailable = []
+            for item in cart_items:
+                product = locked_products.get(item.product_id)
+                if not product or product.status != 'published' or not product.available or product.stock < item.quantity:
+                    missing_or_unavailable.append(item.product.title)
+
+            if missing_or_unavailable:
+                return Response(
+                    {'error': f"موجودی این کالاها تغییر کرده است: {', '.join(missing_or_unavailable)}"},
+                    status=status.HTTP_409_CONFLICT,
+                )
+
+            subtotal = sum(locked_products[item.product_id].price * item.quantity for item in cart_items)
+            shipping_price = 0 if subtotal >= SHIPPING_FREE_THRESHOLD else STANDARD_SHIPPING_PRICE
+            order = Order.objects.create(
+                user=request.user if request.user.is_authenticated else None,
+                customer_name=details['customer_name'],
+                phone=details['phone'],
+                email=details.get('email', ''),
+                province=details['province'],
+                city=details['city'],
+                address=details['address'],
+                postal_code=details.get('postal_code', ''),
+                notes=details.get('notes', ''),
+                subtotal=subtotal,
+                shipping_price=shipping_price,
+                total_price=subtotal + shipping_price,
+                payment_method=details['payment_method'],
+                payment_status='unpaid',
+                status='awaiting_review',
+            )
+
+            order_items = []
+            for item in cart_items:
+                product = locked_products[item.product_id]
+                product.stock -= item.quantity
+                if product.stock == 0:
+                    product.available = False
+                product.save(update_fields=['stock', 'available', 'updated'])
+                order_items.append(OrderItem(
+                    order=order,
+                    product=product,
+                    product_title=product.title,
+                    product_slug=product.slug,
+                    unit_price=product.price,
+                    quantity=item.quantity,
+                ))
+            OrderItem.objects.bulk_create(order_items)
+            CartItem.objects.filter(cart=cart).delete()
+
+    return Response({
+        'order': OrderSerializer(order).data,
+        'message': 'سفارش ثبت شد. کارشناس برای تأیید موجودی و هماهنگی پرداخت با شما تماس می‌گیرد.'
+    }, status=status.HTTP_201_CREATED)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def order_lookup(request):
+    code = request.query_params.get('code', '').strip().upper()
+    phone = request.query_params.get('phone', '').strip().replace(' ', '').replace('-', '')
+    if not code or not phone:
+        return Response({'error': 'کد سفارش و شماره تماس الزامی است.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    order = get_object_or_404(Order.objects.prefetch_related('items'), code=code, phone=phone)
+    return Response(OrderSerializer(order).data)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def my_orders(request):
+    orders = Order.objects.filter(user=request.user).prefetch_related('items')
+    return Response(OrderSerializer(orders, many=True).data)
+
+
+# ========================================
+# Agricultural services and farmer procurement
+# ========================================
+@api_view(['POST'])
+@permission_classes([permissions.AllowAny])
+def create_service_request(request):
+    serializer = ServiceRequestSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    service_request = serializer.save(user=request.user if request.user.is_authenticated else None)
+    return Response({
+        'request': ServiceRequestSerializer(service_request).data,
+        'message': 'درخواست شما ثبت شد؛ کارشناس مناسب با شما تماس می‌گیرد.'
+    }, status=status.HTTP_201_CREATED)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.AllowAny])
+def create_procurement_request(request):
+    serializer = ProcurementRequestSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    procurement_request = serializer.save(user=request.user if request.user.is_authenticated else None)
+    return Response({
+        'request': ProcurementRequestSerializer(procurement_request).data,
+        'message': 'درخواست فروش محصول ثبت شد و پس از ارزیابی با شما تماس می‌گیریم.'
+    }, status=status.HTTP_201_CREATED)
+
+
+# ========================================
+# Farmer marketplace foundation
+# ========================================
+class MarketplaceListingViewSet(viewsets.ModelViewSet):
+    serializer_class = MarketplaceListingSerializer
+    lookup_field = 'slug'
+    filter_backends = [SearchFilter, OrderingFilter]
+    search_fields = ['title', 'crop_name', 'description', 'storefront__name']
+    ordering_fields = ['price', 'created_at', 'harvest_date']
+    ordering = ['-created_at']
+
+    def get_queryset(self):
+        base = MarketplaceListing.objects.select_related('storefront', 'storefront__user')
+        if self.action in {'list', 'retrieve'}:
+            return base.filter(status='published')
+        if self.request.user.is_authenticated:
+            return base.filter(storefront__user=self.request.user)
+        return base.none()
+
+    def get_permissions(self):
+        if self.action in {'list', 'retrieve'}:
+            return [permissions.AllowAny()]
+        return [permissions.IsAuthenticated()]
+
+    def perform_create(self, serializer):
+        storefront = get_object_or_404(Storefront, user=self.request.user)
+        serializer.save(storefront=storefront, status='pending_review')
+
+    @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated])
+    def mine(self, request):
+        listings = self.get_queryset()
+        return Response(self.get_serializer(listings, many=True).data)
+
+
+@api_view(['GET', 'POST', 'PATCH'])
+@permission_classes([permissions.IsAuthenticated])
+def my_storefront(request):
+    storefront = Storefront.objects.filter(user=request.user).first()
+    if request.method == 'GET':
+        return Response(StorefrontSerializer(storefront).data if storefront else None)
+
+    if request.method == 'POST':
+        if storefront:
+            return Response({'error': 'شما قبلاً غرفه ساخته‌اید.'}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = StorefrontSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        storefront = serializer.save(user=request.user)
+        return Response(StorefrontSerializer(storefront).data, status=status.HTTP_201_CREATED)
+
+    if not storefront:
+        return Response({'error': 'ابتدا غرفه خود را بسازید.'}, status=status.HTTP_404_NOT_FOUND)
+    serializer = StorefrontSerializer(storefront, data=request.data, partial=True)
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    return Response(serializer.data)
 
 
 # ========================================

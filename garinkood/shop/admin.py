@@ -1,7 +1,10 @@
 from django.contrib import admin
 from .models import Category, Product
 from .models import FertilizerDetail, PesticideDetail, SeedDetail, EquipmentDetail
-from .models import Comment, UserAccount
+from .models import (
+    Comment, UserAccount, Order, OrderItem, ServiceRequest, ProcurementRequest,
+    Storefront, MarketplaceListing
+)
 
 
 # --- Inline Forms ---
@@ -31,6 +34,13 @@ class EquipmentDetailInline(admin.StackedInline):
     extra = 1
     verbose_name = "مشخصات ابزار"
     verbose_name_plural = "مشخصات ابزار"
+
+
+class OrderItemInline(admin.TabularInline):
+    model = OrderItem
+    extra = 0
+    can_delete = False
+    readonly_fields = ('product', 'product_title', 'product_slug', 'unit_price', 'quantity', 'total_price')
 
 
 # --- اکشن‌ها ---
@@ -70,7 +80,6 @@ class AdminCategory(admin.ModelAdmin):
     prepopulated_fields = {'slug': ('name',)}
     ordering = ('name',)
 
-    # ✅ اصلاح: استفاده از products به جای product_set (مطابق related_name در models.py)
     def get_product_count(self, obj):
         return obj.products.filter(status='published').count()
 
@@ -84,10 +93,7 @@ class AdminProduct(admin.ModelAdmin):
     list_display = ('title', 'author', 'category', 'slug', 'status', 'publish', 'price', 'stock')
     search_fields = ('title', 'description', 'author__username')
     prepopulated_fields = {'slug': ('title',)}
-
-    # ✅ رفع باگ بحرانی ۱: حذف raw_id_fields چون با autocomplete_fields تداخل دارد و باعث کرش پنل ادمین می‌شود
     autocomplete_fields = ('author',)
-
     date_hierarchy = 'publish'
     ordering = ('-publish',)
     list_display_links = ('slug',)
@@ -99,19 +105,10 @@ class AdminProduct(admin.ModelAdmin):
     actions = [make_published, make_draft]
 
     fieldsets = (
-        ('اطلاعات اصلی', {
-            'fields': ('title', 'slug', 'author', 'status')
-        }),
-        ('دسته‌بندی و قیمت', {
-            'fields': ('category', 'price', 'stock')
-        }),
-        ('محتوا', {
-            'fields': ('description', 'image')
-        }),
-        ('تاریخ‌ها', {
-            'fields': ('publish', 'created', 'updated'),
-            'classes': ('collapse',)
-        }),
+        ('اطلاعات اصلی', {'fields': ('title', 'slug', 'author', 'status')}),
+        ('دسته‌بندی و قیمت', {'fields': ('category', 'price', 'stock')}),
+        ('محتوا', {'fields': ('description', 'image')}),
+        ('تاریخ‌ها', {'fields': ('publish', 'created', 'updated'), 'classes': ('collapse',)}),
     )
 
     def save_model(self, request, obj, form, change):
@@ -119,21 +116,18 @@ class AdminProduct(admin.ModelAdmin):
             obj.author = request.user
         super().save_model(request, obj, form, change)
 
-    # ✅ رفع باگ بحرانی ۲: استفاده از slug به جای name (چون slug ثابت است اما name ممکن است تغییر کند)
     def get_inline_instances(self, request, obj=None):
         if not obj:
             return super().get_inline_instances(request)
-
         if obj.category and obj.category.slug == "fertilizer":
             return [FertilizerDetailInline(self.model, self.admin_site)]
-        elif obj.category and obj.category.slug == "pesticide":
+        if obj.category and obj.category.slug == "pesticide":
             return [PesticideDetailInline(self.model, self.admin_site)]
-        elif obj.category and obj.category.slug == "seed":
+        if obj.category and obj.category.slug == "seed":
             return [SeedDetailInline(self.model, self.admin_site)]
-        elif obj.category and obj.category.slug == "equipment":
+        if obj.category and obj.category.slug == "equipment":
             return [EquipmentDetailInline(self.model, self.admin_site)]
-        else:
-            return []
+        return []
 
 
 # --- Admin UserAccount ---
@@ -152,12 +146,63 @@ class AdminComment(admin.ModelAdmin):
     list_display = ('name', 'product', 'created', 'active', 'email')
     list_filter = ('active', 'created', 'updated')
     list_editable = ('active',)
-
-    # ✅ رفع باگ بحرانی ۳: تغییر post به product و description به body (چون در مدل Comment این فیلدها وجود ندارند)
     search_fields = ('name', 'email', 'body', 'product__title')
-
     actions = [approve_comments, disapprove_comments]
     date_hierarchy = 'created'
     ordering = ('-created',)
     readonly_fields = ('created', 'updated')
     list_per_page = 20
+
+
+# --- Commerce operations ---
+@admin.register(Order)
+class AdminOrder(admin.ModelAdmin):
+    list_display = ('code', 'customer_name', 'phone', 'total_price', 'payment_status', 'status', 'created_at')
+    list_filter = ('status', 'payment_status', 'payment_method', 'created_at')
+    search_fields = ('code', 'customer_name', 'phone', 'email')
+    list_editable = ('status', 'payment_status')
+    readonly_fields = ('code', 'user', 'subtotal', 'shipping_price', 'total_price', 'created_at', 'updated_at')
+    inlines = [OrderItemInline]
+    date_hierarchy = 'created_at'
+    ordering = ('-created_at',)
+
+
+@admin.register(ServiceRequest)
+class AdminServiceRequest(admin.ModelAdmin):
+    list_display = ('code', 'service_type', 'customer_name', 'phone', 'city', 'status', 'created_at')
+    list_filter = ('service_type', 'status', 'province', 'created_at')
+    search_fields = ('code', 'customer_name', 'phone', 'city', 'crop')
+    list_editable = ('status',)
+    readonly_fields = ('code', 'user', 'created_at', 'updated_at')
+    ordering = ('-created_at',)
+
+
+@admin.register(ProcurementRequest)
+class AdminProcurementRequest(admin.ModelAdmin):
+    list_display = ('code', 'crop_name', 'farmer_name', 'quantity', 'unit', 'city', 'status', 'created_at')
+    list_filter = ('status', 'province', 'created_at')
+    search_fields = ('code', 'farmer_name', 'phone', 'crop_name', 'city')
+    list_editable = ('status',)
+    readonly_fields = ('code', 'user', 'created_at', 'updated_at')
+    ordering = ('-created_at',)
+
+
+@admin.register(Storefront)
+class AdminStorefront(admin.ModelAdmin):
+    list_display = ('name', 'user', 'seller_type', 'city', 'is_verified', 'commission_rate', 'created_at')
+    list_filter = ('seller_type', 'is_verified', 'province')
+    search_fields = ('name', 'slug', 'user__username', 'user__email')
+    prepopulated_fields = {'slug': ('name',)}
+    list_editable = ('is_verified', 'commission_rate')
+    readonly_fields = ('created_at', 'updated_at')
+
+
+@admin.register(MarketplaceListing)
+class AdminMarketplaceListing(admin.ModelAdmin):
+    list_display = ('title', 'storefront', 'crop_name', 'price', 'unit', 'quantity_available', 'status', 'created_at')
+    list_filter = ('status', 'harvest_date', 'created_at')
+    search_fields = ('title', 'slug', 'crop_name', 'storefront__name')
+    prepopulated_fields = {'slug': ('title',)}
+    list_editable = ('status',)
+    readonly_fields = ('created_at', 'updated_at')
+    ordering = ('-created_at',)

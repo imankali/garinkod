@@ -268,3 +268,237 @@ class CartItem(models.Model):
     @property
     def is_in_stock(self):
         return self.product.is_in_stock and self.quantity <= self.product.stock
+
+
+# --- Orders ---
+def create_reference(prefix: str) -> str:
+    """Create a short human-readable reference for support and guests."""
+    import secrets
+
+    return f"{prefix}-{timezone.now():%y%m%d}-{secrets.token_hex(4).upper()}"
+
+
+def create_order_code() -> str:
+    return create_reference('GK')
+
+
+def create_service_code() -> str:
+    return create_reference('SV')
+
+
+def create_procurement_code() -> str:
+    return create_reference('PR')
+
+
+class Order(models.Model):
+    STATUS_CHOICES = (
+        ('awaiting_review', 'در انتظار بررسی'),
+        ('confirmed', 'تأیید شده'),
+        ('preparing', 'در حال آماده‌سازی'),
+        ('shipped', 'ارسال شده'),
+        ('delivered', 'تحویل شده'),
+        ('cancelled', 'لغو شده'),
+    )
+    PAYMENT_STATUS_CHOICES = (
+        ('unpaid', 'پرداخت نشده'),
+        ('pending', 'در انتظار پرداخت'),
+        ('paid', 'پرداخت شده'),
+        ('refunded', 'بازگشت وجه'),
+    )
+    PAYMENT_METHOD_CHOICES = (
+        ('coordination', 'هماهنگی با کارشناس'),
+        ('zarinpal', 'پرداخت آنلاین زرین‌پال'),
+    )
+
+    code = models.CharField(max_length=32, unique=True, db_index=True, default=create_order_code)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='orders')
+    customer_name = models.CharField(max_length=150, verbose_name='نام تحویل‌گیرنده')
+    phone = models.CharField(max_length=20, db_index=True, verbose_name='شماره تماس')
+    email = models.EmailField(blank=True, verbose_name='ایمیل')
+    province = models.CharField(max_length=80, verbose_name='استان')
+    city = models.CharField(max_length=80, verbose_name='شهر')
+    address = models.TextField(max_length=500, verbose_name='نشانی')
+    postal_code = models.CharField(max_length=20, blank=True, verbose_name='کد پستی')
+    notes = models.TextField(max_length=1000, blank=True, verbose_name='توضیحات مشتری')
+    subtotal = models.PositiveBigIntegerField(default=0)
+    shipping_price = models.PositiveBigIntegerField(default=0)
+    total_price = models.PositiveBigIntegerField(default=0)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='awaiting_review', db_index=True)
+    payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='unpaid', db_index=True)
+    payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES, default='coordination')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ('-created_at',)
+        verbose_name = 'سفارش'
+        verbose_name_plural = 'سفارش‌ها'
+
+    def __str__(self):
+        return f"{self.code} — {self.customer_name}"
+
+    @property
+    def total_items(self):
+        return self.items.aggregate(total=Sum('quantity'))['total'] or 0
+
+
+class OrderItem(models.Model):
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items')
+    product = models.ForeignKey(Product, null=True, blank=True, on_delete=models.SET_NULL, related_name='order_items')
+    product_title = models.CharField(max_length=250)
+    product_slug = models.SlugField(max_length=250)
+    unit_price = models.PositiveBigIntegerField()
+    quantity = models.PositiveIntegerField()
+
+    class Meta:
+        verbose_name = 'آیتم سفارش'
+        verbose_name_plural = 'آیتم‌های سفارش'
+
+    def __str__(self):
+        return f"{self.quantity} × {self.product_title}"
+
+    @property
+    def total_price(self):
+        return self.unit_price * self.quantity
+
+
+# --- Agricultural service and procurement leads ---
+class ServiceRequest(models.Model):
+    SERVICE_CHOICES = (
+        ('agronomy', 'مشاوره زراعی'),
+        ('irrigation', 'طراحی و نصب آبیاری'),
+        ('soil', 'آزمایش و بهبود خاک'),
+        ('greenhouse', 'گلخانه و کشت کنترل‌شده'),
+        ('machinery', 'ماشین‌آلات و تعمیرات'),
+        ('other', 'سایر خدمات'),
+    )
+    STATUS_CHOICES = (
+        ('new', 'جدید'),
+        ('contacted', 'تماس گرفته شد'),
+        ('quoted', 'پیشنهاد ارسال شد'),
+        ('closed', 'بسته شده'),
+    )
+
+    code = models.CharField(max_length=32, unique=True, db_index=True, default=create_service_code)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='service_requests')
+    service_type = models.CharField(max_length=20, choices=SERVICE_CHOICES)
+    customer_name = models.CharField(max_length=150)
+    phone = models.CharField(max_length=20)
+    province = models.CharField(max_length=80)
+    city = models.CharField(max_length=80)
+    crop = models.CharField(max_length=120, blank=True)
+    farm_area_hectare = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    description = models.TextField(max_length=1500)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='new', db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ('-created_at',)
+        verbose_name = 'درخواست خدمت'
+        verbose_name_plural = 'درخواست‌های خدمت'
+
+    def __str__(self):
+        return f"{self.code} — {self.get_service_type_display()}"
+
+
+class ProcurementRequest(models.Model):
+    STATUS_CHOICES = (
+        ('new', 'جدید'),
+        ('reviewing', 'در حال ارزیابی'),
+        ('offered', 'پیشنهاد ارسال شد'),
+        ('contracted', 'قرارداد شده'),
+        ('closed', 'بسته شده'),
+    )
+
+    code = models.CharField(max_length=32, unique=True, db_index=True, default=create_procurement_code)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='procurement_requests')
+    farmer_name = models.CharField(max_length=150)
+    phone = models.CharField(max_length=20)
+    crop_name = models.CharField(max_length=150)
+    variety = models.CharField(max_length=150, blank=True)
+    quantity = models.DecimalField(max_digits=14, decimal_places=2)
+    unit = models.CharField(max_length=30, default='کیلوگرم')
+    requested_price = models.PositiveBigIntegerField(null=True, blank=True)
+    province = models.CharField(max_length=80)
+    city = models.CharField(max_length=80)
+    harvest_date = models.DateField(null=True, blank=True)
+    description = models.TextField(max_length=1500, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='new', db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ('-created_at',)
+        verbose_name = 'درخواست خرید محصول کشاورز'
+        verbose_name_plural = 'درخواست‌های خرید محصول کشاورز'
+
+    def __str__(self):
+        return f"{self.code} — {self.crop_name}"
+
+
+# --- Marketplace storefront foundation ---
+class Storefront(models.Model):
+    SELLER_TYPE_CHOICES = (
+        ('farmer', 'کشاورز'),
+        ('cooperative', 'تعاونی'),
+        ('merchant', 'تاجر'),
+        ('company', 'شرکت'),
+    )
+
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='storefront')
+    name = models.CharField(max_length=150)
+    slug = models.SlugField(max_length=180, unique=True)
+    seller_type = models.CharField(max_length=20, choices=SELLER_TYPE_CHOICES, default='farmer')
+    bio = models.TextField(max_length=1000, blank=True)
+    province = models.CharField(max_length=80, blank=True)
+    city = models.CharField(max_length=80, blank=True)
+    is_verified = models.BooleanField(default=False, db_index=True)
+    commission_rate = models.DecimalField(max_digits=5, decimal_places=2, default=8)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'غرفه'
+        verbose_name_plural = 'غرفه‌ها'
+
+    def __str__(self):
+        return self.name
+
+
+class MarketplaceListing(models.Model):
+    STATUS_CHOICES = (
+        ('draft', 'پیش‌نویس'),
+        ('pending_review', 'در انتظار تأیید'),
+        ('published', 'منتشر شده'),
+        ('rejected', 'رد شده'),
+        ('sold_out', 'اتمام موجودی'),
+        ('archived', 'بایگانی'),
+    )
+
+    storefront = models.ForeignKey(Storefront, on_delete=models.CASCADE, related_name='listings')
+    title = models.CharField(max_length=250)
+    slug = models.SlugField(max_length=280, unique=True)
+    crop_name = models.CharField(max_length=150)
+    description = models.TextField(max_length=3000)
+    price = models.PositiveBigIntegerField()
+    unit = models.CharField(max_length=30, default='کیلوگرم')
+    quantity_available = models.DecimalField(max_digits=14, decimal_places=2)
+    min_order_quantity = models.DecimalField(max_digits=14, decimal_places=2, default=1)
+    harvest_date = models.DateField(null=True, blank=True)
+    image = models.ImageField(upload_to='marketplace/', blank=True, null=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft', db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ('-created_at',)
+        verbose_name = 'آگهی بازار کشاورزان'
+        verbose_name_plural = 'آگهی‌های بازار کشاورزان'
+
+    def __str__(self):
+        return self.title
+
+    @property
+    def image_url(self):
+        return self.image.url if self.image else '/images/hero-farm.jpg'

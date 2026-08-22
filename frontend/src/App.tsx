@@ -32,6 +32,11 @@ import AgriCalculator from "./components/AgriCalculator";
 const Login = lazy(() => import("./pages/Login"));
 const Profile = lazy(() => import("./pages/Profile"));
 const ProductPage = lazy(() => import("./pages/ProductPage"));
+const Checkout = lazy(() => import("./pages/Checkout"));
+const Orders = lazy(() => import("./pages/Orders"));
+const Services = lazy(() => import("./pages/Services"));
+const FarmerSell = lazy(() => import("./pages/FarmerSell"));
+const Marketplace = lazy(() => import("./pages/Marketplace"));
 
 // ========================================
 // Stores
@@ -418,6 +423,15 @@ export default function App() {
 
               {/* Keep legacy catalogue links indexable and functional. */}
               <Route path="/products" element={<Navigate to={`/${window.location.search}`} replace />} />
+
+              {/* ======================================== */}
+              {/* Platform routes */}
+              {/* ======================================== */}
+              <Route path="/checkout" element={<Checkout />} />
+              <Route path="/orders" element={<Orders />} />
+              <Route path="/services" element={<Services />} />
+              <Route path="/farmer-sell" element={<FarmerSell />} />
+              <Route path="/marketplace" element={<Marketplace />} />
 
               {/* ======================================== */}
               {/* Crawlable product detail route */}

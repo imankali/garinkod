@@ -88,3 +88,114 @@ class ProfileAndSeoTests(TestCase):
         self.assertIn("Sitemap:", robots.content.decode())
         self.assertEqual(sitemap.status_code, 200)
         self.assertIn("<urlset", sitemap.content.decode())
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class OrderAndPlatformTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(username="platform-user", password="safe-password-123")
+        self.seller = User.objects.create_user(username="seller-user", password="safe-password-123")
+        self.category = Category.objects.create(name="کود", slug="fertilizer")
+        self.product = Product.objects.create(
+            title="کود آزمایشی", slug="checkout-fertilizer", author=self.user,
+            category=self.category, description="محصول برای تست سفارش", status="published",
+            price=500000, stock=6, available=True,
+        )
+
+    def _add_to_guest_cart(self):
+        response = self.client.post(
+            "/api/cart/add/", {"product_id": self.product.id, "quantity": 2}, format="json"
+        )
+        self.assertEqual(response.status_code, 201)
+
+    def test_checkout_creates_order_reserves_stock_and_clears_cart(self):
+        self._add_to_guest_cart()
+        response = self.client.post(
+            "/api/orders/checkout/",
+            {
+                "customer_name": "کشاورز نمونه",
+                "phone": "09123456789",
+                "province": "فارس",
+                "city": "شیراز",
+                "address": "خیابان نمونه، پلاک ۱",
+                "payment_method": "coordination",
+                "terms_accepted": True,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        order = response.data["order"]
+        self.assertEqual(order["status"], "awaiting_review")
+        self.assertEqual(order["payment_status"], "unpaid")
+        self.assertEqual(order["subtotal"], 1000000)
+        self.assertEqual(order["shipping_price"], 45000)
+        self.assertEqual(len(order["items"]), 1)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock, 4)
+        self.assertEqual(self.client.get("/api/cart/").data["items"], [])
+
+        lookup = self.client.get("/api/orders/lookup/", {"code": order["code"], "phone": "09123456789"})
+        self.assertEqual(lookup.status_code, 200)
+        self.assertEqual(lookup.data["code"], order["code"])
+
+    def test_checkout_requires_terms_acceptance(self):
+        self._add_to_guest_cart()
+        response = self.client.post(
+            "/api/orders/checkout/",
+            {
+                "customer_name": "کشاورز نمونه", "phone": "09123456789", "province": "فارس",
+                "city": "شیراز", "address": "خیابان نمونه", "terms_accepted": False,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock, 6)
+
+    def test_service_and_procurement_requests_are_recorded(self):
+        service = self.client.post(
+            "/api/services/requests/",
+            {
+                "service_type": "irrigation", "customer_name": "علی", "phone": "09123456789",
+                "province": "کرمان", "city": "رفسنجان", "crop": "پسته", "description": "نیاز به طراحی آبیاری قطره‌ای",
+            },
+            format="json",
+        )
+        procurement = self.client.post(
+            "/api/procurement/requests/",
+            {
+                "farmer_name": "زهرا", "phone": "09121234567", "crop_name": "گندم",
+                "quantity": "2500", "unit": "کیلوگرم", "province": "همدان", "city": "ملایر",
+            },
+            format="json",
+        )
+        self.assertEqual(service.status_code, 201)
+        self.assertTrue(service.data["request"]["code"].startswith("SV-"))
+        self.assertEqual(procurement.status_code, 201)
+        self.assertTrue(procurement.data["request"]["code"].startswith("PR-"))
+
+    def test_seller_can_create_storefront_and_submit_listing_for_review(self):
+        self.client.force_authenticate(self.seller)
+        storefront = self.client.post(
+            "/api/marketplace/storefront/",
+            {"name": "غرفه نمونه", "slug": "sample-stall", "seller_type": "farmer", "province": "فارس", "city": "شیراز"},
+            format="json",
+        )
+        self.assertEqual(storefront.status_code, 201)
+
+        listing = self.client.post(
+            "/api/marketplace/listings/",
+            {
+                "title": "گندم ممتاز", "slug": "premium-wheat", "crop_name": "گندم",
+                "description": "گندم برداشت امسال", "price": 45000, "unit": "کیلوگرم",
+                "quantity_available": "1000", "min_order_quantity": "100",
+            },
+            format="json",
+        )
+        self.assertEqual(listing.status_code, 201)
+        self.assertEqual(listing.data["status"], "pending_review")
+
+        public_list = self.client.get("/api/marketplace/listings/")
+        self.assertEqual(public_list.data["count"], 0)
