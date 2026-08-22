@@ -3,10 +3,10 @@ import { Link } from "react-router-dom";
 import { CheckCircle2, ClipboardCheck, PackageCheck, Phone, ShieldCheck } from "lucide-react";
 import toast from "react-hot-toast";
 
-import { ordersApi } from "../api/services";
+import { ordersApi, paymentsApi } from "../api/services";
 import { useAuthStore } from "../store/authStore";
 import { useCartStore } from "../store/cartStore";
-import type { CheckoutPayload, Order } from "../types";
+import type { CheckoutPayload, Order, PaymentProviderOption } from "../types";
 import { formatPrice } from "../utils/formatPrice";
 
 const EMPTY_FORM: CheckoutPayload = {
@@ -25,12 +25,17 @@ const EMPTY_FORM: CheckoutPayload = {
 export default function Checkout() {
   const { cart, fetchCart, isLoading } = useCartStore();
   const { user, account } = useAuthStore();
-  const [form, setForm] = useState<CheckoutPayload>(EMPTY_FORM);
+  const [form, setForm] = useState<CheckoutPayload>(() => ({
+    ...EMPTY_FORM,
+    affiliate_code: localStorage.getItem('affiliate_referral_code') || '',
+  }));
+  const [providers, setProviders] = useState<PaymentProviderOption[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [order, setOrder] = useState<Order | null>(null);
 
   useEffect(() => {
     fetchCart();
+    paymentsApi.options().then((response) => setProviders(response.data.providers)).catch(() => undefined);
   }, [fetchCart]);
 
   useEffect(() => {
@@ -93,7 +98,7 @@ export default function Checkout() {
             <p className="mt-1 text-xl font-extrabold tracking-wider text-emerald-700 dark:text-lime-300" dir="ltr">{order.code}</p>
             <p className="mt-3 text-sm font-bold text-slate-700 dark:text-white">مبلغ ثبت‌شده: {formatPrice(order.total_price)}</p>
           </div>
-          <p className="mt-4 text-xs text-slate-400">تا زمان اتصال زرین‌پال، هیچ پرداخت آنلاین در این مرحله دریافت نمی‌شود.</p>
+          <p className="mt-4 text-xs text-slate-400">پرداخت فقط از طریق روش فعال‌شده و تأییدشدهٔ سرور انجام می‌شود؛ هیچ درگاه غیرفعالی مبلغ دریافت نمی‌کند.</p>
           <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
             <Link to="/orders" className="rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white">پیگیری سفارش</Link>
             <Link to="/" className="rounded-xl border border-emerald-200 px-5 py-3 text-sm font-bold text-emerald-700 dark:border-emerald-700 dark:text-lime-300">بازگشت به فروشگاه</Link>
@@ -144,9 +149,22 @@ export default function Checkout() {
           </label>
 
           <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
-            <div className="flex items-center gap-2 font-extrabold"><Phone size={17} /> پرداخت در این مرحله با هماهنگی کارشناس</div>
-            <p className="mt-1">زرین‌پال هنوز متصل نشده است؛ برای جلوگیری از پرداخت ناموفق، سفارش ابتدا بررسی می‌شود و هیچ درگاه پرداختی باز نمی‌شود.</p>
+            <div className="flex items-center gap-2 font-extrabold"><Phone size={17} /> روش پرداخت</div>
+            <p className="mt-1">فقط روش‌هایی که سرور با credential، callback verify و تست کامل فعال کرده باشد قابل انتخاب‌اند. روش‌های دیگر صرفاً برای شفافیت نمایش داده می‌شوند.</p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {providers.map((provider) => (
+                <button key={provider.code} type="button" disabled={!provider.enabled} onClick={() => updateField('payment_method', provider.code)} className={`rounded-xl border p-3 text-right text-xs transition ${form.payment_method === provider.code ? 'border-emerald-600 bg-emerald-100 text-emerald-900 dark:bg-emerald-900 dark:text-lime-100' : 'border-amber-200 bg-white/80 dark:border-amber-800 dark:bg-emerald-950'} ${!provider.enabled ? 'cursor-not-allowed opacity-60' : ''}`}>
+                  <span className="block font-extrabold">{provider.label}</span>
+                  <span className="mt-1 block text-[10px]">{provider.enabled ? 'فعال' : provider.reason}</span>
+                </button>
+              ))}
+            </div>
           </div>
+
+          <label className="block text-sm font-bold text-slate-700 dark:text-emerald-50">
+            کد همکاری در فروش (اختیاری)
+            <input value={form.affiliate_code || ''} onChange={(event) => updateField('affiliate_code', event.target.value.toUpperCase())} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-normal outline-none transition focus:border-emerald-500 dark:border-emerald-700 dark:bg-emerald-900" placeholder="مثال: GKAF-..." dir="ltr" />
+          </label>
 
           <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-slate-50 p-3 text-xs leading-6 text-slate-600 dark:bg-emerald-900/40 dark:text-emerald-100">
             <input type="checkbox" checked={form.terms_accepted} onChange={(event) => updateField("terms_accepted", event.target.checked)} className="mt-1 h-4 w-4 accent-emerald-600" />

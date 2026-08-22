@@ -2,7 +2,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
-from .models import Category, Product
+from .models import AffiliateProfile, Category, Product, Storefront
 
 
 @override_settings(SECURE_SSL_REDIRECT=False)
@@ -199,3 +199,56 @@ class OrderAndPlatformTests(TestCase):
 
         public_list = self.client.get("/api/marketplace/listings/")
         self.assertEqual(public_list.data["count"], 0)
+
+    def test_payment_registry_only_exposes_verified_manual_flow(self):
+        response = self.client.get('/api/payments/options/')
+        self.assertEqual(response.status_code, 200)
+        providers = {provider['code']: provider for provider in response.data['providers']}
+        self.assertTrue(providers['coordination']['enabled'])
+        self.assertFalse(providers['zarinpal']['enabled'])
+        self.assertFalse(providers['paypal']['enabled'])
+        self.assertFalse(providers['crypto']['enabled'])
+
+    def test_active_affiliate_creates_pending_conversion_and_ledger_entry(self):
+        self.client.force_authenticate(self.user)
+        affiliate_response = self.client.post('/api/affiliate/me/', {}, format='json')
+        self.assertEqual(affiliate_response.status_code, 201)
+        code = affiliate_response.data['profile']['code']
+        AffiliateProfile.objects.filter(code=code).update(status='active', commission_rate=10)
+
+        self._add_to_guest_cart()
+        response = self.client.post(
+            '/api/orders/checkout/',
+            {
+                'customer_name': 'کشاورز نمونه', 'phone': '09123456789', 'province': 'فارس',
+                'city': 'شیراز', 'address': 'خیابان نمونه', 'payment_method': 'coordination',
+                'affiliate_code': code, 'terms_accepted': True,
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data['order']['affiliate_code'], code)
+
+        dashboard = self.client.get('/api/affiliate/me/')
+        self.assertEqual(len(dashboard.data['conversions']), 1)
+        self.assertEqual(dashboard.data['conversions'][0]['status'], 'pending')
+        self.assertEqual(len(dashboard.data['ledger']), 1)
+        self.assertEqual(dashboard.data['ledger'][0]['amount'], 100000)
+
+    def test_feedback_and_authenticated_storefront_complaint_are_recorded(self):
+        feedback = self.client.post(
+            '/api/feedback/',
+            {'kind': 'suggestion', 'subject': 'جستجوی بهتر', 'message': 'فیلتر شهر اضافه شود.'},
+            format='json',
+        )
+        self.assertEqual(feedback.status_code, 201)
+
+        storefront = Storefront.objects.create(user=self.seller, name='غرفه فروشنده', slug='seller-stall')
+        self.client.force_authenticate(self.user)
+        complaint = self.client.post(
+            '/api/complaints/storefront/',
+            {'storefront': storefront.id, 'subject': 'کیفیت نامشخص', 'description': 'لطفاً مشخصات گرید تکمیل شود.'},
+            format='json',
+        )
+        self.assertEqual(complaint.status_code, 201)
+        self.assertEqual(complaint.data['complaint']['status'], 'new')

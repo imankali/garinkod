@@ -266,8 +266,78 @@ export interface CheckoutPayload {
   address: string;
   postal_code?: string;
   notes?: string;
-  payment_method: 'coordination';
+  payment_method: 'coordination' | 'zarinpal' | 'stripe_card' | 'paypal' | 'crypto';
+  affiliate_code?: string;
   terms_accepted: boolean;
+}
+
+export interface PaymentProviderOption {
+  code: CheckoutPayload['payment_method'];
+  label: string;
+  currency: string;
+  enabled: boolean;
+  configured: boolean;
+  reason: string;
+}
+
+export interface AffiliateProfile {
+  id: number;
+  code: string;
+  commission_rate: string;
+  status: 'pending' | 'active' | 'suspended';
+  status_label: string;
+  created_at: string;
+}
+
+export interface AffiliateConversion {
+  id: number;
+  order_code: string;
+  commission_amount: number;
+  status: string;
+  status_label: string;
+  created_at: string;
+}
+
+export interface FinancialLedgerEntry {
+  id: number;
+  owner_type: string;
+  entry_type: string;
+  entry_type_label: string;
+  status: string;
+  status_label: string;
+  amount: number;
+  currency: string;
+  description: string;
+  created_at: string;
+  available_at: string | null;
+}
+
+export interface PlatformFeedbackPayload {
+  name?: string;
+  email?: string;
+  kind: 'suggestion' | 'criticism' | 'consultation' | 'other';
+  subject: string;
+  message: string;
+}
+
+export interface StorefrontComplaintPayload {
+  storefront: number;
+  listing?: number;
+  order?: number;
+  subject: string;
+  description: string;
+}
+
+export interface VisualSearchResponse {
+  request: {
+    id: number;
+    target: string;
+    status: string;
+    status_label: string;
+    result_payload: Record<string, unknown>;
+    created_at: string;
+  };
+  message: string;
 }
 
 export interface ServiceRequestPayload {

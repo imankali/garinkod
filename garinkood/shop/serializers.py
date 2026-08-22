@@ -4,7 +4,9 @@ from .models import (
     Category, SubCategory, Product,
     FertilizerDetail, PesticideDetail, SeedDetail, EquipmentDetail,
     UserAccount, Comment, Cart, CartItem, Order, OrderItem,
-    ServiceRequest, ProcurementRequest, Storefront, MarketplaceListing
+    ServiceRequest, ProcurementRequest, Storefront, MarketplaceListing,
+    PaymentAttempt, AffiliateProfile, AffiliateConversion, FinancialLedgerEntry,
+    PlatformFeedback, StorefrontComplaint, VisualSearchRequest
 )
 
 
@@ -245,7 +247,7 @@ class OrderSerializer(serializers.ModelSerializer):
             'id', 'code', 'customer_name', 'phone', 'email', 'province', 'city',
             'address', 'postal_code', 'notes', 'subtotal', 'shipping_price',
             'total_price', 'status', 'status_label', 'payment_status',
-            'payment_status_label', 'payment_method', 'payment_method_label',
+            'payment_status_label', 'payment_method', 'payment_method_label', 'affiliate_code',
             'total_items', 'items', 'created_at', 'updated_at'
         ]
         read_only_fields = fields
@@ -260,10 +262,13 @@ class CheckoutSerializer(serializers.Serializer):
     address = serializers.CharField(max_length=500)
     postal_code = serializers.CharField(max_length=20, required=False, allow_blank=True)
     notes = serializers.CharField(max_length=1000, required=False, allow_blank=True)
-    # Zarinpal is accepted only after its payment adapter is enabled. Until then
-    # all orders are recorded for expert coordination rather than pretending
-    # that a payment has been collected.
-    payment_method = serializers.ChoiceField(choices=['coordination'], default='coordination')
+    # Providers are validated against server configuration at checkout time.
+    # A frontend never decides whether a gateway is operational.
+    payment_method = serializers.ChoiceField(
+        choices=['coordination', 'zarinpal', 'stripe_card', 'paypal', 'crypto'],
+        default='coordination',
+    )
+    affiliate_code = serializers.CharField(max_length=32, required=False, allow_blank=True)
     terms_accepted = serializers.BooleanField()
 
     def validate_phone(self, value):
@@ -341,3 +346,81 @@ class MarketplaceListingSerializer(serializers.ModelSerializer):
 
     def get_image_url(self, obj):
         return obj.image_url
+
+# ========================================
+# Payments, finance, affiliate and trust
+# ========================================
+class PaymentAttemptSerializer(serializers.ModelSerializer):
+    provider_label = serializers.CharField(source='get_provider_display', read_only=True)
+    status_label = serializers.CharField(source='get_status_display', read_only=True)
+
+    class Meta:
+        model = PaymentAttempt
+        fields = [
+            'id', 'provider', 'provider_label', 'status', 'status_label', 'amount',
+            'currency', 'external_reference', 'checkout_url', 'created_at', 'verified_at', 'expires_at'
+        ]
+        read_only_fields = fields
+
+
+class FinancialLedgerEntrySerializer(serializers.ModelSerializer):
+    status_label = serializers.CharField(source='get_status_display', read_only=True)
+    entry_type_label = serializers.CharField(source='get_entry_type_display', read_only=True)
+
+    class Meta:
+        model = FinancialLedgerEntry
+        fields = ['id', 'owner_type', 'entry_type', 'entry_type_label', 'status', 'status_label', 'amount', 'currency', 'description', 'created_at', 'available_at']
+        read_only_fields = fields
+
+
+class AffiliateProfileSerializer(serializers.ModelSerializer):
+    status_label = serializers.CharField(source='get_status_display', read_only=True)
+
+    class Meta:
+        model = AffiliateProfile
+        fields = ['id', 'code', 'commission_rate', 'status', 'status_label', 'created_at']
+        read_only_fields = ['id', 'code', 'commission_rate', 'status', 'status_label', 'created_at']
+
+
+class AffiliateConversionSerializer(serializers.ModelSerializer):
+    order_code = serializers.CharField(source='order.code', read_only=True)
+    status_label = serializers.CharField(source='get_status_display', read_only=True)
+
+    class Meta:
+        model = AffiliateConversion
+        fields = ['id', 'order_code', 'commission_amount', 'status', 'status_label', 'created_at']
+        read_only_fields = fields
+
+
+class PlatformFeedbackSerializer(serializers.ModelSerializer):
+    status_label = serializers.CharField(source='get_status_display', read_only=True)
+
+    class Meta:
+        model = PlatformFeedback
+        fields = ['id', 'name', 'email', 'kind', 'subject', 'message', 'status', 'status_label', 'created_at']
+        read_only_fields = ['id', 'status', 'status_label', 'created_at']
+
+
+class StorefrontComplaintSerializer(serializers.ModelSerializer):
+    status_label = serializers.CharField(source='get_status_display', read_only=True)
+    storefront_name = serializers.CharField(source='storefront.name', read_only=True)
+
+    class Meta:
+        model = StorefrontComplaint
+        fields = ['id', 'storefront', 'storefront_name', 'listing', 'order', 'subject', 'description', 'status', 'status_label', 'resolution_note', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'status', 'status_label', 'resolution_note', 'created_at', 'updated_at']
+
+    def validate_listing(self, listing):
+        storefront = self.initial_data.get('storefront')
+        if storefront and str(listing.storefront_id) != str(storefront):
+            raise serializers.ValidationError('آگهی باید متعلق به همان غرفه باشد.')
+        return listing
+
+
+class VisualSearchRequestSerializer(serializers.ModelSerializer):
+    status_label = serializers.CharField(source='get_status_display', read_only=True)
+
+    class Meta:
+        model = VisualSearchRequest
+        fields = ['id', 'image', 'target', 'status', 'status_label', 'result_payload', 'created_at']
+        read_only_fields = ['id', 'status', 'status_label', 'result_payload', 'created_at']

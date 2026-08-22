@@ -25,6 +25,8 @@ const quickLinks = [
   { label: "محصولات", href: "/products" },
   { label: "خدمات کشاورزی", href: "/services" },
   { label: "بازار کشاورزان", href: "/marketplace" },
+  { label: "همکاری در فروش", href: "/affiliate" },
+  { label: "پشتیبانی و بازخورد", href: "/support" },
   { label: "فروش محصول به گرین کود", href: "/farmer-sell" },
   { label: "تخفیف‌های ویژه", href: "/products?featured=true" },
 ];

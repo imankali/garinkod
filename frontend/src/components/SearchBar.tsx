@@ -6,10 +6,11 @@ import { useQuery } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import {
   Search, X, Clock, SlidersHorizontal,
-  PackageCheck, Mic, Sparkles, Tag, Flame
+  PackageCheck, Mic, Sparkles, Tag, Flame, ImagePlus
 } from "lucide-react";
 import { categories } from "../data/shopData";
-import { productsApi } from "../api/services";
+import { productsApi, trustApi } from "../api/services";
+import { useTranslation } from "../i18n";
 import type { ProductList, MockProduct } from "../types";
 
 // ========================================
@@ -87,6 +88,7 @@ const trendingSearches = [
 // SearchBar Component
 // ========================================
 export default function SearchBar({ variant = "desktop", onSelectProduct }: SearchBarProps) {
+  const { locale } = useTranslation();
   const [query, setQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("all");
   const [isFocused, setIsFocused] = useState(false);
@@ -104,6 +106,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
   });
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const imageSearchRef = useRef<HTMLInputElement>(null);
   const debouncedQuery = useDebounce(query, 300);
 
   // ========================================
@@ -179,6 +182,24 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
     setActiveCategory("all");
   }
 
+  async function handleImageSearch(event: React.ChangeEvent<HTMLInputElement>) {
+    const image = event.target.files?.[0];
+    if (!image) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(image.type) || image.size > 5 * 1024 * 1024) {
+      toast.error('تصویر باید JPG، PNG یا WebP و حداکثر ۵ مگابایت باشد.');
+      event.target.value = '';
+      return;
+    }
+    try {
+      const response = await trustApi.visualSearch(image, 'product');
+      toast(response.data.message);
+    } catch {
+      // The API client displays the failure message.
+    } finally {
+      event.target.value = '';
+    }
+  }
+
   function toggleVoiceSearch() {
     if (isListening) {
       setIsListening(false);
@@ -191,7 +212,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
       try {
         const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
         const recognition = new SpeechRecognition();
-        recognition.lang = "fa-IR";
+        recognition.lang = locale === 'fa' ? 'fa-IR' : locale === 'ar' ? 'ar-SA' : 'en-US';
         recognition.onresult = (event: any) => {
           const transcript = event.results[0][0].transcript;
           setQuery(transcript);
@@ -247,6 +268,19 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
           className="w-full flex-1 bg-transparent px-4 py-2.5 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none dark:text-white dark:placeholder:text-emerald-400 md:py-3 md:text-base"
           aria-label="جستجوی محصولات"
         />
+
+        <input ref={imageSearchRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={handleImageSearch} className="hidden" aria-label="انتخاب تصویر برای جستجو" />
+
+        {/* Visual search queues the image for the verified server-side pipeline. */}
+        <button
+          type="button"
+          onClick={() => imageSearchRef.current?.click()}
+          title="جستجو با تصویر"
+          className="flex items-center px-2 text-slate-400 transition-colors hover:text-[#0F8A5F] dark:text-emerald-400 dark:hover:text-lime-300"
+          aria-label="جستجو با تصویر"
+        >
+          <ImagePlus size={18} />
+        </button>
 
         {/* Voice Search Button */}
         <button

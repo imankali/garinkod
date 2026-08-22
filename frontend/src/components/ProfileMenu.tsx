@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { LogIn, LogOut, Package, Store, User } from "lucide-react";
+import { Landmark, LogIn, LogOut, Package, Store, User } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 
 // ========================================
@@ -26,6 +26,7 @@ const menuItems: MenuItem[] = [
   { icon: User, label: "مرکز حساب", desc: "خریدها، اطلاعات و نشانی", href: "/profile" },
   { icon: Package, label: "سفارش‌های من", desc: "پیگیری سفارش و تحویل", href: "/orders" },
   { icon: Store, label: "غرفه و فروش", desc: "ساخت غرفه و ثبت آگهی", href: "/profile?tab=seller" },
+  { icon: Landmark, label: "دفتر مالی", desc: "کمیسیون و وضعیت تسویه", href: "/finance" },
 ];
 
 // ========================================

@@ -31,4 +31,10 @@ urlpatterns = [
     path('services/requests/', api_views.create_service_request, name='api_service_request'),
     path('procurement/requests/', api_views.create_procurement_request, name='api_procurement_request'),
     path('marketplace/storefront/', api_views.my_storefront, name='api_my_storefront'),
+    path('marketplace/finance/', api_views.storefront_finance, name='api_storefront_finance'),
+    path('payments/options/', api_views.payment_options_view, name='api_payment_options'),
+    path('affiliate/me/', api_views.affiliate_me, name='api_affiliate_me'),
+    path('feedback/', api_views.submit_feedback, name='api_feedback'),
+    path('complaints/storefront/', api_views.submit_storefront_complaint, name='api_storefront_complaint'),
+    path('visual-search/', api_views.visual_search, name='api_visual_search'),
 ]

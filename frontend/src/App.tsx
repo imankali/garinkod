@@ -37,6 +37,9 @@ const Orders = lazy(() => import("./pages/Orders"));
 const Services = lazy(() => import("./pages/Services"));
 const FarmerSell = lazy(() => import("./pages/FarmerSell"));
 const Marketplace = lazy(() => import("./pages/Marketplace"));
+const Support = lazy(() => import("./pages/Support"));
+const Affiliate = lazy(() => import("./pages/Affiliate"));
+const Finance = lazy(() => import("./pages/Finance"));
 
 // ========================================
 // Stores
@@ -155,6 +158,14 @@ export default function App() {
   // ========================================
   const { cart, fetchCart, addToCart: addToCartStore } = useCartStore();
   const { isAuthenticated, fetchProfile } = useAuthStore();
+
+  // Preserve a valid affiliate referral before navigation removes query parameters.
+  useEffect(() => {
+    const referral = new URLSearchParams(window.location.search).get('ref')?.trim().toUpperCase();
+    if (referral && /^[A-Z0-9_-]{4,32}$/.test(referral)) {
+      localStorage.setItem('affiliate_referral_code', referral);
+    }
+  }, []);
 
   // ========================================
   // Fetch Cart on Mount
@@ -435,6 +446,9 @@ export default function App() {
               <Route path="/services" element={<Services />} />
               <Route path="/farmer-sell" element={<FarmerSell />} />
               <Route path="/marketplace" element={<Marketplace />} />
+              <Route path="/support" element={<Support />} />
+              <Route path="/affiliate" element={<Affiliate />} />
+              <Route path="/finance" element={<Finance />} />
 
               {/* ======================================== */}
               {/* Crawlable product detail route */}

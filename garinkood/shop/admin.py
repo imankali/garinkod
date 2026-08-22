@@ -3,7 +3,9 @@ from .models import Category, Product
 from .models import FertilizerDetail, PesticideDetail, SeedDetail, EquipmentDetail
 from .models import (
     Comment, UserAccount, Order, OrderItem, ServiceRequest, ProcurementRequest,
-    Storefront, MarketplaceListing
+    Storefront, MarketplaceListing, PaymentAttempt, AffiliateProfile,
+    AffiliateConversion, FinancialLedgerEntry, PlatformFeedback,
+    StorefrontComplaint, VisualSearchRequest
 )
 
 
@@ -206,3 +208,65 @@ class AdminMarketplaceListing(admin.ModelAdmin):
     list_editable = ('status',)
     readonly_fields = ('created_at', 'updated_at')
     ordering = ('-created_at',)
+
+
+@admin.register(PaymentAttempt)
+class AdminPaymentAttempt(admin.ModelAdmin):
+    list_display = ('order', 'provider', 'amount', 'currency', 'status', 'external_reference', 'created_at')
+    list_filter = ('provider', 'status', 'currency', 'created_at')
+    search_fields = ('order__code', 'external_reference', 'idempotency_key')
+    readonly_fields = ('order', 'provider', 'amount', 'currency', 'idempotency_key', 'external_reference', 'checkout_url', 'provider_payload', 'created_at', 'updated_at', 'verified_at')
+
+
+@admin.register(AffiliateProfile)
+class AdminAffiliateProfile(admin.ModelAdmin):
+    list_display = ('code', 'user', 'commission_rate', 'status', 'created_at')
+    list_filter = ('status', 'created_at')
+    search_fields = ('code', 'user__username', 'user__email')
+    list_editable = ('commission_rate', 'status')
+    readonly_fields = ('created_at', 'updated_at')
+
+
+@admin.register(AffiliateConversion)
+class AdminAffiliateConversion(admin.ModelAdmin):
+    list_display = ('affiliate', 'order', 'commission_amount', 'status', 'created_at')
+    list_filter = ('status', 'created_at')
+    search_fields = ('affiliate__code', 'order__code')
+    list_editable = ('status',)
+    readonly_fields = ('created_at', 'updated_at')
+
+
+@admin.register(FinancialLedgerEntry)
+class AdminFinancialLedgerEntry(admin.ModelAdmin):
+    list_display = ('owner_type', 'user', 'storefront', 'entry_type', 'amount', 'currency', 'status', 'created_at')
+    list_filter = ('owner_type', 'entry_type', 'status', 'currency', 'created_at')
+    search_fields = ('user__username', 'storefront__name', 'order__code', 'description')
+    list_editable = ('status',)
+    readonly_fields = ('created_at',)
+
+
+@admin.register(PlatformFeedback)
+class AdminPlatformFeedback(admin.ModelAdmin):
+    list_display = ('kind', 'subject', 'name', 'user', 'status', 'created_at')
+    list_filter = ('kind', 'status', 'created_at')
+    search_fields = ('subject', 'message', 'name', 'email', 'user__username')
+    list_editable = ('status',)
+    readonly_fields = ('created_at', 'updated_at')
+
+
+@admin.register(StorefrontComplaint)
+class AdminStorefrontComplaint(admin.ModelAdmin):
+    list_display = ('storefront', 'subject', 'complainant', 'status', 'created_at')
+    list_filter = ('status', 'created_at')
+    search_fields = ('storefront__name', 'subject', 'description', 'complainant__username')
+    list_editable = ('status',)
+    readonly_fields = ('created_at', 'updated_at')
+
+
+@admin.register(VisualSearchRequest)
+class AdminVisualSearchRequest(admin.ModelAdmin):
+    list_display = ('target', 'user', 'status', 'created_at')
+    list_filter = ('target', 'status', 'created_at')
+    search_fields = ('user__username',)
+    list_editable = ('status',)
+    readonly_fields = ('created_at', 'updated_at', 'result_payload')

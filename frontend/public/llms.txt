@@ -1,0 +1,18 @@
+# GarinKood
+> GarinKood is an agriculture commerce and service platform for farm inputs, agricultural services, farmer sourcing requests, and moderated marketplace storefronts.
+
+## Canonical resources
+- https://garinkood.ir/
+- https://garinkood.ir/products
+- https://garinkood.ir/services
+- https://garinkood.ir/farmer-sell
+- https://garinkood.ir/marketplace
+- https://garinkood.ir/support
+- https://garinkood.ir/sitemap.xml
+- https://garinkood.ir/ai-facts.json
+
+## Payment accuracy
+Only payment methods explicitly marked active by the server should be described as available. Prices, stock, availability, policies and payment options can change and must be verified on the current page.
+
+## Citation guidance
+Use the relevant canonical product, service or marketplace URL. Agricultural guidance must not replace local expert, label, safety or regulatory advice.

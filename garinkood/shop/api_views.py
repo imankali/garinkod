@@ -1,6 +1,9 @@
 from contextlib import nullcontext
+from secrets import token_urlsafe
 from threading import Lock
 
+from django.conf import settings
+from django.db.models import Sum
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
@@ -15,21 +18,34 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 from .filters import ProductFilter
 from .models import (
     Category, Product, Comment, UserAccount, Cart, CartItem, Order, OrderItem,
-    ServiceRequest, ProcurementRequest, Storefront, MarketplaceListing
+    ServiceRequest, ProcurementRequest, Storefront, MarketplaceListing,
+    PaymentAttempt, AffiliateProfile, AffiliateConversion, FinancialLedgerEntry,
+    PlatformFeedback, StorefrontComplaint, VisualSearchRequest
 )
 from .serializers import (
     CategorySerializer, ProductSerializer, ProductListSerializer,
     CommentSerializer, UserAccountSerializer, CartSerializer,
     UserSerializer, RegisterSerializer, CheckoutSerializer, OrderSerializer,
     ServiceRequestSerializer, ProcurementRequestSerializer, StorefrontSerializer,
-    MarketplaceListingSerializer
+    MarketplaceListingSerializer, PaymentAttemptSerializer, AffiliateProfileSerializer,
+    AffiliateConversionSerializer, FinancialLedgerEntrySerializer, PlatformFeedbackSerializer,
+    StorefrontComplaintSerializer, VisualSearchRequestSerializer
 )
+from .payments import get_provider, provider_options
 
 # SQLite is used for local development only. It permits a single writer, so a
 # process-local lock prevents its deferred transactions from upgrading into
 # "database is locked" errors under a concurrent local smoke test. PostgreSQL
 # relies on normal row locks and never takes this branch.
 _SQLITE_CART_WRITE_LOCK = Lock()
+
+
+def _generate_affiliate_code() -> str:
+    """Generate a short code while respecting the database uniqueness rule."""
+    while True:
+        code = f"GKAF-{token_urlsafe(5).upper().replace('-', '')}"
+        if not AffiliateProfile.objects.filter(code=code).exists():
+            return code
 
 
 # ========================================
@@ -343,6 +359,12 @@ def checkout(request):
     serializer = CheckoutSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     details = serializer.validated_data
+    provider = get_provider(details['payment_method'])
+    if not provider or not provider.enabled:
+        return Response(
+            {'error': 'روش پرداخت انتخاب‌شده هنوز برای دریافت وجه فعال نشده است.'},
+            status=status.HTTP_409_CONFLICT,
+        )
     sqlite_lock = _SQLITE_CART_WRITE_LOCK if connection.vendor == 'sqlite' else nullcontext()
 
     with sqlite_lock:
@@ -373,6 +395,12 @@ def checkout(request):
 
             subtotal = sum(locked_products[item.product_id].price * item.quantity for item in cart_items)
             shipping_price = 0 if subtotal >= SHIPPING_FREE_THRESHOLD else STANDARD_SHIPPING_PRICE
+            affiliate_code = details.get('affiliate_code', '').strip().upper()
+            affiliate = None
+            if affiliate_code:
+                affiliate = AffiliateProfile.objects.filter(code=affiliate_code, status='active').first()
+                if not affiliate:
+                    return Response({'error': 'کد همکاری در فروش معتبر یا فعال نیست.'}, status=status.HTTP_400_BAD_REQUEST)
             order = Order.objects.create(
                 user=request.user if request.user.is_authenticated else None,
                 customer_name=details['customer_name'],
@@ -387,6 +415,7 @@ def checkout(request):
                 shipping_price=shipping_price,
                 total_price=subtotal + shipping_price,
                 payment_method=details['payment_method'],
+                affiliate_code=affiliate_code,
                 payment_status='unpaid',
                 status='awaiting_review',
             )
@@ -407,6 +436,25 @@ def checkout(request):
                     quantity=item.quantity,
                 ))
             OrderItem.objects.bulk_create(order_items)
+            if affiliate:
+                commission_amount = int(subtotal * affiliate.commission_rate / 100)
+                conversion = AffiliateConversion.objects.create(
+                    affiliate=affiliate,
+                    order=order,
+                    commission_amount=commission_amount,
+                    status='pending',
+                )
+                FinancialLedgerEntry.objects.create(
+                    owner_type='affiliate',
+                    user=affiliate.user,
+                    order=order,
+                    affiliate_conversion=conversion,
+                    entry_type='affiliate_commission',
+                    status='pending',
+                    amount=commission_amount,
+                    currency='IRR',
+                    description=f'کمیسیون همکاری در فروش سفارش {order.code}',
+                )
             CartItem.objects.filter(cart=cart).delete()
 
     return Response({
@@ -579,3 +627,113 @@ def user_profile(request):
         'account': UserAccountSerializer(account).data if account else None,
         'message': 'پروفایل با موفقیت بروزرسانی شد'
     })
+
+# ========================================
+# Payments, affiliate, finance and trust centre
+# ========================================
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def payment_options_view(_request):
+    """Expose only the payment availability declared by the server registry."""
+    return Response({
+        'providers': [
+            {
+                'code': provider.code,
+                'label': provider.label,
+                'currency': provider.currency,
+                'enabled': provider.enabled,
+                'configured': provider.configured,
+                'reason': provider.reason,
+            }
+            for provider in provider_options()
+        ]
+    })
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([permissions.IsAuthenticated])
+def affiliate_me(request):
+    profile = AffiliateProfile.objects.filter(user=request.user).first()
+    if request.method == 'POST':
+        if profile:
+            return Response({'error': 'حساب همکاری در فروش قبلاً ایجاد شده است.'}, status=status.HTTP_400_BAD_REQUEST)
+        profile = AffiliateProfile.objects.create(user=request.user, code=_generate_affiliate_code())
+        return Response({
+            'profile': AffiliateProfileSerializer(profile).data,
+            'message': 'درخواست همکاری ثبت شد؛ پس از بررسی، کد برای ثبت تبدیل فعال می‌شود.'
+        }, status=status.HTTP_201_CREATED)
+
+    if not profile:
+        return Response({'profile': None, 'conversions': [], 'ledger': []})
+
+    conversions = AffiliateConversion.objects.filter(affiliate=profile).select_related('order')
+    ledger = FinancialLedgerEntry.objects.filter(user=request.user, owner_type='affiliate')
+    return Response({
+        'profile': AffiliateProfileSerializer(profile).data,
+        'conversions': AffiliateConversionSerializer(conversions, many=True).data,
+        'ledger': FinancialLedgerEntrySerializer(ledger, many=True).data,
+    })
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def storefront_finance(request):
+    storefront = get_object_or_404(Storefront, user=request.user)
+    entries = FinancialLedgerEntry.objects.filter(storefront=storefront)
+    totals = entries.values('status').annotate(total=Sum('amount'))
+    balances = {row['status']: row['total'] or 0 for row in totals}
+    return Response({
+        'storefront': StorefrontSerializer(storefront).data,
+        'balances': {
+            'pending': balances.get('pending', 0),
+            'available': balances.get('available', 0),
+            'held': balances.get('held', 0),
+            'paid': balances.get('paid', 0),
+        },
+        'entries': FinancialLedgerEntrySerializer(entries[:50], many=True).data,
+        'notice': 'تسویه خودکار پس از راه‌اندازی سفارش امن marketplace و تأیید پرداخت فعال می‌شود.'
+    })
+
+
+@api_view(['POST'])
+@permission_classes([permissions.AllowAny])
+def submit_feedback(request):
+    serializer = PlatformFeedbackSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    feedback = serializer.save(user=request.user if request.user.is_authenticated else None)
+    return Response({
+        'feedback': PlatformFeedbackSerializer(feedback).data,
+        'message': 'بازخورد شما ثبت شد و برای بررسی به تیم مربوطه ارسال می‌شود.'
+    }, status=status.HTTP_201_CREATED)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def submit_storefront_complaint(request):
+    serializer = StorefrontComplaintSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    complaint = serializer.save(complainant=request.user)
+    return Response({
+        'complaint': StorefrontComplaintSerializer(complaint).data,
+        'message': 'شکایت ثبت شد. تا زمان بررسی، وضعیت آن در پنل عملیات پیگیری می‌شود.'
+    }, status=status.HTTP_201_CREATED)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.AllowAny])
+def visual_search(request):
+    upload = request.FILES.get('image')
+    if not upload:
+        return Response({'error': 'تصویر برای جستجو الزامی است.'}, status=status.HTTP_400_BAD_REQUEST)
+    if upload.size > settings.VISUAL_SEARCH_MAX_UPLOAD_BYTES:
+        return Response({'error': 'حجم تصویر از حد مجاز بیشتر است.'}, status=status.HTTP_400_BAD_REQUEST)
+    if upload.content_type not in {'image/jpeg', 'image/png', 'image/webp'}:
+        return Response({'error': 'فرمت تصویر باید JPG، PNG یا WebP باشد.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    serializer = VisualSearchRequestSerializer(data={'image': upload, 'target': request.data.get('target', 'product')})
+    serializer.is_valid(raise_exception=True)
+    search_request = serializer.save(user=request.user if request.user.is_authenticated else None)
+    return Response({
+        'request': VisualSearchRequestSerializer(search_request).data,
+        'message': 'تصویر ثبت شد. تا اتصال موتور بینایی ماشین، نتیجهٔ خودکار نمایش داده نمی‌شود.'
+    }, status=status.HTTP_201_CREATED)

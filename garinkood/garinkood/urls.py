@@ -11,6 +11,8 @@ urlpatterns = [
     path("api/", include("shop.api_urls")),
     path("robots.txt", seo_views.robots_txt, name="robots"),
     path("sitemap.xml", seo_views.sitemap_xml, name="sitemap"),
+    path("llms.txt", seo_views.llms_txt, name="llms"),
+    path("ai-facts.json", seo_views.ai_facts_json, name="ai_facts"),
     # The storefront is deployed separately from the API.  Its URL is
     # configurable so an API request never redirects visitors to localhost.
     path("", lambda request: HttpResponseRedirect(settings.FRONTEND_URL), name="home"),

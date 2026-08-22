@@ -194,3 +194,29 @@ EMAIL_HOST = config("EMAIL_HOST", default="localhost")
 EMAIL_PORT = config("EMAIL_PORT", default=25, cast=int)
 EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=False, cast=bool)
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="noreply@garinkood.ir")
+
+# Payment providers are opt-in.  Never add merchant, secret, wallet or webhook
+# credentials to Git; use the production environment/secrets manager.
+PAYMENT_PROVIDER_CONFIG = {
+    "zarinpal": {
+        "enabled": config("PAYMENT_ENABLE_ZARINPAL", default=False, cast=bool),
+        "merchant_id": config("ZARINPAL_MERCHANT_ID", default=""),
+    },
+    "stripe_card": {
+        "enabled": config("PAYMENT_ENABLE_STRIPE", default=False, cast=bool),
+        "secret_key": config("STRIPE_SECRET_KEY", default=""),
+        "publishable_key": config("STRIPE_PUBLISHABLE_KEY", default=""),
+    },
+    "paypal": {
+        "enabled": config("PAYMENT_ENABLE_PAYPAL", default=False, cast=bool),
+        "client_id": config("PAYPAL_CLIENT_ID", default=""),
+        "client_secret": config("PAYPAL_CLIENT_SECRET", default=""),
+    },
+    "crypto": {
+        "enabled": config("PAYMENT_ENABLE_CRYPTO", default=False, cast=bool),
+        "provider_key": config("CRYPTO_PAYMENT_PROVIDER_KEY", default=""),
+    },
+}
+
+# Upload limits are enforced before media is accepted by visual-search APIs.
+VISUAL_SEARCH_MAX_UPLOAD_BYTES = config("VISUAL_SEARCH_MAX_UPLOAD_BYTES", default=5 * 1024 * 1024, cast=int)

@@ -307,7 +307,10 @@ class Order(models.Model):
     )
     PAYMENT_METHOD_CHOICES = (
         ('coordination', 'هماهنگی با کارشناس'),
-        ('zarinpal', 'پرداخت آنلاین زرین‌پال'),
+        ('zarinpal', 'زرین‌پال'),
+        ('stripe_card', 'کارت بین‌المللی از طریق Stripe'),
+        ('paypal', 'PayPal'),
+        ('crypto', 'پرداخت رمزارزی'),
     )
 
     code = models.CharField(max_length=32, unique=True, db_index=True, default=create_order_code)
@@ -326,6 +329,7 @@ class Order(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='awaiting_review', db_index=True)
     payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='unpaid', db_index=True)
     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES, default='coordination')
+    affiliate_code = models.CharField(max_length=32, blank=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -502,3 +506,231 @@ class MarketplaceListing(models.Model):
     @property
     def image_url(self):
         return self.image.url if self.image else '/images/hero-farm.jpg'
+
+
+# --- Payments, finance and growth ---
+class PaymentAttempt(models.Model):
+    PROVIDER_CHOICES = (
+        ('coordination', 'هماهنگی با کارشناس'),
+        ('zarinpal', 'زرین‌پال'),
+        ('stripe_card', 'کارت بین‌المللی از طریق Stripe'),
+        ('paypal', 'PayPal'),
+        ('crypto', 'پرداخت رمزارزی'),
+    )
+    STATUS_CHOICES = (
+        ('created', 'ایجاد شده'),
+        ('pending', 'در انتظار پرداخت'),
+        ('processing', 'در حال پردازش'),
+        ('paid', 'پرداخت موفق'),
+        ('failed', 'ناموفق'),
+        ('cancelled', 'لغو شده'),
+        ('expired', 'منقضی شده'),
+        ('refunded', 'بازگشت وجه'),
+    )
+
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='payment_attempts')
+    provider = models.CharField(max_length=20, choices=PROVIDER_CHOICES)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='created', db_index=True)
+    amount = models.PositiveBigIntegerField()
+    currency = models.CharField(max_length=8, default='IRR')
+    idempotency_key = models.CharField(max_length=64, unique=True)
+    external_reference = models.CharField(max_length=255, blank=True, db_index=True)
+    checkout_url = models.URLField(blank=True)
+    provider_payload = models.JSONField(default=dict, blank=True)
+    verified_at = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ('-created_at',)
+        verbose_name = 'تلاش پرداخت'
+        verbose_name_plural = 'تلاش‌های پرداخت'
+
+    def __str__(self):
+        return f"{self.order.code} — {self.provider} — {self.status}"
+
+
+class AffiliateProfile(models.Model):
+    STATUS_CHOICES = (
+        ('pending', 'در انتظار بررسی'),
+        ('active', 'فعال'),
+        ('suspended', 'معلق'),
+    )
+
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='affiliate_profile')
+    code = models.CharField(max_length=32, unique=True, db_index=True)
+    commission_rate = models.DecimalField(max_digits=5, decimal_places=2, default=5)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending', db_index=True)
+    payout_details = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'همکار فروش'
+        verbose_name_plural = 'همکاران فروش'
+
+    def __str__(self):
+        return f"{self.code} — {self.user.username}"
+
+
+class AffiliateConversion(models.Model):
+    STATUS_CHOICES = (
+        ('pending', 'در انتظار تأیید پرداخت'),
+        ('approved', 'تأیید شده'),
+        ('rejected', 'رد شده'),
+        ('paid_out', 'تسویه شده'),
+    )
+
+    affiliate = models.ForeignKey(AffiliateProfile, on_delete=models.PROTECT, related_name='conversions')
+    order = models.OneToOneField(Order, on_delete=models.CASCADE, related_name='affiliate_conversion')
+    commission_amount = models.PositiveBigIntegerField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending', db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'تبدیل همکار فروش'
+        verbose_name_plural = 'تبدیل‌های همکار فروش'
+
+    def __str__(self):
+        return f"{self.affiliate.code} — {self.order.code}"
+
+
+class FinancialLedgerEntry(models.Model):
+    OWNER_TYPE_CHOICES = (
+        ('platform', 'پلتفرم'),
+        ('seller', 'فروشنده'),
+        ('advisor', 'مشاور'),
+        ('affiliate', 'همکار فروش'),
+    )
+    ENTRY_TYPE_CHOICES = (
+        ('sale', 'فروش'),
+        ('commission', 'کمیسیون'),
+        ('consultation', 'مشاوره'),
+        ('affiliate_commission', 'کمیسیون همکاری در فروش'),
+        ('payout', 'تسویه'),
+        ('refund', 'بازگشت وجه'),
+        ('adjustment', 'اصلاحیه'),
+    )
+    STATUS_CHOICES = (
+        ('pending', 'در انتظار'),
+        ('available', 'قابل تسویه'),
+        ('held', 'مسدود برای رسیدگی'),
+        ('paid', 'تسویه شده'),
+        ('reversed', 'برگشت خورده'),
+    )
+
+    owner_type = models.CharField(max_length=20, choices=OWNER_TYPE_CHOICES)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='financial_entries')
+    storefront = models.ForeignKey(Storefront, null=True, blank=True, on_delete=models.SET_NULL, related_name='financial_entries')
+    order = models.ForeignKey(Order, null=True, blank=True, on_delete=models.SET_NULL, related_name='ledger_entries')
+    affiliate_conversion = models.ForeignKey(AffiliateConversion, null=True, blank=True, on_delete=models.SET_NULL, related_name='ledger_entries')
+    entry_type = models.CharField(max_length=30, choices=ENTRY_TYPE_CHOICES)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending', db_index=True)
+    amount = models.BigIntegerField(help_text='Positive for credit, negative for debit.')
+    currency = models.CharField(max_length=8, default='IRR')
+    description = models.CharField(max_length=500)
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    available_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ('-created_at',)
+        verbose_name = 'رکورد دفتر مالی'
+        verbose_name_plural = 'دفتر مالی'
+
+    def __str__(self):
+        return f"{self.owner_type} {self.amount} {self.currency}"
+
+
+# --- Trust, feedback and visual-search queue ---
+class PlatformFeedback(models.Model):
+    KIND_CHOICES = (
+        ('suggestion', 'پیشنهاد'),
+        ('criticism', 'انتقاد'),
+        ('consultation', 'درخواست راهنمایی'),
+        ('other', 'سایر'),
+    )
+    STATUS_CHOICES = (
+        ('new', 'جدید'),
+        ('reviewing', 'در حال بررسی'),
+        ('resolved', 'رسیدگی شد'),
+    )
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='feedback_items')
+    name = models.CharField(max_length=150, blank=True)
+    email = models.EmailField(blank=True)
+    kind = models.CharField(max_length=20, choices=KIND_CHOICES)
+    subject = models.CharField(max_length=200)
+    message = models.TextField(max_length=3000)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='new', db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ('-created_at',)
+        verbose_name = 'بازخورد پلتفرم'
+        verbose_name_plural = 'بازخوردهای پلتفرم'
+
+    def __str__(self):
+        return f"{self.get_kind_display()} — {self.subject}"
+
+
+class StorefrontComplaint(models.Model):
+    STATUS_CHOICES = (
+        ('new', 'جدید'),
+        ('reviewing', 'در حال بررسی'),
+        ('awaiting_response', 'در انتظار پاسخ فروشنده'),
+        ('resolved', 'حل شده'),
+        ('rejected', 'رد شده'),
+    )
+
+    complainant = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='submitted_complaints')
+    storefront = models.ForeignKey(Storefront, on_delete=models.PROTECT, related_name='complaints')
+    listing = models.ForeignKey(MarketplaceListing, null=True, blank=True, on_delete=models.SET_NULL, related_name='complaints')
+    order = models.ForeignKey(Order, null=True, blank=True, on_delete=models.SET_NULL, related_name='storefront_complaints')
+    subject = models.CharField(max_length=200)
+    description = models.TextField(max_length=4000)
+    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='new', db_index=True)
+    resolution_note = models.TextField(max_length=2000, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ('-created_at',)
+        verbose_name = 'شکایت از غرفه'
+        verbose_name_plural = 'شکایت‌های غرفه'
+
+    def __str__(self):
+        return f"{self.storefront.name} — {self.subject}"
+
+
+class VisualSearchRequest(models.Model):
+    TARGET_CHOICES = (
+        ('product', 'جستجوی محصول'),
+        ('pest', 'تشخیص آفت/بیماری'),
+    )
+    STATUS_CHOICES = (
+        ('pending', 'در انتظار تحلیل'),
+        ('processing', 'در حال تحلیل'),
+        ('completed', 'تکمیل شده'),
+        ('no_match', 'بدون نتیجه'),
+        ('rejected', 'رد شده'),
+    )
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='visual_searches')
+    image = models.ImageField(upload_to='visual-search/%Y/%m/')
+    target = models.CharField(max_length=20, choices=TARGET_CHOICES, default='product')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending', db_index=True)
+    result_payload = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ('-created_at',)
+        verbose_name = 'درخواست جستجوی تصویری'
+        verbose_name_plural = 'درخواست‌های جستجوی تصویری'
+
+    def __str__(self):
+        return f"{self.get_target_display()} — {self.status}"

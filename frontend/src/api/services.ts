@@ -17,6 +17,13 @@ import type {
   ProcurementRequestPayload,
   Storefront,
   MarketplaceListing,
+  PaymentProviderOption,
+  AffiliateProfile,
+  AffiliateConversion,
+  FinancialLedgerEntry,
+  PlatformFeedbackPayload,
+  StorefrontComplaintPayload,
+  VisualSearchResponse,
 } from '../types';
 
 // ========================================
@@ -240,4 +247,32 @@ export const agricultureApi = {
   myListings: () => apiClient.get<MarketplaceListing[]>('/marketplace/listings/mine/'),
   createListing: (data: Partial<MarketplaceListing>) =>
     apiClient.post<MarketplaceListing>('/marketplace/listings/', data),
+};
+// ========================================
+// Payment readiness, affiliate, finance and trust
+// ========================================
+export const paymentsApi = {
+  options: () => apiClient.get<{ providers: PaymentProviderOption[] }>('/payments/options/'),
+};
+
+export const affiliateApi = {
+  me: () => apiClient.get<{ profile: AffiliateProfile | null; conversions: AffiliateConversion[]; ledger: FinancialLedgerEntry[] }>('/affiliate/me/'),
+  join: () => apiClient.post<{ profile: AffiliateProfile; message: string }>('/affiliate/me/'),
+};
+
+export const financeApi = {
+  storefront: () => apiClient.get<{ storefront: Storefront; balances: Record<string, number>; entries: FinancialLedgerEntry[]; notice: string }>('/marketplace/finance/'),
+};
+
+export const trustApi = {
+  feedback: (data: PlatformFeedbackPayload) => apiClient.post('/feedback/', data),
+  complaint: (data: StorefrontComplaintPayload) => apiClient.post('/complaints/storefront/', data),
+  visualSearch: (image: File, target: 'product' | 'pest' = 'product') => {
+    const formData = new FormData();
+    formData.append('image', image);
+    formData.append('target', target);
+    return apiClient.post<VisualSearchResponse>('/visual-search/', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
 };
