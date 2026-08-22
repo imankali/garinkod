@@ -1,8 +1,9 @@
 // frontend/src/components/MobileMenu.tsx
 
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, Heart, LogIn, LogOut, Package, Phone, Settings, User, X } from "lucide-react";
+import { ChevronDown, Heart, LogIn, LogOut, Package, Phone, User, X } from "lucide-react";
 import { categories } from "../data/shopData";
 import { useAuthStore } from "../store/authStore";
 import SearchBar from "./SearchBar";
@@ -23,10 +24,12 @@ interface MobileMenuProps {
 const quickLinks = [
   { label: "خانه", href: "/" },
   { label: "محصولات", href: "/products" },
+  { label: "خدمات کشاورزی", href: "/services" },
+  { label: "بازار کشاورزان", href: "/marketplace" },
+  { label: "همکاری در فروش", href: "/affiliate" },
+  { label: "پشتیبانی و بازخورد", href: "/support" },
+  { label: "فروش محصول به گرین کود", href: "/farmer-sell" },
   { label: "تخفیف‌های ویژه", href: "/products?featured=true" },
-  { label: "مجله کشاورزی", href: "/blog" },
-  { label: "درباره ما", href: "/about" },
-  { label: "تماس با ما", href: "/contact" },
 ];
 
 // ========================================
@@ -34,6 +37,7 @@ const quickLinks = [
 // ========================================
 export default function MobileMenu({ isOpen, onClose, onOpenWishlist }: MobileMenuProps) {
   const [expanded, setExpanded] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   // دریافت اطلاعات کاربر از auth store
   const { user, isAuthenticated, logout } = useAuthStore();
@@ -44,17 +48,17 @@ export default function MobileMenu({ isOpen, onClose, onOpenWishlist }: MobileMe
   async function handleLogout() {
     await logout();
     onClose();
-    window.location.href = '/';
+    navigate('/');
   }
 
   function handleCategoryClick(categorySlug: string) {
     onClose();
-    window.location.href = `/products?category=${categorySlug}`;
+    navigate(`/products?category=${categorySlug}`);
   }
 
   function handleLinkClick(href: string) {
     onClose();
-    window.location.href = href;
+    navigate(href);
   }
 
   function handleWishlistClick() {
@@ -111,7 +115,7 @@ export default function MobileMenu({ isOpen, onClose, onOpenWishlist }: MobileMe
                 <div className="flex items-center gap-3">
                   {/* Avatar */}
                   <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/20 text-lg font-bold backdrop-blur">
-                    {user.first_name?.[0] || user.username[0].toUpperCase()}
+                    {user.first_name?.charAt(0) || user.username.charAt(0).toUpperCase() || '?'}
                   </div>
                   <div>
                     <p className="font-bold">

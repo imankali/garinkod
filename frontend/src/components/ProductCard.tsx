@@ -38,6 +38,7 @@ export default function ProductCard({
   const discountPercent = product.oldPrice
     ? Math.round(((product.oldPrice - product.price) / product.oldPrice) * 100)
     : 0;
+  const productUrl = product.slug ? `/products/${product.slug}` : undefined;
 
   return (
     <motion.div
@@ -88,17 +89,29 @@ export default function ProductCard({
       {/* Product Image */}
       {/* ======================================== */}
       <div className="relative h-40 overflow-hidden bg-gradient-to-br from-emerald-50 via-white to-[#F7F3E8] dark:from-emerald-950 dark:to-emerald-900 md:h-48">
-        <motion.img
-          src={product.image}
-          alt={product.name}
-          whileHover={{ scale: 1.1 }}
-          transition={{ duration: 0.4, ease: "easeOut" }}
-          className={`h-full w-full object-cover ${!product.inStock ? "grayscale" : ""}`}
-          loading="lazy"
-          onError={(e) => {
-            (e.target as HTMLImageElement).src = '/images/products/default.jpg';
+        <a
+          href={productUrl || '#'}
+          aria-label={`مشاهده ${product.name}`}
+          onClick={(event) => {
+            if (!productUrl) {
+              event.preventDefault();
+              onQuickView(product);
+            }
           }}
-        />
+          className="block h-full w-full"
+        >
+          <motion.img
+            src={product.image}
+            alt={product.name}
+            whileHover={{ scale: 1.1 }}
+            transition={{ duration: 0.4, ease: "easeOut" }}
+            className={`h-full w-full object-cover ${!product.inStock ? "grayscale" : ""}`}
+            loading="lazy"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = '/images/hero-farm.jpg';
+            }}
+          />
+        </a>
 
         {/* Quick View Overlay */}
         <motion.button
@@ -121,28 +134,34 @@ export default function ProductCard({
         </div>
 
         {/* Product Name */}
-        <h3
-          onClick={() => onQuickView(product)}
-          className="mb-2 line-clamp-2 flex-1 cursor-pointer text-sm font-semibold text-slate-700 transition-colors hover:text-[#0F8A5F] dark:text-emerald-50"
-          title={product.name}
-        >
-          {product.name}
+        <h3 className="mb-2 line-clamp-2 flex-1 text-sm font-semibold text-slate-700 dark:text-emerald-50" title={product.name}>
+          {productUrl ? (
+            <a href={productUrl} className="transition-colors hover:text-[#0F8A5F]">
+              {product.name}
+            </a>
+          ) : (
+            <button type="button" onClick={() => onQuickView(product)} className="text-right transition-colors hover:text-[#0F8A5F]">
+              {product.name}
+            </button>
+          )}
         </h3>
 
-        {/* Rating & Reviews */}
-        <div className="mb-2 flex items-center gap-1 text-amber-400">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Star
-              key={i}
-              size={12}
-              fill={i < Math.round(product.rating) ? "currentColor" : "none"}
-              className={i < Math.round(product.rating) ? "" : "text-slate-200"}
-            />
-          ))}
-          <span className="mr-1 text-xs text-slate-400">
-            ({product.rating}) · {product.reviews.toLocaleString("fa-IR")} نظر
-          </span>
-        </div>
+        {/* Ratings are shown only when verified review data exists. */}
+        {product.reviews > 0 && (
+          <div className="mb-2 flex items-center gap-1 text-amber-400">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Star
+                key={i}
+                size={12}
+                fill={i < Math.round(product.rating) ? "currentColor" : "none"}
+                className={i < Math.round(product.rating) ? "" : "text-slate-200"}
+              />
+            ))}
+            <span className="mr-1 text-xs text-slate-400">
+              ({product.rating}) · {product.reviews.toLocaleString("fa-IR")} نظر
+            </span>
+          </div>
+        )}
 
         {/* Price */}
         <div className="mb-3 flex items-baseline gap-2">

@@ -3,14 +3,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
+import toast from "react-hot-toast";
 import {
-  ChevronDown, Search, TrendingUp, X, Clock, SlidersHorizontal,
-  Star, PackageCheck, Mic, Sparkles, Tag, Flame
+  Search, X, Clock, SlidersHorizontal,
+  PackageCheck, Mic, Sparkles, Tag, Flame, ImagePlus
 } from "lucide-react";
 import { categories } from "../data/shopData";
-import { productsApi } from "../api/services";
+import { productsApi, trustApi } from "../api/services";
+import { useTranslation } from "../i18n";
 import type { ProductList, MockProduct } from "../types";
-import { formatPrice } from "../utils/formatPrice";
 
 // ========================================
 // Types
@@ -26,15 +27,16 @@ interface SearchBarProps {
 function convertProduct(apiProduct: ProductList): MockProduct {
   return {
     id: apiProduct.id,
+    slug: apiProduct.slug,
     name: apiProduct.title,
     category: typeof apiProduct.category === 'string' ? apiProduct.category : 'کود کشاورزی',
     categoryId: 'fertilizer',
     subCategoryId: '',
     brand: 'گرین کود',
     price: apiProduct.price,
-    rating: 4.5,
+    rating: 0,
     reviews: 0,
-    image: apiProduct.image_url || '/images/products/default.jpg',
+    image: apiProduct.image_url || '/images/hero-farm.jpg',
     inStock: apiProduct.is_in_stock,
     description: '',
     features: [],
@@ -86,14 +88,12 @@ const trendingSearches = [
 // SearchBar Component
 // ========================================
 export default function SearchBar({ variant = "desktop", onSelectProduct }: SearchBarProps) {
+  const { locale } = useTranslation();
   const [query, setQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("all");
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
-  const [minRating, setMinRating] = useState(0);
   const [inStockOnly, setInStockOnly] = useState(false);
 
   const [recent, setRecent] = useState<string[]>(() => {
@@ -106,6 +106,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
   });
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const imageSearchRef = useRef<HTMLInputElement>(null);
   const debouncedQuery = useDebounce(query, 300);
 
   // ========================================
@@ -119,7 +120,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
   // دریافت محصولات از API
   // ========================================
   const { data: searchResults, isLoading } = useQuery({
-    queryKey: ['search', debouncedQuery, activeCategory, inStockOnly, minRating],
+    queryKey: ['search', debouncedQuery, activeCategory, inStockOnly],
     queryFn: async () => {
       const params: any = {};
 
@@ -132,13 +133,13 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
       }
 
       if (inStockOnly) {
-        params.available = true;
+        params.in_stock = true;
       }
 
       const response = await productsApi.getAll({ ...params, page: 1 });
       return response.data.results.map(convertProduct);
     },
-    enabled: debouncedQuery.trim().length > 0 || activeCategory !== 'all' || inStockOnly || minRating > 0,
+    enabled: debouncedQuery.trim().length > 0 || activeCategory !== 'all' || inStockOnly,
     staleTime: 30000,
   });
 
@@ -149,7 +150,6 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
     function handleClickOutside(event: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsFocused(false);
-        setIsFilterOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -159,23 +159,12 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
   // ========================================
   // محاسبات
   // ========================================
-  const activeFacetCount = [selectedBrand, minRating > 0, inStockOnly].filter(Boolean).length;
+  const activeFacetCount = [inStockOnly].filter(Boolean).length;
 
-  const filteredProducts: MockProduct[] = useMemo(() => {
-    if (!searchResults) return [];
-
-    let results = searchResults;
-
-    // فیلتر بر اساس امتیاز
-    if (minRating > 0) {
-      results = results.filter(p => p.rating >= minRating);
-    }
-
-    return results.slice(0, 8);
-  }, [searchResults, minRating]);
-
-  const activeCategoryLabel =
-    activeCategory === "all" ? "همه دسته‌ها" : categories.find((c) => c.id === activeCategory)?.label;
+  const filteredProducts: MockProduct[] = useMemo(
+    () => (searchResults || []).slice(0, 8),
+    [searchResults]
+  );
 
   // ========================================
   // Handlers
@@ -189,10 +178,26 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
   }
 
   function resetFacets() {
-    setSelectedBrand(null);
-    setMinRating(0);
     setInStockOnly(false);
     setActiveCategory("all");
+  }
+
+  async function handleImageSearch(event: React.ChangeEvent<HTMLInputElement>) {
+    const image = event.target.files?.[0];
+    if (!image) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(image.type) || image.size > 5 * 1024 * 1024) {
+      toast.error('تصویر باید JPG، PNG یا WebP و حداکثر ۵ مگابایت باشد.');
+      event.target.value = '';
+      return;
+    }
+    try {
+      const response = await trustApi.visualSearch(image, 'product');
+      toast(response.data.message);
+    } catch {
+      // The API client displays the failure message.
+    } finally {
+      event.target.value = '';
+    }
   }
 
   function toggleVoiceSearch() {
@@ -207,7 +212,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
       try {
         const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
         const recognition = new SpeechRecognition();
-        recognition.lang = "fa-IR";
+        recognition.lang = locale === 'fa' ? 'fa-IR' : locale === 'ar' ? 'ar-SA' : 'en-US';
         recognition.onresult = (event: any) => {
           const transcript = event.results[0][0].transcript;
           setQuery(transcript);
@@ -217,26 +222,21 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
         recognition.onend = () => setIsListening(false);
         recognition.start();
         return;
-      } catch (e) {
-        // Fallback
+      } catch {
+        setIsListening(false);
+        toast.error("شروع جستجوی صوتی ممکن نشد؛ لطفاً عبارت خود را تایپ کنید.");
+        return;
       }
     }
 
-    setTimeout(() => {
-      const sampleQueries = ["کود اوره گرانوله", "سمپاش موتوری", "سم علف‌کش", "بذر گوجه‌فرنگی"];
-      const randomQuery = sampleQueries[Math.floor(Math.random() * sampleQueries.length)];
-      setQuery(randomQuery);
-      setIsListening(false);
-    }, 2200);
+    setIsListening(false);
+    toast("جستجوی صوتی در این مرورگر پشتیبانی نمی‌شود.");
   }
 
   function handleQuickFilter(filterType: string, value: any) {
     switch (filterType) {
       case 'inStock':
         setInStockOnly(!inStockOnly);
-        break;
-      case 'rating':
-        setMinRating(minRating === value ? 0 : value);
         break;
       case 'category':
         setActiveCategory(value);
@@ -268,6 +268,19 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
           className="w-full flex-1 bg-transparent px-4 py-2.5 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none dark:text-white dark:placeholder:text-emerald-400 md:py-3 md:text-base"
           aria-label="جستجوی محصولات"
         />
+
+        <input ref={imageSearchRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={handleImageSearch} className="hidden" aria-label="انتخاب تصویر برای جستجو" />
+
+        {/* Visual search queues the image for the verified server-side pipeline. */}
+        <button
+          type="button"
+          onClick={() => imageSearchRef.current?.click()}
+          title="جستجو با تصویر"
+          className="flex items-center px-2 text-slate-400 transition-colors hover:text-[#0F8A5F] dark:text-emerald-400 dark:hover:text-lime-300"
+          aria-label="جستجو با تصویر"
+        >
+          <ImagePlus size={18} />
+        </button>
 
         {/* Voice Search Button */}
         <button
@@ -378,20 +391,6 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
                     >
                       <PackageCheck size={13} /> فقط کالای موجود
                     </button>
-                    {[4, 3].map((rating) => (
-                      <button
-                        key={rating}
-                        onClick={() => handleQuickFilter('rating', rating)}
-                        className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${
-                          minRating === rating
-                            ? "bg-amber-500 text-white"
-                            : "bg-white text-slate-600 ring-1 ring-slate-200 dark:bg-emerald-900 dark:text-emerald-100 dark:ring-emerald-800"
-                        }`}
-                      >
-                        <Star size={12} fill={minRating === rating ? "currentColor" : "none"} />
-                        امتیاز {rating.toLocaleString("fa-IR")}+
-                      </button>
-                    ))}
                   </div>
                 </div>
 
@@ -535,7 +534,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
                             alt={product.name}
                             className="h-full w-full object-cover"
                             onError={(e) => {
-                              (e.target as HTMLImageElement).src = '/images/products/default.jpg';
+                              (e.target as HTMLImageElement).src = '/images/hero-farm.jpg';
                             }}
                           />
                         </span>

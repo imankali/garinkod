@@ -33,7 +33,7 @@ interface CartState {
 // ========================================
 export const useCartStore = create<CartState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       // Initial State
       cart: null,
       isOpen: false,

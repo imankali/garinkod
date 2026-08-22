@@ -6,13 +6,30 @@ import type {
   ProductList,
   Category,
   Cart,
-  User,
-  UserAccount,
   Comment,
   PaginatedResponse,
   AuthResponse,
   ProfileResponse,
   ProductQueryParams,
+  Order,
+  CheckoutPayload,
+  ServiceRequestPayload,
+  ProcurementRequestPayload,
+  Storefront,
+  MarketplaceListing,
+  PaymentProviderOption,
+  AffiliateProfile,
+  AffiliateConversion,
+  FinancialLedgerEntry,
+  PlatformFeedbackPayload,
+  StorefrontComplaintPayload,
+  VisualSearchResponse,
+  Coupon,
+  Wallet,
+  StorefrontPost,
+  ManagementDashboard,
+  ManagementStaffMember,
+  ManagementAuditLog,
 } from '../types';
 
 // ========================================
@@ -33,6 +50,10 @@ export const productsApi = {
    */
   getBySlug: (slug: string) => {
     return apiClient.get<Product>(`/products/${slug}/`);
+  },
+
+  getSimilar: (slug: string) => {
+    return apiClient.get<ProductList[]>(`/products/${slug}/similar/`);
   },
 
   /**
@@ -91,7 +112,18 @@ export const commentsApi = {
    * ثبت نظر جدید
    * POST /api/comments/
    */
-  create: (data: { product: number; name: string; email?: string; body: string }) => {
+  create: (data: { product: number; name: string; email?: string; body: string; parent?: number | null; sticker?: string; image?: File | null }) => {
+    if (data.image) {
+      const formData = new FormData();
+      formData.append('product', String(data.product));
+      formData.append('name', data.name);
+      formData.append('body', data.body);
+      if (data.email) formData.append('email', data.email);
+      if (data.parent) formData.append('parent', String(data.parent));
+      if (data.sticker) formData.append('sticker', data.sticker);
+      formData.append('image', data.image);
+      return apiClient.post<Comment>('/comments/', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+    }
     return apiClient.post<Comment>('/comments/', data);
   },
 
@@ -187,6 +219,8 @@ export const authApi = {
     return apiClient.post<{ message: string }>('/auth/logout/');
   },
 
+  session: () => apiClient.get<ProfileResponse>('/auth/session/'),
+
   /**
    * دریافت پروفایل کاربر
    * GET /api/profile/
@@ -209,4 +243,91 @@ export const authApi = {
   }>) => {
     return apiClient.patch<ProfileResponse>('/profile/', data);
   },
+};
+
+// ========================================
+// Orders — interim expert-coordination checkout
+// ========================================
+export const ordersApi = {
+  checkout: (data: CheckoutPayload) =>
+    apiClient.post<{ order: Order; message: string }>('/orders/checkout/', data),
+  lookup: (code: string, phone: string) =>
+    apiClient.get<Order>('/orders/lookup/', { params: { code, phone } }),
+  cancel: (code: string, phone: string) =>
+    apiClient.post<{ order: Order; message: string }>('/orders/cancel/', { code, phone }),
+  mine: () => apiClient.get<Order[]>('/orders/mine/'),
+};
+
+// ========================================
+// Agriculture services, procurement and marketplace
+// ========================================
+export const agricultureApi = {
+  requestService: (data: ServiceRequestPayload) => apiClient.post('/services/requests/', data),
+  requestProcurement: (data: ProcurementRequestPayload) => apiClient.post('/procurement/requests/', data),
+  getStorefront: () => apiClient.get<Storefront | null>('/marketplace/storefront/'),
+  createStorefront: (data: Pick<Storefront, 'name' | 'slug' | 'seller_type' | 'bio' | 'province' | 'city'>) =>
+    apiClient.post<Storefront>('/marketplace/storefront/', data),
+  listMarketplace: (params?: { search?: string; ordering?: string }) =>
+    apiClient.get<PaginatedResponse<MarketplaceListing>>('/marketplace/listings/', { params }),
+  myListings: () => apiClient.get<MarketplaceListing[]>('/marketplace/listings/mine/'),
+  createListing: (data: Partial<MarketplaceListing>) =>
+    apiClient.post<MarketplaceListing>('/marketplace/listings/', data),
+};
+// ========================================
+// Payment readiness, affiliate, finance and trust
+// ========================================
+export const paymentsApi = {
+  options: () => apiClient.get<{ providers: PaymentProviderOption[] }>('/payments/options/'),
+};
+
+export const affiliateApi = {
+  me: () => apiClient.get<{ profile: AffiliateProfile | null; conversions: AffiliateConversion[]; ledger: FinancialLedgerEntry[] }>('/affiliate/me/'),
+  join: () => apiClient.post<{ profile: AffiliateProfile; message: string }>('/affiliate/me/'),
+};
+
+export const financeApi = {
+  storefront: () => apiClient.get<{ storefront: Storefront; balances: Record<string, number>; entries: FinancialLedgerEntry[]; notice: string }>('/marketplace/finance/'),
+};
+
+export const trustApi = {
+  feedback: (data: PlatformFeedbackPayload) => apiClient.post('/feedback/', data),
+  complaint: (data: StorefrontComplaintPayload) => apiClient.post('/complaints/storefront/', data),
+  visualSearch: (image: File, target: 'product' | 'pest' = 'product') => {
+    const formData = new FormData();
+    formData.append('image', image);
+    formData.append('target', target);
+    return apiClient.post<VisualSearchResponse>('/visual-search/', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+};
+
+export const rewardsApi = {
+  myCoupons: () => apiClient.get<Coupon[]>('/rewards/me/'),
+  wallet: () => apiClient.get<Wallet>('/wallet/me/'),
+};
+
+export const storefrontPostsApi = {
+  list: (params?: { post_type?: 'post' | 'story' }) =>
+    apiClient.get<PaginatedResponse<StorefrontPost>>('/marketplace/posts/', { params }),
+  mine: () => apiClient.get<StorefrontPost[]>('/marketplace/posts/mine/'),
+  create: (data: { post_type: 'post' | 'story'; caption: string; listing?: number; image?: File | null }) => {
+    const formData = new FormData();
+    formData.append('post_type', data.post_type);
+    formData.append('caption', data.caption);
+    if (data.listing) formData.append('listing', String(data.listing));
+    if (data.image) formData.append('image', data.image);
+    return apiClient.post<StorefrontPost>('/marketplace/posts/', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+  },
+};
+
+export const managementApi = {
+  dashboard: () => apiClient.get<ManagementDashboard>('/management/dashboard/'),
+  staff: () => apiClient.get<{ roles: string[]; staff: ManagementStaffMember[] }>('/management/staff/'),
+  updateStaff: (username: string, groups: string[], isActive: boolean) =>
+    apiClient.patch<{ username: string; groups: string[]; is_active: boolean }>('/management/staff/', { username, groups, is_active: isActive }),
+  audit: () => apiClient.get<ManagementAuditLog[]>('/management/audit/'),
+  markOrderPaid: (code: string) => apiClient.post(`/management/orders/${code}/mark-paid/`),
+  moderate: (type: 'comment' | 'post' | 'listing', id: number, status: string) =>
+    apiClient.post(`/management/moderate/${type}/${id}/`, { status }),
 };

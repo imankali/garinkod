@@ -1,10 +1,10 @@
 // frontend/src/components/CartDrawer.tsx
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,
-  BadgeCheck,
   CheckCircle2,
   Gift,
   Minus,
@@ -12,7 +12,6 @@ import {
   ShieldCheck,
   ShoppingBag,
   Sparkles,
-  Tag,
   Trash2,
   Truck,
   X,
@@ -49,7 +48,7 @@ function convertToSuggestion(apiProduct: ProductList): SuggestedProduct {
   return {
     id: apiProduct.id,
     name: apiProduct.title,
-    image: apiProduct.image_url || '/images/products/default.jpg',
+    image: apiProduct.image_url || '/images/hero-farm.jpg',
     price: apiProduct.price,
   };
 }
@@ -58,10 +57,8 @@ function convertToSuggestion(apiProduct: ProductList): SuggestedProduct {
 // CartDrawer Component
 // ========================================
 export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
-  const [promoCode, setPromoCode] = useState("");
-  const [appliedPromo, setAppliedPromo] = useState<{ code: string; percent: number } | null>(null);
-  const [promoError, setPromoError] = useState("");
   const [suggestion, setSuggestion] = useState<SuggestedProduct | null>(null);
+  const navigate = useNavigate();
 
   // دریافت توابع و state از cartStore
   const { cart, fetchCart, addToCart, removeFromCart, updateQuantity } = useCartStore();
@@ -69,28 +66,28 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
   // ========================================
   // لود سبد خرید و محصول پیشنهادی هنگام باز شدن
   // ========================================
+  // ========================================
+  // لود یک محصول پیشنهادی تصادفی
+  // ========================================
+  const loadSuggestion = useCallback(async () => {
+    try {
+      const response = await productsApi.getAll({ page: 1 });
+      const products = response.data.results;
+      if (products.length > 0) {
+        const randomProduct = products[Math.floor(Math.random() * products.length)];
+        if (randomProduct) setSuggestion(convertToSuggestion(randomProduct));
+      }
+    } catch (error) {
+      console.error('Failed to load suggestion:', error);
+    }
+  }, []);
+
   useEffect(() => {
     if (isOpen) {
       fetchCart();
       loadSuggestion();
     }
-  }, [isOpen]);
-
-  // ========================================
-  // لود یک محصول پیشنهادی تصادفی
-  // ========================================
-  async function loadSuggestion() {
-    try {
-      const response = await productsApi.getAll({ page: 1 });
-      const products = response.data.results;
-      if (products && products.length > 0) {
-        const randomProduct = products[Math.floor(Math.random() * products.length)];
-        setSuggestion(convertToSuggestion(randomProduct));
-      }
-    } catch (error) {
-      console.error('Failed to load suggestion:', error);
-    }
-  }
+  }, [isOpen, fetchCart, loadSuggestion]);
 
   // ========================================
   // محاسبات مالی
@@ -101,8 +98,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
   const remainingForFreeShipping = Math.max(FREE_SHIPPING_THRESHOLD - subtotal, 0);
   const isFreeShipping = subtotal >= FREE_SHIPPING_THRESHOLD;
   const shipping = subtotal > 0 ? (isFreeShipping ? 0 : 45000) : 0;
-  const discountAmount = appliedPromo ? Math.round((subtotal * appliedPromo.percent) / 100) : 0;
-  const total = subtotal + shipping - discountAmount;
+  const total = subtotal + shipping;
   const totalItems = cart?.total_items || 0;
 
   // ✅ بررسی وجود سموم در سبد (برای نمایش هشدار ایمنی)
@@ -110,30 +106,6 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
     item.product?.category === "سموم دفع آفات" ||
     item.product?.category?.toString().toLowerCase().includes("pesticide")
   );
-
-  // ========================================
-  // اعمال کد تخفیف
-  // ========================================
-  function handleApplyPromo() {
-    const code = promoCode.trim().toUpperCase();
-
-    if (!code) {
-      setPromoError("لطفاً کد تخفیف را وارد کنید");
-      return;
-    }
-
-    // TODO: در آینده به API متصل شود
-    if (code === "KESHT10") {
-      setAppliedPromo({ code, percent: 10 });
-      setPromoError("");
-    } else if (code === "KESHT20") {
-      setAppliedPromo({ code, percent: 20 });
-      setPromoError("");
-    } else {
-      setPromoError("کد تخفیف نامعتبر است");
-      setAppliedPromo(null);
-    }
-  }
 
   // ========================================
   // Handlers
@@ -224,13 +196,13 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
               {/* Trust mini strip */}
               <div className="relative mt-3 flex items-center justify-between text-[10px] text-white/85">
                 <span className="flex items-center gap-1">
-                  <Truck size={11} /> ارسال ۴ تا ۴۸ ساعته
+                  <Truck size={11} /> زمان ارسال پس از هماهنگی
                 </span>
                 <span className="flex items-center gap-1">
                   <ShieldCheck size={11} /> ضمانت اصالت کالا
                 </span>
                 <span className="flex items-center gap-1">
-                  <BadgeCheck size={11} /> پرداخت امن
+                  ثبت سفارش با هماهنگی کارشناس
                 </span>
               </div>
             </div>
@@ -268,7 +240,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                   <motion.button
                     onClick={() => {
                       onClose();
-                      window.location.href = '/products';
+                      navigate('/products');
                     }}
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
@@ -293,11 +265,11 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                         {/* Product Image */}
                         <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-white shadow-inner">
                           <img
-                            src={item.product?.image_url || item.product?.image}
-                            alt={item.product?.title}
+                            src={item.product.image_url || item.product.image || '/images/hero-farm.jpg'}
+                            alt={item.product.title}
                             className="h-full w-full object-cover"
                             onError={(e) => {
-                              (e.target as HTMLImageElement).src = '/images/products/default.jpg';
+                              (e.target as HTMLImageElement).src = '/images/hero-farm.jpg';
                             }}
                           />
                         </div>
@@ -305,10 +277,10 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                         {/* Product Info */}
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-semibold text-slate-700 dark:text-white">
-                            {item.product?.title}
+                            {item.product.title}
                           </p>
                           <div className="mb-2 flex items-center gap-1.5 text-[10px] text-slate-400">
-                            <span>{typeof item.product?.category === 'string' ? item.product.category : item.product?.category?.name}</span>
+                            <span>{item.product.category}</span>
                           </div>
 
                           {/* Quantity Controls */}
@@ -372,7 +344,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                           alt={suggestion.name}
                           className="h-full w-full object-cover"
                           onError={(e) => {
-                            (e.target as HTMLImageElement).src = '/images/products/default.jpg';
+                            (e.target as HTMLImageElement).src = '/images/hero-farm.jpg';
                           }}
                         />
                       </div>
@@ -401,43 +373,12 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
             {/* ======================================== */}
             {items.length > 0 && (
               <div className="border-t border-slate-100 bg-gradient-to-br from-white to-emerald-50/30 p-5 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] dark:border-emerald-800 dark:from-emerald-950 dark:to-emerald-900/30">
-                {/* Promo Code Input */}
-                <div className="mb-3">
-                  <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white p-1.5 dark:border-emerald-700 dark:bg-emerald-900">
-                    <Tag size={15} className="mr-1 shrink-0 text-slate-400" />
-                    <input
-                      value={promoCode}
-                      onChange={(e) => setPromoCode(e.target.value)}
-                      placeholder="کد تخفیف (مثال: KESHT10)"
-                      className="flex-1 bg-transparent text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none dark:text-white"
-                    />
-                    <button
-                      onClick={handleApplyPromo}
-                      className="shrink-0 rounded-lg bg-slate-800 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-slate-700"
-                    >
-                      اعمال کد
-                    </button>
-                  </div>
-                  {promoError && <p className="mt-1 text-[10px] text-rose-500">{promoError}</p>}
-                  {appliedPromo && (
-                    <p className="mt-1 flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-lime-300">
-                      <CheckCircle2 size={11} /> کد {appliedPromo.code} با موفقیت اعمال شد ({appliedPromo.percent}٪ تخفیف)
-                    </p>
-                  )}
-                </div>
-
                 {/* Price Breakdown */}
                 <div className="mb-4 space-y-2 rounded-2xl bg-white/60 p-3 backdrop-blur dark:bg-emerald-900/50">
                   <div className="flex justify-between text-sm text-slate-500 dark:text-emerald-200">
                     <span>جمع کالاها ({totalItems} عدد)</span>
                     <span className="font-semibold text-slate-700 dark:text-white">{formatPrice(subtotal)}</span>
                   </div>
-                  {appliedPromo && (
-                    <div className="flex justify-between text-sm text-emerald-600 dark:text-lime-300">
-                      <span>تخفیف کد ({appliedPromo.percent}٪)</span>
-                      <span className="font-semibold">-{formatPrice(discountAmount)}</span>
-                    </div>
-                  )}
                   <div className="flex justify-between text-sm text-slate-500 dark:text-emerald-200">
                     <span className="flex items-center gap-1">
                       <Truck size={14} /> هزینه ارسال
@@ -468,12 +409,12 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                   <span className="absolute inset-0 -translate-x-full bg-gradient-to-l from-transparent via-white/30 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
                   <span className="relative z-10 flex items-center justify-center gap-2">
                     <Sparkles size={16} />
-                    تسویه حساب و پرداخت
+                    ادامه و ثبت سفارش
                   </span>
                 </motion.a>
 
                 <p className="mt-3 text-center text-[10px] text-slate-400 dark:text-emerald-400">
-                  🔒 پرداخت امن و رمزنگاری‌شده · گارانتی بازگشت کالا تا ۷۲ ساعت
+                  مبلغ و موجودی نهایی پیش از تأیید سفارش توسط کارشناس بررسی می‌شود.
                 </p>
               </div>
             )}

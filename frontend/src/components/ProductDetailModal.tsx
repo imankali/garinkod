@@ -121,7 +121,7 @@ export default function ProductDetailModal({
                   alt={product.name}
                   className="h-full w-full object-cover"
                   onError={(e) => {
-                    (e.target as HTMLImageElement).src = '/images/products/default.jpg';
+                    (e.target as HTMLImageElement).src = '/images/hero-farm.jpg';
                   }}
                 />
 

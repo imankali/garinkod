@@ -10,7 +10,7 @@ import type { Category } from "../types";
 // ========================================
 // Types
 // ========================================
-export type SortOption = "popular" | "cheapest" | "expensive" | "rating";
+export type SortOption = "popular" | "cheapest" | "expensive";
 
 interface FilterSortBarProps {
   activeCategory: string;
@@ -21,8 +21,6 @@ interface FilterSortBarProps {
   priceLimit: number;
   onPriceLimitChange: (value: number) => void;
   resultsCount: number;
-  selectedBrand: string | null;
-  onBrandChange: (brand: string | null) => void;
   inStockOnly: boolean;
   onInStockChange: (value: boolean) => void;
 }
@@ -34,7 +32,6 @@ const sortOptions: { id: SortOption; label: string }[] = [
   { id: "popular", label: "محبوب‌ترین" },
   { id: "cheapest", label: "ارزان‌ترین" },
   { id: "expensive", label: "گران‌ترین" },
-  { id: "rating", label: "بالاترین امتیاز" },
 ];
 
 // ========================================
@@ -49,8 +46,6 @@ export default function FilterSortBar({
   priceLimit,
   onPriceLimitChange,
   resultsCount,
-  selectedBrand,
-  onBrandChange,
   inStockOnly,
   onInStockChange,
 }: FilterSortBarProps) {
@@ -58,7 +53,7 @@ export default function FilterSortBar({
   const [showSortDropdown, setShowSortDropdown] = useState(false);
 
   // محاسبه تعداد فیلترهای فعال
-  const activeFacets = [selectedBrand, inStockOnly, priceLimit < maxPrice].filter(Boolean).length;
+  const activeFacets = [inStockOnly, priceLimit < maxPrice].filter(Boolean).length;
 
   // ========================================
   // دریافت دسته‌بندی‌ها از API

@@ -2,9 +2,8 @@
 // ✅ فایل اصلی اپلیکیشن - نقطه اتصال همه کامپوننت‌ها
 
 import { useEffect, useState, lazy, Suspense } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Navigate, Routes, Route } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
-import { AnimatePresence, motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 
 // ========================================
@@ -32,6 +31,18 @@ import AgriCalculator from "./components/AgriCalculator";
 // ========================================
 const Login = lazy(() => import("./pages/Login"));
 const Profile = lazy(() => import("./pages/Profile"));
+const ProductPage = lazy(() => import("./pages/ProductPage"));
+const Checkout = lazy(() => import("./pages/Checkout"));
+const Orders = lazy(() => import("./pages/Orders"));
+const Services = lazy(() => import("./pages/Services"));
+const FarmerSell = lazy(() => import("./pages/FarmerSell"));
+const Marketplace = lazy(() => import("./pages/Marketplace"));
+const Support = lazy(() => import("./pages/Support"));
+const Affiliate = lazy(() => import("./pages/Affiliate"));
+const Finance = lazy(() => import("./pages/Finance"));
+const Studio = lazy(() => import("./pages/Studio"));
+const Rewards = lazy(() => import("./pages/Rewards"));
+const Management = lazy(() => import("./pages/Management"));
 
 // ========================================
 // Stores
@@ -48,6 +59,7 @@ import { productsApi } from "./api/services";
 // Hooks
 // ========================================
 import { useDarkMode } from "./hooks/useDarkMode";
+import { useTranslation } from "./i18n";
 
 // ========================================
 // Types
@@ -60,15 +72,16 @@ import type { MockProduct, ProductList } from "./types";
 function convertToMockProduct(apiProduct: ProductList): MockProduct {
   return {
     id: apiProduct.id,
+    slug: apiProduct.slug,
     name: apiProduct.title,
     category: typeof apiProduct.category === 'string' ? apiProduct.category : 'کود کشاورزی',
     categoryId: 'fertilizer',
     subCategoryId: '',
     brand: 'گرین کود',
     price: apiProduct.price,
-    rating: 4.5,
+    rating: 0,
     reviews: 0,
-    image: apiProduct.image_url || '/images/products/default.jpg',
+    image: apiProduct.image_url || '/images/hero-farm.jpg',
     inStock: apiProduct.is_in_stock,
     description: '',
     features: [],
@@ -104,6 +117,7 @@ export default function App() {
   // Dark Mode
   // ========================================
   const { isDark, toggle: toggleDark } = useDarkMode();
+  const { dir } = useTranslation();
 
   // ========================================
   // UI State
@@ -114,10 +128,13 @@ export default function App() {
   const [compareOpen, setCompareOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<MockProduct | null>(null);
   const [activeCrop, setActiveCrop] = useState<string | null>(null);
-  const [activeCategory, setActiveCategory] = useState<string>("all");
-  const [sort, setSort] = useState<"popular" | "cheapest" | "expensive" | "rating">("popular");
+  const [activeCategory, setActiveCategory] = useState<string>(() => {
+    const category = new URLSearchParams(window.location.search).get("category");
+    return category || "all";
+  });
+  const [featuredOnly] = useState(() => new URLSearchParams(window.location.search).get("featured") === "true");
+  const [sort, setSort] = useState<"popular" | "cheapest" | "expensive">("popular");
   const [priceLimit, setPriceLimit] = useState<number>(10000000);
-  const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
   const [inStockOnly, setInStockOnly] = useState<boolean>(false);
 
   // ========================================
@@ -143,23 +160,33 @@ export default function App() {
   // Stores
   // ========================================
   const { cart, fetchCart, addToCart: addToCartStore } = useCartStore();
-  const { isAuthenticated, fetchProfile } = useAuthStore();
+  const { isAuthenticated, fetchProfile, initializeSession } = useAuthStore();
+
+  // Preserve a valid affiliate referral before navigation removes query parameters.
+  useEffect(() => {
+    const referral = new URLSearchParams(window.location.search).get('ref')?.trim().toUpperCase();
+    if (referral && /^[A-Z0-9_-]{4,32}$/.test(referral)) {
+      localStorage.setItem('affiliate_referral_code', referral);
+    }
+  }, []);
 
   // ========================================
-  // Fetch Cart on Mount
+  // Establish browser session from the HttpOnly cookie once on app start.
   // ========================================
   useEffect(() => {
+    initializeSession();
+  }, [initializeSession]);
+
+  useEffect(() => {
     fetchCart();
-    if (isAuthenticated) {
-      fetchProfile();
-    }
+    if (isAuthenticated) fetchProfile();
   }, [fetchCart, isAuthenticated, fetchProfile]);
 
   // ========================================
   // Fetch Products from API
   // ========================================
   const { data: productsData, isLoading: productsLoading } = useQuery({
-    queryKey: ['products', activeCategory, sort, inStockOnly, priceLimit],
+    queryKey: ['products', activeCategory, sort, inStockOnly, featuredOnly, priceLimit],
     queryFn: async () => {
       const params: any = { page: 1 };
 
@@ -168,7 +195,11 @@ export default function App() {
       }
 
       if (inStockOnly) {
-        params.available = true;
+        params.in_stock = true;
+      }
+
+      if (featuredOnly) {
+        params.is_featured = true;
       }
 
       if (priceLimit < 10000000) {
@@ -180,7 +211,6 @@ export default function App() {
         'popular': '-publish',
         'cheapest': 'price',
         'expensive': '-price',
-        'rating': '-rating',
       };
 
       if (sort !== 'popular') {
@@ -284,7 +314,7 @@ export default function App() {
       {/* ✅ div اصلی با min-h-screen و w-full */}
       <div
         className={`min-h-screen w-full overflow-x-hidden ${isDark ? 'dark' : ''}`}
-        dir="rtl"
+        dir={dir}
       >
         {/* ======================================== */}
         {/* Scroll Progress Bar */}
@@ -342,11 +372,14 @@ export default function App() {
                 path="/"
                 element={
                   <>
+                    <h1 className="sr-only">گرین کود، فروشگاه تخصصی نهاده‌های کشاورزی</h1>
                     {/* Weather Widget */}
                     <WeatherWidget />
 
-                    {/* Crop Selector */}
-                    <CropSelector activeCrop={activeCrop} onSelectCrop={setActiveCrop} />
+                    {/* Crop selector is shown only when the catalogue has verified crop tags. */}
+                    {products.some((product) => product.cropTags.length > 0) && (
+                      <CropSelector activeCrop={activeCrop} onSelectCrop={setActiveCrop} />
+                    )}
 
                     {/* Installment Banner */}
                     <InstallmentBanner />
@@ -362,15 +395,13 @@ export default function App() {
                         priceLimit={priceLimit}
                         onPriceLimitChange={setPriceLimit}
                         resultsCount={filteredProducts.length}
-                        selectedBrand={selectedBrand}
-                        onBrandChange={setSelectedBrand}
                         inStockOnly={inStockOnly}
                         onInStockChange={setInStockOnly}
                       />
                     </div>
 
                     {/* Products Grid */}
-                    <section className="mx-auto max-w-7xl px-4 py-8">
+                    <section id="products" className="mx-auto max-w-7xl px-4 py-8" aria-label="فهرست محصولات">
                       {productsLoading ? (
                         <LoadingSpinner />
                       ) : filteredProducts.length === 0 ? (
@@ -394,7 +425,7 @@ export default function App() {
                               isComparing={compareItems.some((p) => p.id === product.id)}
                               compareDisabled={compareItems.length >= 3}
                               onToggleWishlist={handleToggleWishlist}
-                              onAddToCart={handleAddToCart}
+                              onAddToCart={(product, event) => handleAddToCart(product, 1, event)}
                               onQuickView={setSelectedProduct}
                               onToggleCompare={handleToggleCompare}
                             />
@@ -408,6 +439,29 @@ export default function App() {
                   </>
                 }
               />
+
+              {/* Keep legacy catalogue links indexable and functional. */}
+              <Route path="/products" element={<Navigate to={`/${window.location.search}`} replace />} />
+
+              {/* ======================================== */}
+              {/* Platform routes */}
+              {/* ======================================== */}
+              <Route path="/checkout" element={<Checkout />} />
+              <Route path="/orders" element={<Orders />} />
+              <Route path="/services" element={<Services />} />
+              <Route path="/farmer-sell" element={<FarmerSell />} />
+              <Route path="/marketplace" element={<Marketplace />} />
+              <Route path="/support" element={<Support />} />
+              <Route path="/affiliate" element={<Affiliate />} />
+              <Route path="/finance" element={<Finance />} />
+              <Route path="/studio" element={<Studio />} />
+              <Route path="/rewards" element={<Rewards />} />
+              <Route path="/management" element={<Management />} />
+
+              {/* ======================================== */}
+              {/* Crawlable product detail route */}
+              {/* ======================================== */}
+              <Route path="/products/:slug" element={<ProductPage />} />
 
               {/* ======================================== */}
               {/* Login Page */}
@@ -499,6 +553,7 @@ export default function App() {
         {/* Compare Modal */}
         {/* ======================================== */}
         <CompareModal
+          isOpen={compareOpen}
           items={compareItems}
           onClose={() => setCompareOpen(false)}
           onAddToCart={(product) => handleAddToCart(product, 1)}

@@ -1,20 +1,23 @@
-from django.contrib import admin
-from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from django.contrib import admin
 from django.http import HttpResponseRedirect
+from django.urls import include, path
+
+from shop import seo_views
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
-
-    # API endpoints (همه از طریق api_urls.py مدیریت می‌شوند)
-    path('api/', include('shop.api_urls')),
-
-    # Root endpoint - Redirect به React
-    path('', lambda request: HttpResponseRedirect('http://localhost:5173/'), name='home'),
+    path("admin/", admin.site.urls),
+    path("api/", include("shop.api_urls")),
+    path("robots.txt", seo_views.robots_txt, name="robots"),
+    path("sitemap.xml", seo_views.sitemap_xml, name="sitemap"),
+    path("llms.txt", seo_views.llms_txt, name="llms"),
+    path("ai-facts.json", seo_views.ai_facts_json, name="ai_facts"),
+    # The storefront is deployed separately from the API.  Its URL is
+    # configurable so an API request never redirects visitors to localhost.
+    path("", lambda request: HttpResponseRedirect(settings.FRONTEND_URL), name="home"),
 ]
 
-# Serve media files in development
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

@@ -1,9 +1,14 @@
 from rest_framework import serializers
+from django.conf import settings
 from django.contrib.auth.models import User
 from .models import (
     Category, SubCategory, Product,
     FertilizerDetail, PesticideDetail, SeedDetail, EquipmentDetail,
-    UserAccount, Comment, Cart, CartItem
+    UserAccount, Comment, Cart, CartItem, Order, OrderItem,
+    ServiceRequest, ProcurementRequest, Storefront, MarketplaceListing,
+    PaymentAttempt, AffiliateProfile, AffiliateConversion, FinancialLedgerEntry,
+    PlatformFeedback, StorefrontComplaint, VisualSearchRequest, Coupon, Wallet,
+    WalletTransaction, StorefrontPost, AdminAuditLog
 )
 
 
@@ -118,10 +123,15 @@ class CommentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
         fields = [
-            'id', 'product', 'name', 'email', 'body', 'parent',
+            'id', 'product', 'name', 'email', 'body', 'image', 'sticker', 'parent',
             'created', 'updated', 'active', 'replies'
         ]
         read_only_fields = ['created', 'updated', 'active']
+
+    def validate_image(self, image):
+        if image and image.size > settings.VISUAL_SEARCH_MAX_UPLOAD_BYTES:
+            raise serializers.ValidationError('حجم تصویر نظر از حد مجاز بیشتر است.')
+        return image
 
     def get_replies(self, obj):
         replies = obj.replies.filter(active=True)
@@ -217,3 +227,271 @@ class RegisterSerializer(serializers.ModelSerializer):
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField()
     password = serializers.CharField(write_only=True)
+
+
+# ========================================
+# Orders and checkout
+# ========================================
+class OrderItemSerializer(serializers.ModelSerializer):
+    total_price = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = OrderItem
+        fields = ['id', 'product', 'product_title', 'product_slug', 'unit_price', 'quantity', 'total_price']
+        read_only_fields = fields
+
+
+class OrderSerializer(serializers.ModelSerializer):
+    items = OrderItemSerializer(many=True, read_only=True)
+    status_label = serializers.CharField(source='get_status_display', read_only=True)
+    payment_status_label = serializers.CharField(source='get_payment_status_display', read_only=True)
+    payment_method_label = serializers.CharField(source='get_payment_method_display', read_only=True)
+    total_items = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = Order
+        fields = [
+            'id', 'code', 'customer_name', 'phone', 'email', 'province', 'city',
+            'address', 'postal_code', 'notes', 'subtotal', 'discount_amount',
+            'coupon_code', 'shipping_price', 'total_price', 'status', 'status_label', 'payment_status',
+            'payment_status_label', 'payment_method', 'payment_method_label', 'affiliate_code',
+            'total_items', 'items', 'created_at', 'updated_at'
+        ]
+        read_only_fields = fields
+
+
+class CheckoutSerializer(serializers.Serializer):
+    customer_name = serializers.CharField(max_length=150)
+    phone = serializers.CharField(max_length=20)
+    email = serializers.EmailField(required=False, allow_blank=True)
+    province = serializers.CharField(max_length=80)
+    city = serializers.CharField(max_length=80)
+    address = serializers.CharField(max_length=500)
+    postal_code = serializers.CharField(max_length=20, required=False, allow_blank=True)
+    notes = serializers.CharField(max_length=1000, required=False, allow_blank=True)
+    # Providers are validated against server configuration at checkout time.
+    # A frontend never decides whether a gateway is operational.
+    payment_method = serializers.ChoiceField(
+        choices=['coordination', 'zarinpal', 'stripe_card', 'paypal', 'crypto'],
+        default='coordination',
+    )
+    affiliate_code = serializers.CharField(max_length=32, required=False, allow_blank=True)
+    coupon_code = serializers.CharField(max_length=40, required=False, allow_blank=True)
+    terms_accepted = serializers.BooleanField()
+
+    def validate_phone(self, value):
+        normalised = value.replace(' ', '').replace('-', '')
+        digits = ''.join(char for char in normalised if char.isdigit())
+        if len(digits) < 10 or len(digits) > 15:
+            raise serializers.ValidationError('شماره تماس معتبر نیست.')
+        return normalised
+
+    def validate_terms_accepted(self, value):
+        if not value:
+            raise serializers.ValidationError('پذیرش شرایط ثبت سفارش الزامی است.')
+        return value
+
+
+# ========================================
+# Services, procurement and marketplace foundation
+# ========================================
+class ServiceRequestSerializer(serializers.ModelSerializer):
+    status_label = serializers.CharField(source='get_status_display', read_only=True)
+    service_label = serializers.CharField(source='get_service_type_display', read_only=True)
+
+    class Meta:
+        model = ServiceRequest
+        fields = [
+            'id', 'code', 'service_type', 'service_label', 'customer_name', 'phone',
+            'province', 'city', 'crop', 'farm_area_hectare', 'description',
+            'status', 'status_label', 'created_at'
+        ]
+        read_only_fields = ['id', 'code', 'status', 'status_label', 'created_at']
+
+
+class ProcurementRequestSerializer(serializers.ModelSerializer):
+    status_label = serializers.CharField(source='get_status_display', read_only=True)
+
+    class Meta:
+        model = ProcurementRequest
+        fields = [
+            'id', 'code', 'farmer_name', 'phone', 'crop_name', 'variety',
+            'quantity', 'unit', 'requested_price', 'province', 'city',
+            'harvest_date', 'description', 'status', 'status_label', 'created_at'
+        ]
+        read_only_fields = ['id', 'code', 'status', 'status_label', 'created_at']
+
+
+class StorefrontSerializer(serializers.ModelSerializer):
+    owner_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Storefront
+        fields = [
+            'id', 'name', 'slug', 'seller_type', 'bio', 'province', 'city',
+            'is_verified', 'commission_rate', 'owner_name', 'created_at'
+        ]
+        read_only_fields = ['id', 'is_verified', 'commission_rate', 'owner_name', 'created_at']
+
+    def get_owner_name(self, obj):
+        return obj.user.get_full_name() or obj.user.username
+
+
+class MarketplaceListingSerializer(serializers.ModelSerializer):
+    storefront = StorefrontSerializer(read_only=True)
+    image_url = serializers.SerializerMethodField()
+    status_label = serializers.CharField(source='get_status_display', read_only=True)
+
+    class Meta:
+        model = MarketplaceListing
+        fields = [
+            'id', 'storefront', 'title', 'slug', 'crop_name', 'description',
+            'price', 'unit', 'quantity_available', 'min_order_quantity',
+            'harvest_date', 'image', 'image_url', 'status', 'status_label',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'storefront', 'status', 'status_label', 'image_url', 'created_at', 'updated_at']
+
+    def get_image_url(self, obj):
+        return obj.image_url
+
+# ========================================
+# Payments, finance, affiliate and trust
+# ========================================
+class PaymentAttemptSerializer(serializers.ModelSerializer):
+    provider_label = serializers.CharField(source='get_provider_display', read_only=True)
+    status_label = serializers.CharField(source='get_status_display', read_only=True)
+
+    class Meta:
+        model = PaymentAttempt
+        fields = [
+            'id', 'provider', 'provider_label', 'status', 'status_label', 'amount',
+            'currency', 'external_reference', 'checkout_url', 'created_at', 'verified_at', 'expires_at'
+        ]
+        read_only_fields = fields
+
+
+class FinancialLedgerEntrySerializer(serializers.ModelSerializer):
+    status_label = serializers.CharField(source='get_status_display', read_only=True)
+    entry_type_label = serializers.CharField(source='get_entry_type_display', read_only=True)
+
+    class Meta:
+        model = FinancialLedgerEntry
+        fields = ['id', 'owner_type', 'entry_type', 'entry_type_label', 'status', 'status_label', 'amount', 'currency', 'description', 'created_at', 'available_at']
+        read_only_fields = fields
+
+
+class AffiliateProfileSerializer(serializers.ModelSerializer):
+    status_label = serializers.CharField(source='get_status_display', read_only=True)
+
+    class Meta:
+        model = AffiliateProfile
+        fields = ['id', 'code', 'commission_rate', 'status', 'status_label', 'created_at']
+        read_only_fields = ['id', 'code', 'commission_rate', 'status', 'status_label', 'created_at']
+
+
+class AffiliateConversionSerializer(serializers.ModelSerializer):
+    order_code = serializers.CharField(source='order.code', read_only=True)
+    status_label = serializers.CharField(source='get_status_display', read_only=True)
+
+    class Meta:
+        model = AffiliateConversion
+        fields = ['id', 'order_code', 'commission_amount', 'status', 'status_label', 'created_at']
+        read_only_fields = fields
+
+
+class PlatformFeedbackSerializer(serializers.ModelSerializer):
+    status_label = serializers.CharField(source='get_status_display', read_only=True)
+
+    class Meta:
+        model = PlatformFeedback
+        fields = ['id', 'name', 'email', 'kind', 'subject', 'message', 'status', 'status_label', 'created_at']
+        read_only_fields = ['id', 'status', 'status_label', 'created_at']
+
+
+class StorefrontComplaintSerializer(serializers.ModelSerializer):
+    status_label = serializers.CharField(source='get_status_display', read_only=True)
+    storefront_name = serializers.CharField(source='storefront.name', read_only=True)
+
+    class Meta:
+        model = StorefrontComplaint
+        fields = ['id', 'storefront', 'storefront_name', 'listing', 'order', 'subject', 'description', 'status', 'status_label', 'resolution_note', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'status', 'status_label', 'resolution_note', 'created_at', 'updated_at']
+
+    def validate_listing(self, listing):
+        storefront = self.initial_data.get('storefront')
+        if storefront and str(listing.storefront_id) != str(storefront):
+            raise serializers.ValidationError('آگهی باید متعلق به همان غرفه باشد.')
+        return listing
+
+
+class VisualSearchRequestSerializer(serializers.ModelSerializer):
+    status_label = serializers.CharField(source='get_status_display', read_only=True)
+
+    class Meta:
+        model = VisualSearchRequest
+        fields = ['id', 'image', 'target', 'status', 'status_label', 'result_payload', 'created_at']
+        read_only_fields = ['id', 'status', 'status_label', 'result_payload', 'created_at']
+
+
+class CouponSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Coupon
+        fields = [
+            'id', 'code', 'description', 'discount_type', 'discount_value',
+            'max_discount_amount', 'min_order_amount', 'usage_limit', 'usage_count',
+            'is_active', 'valid_from', 'valid_until'
+        ]
+        read_only_fields = fields
+
+
+class WalletTransactionSerializer(serializers.ModelSerializer):
+    status_label = serializers.CharField(source='get_status_display', read_only=True)
+    type_label = serializers.CharField(source='get_transaction_type_display', read_only=True)
+
+    class Meta:
+        model = WalletTransaction
+        fields = ['id', 'order', 'amount', 'transaction_type', 'type_label', 'status', 'status_label', 'description', 'created_at', 'available_at']
+        read_only_fields = fields
+
+
+class WalletSerializer(serializers.ModelSerializer):
+    transactions = WalletTransactionSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Wallet
+        fields = ['id', 'currency', 'balance', 'updated_at', 'transactions']
+        read_only_fields = fields
+
+
+class StorefrontPostSerializer(serializers.ModelSerializer):
+    storefront_name = serializers.CharField(source='storefront.name', read_only=True)
+    image_url = serializers.SerializerMethodField()
+    status_label = serializers.CharField(source='get_status_display', read_only=True)
+    post_type_label = serializers.CharField(source='get_post_type_display', read_only=True)
+
+    class Meta:
+        model = StorefrontPost
+        fields = [
+            'id', 'storefront', 'storefront_name', 'listing', 'post_type',
+            'post_type_label', 'caption', 'image', 'image_url', 'status',
+            'status_label', 'expires_at', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'storefront', 'storefront_name', 'image_url', 'status', 'status_label', 'created_at', 'updated_at']
+
+    def validate_image(self, image):
+        if image and image.size > settings.VISUAL_SEARCH_MAX_UPLOAD_BYTES:
+            raise serializers.ValidationError('حجم تصویر پست از حد مجاز بیشتر است.')
+        return image
+
+    def get_image_url(self, obj):
+        return obj.image_url
+
+
+class AdminAuditLogSerializer(serializers.ModelSerializer):
+    actor_username = serializers.CharField(source='actor.username', read_only=True, default='system')
+
+    class Meta:
+        model = AdminAuditLog
+        fields = ['id', 'actor_username', 'action', 'target_type', 'target_id', 'summary', 'metadata', 'created_at']
+        read_only_fields = fields

@@ -8,10 +8,9 @@ import {
   useReducedMotion,
   useScroll,
   useSpring,
-  useTransform,
   useVelocity,
 } from "framer-motion";
-import { Heart, Menu, Moon, ShoppingCart, Sun, X } from "lucide-react";
+import { Globe2, Heart, Menu, Moon, ShoppingCart, Sun, X } from "lucide-react";
 import TopBar from "./TopBar";
 import Logo from "./Logo";
 import MegaMenu from "./MegaMenu";
@@ -20,16 +19,17 @@ import ProfileMenu from "./ProfileMenu";
 import MobileMenu from "./MobileMenu";
 import CartDrawer from "./CartDrawer";
 import { useCartStore } from "../store/cartStore";
+import { useTranslation } from "../i18n";
 
 // ========================================
 // Constants
 // ========================================
 const NAV_LINKS = [
-  { label: "خانه", href: "/" },
-  { label: "محصولات", href: "/products" },
-  { label: "تخفیف‌ها", href: "/products?featured=true" },
-  { label: "مجله", href: "/blog" },
-  { label: "تماس با ما", href: "/contact" },
+  { key: "nav.home", href: "/" },
+  { key: "nav.products", href: "/products" },
+  { key: "nav.services", href: "/services" },
+  { key: "nav.marketplace", href: "/marketplace" },
+  { key: "nav.offers", href: "/products?featured=true" },
 ] as const;
 
 const SPRING = { type: "spring", damping: 28, stiffness: 320, mass: 0.6 } as const;
@@ -200,6 +200,7 @@ const IconButton = memo(function IconButton({
 // ✅ Nav Link با underline هوشمند (layoutId)
 // ========================================
 const DesktopNav = memo(function DesktopNav() {
+  const { t } = useTranslation();
   const [hoveredHref, setHoveredHref] = useState<string | null>(null);
   const activeHref =
     typeof window !== "undefined" ? window.location.pathname : "/";
@@ -233,7 +234,7 @@ const DesktopNav = memo(function DesktopNav() {
                 }`}
                 aria-current={isActive ? "page" : undefined}
               >
-                {link.label}
+                {t(link.key)}
                 {/* ✨ underline سیال که بین لینک‌ها حرکت می‌کند */}
                 {showUnderline && (
                   <motion.span
@@ -258,6 +259,29 @@ const DesktopNav = memo(function DesktopNav() {
     </nav>
   );
 });
+
+// ========================================
+// Language selector
+// ========================================
+function LanguageSelector({ compact = false }: { compact?: boolean }) {
+  const { locale, setLocale, t } = useTranslation();
+  return (
+    <label className={`relative flex items-center gap-1 rounded-xl border border-emerald-100 bg-emerald-50 px-2 py-1.5 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/50 dark:text-lime-300 ${compact ? "px-1.5" : ""}`}>
+      <Globe2 size={compact ? 16 : 15} aria-hidden="true" />
+      <span className="sr-only">{t("language.label")}</span>
+      <select
+        value={locale}
+        onChange={(event) => setLocale(event.target.value as "fa" | "en" | "ar")}
+        className="max-w-20 cursor-pointer appearance-none bg-transparent text-xs font-bold outline-none"
+        aria-label={t("language.label")}
+      >
+        <option value="fa">FA</option>
+        <option value="en">EN</option>
+        <option value="ar">AR</option>
+      </select>
+    </label>
+  );
+}
 
 // ========================================
 // Header Props
@@ -431,6 +455,8 @@ export default function Header({
                 <MegaMenu />
               </div>
 
+              <LanguageSelector />
+
               {/* Dark Mode */}
               <IconButton
                 onClick={onToggleDark}
@@ -489,8 +515,9 @@ export default function Header({
               />
             </div>
 
-            {/* ✅ Cart - Mobile (فقط یک بار!) */}
-            <div className="sm:hidden">
+            {/* Language + cart on compact screens */}
+            <div className="flex items-center gap-1 sm:hidden">
+              <LanguageSelector compact />
               <CartButton
                 mobile
                 count={cartCount}

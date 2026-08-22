@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /login
+Disallow: /profile
+Sitemap: https://garinkood.ir/sitemap.xml
+# AI facts: https://garinkood.ir/ai-facts.json
+# LLM guide: https://garinkood.ir/llms.txt

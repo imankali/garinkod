@@ -1,19 +1,21 @@
-// frontend/src/pages/Profile.tsx
-
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAuthStore } from "../store/authStore";
-import { motion } from "framer-motion";
+import { FormEvent, useCallback, useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import {
-  User, Mail, Phone, MapPin, LogOut, ArrowRight, Edit2,
-  Save, X, Package, Heart, Settings, Loader2
+  BadgeCheck, BarChart3, Building2, ClipboardList, Edit3, Leaf,
+  LogOut, Package, Plus, Save, Settings2, ShoppingBag,
+  Store, UserRound, X,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
-// ========================================
-// Types
-// ========================================
-interface EditData {
+import { agricultureApi, ordersApi } from "../api/services";
+import { useTranslation } from "../i18n";
+import { useAuthStore } from "../store/authStore";
+import type { MarketplaceListing, Order, Storefront } from "../types";
+import { formatPrice } from "../utils/formatPrice";
+
+type Tab = "overview" | "buyer" | "seller" | "settings";
+
+interface ProfileForm {
   first_name: string;
   last_name: string;
   email: string;
@@ -21,391 +23,201 @@ interface EditData {
   address: string;
 }
 
-// ========================================
-// Profile Component
-// ========================================
+const emptyStore = { name: "", slug: "", seller_type: "farmer" as Storefront["seller_type"], bio: "", province: "", city: "" };
+const emptyListing = { title: "", slug: "", crop_name: "", description: "", price: "", unit: "کیلوگرم", quantity_available: "", min_order_quantity: "1" };
+
 export default function Profile() {
-  const {
-    user,
-    account,
-    isAuthenticated,
-    isLoading,
-    logout,
-    fetchProfile,
-    updateProfile
-  } = useAuthStore();
-
+  const { user, account, isAuthenticated, isLoading, isSessionChecked, logout, fetchProfile, updateProfile } = useAuthStore();
+  const { t } = useTranslation();
   const navigate = useNavigate();
-  const [isEditing, setIsEditing] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
+  const [tab, setTab] = useState<Tab>(() => new URLSearchParams(window.location.search).get("tab") === "seller" ? "seller" : "overview");
+  const [profileForm, setProfileForm] = useState<ProfileForm>({ first_name: "", last_name: "", email: "", phone: "", address: "" });
+  const [editing, setEditing] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [storefront, setStorefront] = useState<Storefront | null>(null);
+  const [listings, setListings] = useState<MarketplaceListing[]>([]);
+  const [loadingSeller, setLoadingSeller] = useState(false);
+  const [storeForm, setStoreForm] = useState(emptyStore);
+  const [listingForm, setListingForm] = useState(emptyListing);
+  const [creatingStore, setCreatingStore] = useState(false);
+  const [creatingListing, setCreatingListing] = useState(false);
 
-  const [editData, setEditData] = useState<EditData>({
-    first_name: '',
-    last_name: '',
-    email: '',
-    phone: '',
-    address: '',
-  });
-
-  // ========================================
-  // Check Authentication & Fetch Profile
-  // ========================================
-  useEffect(() => {
-    if (!isAuthenticated) {
-      navigate('/login');
-    } else {
-      fetchProfile();
-    }
-  }, [isAuthenticated, navigate, fetchProfile]);
-
-  // ========================================
-  // Sync editData with user/account data
-  // ========================================
-  useEffect(() => {
-    if (user) {
-      setEditData({
-        first_name: user.first_name || '',
-        last_name: user.last_name || '',
-        email: user.email || '',
-        phone: account?.phone || '',
-        address: account?.address || '',
-      });
-    }
+  const syncProfileForm = useCallback(() => {
+    setProfileForm({
+      first_name: user?.first_name || "",
+      last_name: user?.last_name || "",
+      email: user?.email || "",
+      phone: account?.phone || "",
+      address: account?.address || "",
+    });
   }, [user, account]);
 
-  // ========================================
-  // Loading State
-  // ========================================
-  if (!isAuthenticated || isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-lime-50 dark:from-emerald-950 dark:to-emerald-900">
-        <div className="text-center">
-          <div className="h-12 w-12 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent mx-auto mb-4"></div>
-          <p className="text-slate-500 dark:text-emerald-300">در حال بارگذاری...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // ========================================
-  // Handlers
-  // ========================================
-  async function handleLogout() {
-    await logout();
-    navigate('/');
-  }
-
-  function handleEdit() {
-    setIsEditing(true);
-  }
-
-  function handleCancel() {
-    setIsEditing(false);
-    // Reset to original values
-    if (user) {
-      setEditData({
-        first_name: user.first_name || '',
-        last_name: user.last_name || '',
-        email: user.email || '',
-        phone: account?.phone || '',
-        address: account?.address || '',
-      });
-    }
-  }
-
-  async function handleSave() {
-    // Validation
-    if (!editData.first_name.trim()) {
-      toast.error('نام الزامی است');
-      return;
-    }
-    if (!editData.last_name.trim()) {
-      toast.error('نام خانوادگی الزامی است');
-      return;
-    }
-    if (!editData.email.trim()) {
-      toast.error('ایمیل الزامی است');
-      return;
-    }
-
-    setIsSaving(true);
+  const loadSeller = useCallback(async () => {
+    setLoadingSeller(true);
     try {
-      await updateProfile({
-        first_name: editData.first_name,
-        last_name: editData.last_name,
-        email: editData.email,
-        phone: editData.phone,
-        address: editData.address,
-      });
-      setIsEditing(false);
-    } catch (error) {
-      // Error is handled in store
+      const storeResponse = await agricultureApi.getStorefront();
+      setStorefront(storeResponse.data);
+      if (storeResponse.data) {
+        const listingsResponse = await agricultureApi.myListings();
+        setListings(listingsResponse.data);
+      } else {
+        setListings([]);
+      }
+    } catch {
+      toast.error("دریافت اطلاعات غرفه با خطا روبه‌رو شد.");
     } finally {
-      setIsSaving(false);
+      setLoadingSeller(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isSessionChecked) return;
+    if (!isAuthenticated) {
+      navigate("/login", { replace: true });
+      return;
+    }
+    fetchProfile();
+  }, [isSessionChecked, isAuthenticated, navigate, fetchProfile]);
+
+  useEffect(() => {
+    syncProfileForm();
+  }, [syncProfileForm]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      ordersApi.mine().then((response) => setOrders(response.data)).catch(() => undefined);
+      loadSeller();
+    }
+  }, [isAuthenticated, loadSeller]);
+
+  async function saveProfile(event: FormEvent) {
+    event.preventDefault();
+    setSavingProfile(true);
+    try {
+      await updateProfile(profileForm);
+      setEditing(false);
+      toast.success(t("account.profileSaved"));
+    } catch {
+      // API client reports a detailed error.
+    } finally {
+      setSavingProfile(false);
     }
   }
 
-  function handleGoBack() {
-    navigate(-1);
+  async function createStore(event: FormEvent) {
+    event.preventDefault();
+    setCreatingStore(true);
+    try {
+      const response = await agricultureApi.createStorefront(storeForm);
+      setStorefront(response.data);
+      setStoreForm(emptyStore);
+      toast.success(t("account.storeCreated"));
+    } catch {
+      // API client reports a detailed error.
+    } finally {
+      setCreatingStore(false);
+    }
   }
 
-  // ========================================
-  // Render
-  // ========================================
+  async function createListing(event: FormEvent) {
+    event.preventDefault();
+    setCreatingListing(true);
+    try {
+      await agricultureApi.createListing({
+        ...listingForm,
+        price: Number(listingForm.price),
+        quantity_available: listingForm.quantity_available,
+        min_order_quantity: listingForm.min_order_quantity,
+      });
+      setListingForm(emptyListing);
+      await loadSeller();
+      toast.success(t("account.listingCreated"));
+    } catch {
+      // API client reports a detailed error.
+    } finally {
+      setCreatingListing(false);
+    }
+  }
+
+  async function signOut() {
+    await logout();
+    navigate("/");
+  }
+
+  if (!isSessionChecked || !isAuthenticated || isLoading) {
+    return <main className="flex min-h-[55vh] items-center justify-center"><div className="text-center"><div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" /><p className="mt-4 text-sm text-slate-500">{t("common.loading")}</p></div></main>;
+  }
+
+  const fullName = [user?.first_name, user?.last_name].filter(Boolean).join(" ") || user?.username || "—";
+  const pendingOrders = orders.filter((order) => !["delivered", "cancelled"].includes(order.status));
+  const activeListings = listings.filter((listing) => listing.status === "published");
+  const navItems: { id: Tab; label: string; icon: typeof BarChart3 }[] = [
+    { id: "overview", label: t("account.overview"), icon: BarChart3 },
+    { id: "buyer", label: t("account.buyer"), icon: ShoppingBag },
+    { id: "seller", label: t("account.seller"), icon: Store },
+    { id: "settings", label: t("account.settings"), icon: Settings2 },
+  ];
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-lime-50 py-8 px-4 dark:from-emerald-950 dark:to-emerald-900" dir="rtl">
-      <div className="mx-auto max-w-3xl">
-
-        {/* ======================================== */}
-        {/* Header with Back Button */}
-        {/* ======================================== */}
-        <div className="mb-6 flex items-center justify-between">
-          <motion.button
-            onClick={handleGoBack}
-            whileHover={{ scale: 1.05, x: 5 }}
-            whileTap={{ scale: 0.95 }}
-            className="flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-md hover:shadow-lg transition-shadow dark:bg-emerald-900 dark:text-emerald-100"
-          >
-            <ArrowRight size={18} />
-            بازگشت
-          </motion.button>
-
-          {!isEditing ? (
-            <motion.button
-              onClick={handleEdit}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-md hover:bg-emerald-700 transition-colors"
-            >
-              <Edit2 size={16} />
-              ویرایش اطلاعات
-            </motion.button>
-          ) : (
-            <div className="flex gap-2">
-              <motion.button
-                onClick={handleCancel}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="flex items-center gap-2 rounded-xl bg-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-300 transition-colors dark:bg-emerald-800 dark:text-emerald-100 dark:hover:bg-emerald-700"
-              >
-                <X size={16} />
-                انصراف
-              </motion.button>
-              <motion.button
-                onClick={handleSave}
-                disabled={isSaving}
-                whileHover={{ scale: isSaving ? 1 : 1.05 }}
-                whileTap={{ scale: isSaving ? 1 : 0.95 }}
-                className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-md hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isSaving ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin" />
-                    در حال ذخیره...
-                  </>
-                ) : (
-                  <>
-                    <Save size={16} />
-                    ذخیره تغییرات
-                  </>
-                )}
-              </motion.button>
+    <main className="min-h-screen bg-gradient-to-b from-emerald-50 via-[#f8faf6] to-white px-4 py-7 dark:from-emerald-950 dark:via-[#062d21] dark:to-emerald-950">
+      <div className="mx-auto max-w-7xl">
+        <section className="overflow-hidden rounded-3xl bg-gradient-to-l from-emerald-800 via-emerald-700 to-lime-600 p-6 text-white shadow-xl shadow-emerald-900/15 md:p-8">
+          <div className="flex flex-col justify-between gap-6 md:flex-row md:items-center">
+            <div className="flex items-center gap-4">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-white/15 text-2xl font-extrabold backdrop-blur">{fullName.charAt(0)}</div>
+              <div><p className="text-sm text-lime-200">{t("account.title")}</p><h1 className="mt-1 text-2xl font-extrabold md:text-3xl">{fullName}</h1><p className="mt-1 text-sm text-emerald-100">{user?.email || user?.username}</p></div>
             </div>
-          )}
+            <div className="flex flex-wrap gap-2">
+              <span className="rounded-full bg-white/15 px-3 py-1.5 text-xs font-bold"><UserRound size={14} className="ml-1 inline" />{t("role.buyer")}</span>
+              {storefront && <span className="rounded-full bg-lime-300/20 px-3 py-1.5 text-xs font-bold text-lime-100"><Store size={14} className="ml-1 inline" />{t("role.seller")}</span>}
+              <button onClick={signOut} className="rounded-full bg-white/15 px-3 py-1.5 text-xs font-bold transition hover:bg-white/25"><LogOut size={14} className="ml-1 inline" />{t("account.signout")}</button>
+            </div>
+          </div>
+        </section>
+
+        <div className="mt-6 grid gap-6 lg:grid-cols-[230px_1fr]">
+          <aside className="h-fit rounded-3xl border border-emerald-100 bg-white p-3 shadow-sm dark:border-emerald-900 dark:bg-emerald-950 lg:sticky lg:top-5">
+            <nav className="flex gap-2 overflow-x-auto lg:flex-col" aria-label="Account sections">
+              {navItems.map(({ id, label, icon: Icon }) => <button key={id} onClick={() => setTab(id)} className={`flex shrink-0 items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold transition ${tab === id ? "bg-emerald-600 text-white shadow-md" : "text-slate-600 hover:bg-emerald-50 dark:text-emerald-100 dark:hover:bg-emerald-900/50"}`}><Icon size={18} />{label}</button>)}
+            </nav>
+            <div className="mt-3 rounded-2xl bg-emerald-50 p-4 text-xs leading-6 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-100"><Leaf size={16} className="mb-1" />حساب شما می‌تواند هم‌زمان خریدار و فروشنده باشد؛ نقش فروشنده با ساخت غرفه فعال می‌شود.</div>
+          </aside>
+
+          <section>
+            {tab === "overview" && <Overview orders={orders} pendingOrders={pendingOrders.length} storefront={storefront} activeListings={activeListings.length} onBuyer={() => setTab("buyer")} onSeller={() => setTab("seller")} t={t} />}
+            {tab === "buyer" && <BuyerPanel orders={orders} t={t} />}
+            {tab === "seller" && <SellerPanel storefront={storefront} listings={listings} loading={loadingSeller} storeForm={storeForm} setStoreForm={setStoreForm} listingForm={listingForm} setListingForm={setListingForm} creatingStore={creatingStore} creatingListing={creatingListing} onCreateStore={createStore} onCreateListing={createListing} t={t} />}
+            {tab === "settings" && <SettingsPanel form={profileForm} setForm={setProfileForm} editing={editing} setEditing={setEditing} saving={savingProfile} onSave={saveProfile} onCancel={() => { syncProfileForm(); setEditing(false); }} t={t} username={user?.username || ""} />}
+          </section>
         </div>
-
-        {/* ======================================== */}
-        {/* Profile Card */}
-        {/* ======================================== */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="rounded-3xl bg-white p-8 shadow-2xl shadow-emerald-100 dark:bg-emerald-900/50 dark:shadow-none"
-        >
-
-          {/* ======================================== */}
-          {/* Avatar and Name */}
-          {/* ======================================== */}
-          <div className="mb-8 text-center">
-            <div className="mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-lime-500 text-3xl font-bold text-white shadow-lg">
-              {user?.first_name?.[0] || user?.username?.[0]?.toUpperCase() || '?'}
-            </div>
-            <h1 className="text-2xl font-bold text-slate-800 dark:text-white">
-              {user?.first_name || user?.username} {user?.last_name}
-            </h1>
-            <p className="mt-2 text-sm text-slate-500 dark:text-emerald-300">
-              {user?.email}
-            </p>
-            <p className="mt-1 text-xs text-slate-400 dark:text-emerald-400">
-              نام کاربری: {user?.username}
-            </p>
-          </div>
-
-          {/* ======================================== */}
-          {/* Info Fields */}
-          {/* ======================================== */}
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-              {/* First Name */}
-              <div className="flex items-center gap-3 rounded-xl bg-emerald-50 p-4 dark:bg-emerald-950/50">
-                <User className="text-emerald-600 shrink-0 dark:text-lime-400" size={20} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-slate-500 dark:text-emerald-300">نام</p>
-                  {isEditing ? (
-                    <input
-                      type="text"
-                      value={editData.first_name}
-                      onChange={(e) => setEditData({ ...editData, first_name: e.target.value })}
-                      className="w-full mt-1 rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-emerald-700 dark:bg-emerald-900 dark:text-white"
-                      placeholder="نام خود را وارد کنید"
-                    />
-                  ) : (
-                    <p className="font-semibold text-slate-700 truncate dark:text-emerald-50">
-                      {user?.first_name || 'تنظیم نشده'}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Last Name */}
-              <div className="flex items-center gap-3 rounded-xl bg-emerald-50 p-4 dark:bg-emerald-950/50">
-                <User className="text-emerald-600 shrink-0 dark:text-lime-400" size={20} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-slate-500 dark:text-emerald-300">نام خانوادگی</p>
-                  {isEditing ? (
-                    <input
-                      type="text"
-                      value={editData.last_name}
-                      onChange={(e) => setEditData({ ...editData, last_name: e.target.value })}
-                      className="w-full mt-1 rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-emerald-700 dark:bg-emerald-900 dark:text-white"
-                      placeholder="نام خانوادگی خود را وارد کنید"
-                    />
-                  ) : (
-                    <p className="font-semibold text-slate-700 truncate dark:text-emerald-50">
-                      {user?.last_name || 'تنظیم نشده'}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Username (Read-only) */}
-              <div className="flex items-center gap-3 rounded-xl bg-emerald-50 p-4 dark:bg-emerald-950/50">
-                <User className="text-emerald-600 shrink-0 dark:text-lime-400" size={20} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-slate-500 dark:text-emerald-300">نام کاربری</p>
-                  <p className="font-semibold text-slate-700 truncate dark:text-emerald-50">
-                    {user?.username}
-                  </p>
-                </div>
-              </div>
-
-              {/* Email */}
-              <div className="flex items-center gap-3 rounded-xl bg-emerald-50 p-4 dark:bg-emerald-950/50">
-                <Mail className="text-emerald-600 shrink-0 dark:text-lime-400" size={20} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-slate-500 dark:text-emerald-300">ایمیل</p>
-                  {isEditing ? (
-                    <input
-                      type="email"
-                      value={editData.email}
-                      onChange={(e) => setEditData({ ...editData, email: e.target.value })}
-                      className="w-full mt-1 rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-emerald-700 dark:bg-emerald-900 dark:text-white"
-                      dir="ltr"
-                      placeholder="example@email.com"
-                    />
-                  ) : (
-                    <p className="font-semibold text-slate-700 truncate dark:text-emerald-50">
-                      {user?.email || 'تنظیم نشده'}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Phone */}
-              <div className="flex items-center gap-3 rounded-xl bg-emerald-50 p-4 dark:bg-emerald-950/50">
-                <Phone className="text-emerald-600 shrink-0 dark:text-lime-400" size={20} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-slate-500 dark:text-emerald-300">تلفن</p>
-                  {isEditing ? (
-                    <input
-                      type="tel"
-                      value={editData.phone}
-                      onChange={(e) => setEditData({ ...editData, phone: e.target.value })}
-                      className="w-full mt-1 rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-emerald-700 dark:bg-emerald-900 dark:text-white"
-                      dir="ltr"
-                      placeholder="09123456789"
-                    />
-                  ) : (
-                    <p className="font-semibold text-slate-700 truncate dark:text-emerald-50">
-                      {account?.phone || 'تنظیم نشده'}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Address */}
-              <div className="flex items-center gap-3 rounded-xl bg-emerald-50 p-4 md:col-span-2 dark:bg-emerald-950/50">
-                <MapPin className="text-emerald-600 shrink-0 dark:text-lime-400" size={20} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-slate-500 dark:text-emerald-300">آدرس</p>
-                  {isEditing ? (
-                    <textarea
-                      value={editData.address}
-                      onChange={(e) => setEditData({ ...editData, address: e.target.value })}
-                      rows={2}
-                      className="w-full mt-1 rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 focus:border-emerald-500 focus:outline-none resize-none dark:border-emerald-700 dark:bg-emerald-900 dark:text-white"
-                      placeholder="آدرس خود را وارد کنید"
-                    />
-                  ) : (
-                    <p className="font-semibold text-slate-700 dark:text-emerald-50">
-                      {account?.address || 'تنظیم نشده'}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* ======================================== */}
-          {/* Quick Actions */}
-          {/* ======================================== */}
-          <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-3">
-            <button
-              onClick={() => navigate('/orders')}
-              className="flex items-center justify-center gap-2 rounded-xl bg-slate-100 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-200 transition-colors dark:bg-emerald-950 dark:text-emerald-100 dark:hover:bg-emerald-800"
-            >
-              <Package size={18} />
-              سفارش‌های من
-            </button>
-            <button
-              onClick={() => navigate('/wishlist')}
-              className="flex items-center justify-center gap-2 rounded-xl bg-slate-100 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-200 transition-colors dark:bg-emerald-950 dark:text-emerald-100 dark:hover:bg-emerald-800"
-            >
-              <Heart size={18} />
-              علاقه‌مندی‌ها
-            </button>
-            <button
-              onClick={() => navigate('/settings')}
-              className="flex items-center justify-center gap-2 rounded-xl bg-slate-100 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-200 transition-colors dark:bg-emerald-950 dark:text-emerald-100 dark:hover:bg-emerald-800"
-            >
-              <Settings size={18} />
-              تنظیمات
-            </button>
-          </div>
-
-          {/* ======================================== */}
-          {/* Logout Button */}
-          {/* ======================================== */}
-          <button
-            onClick={handleLogout}
-            className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-rose-50 py-3 text-sm font-medium text-rose-500 hover:bg-rose-100 transition-colors dark:bg-rose-950/40 dark:text-rose-300 dark:hover:bg-rose-950/60"
-          >
-            <LogOut size={16} />
-            خروج از حساب
-          </button>
-        </motion.div>
       </div>
-    </div>
+    </main>
   );
 }
+
+function Overview({ orders, pendingOrders, storefront, activeListings, onBuyer, onSeller, t }: { orders: Order[]; pendingOrders: number; storefront: Storefront | null; activeListings: number; onBuyer: () => void; onSeller: () => void; t: (key: string) => string }) {
+  return <div className="space-y-6"><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Stat icon={ClipboardList} label={t("account.orders")} value={orders.length.toLocaleString("fa-IR")} /><Stat icon={Package} label="سفارش‌های جاری" value={pendingOrders.toLocaleString("fa-IR")} /><Stat icon={Store} label={t("account.store")} value={storefront ? "فعال" : "—"} /><Stat icon={Building2} label="آگهی منتشرشده" value={activeListings.toLocaleString("fa-IR")} /></div><div className="grid gap-6 lg:grid-cols-2"><Panel title={t("account.buyer")} text={t("account.buyerDescription")} icon={ShoppingBag} action={t("account.openOrders")} onClick={onBuyer} /><Panel title={t("account.seller")} text={t("account.sellerDescription")} icon={Store} action={storefront ? t("account.store") : t("account.createStore")} onClick={onSeller} /></div><section className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm dark:border-emerald-900 dark:bg-emerald-950"><div className="flex items-center justify-between"><h2 className="text-lg font-extrabold text-slate-800 dark:text-white">آخرین سفارش‌ها</h2><Link to="/orders" className="text-sm font-bold text-emerald-700 dark:text-lime-300">{t("common.viewAll")}</Link></div>{orders.length ? <div className="mt-4 divide-y divide-slate-100 dark:divide-emerald-900">{orders.slice(0, 3).map((order) => <div key={order.id} className="flex flex-wrap items-center justify-between gap-3 py-4 text-sm"><div><strong className="text-slate-800 dark:text-white" dir="ltr">{order.code}</strong><p className="mt-1 text-xs text-slate-500">{new Date(order.created_at).toLocaleDateString("fa-IR")}</p></div><span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800 dark:bg-amber-950 dark:text-amber-100">{order.status_label}</span><strong className="text-emerald-700 dark:text-lime-300">{formatPrice(order.total_price)}</strong></div>)}</div> : <Empty text={t("account.noOrders")} />}</section></div>;
+}
+
+function BuyerPanel({ orders, t }: { orders: Order[]; t: (key: string) => string }) {
+  return <section className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm dark:border-emerald-900 dark:bg-emerald-950"><div className="flex flex-col justify-between gap-3 sm:flex-row"><div><h2 className="text-xl font-extrabold text-slate-800 dark:text-white">{t("account.buyer")}</h2><p className="mt-2 text-sm text-slate-500 dark:text-emerald-200">{t("account.buyerDescription")}</p></div><Link to="/orders" className="rounded-xl bg-emerald-600 px-4 py-2.5 text-center text-sm font-bold text-white">{t("account.openOrders")}</Link></div>{orders.length ? <div className="mt-6 space-y-3">{orders.map((order) => <article key={order.id} className="rounded-2xl border border-slate-100 p-4 dark:border-emerald-900"><div className="flex flex-wrap justify-between gap-3"><div><strong dir="ltr" className="text-slate-800 dark:text-white">{order.code}</strong><p className="mt-1 text-xs text-slate-500">{order.total_items} کالا · {new Date(order.created_at).toLocaleDateString("fa-IR")}</p></div><div className="text-left"><span className="block text-xs text-slate-500">{order.status_label}</span><strong className="mt-1 block text-emerald-700 dark:text-lime-300">{formatPrice(order.total_price)}</strong></div></div></article>)}</div> : <Empty text={t("account.noOrders")} />}</section>;
+}
+
+function SellerPanel({ storefront, listings, loading, storeForm, setStoreForm, listingForm, setListingForm, creatingStore, creatingListing, onCreateStore, onCreateListing, t }: { storefront: Storefront | null; listings: MarketplaceListing[]; loading: boolean; storeForm: typeof emptyStore; setStoreForm: (value: typeof emptyStore) => void; listingForm: typeof emptyListing; setListingForm: (value: typeof emptyListing) => void; creatingStore: boolean; creatingListing: boolean; onCreateStore: (event: FormEvent) => Promise<void>; onCreateListing: (event: FormEvent) => Promise<void>; t: (key: string) => string }) {
+  if (loading) return <section className="rounded-3xl bg-white p-8 text-center text-slate-500 dark:bg-emerald-950">{t("common.loading")}</section>;
+  if (!storefront) return <section className="rounded-3xl border border-emerald-100 bg-white p-6 shadow-sm dark:border-emerald-900 dark:bg-emerald-950"><h2 className="text-xl font-extrabold text-slate-800 dark:text-white">{t("account.createStore")}</h2><p className="mt-2 text-sm leading-6 text-slate-500 dark:text-emerald-200">{t("account.noStore")} غرفه به شما امکان ثبت محصول و فروش پس از بررسی را می‌دهد.</p><form onSubmit={onCreateStore} className="mt-6 grid gap-4 sm:grid-cols-2"><TextField label="نام غرفه" value={storeForm.name} onChange={(value) => setStoreForm({ ...storeForm, name: value })} /><TextField label="آدرس یکتا (انگلیسی)" value={storeForm.slug} onChange={(value) => setStoreForm({ ...storeForm, slug: slugify(value) })} /><SelectField label="نوع فروشنده" value={storeForm.seller_type} onChange={(value) => setStoreForm({ ...storeForm, seller_type: value as Storefront["seller_type"] })} options={[['farmer', t("role.farmer")], ['cooperative', t("role.cooperative")], ['merchant', t("role.merchant")], ['company', t("role.company")]]} /><TextField label="استان" value={storeForm.province} onChange={(value) => setStoreForm({ ...storeForm, province: value })} /><TextField label="شهر" value={storeForm.city} onChange={(value) => setStoreForm({ ...storeForm, city: value })} /><label className="block text-sm font-bold text-slate-700 dark:text-emerald-50 sm:col-span-2">معرفی کوتاه<textarea value={storeForm.bio} onChange={(event) => setStoreForm({ ...storeForm, bio: event.target.value })} rows={3} className="mt-2 w-full rounded-xl border border-slate-200 p-3 font-normal outline-none focus:border-emerald-500 dark:border-emerald-700 dark:bg-emerald-900" /></label><button disabled={creatingStore} className="w-fit rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white disabled:opacity-50 sm:col-span-2">{creatingStore ? t("common.loading") : t("account.createStore")}</button></form></section>;
+  return <div className="space-y-6"><section className="rounded-3xl border border-emerald-100 bg-gradient-to-l from-emerald-50 to-white p-6 shadow-sm dark:border-emerald-800 dark:from-emerald-900/40 dark:to-emerald-950"><div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center"><div><div className="flex items-center gap-2"><h2 className="text-xl font-extrabold text-slate-800 dark:text-white">{storefront.name}</h2>{storefront.is_verified ? <BadgeCheck className="text-emerald-600" size={20} /> : null}</div><p className="mt-2 text-sm text-slate-500 dark:text-emerald-200">{storefront.city}{storefront.province ? `، ${storefront.province}` : ""} · کمیسیون توافق‌شده: {storefront.commission_rate}٪</p></div><span className={`rounded-full px-3 py-1.5 text-xs font-bold ${storefront.is_verified ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-lime-300" : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-100"}`}>{storefront.is_verified ? t("seller.verificationApproved") : t("seller.verificationPending")}</span></div></section><section className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm dark:border-emerald-900 dark:bg-emerald-950"><h2 className="text-xl font-extrabold text-slate-800 dark:text-white">{t("account.createListing")}</h2><p className="mt-2 text-sm text-slate-500 dark:text-emerald-200">هر آگهی ابتدا برای بررسی کیفیت و اطلاعات بازار ثبت می‌شود.</p><form onSubmit={onCreateListing} className="mt-5 grid gap-4 sm:grid-cols-2"><TextField label="عنوان آگهی" value={listingForm.title} onChange={(value) => setListingForm({ ...listingForm, title: value })} /><TextField label="آدرس یکتا (انگلیسی)" value={listingForm.slug} onChange={(value) => setListingForm({ ...listingForm, slug: slugify(value) })} /><TextField label="نام محصول" value={listingForm.crop_name} onChange={(value) => setListingForm({ ...listingForm, crop_name: value })} /><TextField label="قیمت هر واحد (تومان)" type="number" value={listingForm.price} onChange={(value) => setListingForm({ ...listingForm, price: value })} /><TextField label="موجودی" type="number" value={listingForm.quantity_available} onChange={(value) => setListingForm({ ...listingForm, quantity_available: value })} /><TextField label="حداقل سفارش" type="number" value={listingForm.min_order_quantity} onChange={(value) => setListingForm({ ...listingForm, min_order_quantity: value })} /><TextField label="واحد" value={listingForm.unit} onChange={(value) => setListingForm({ ...listingForm, unit: value })} /><label className="block text-sm font-bold text-slate-700 dark:text-emerald-50 sm:col-span-2">توضیحات محصول<textarea required value={listingForm.description} onChange={(event) => setListingForm({ ...listingForm, description: event.target.value })} rows={3} className="mt-2 w-full rounded-xl border border-slate-200 p-3 font-normal outline-none focus:border-emerald-500 dark:border-emerald-700 dark:bg-emerald-900" /></label><button disabled={creatingListing} className="w-fit rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white disabled:opacity-50 sm:col-span-2"><Plus size={16} className="ml-1 inline" />{creatingListing ? t("common.loading") : t("account.createListing")}</button></form></section><section className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm dark:border-emerald-900 dark:bg-emerald-950"><h2 className="text-xl font-extrabold text-slate-800 dark:text-white">{t("seller.listings")}</h2>{listings.length ? <div className="mt-4 grid gap-3 md:grid-cols-2">{listings.map((listing) => <article key={listing.id} className="rounded-2xl border border-slate-100 p-4 dark:border-emerald-900"><div className="flex justify-between gap-3"><div><h3 className="font-bold text-slate-800 dark:text-white">{listing.title}</h3><p className="mt-1 text-xs text-slate-500">{listing.quantity_available} {listing.unit} · {formatPrice(listing.price)}</p></div><span className="h-fit rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600 dark:bg-emerald-900 dark:text-emerald-100">{listing.status_label}</span></div></article>)}</div> : <Empty text={t("seller.noListings")} />}</section></div>;
+}
+
+function SettingsPanel({ form, setForm, editing, setEditing, saving, onSave, onCancel, t, username }: { form: ProfileForm; setForm: (value: ProfileForm) => void; editing: boolean; setEditing: (value: boolean) => void; saving: boolean; onSave: (event: FormEvent) => Promise<void>; onCancel: () => void; t: (key: string) => string; username: string }) {
+  return <section className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm dark:border-emerald-900 dark:bg-emerald-950"><div className="flex flex-col justify-between gap-3 sm:flex-row"><div><h2 className="text-xl font-extrabold text-slate-800 dark:text-white">{t("account.settings")}</h2><p className="mt-2 text-sm text-slate-500 dark:text-emerald-200">اطلاعات تحویل برای خریدهای بعدی از اینجا تکمیل می‌شود.</p></div>{!editing ? <button onClick={() => setEditing(true)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white"><Edit3 size={16} />{t("common.edit")}</button> : <div className="flex gap-2"><button onClick={onCancel} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold dark:border-emerald-700"><X size={16} className="ml-1 inline" />{t("common.cancel")}</button></div>}</div><form onSubmit={onSave} className="mt-6 grid gap-4 sm:grid-cols-2"><InfoField label={t("profile.firstName")} value={form.first_name} editing={editing} onChange={(value) => setForm({ ...form, first_name: value })} /><InfoField label={t("profile.lastName")} value={form.last_name} editing={editing} onChange={(value) => setForm({ ...form, last_name: value })} /><InfoField label={t("profile.email")} value={form.email} editing={editing} type="email" onChange={(value) => setForm({ ...form, email: value })} /><InfoField label={t("profile.phone")} value={form.phone} editing={editing} onChange={(value) => setForm({ ...form, phone: value })} /><InfoField label={t("profile.address")} value={form.address} editing={editing} multiline onChange={(value) => setForm({ ...form, address: value })} /><div className="rounded-2xl bg-slate-50 p-4 text-sm dark:bg-emerald-900/40"><p className="text-xs text-slate-500 dark:text-emerald-200">{t("profile.username")}</p><p className="mt-1 font-bold text-slate-800 dark:text-white">{username}</p></div>{editing && <button disabled={saving} className="inline-flex w-fit items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white disabled:opacity-50 sm:col-span-2"><Save size={16} />{saving ? t("common.loading") : t("common.save")}</button>}</form></section>;
+}
+
+function Stat({ icon: Icon, label, value }: { icon: typeof BarChart3; label: string; value: string }) { return <div className="rounded-3xl border border-emerald-100 bg-white p-5 shadow-sm dark:border-emerald-900 dark:bg-emerald-950"><Icon size={20} className="text-emerald-600 dark:text-lime-300" /><p className="mt-4 text-2xl font-extrabold text-slate-800 dark:text-white">{value}</p><p className="mt-1 text-xs text-slate-500 dark:text-emerald-200">{label}</p></div>; }
+function Panel({ title, text, icon: Icon, action, onClick }: { title: string; text: string; icon: typeof Store; action: string; onClick: () => void }) { return <article className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm dark:border-emerald-900 dark:bg-emerald-950"><Icon className="text-emerald-600 dark:text-lime-300" /><h2 className="mt-4 text-xl font-extrabold text-slate-800 dark:text-white">{title}</h2><p className="mt-2 min-h-12 text-sm leading-6 text-slate-500 dark:text-emerald-200">{text}</p><button onClick={onClick} className="mt-5 text-sm font-bold text-emerald-700 dark:text-lime-300">{action}</button></article>; }
+function Empty({ text }: { text: string }) { return <div className="mt-5 rounded-2xl bg-slate-50 p-5 text-sm text-slate-500 dark:bg-emerald-900/40 dark:text-emerald-200">{text}</div>; }
+function TextField({ label, value, onChange, type = "text" }: { label: string; value: string; onChange: (value: string) => void; type?: string }) { return <label className="block text-sm font-bold text-slate-700 dark:text-emerald-50">{label}<input required type={type} min={type === "number" ? 0 : undefined} value={value} onChange={(event) => onChange(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2.5 font-normal outline-none focus:border-emerald-500 dark:border-emerald-700 dark:bg-emerald-900" /></label>; }
+function SelectField({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: [string, string][] }) { return <label className="block text-sm font-bold text-slate-700 dark:text-emerald-50">{label}<select value={value} onChange={(event) => onChange(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2.5 font-normal dark:border-emerald-700 dark:bg-emerald-900">{options.map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></label>; }
+function InfoField({ label, value, editing, onChange, type = "text", multiline = false }: { label: string; value: string; editing: boolean; onChange: (value: string) => void; type?: string; multiline?: boolean }) { return <label className={`block rounded-2xl bg-emerald-50 p-4 text-sm font-bold text-slate-700 dark:bg-emerald-900/40 dark:text-emerald-50 ${multiline ? "sm:col-span-2" : ""}`}><span className="text-xs text-slate-500 dark:text-emerald-200">{label}</span>{editing ? multiline ? <textarea value={value} onChange={(event) => onChange(event.target.value)} rows={3} className="mt-2 w-full rounded-xl border border-emerald-200 bg-white p-2.5 font-normal outline-none focus:border-emerald-500 dark:border-emerald-700 dark:bg-emerald-950" /> : <input type={type} value={value} onChange={(event) => onChange(event.target.value)} className="mt-2 w-full rounded-xl border border-emerald-200 bg-white px-3 py-2.5 font-normal outline-none focus:border-emerald-500 dark:border-emerald-700 dark:bg-emerald-950" /> : <p className="mt-2 font-bold">{value || "—"}</p>}</label>; }
+function slugify(value: string) { return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""); }

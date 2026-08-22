@@ -1,8 +1,9 @@
 // frontend/src/components/ProfileMenu.tsx
 
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { Heart, LogIn, LogOut, Package, Settings, User } from "lucide-react";
+import { Gift, Landmark, LogIn, LogOut, Package, Store, User } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 
 // ========================================
@@ -15,18 +16,16 @@ interface MenuItem {
   href: string;
 }
 
-interface ProfileMenuProps {
-  // در آینده می‌توان props اضافه کرد
-}
-
 // ========================================
 // Menu Items Configuration
 // ========================================
 const menuItems: MenuItem[] = [
-  { icon: User, label: "پروفایل من", desc: "مدیریت اطلاعات حساب", href: "/profile" },
-  { icon: Package, label: "سفارش‌های من", desc: "پیگیری مرسولات", href: "/orders" },
-  { icon: Heart, label: "علاقه‌مندی‌ها", desc: "کالاهای نشان شده", href: "/wishlist" },
-  { icon: Settings, label: "تنظیمات", desc: "امنیت و اعلان‌ها", href: "/settings" },
+  { icon: User, label: "مرکز حساب", desc: "خریدها، اطلاعات و نشانی", href: "/profile" },
+  { icon: Package, label: "سفارش‌های من", desc: "پیگیری سفارش و تحویل", href: "/orders" },
+  { icon: Store, label: "غرفه و فروش", desc: "ساخت غرفه و ثبت آگهی", href: "/profile?tab=seller" },
+  { icon: Gift, label: "پاداش و تخفیف", desc: "کیف پول و کد خرید بعدی", href: "/rewards" },
+  { icon: Landmark, label: "دفتر مالی", desc: "کمیسیون و وضعیت تسویه", href: "/finance" },
+  { icon: Store, label: "استودیو غرفه", desc: "پست و استوری محصولات", href: "/studio" },
 ];
 
 // ========================================
@@ -34,9 +33,9 @@ const menuItems: MenuItem[] = [
 // ========================================
 function getInitials(name: string): string {
   if (!name) return "?";
-  const parts = name.trim().split(/\s+/);
-  if (parts.length >= 2) {
-    return (parts[0][0] + parts[1][0]).toUpperCase();
+  const [firstName, lastName] = name.trim().split(/\s+/);
+  if (firstName && lastName) {
+    return (firstName.charAt(0) + lastName.charAt(0)).toUpperCase();
   }
   return name.slice(0, 2).toUpperCase();
 }
@@ -44,8 +43,9 @@ function getInitials(name: string): string {
 // ========================================
 // ProfileMenu Component
 // ========================================
-export default function ProfileMenu({}: ProfileMenuProps) {
+export default function ProfileMenu() {
   const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
   const ref = useRef<HTMLDivElement>(null);
 
   // دریافت اطلاعات کاربر از auth store
@@ -77,7 +77,7 @@ export default function ProfileMenu({}: ProfileMenuProps) {
   async function handleLogout() {
     await logout();
     setOpen(false);
-    window.location.href = '/';
+    navigate('/');
   }
 
   // ========================================

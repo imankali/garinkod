@@ -71,7 +71,7 @@ export default function Login() {
         });
         toast.success('ثبت‌نام با موفقیت انجام شد');
         navigate('/');
-      } catch (error) {
+      } catch {
         // خطا در store مدیریت و نمایش داده می‌شود
       }
     }
@@ -81,7 +81,7 @@ export default function Login() {
         await login(formData.username, formData.password);
         toast.success('ورود با موفقیت انجام شد');
         navigate('/');
-      } catch (error) {
+      } catch {
         // خطا در store مدیریت و نمایش داده می‌شود
       }
     }
@@ -91,7 +91,7 @@ export default function Login() {
   // Render
   // ========================================
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-lime-50 py-12 px-4 dark:from-emerald-950 dark:to-emerald-900" dir="rtl">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-lime-50 py-12 px-4 dark:from-emerald-950 dark:to-emerald-900">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

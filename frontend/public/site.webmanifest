@@ -1,0 +1,18 @@
+{
+  "name": "گرین کود | فروشگاه تخصصی نهاده‌های کشاورزی",
+  "short_name": "گرین کود",
+  "lang": "fa-IR",
+  "dir": "rtl",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7f3e8",
+  "theme_color": "#0f8a5f",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

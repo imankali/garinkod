@@ -17,7 +17,7 @@ interface CompareBarProps {
 // ========================================
 // Constants
 // ========================================
-const DEFAULT_IMAGE = "/images/products/default.jpg";
+const DEFAULT_IMAGE = "/images/hero-farm.jpg";
 const MAX_COMPARE_ITEMS = 3;
 
 // ========================================

@@ -1,30 +1,22 @@
 // frontend/src/components/TopBar.tsx
 
-import { Globe, MessageCircle, Phone, Send, ShieldCheck, Truck } from "lucide-react";
-
-// ========================================
-// Types
-// ========================================
-interface TopBarProps {
-  isDark?: boolean;
-  onToggleDark?: () => void;
-}
+import { Phone, Truck } from "lucide-react";
 
 // ========================================
 // Messages Configuration
 // ✅ پیام‌های چرخشی در TopBar
 // ========================================
 const messages = [
-  "🚚 ارسال رایگان برای خرید بالای ۳ میلیون تومان در سراسر کشور",
-  "🌱 مشاوره رایگان کارشناسان کشاورزی: ۰۲-۱۲۳۴۵۶۷۸",
-  " تا ۳۰٪ تخفیف ویژه بهاره روی کودهای ارگانیک",
-  "🛡️ دارای مجوز رسمی فروش نهاده‌های کشاورزی",
+  "🚚 ارسال رایگان برای خرید بالای ۳ میلیون تومان، مطابق شرایط سفارش",
+  "🌱 ثبت سفارش، مشاوره و خدمات مزرعه از یک حساب کاربری",
+  "🌾 بازار کشاورزان با بررسی آگهی‌ها پیش از انتشار",
+  "📦 پیش از پرداخت، موجودی و هزینه ارسال سفارش بررسی می‌شود",
 ];
 
 // ========================================
 // TopBar Component
 // ========================================
-export default function TopBar({}: TopBarProps) {
+export default function TopBar(_props: { isDark?: boolean; onToggleDark?: () => void }) {
   // ✅ شماره تلفن از environment variable (با fallback)
   const PHONE_NUMBER = import.meta.env.VITE_PHONE_NUMBER || "02112345678";
 
@@ -40,11 +32,7 @@ export default function TopBar({}: TopBarProps) {
             <Truck size={13} className="text-lime-300" />
             <span className="hidden md:inline">ارسال به سراسر کشور</span>
           </span>
-          <span className="hidden h-3 w-px bg-emerald-400/50 md:block" />
-          <span className="hidden items-center gap-1.5 md:flex">
-            <ShieldCheck size={13} className="text-lime-300" />
-            مجوز رسمی نهاده‌های کشاورزی
-          </span>
+          <span className="hidden text-[11px] text-emerald-100 md:inline">همراه تأمین، فروش و خدمات کشاورزی</span>
         </div>
 
         {/* ======================================== */}
@@ -73,33 +61,7 @@ export default function TopBar({}: TopBarProps) {
             <Phone size={13} />
             <span dir="ltr">{PHONE_NUMBER}</span>
           </a>
-          
-          <span className="hidden h-3 w-px bg-emerald-400/50 md:block" />
-          
-          {/* شبکه‌های اجتماعی */}
-          <div className="flex items-center gap-2.5">
-            <a
-              href="#"
-              className="transition-transform hover:-translate-y-0.5 hover:text-lime-300"
-              aria-label="وبسایت"
-            >
-              <Globe size={14} />
-            </a>
-            <a
-              href="#"
-              className="transition-transform hover:-translate-y-0.5 hover:text-lime-300"
-              aria-label="تلگرام"
-            >
-              <Send size={14} />
-            </a>
-            <a
-              href="#"
-              className="transition-transform hover:-translate-y-0.5 hover:text-lime-300"
-              aria-label="واتس‌اپ"
-            >
-              <MessageCircle size={14} />
-            </a>
-          </div>
+
         </div>
       </div>
     </div>

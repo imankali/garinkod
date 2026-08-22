@@ -77,7 +77,7 @@ const weatherData: WeatherDataMap = {
 // ========================================
 export default function WeatherWidget() {
   const [province, setProvince] = useState<string>("fars");
-  const data: WeatherData = weatherData[province] || weatherData.fars;
+  const data: WeatherData = weatherData[province] ?? weatherData.fars!;
   const IconComponent = data.icon;
 
   return (
@@ -95,7 +95,7 @@ export default function WeatherWidget() {
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold text-slate-400 dark:text-emerald-300">
-                  سامانه هوشمند اقلیمی
+                  نمونهٔ توصیه اقلیمی
                 </span>
                 <span
                   className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
@@ -108,7 +108,7 @@ export default function WeatherWidget() {
                 </span>
               </div>
               <h3 className="text-sm font-bold text-slate-800 dark:text-white md:text-base">
-                وضعیت جوی و توصیه زراعی امروز
+                توصیه نمایشی؛ پیش از مصرف، داده زنده را بررسی کنید
               </h3>
             </div>
           </div>

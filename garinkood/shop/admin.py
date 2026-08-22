@@ -1,7 +1,14 @@
 from django.contrib import admin
 from .models import Category, Product
 from .models import FertilizerDetail, PesticideDetail, SeedDetail, EquipmentDetail
-from .models import Comment, UserAccount
+from .models import (
+    Comment, UserAccount, Order, OrderItem, ServiceRequest, ProcurementRequest,
+    Storefront, MarketplaceListing, PaymentAttempt, AffiliateProfile,
+    AffiliateConversion, FinancialLedgerEntry, PlatformFeedback,
+    StorefrontComplaint, VisualSearchRequest, Coupon, Wallet, WalletTransaction,
+    StorefrontPost, AdminAuditLog
+)
+from .rewards import mark_order_paid_and_reward
 
 
 # --- Inline Forms ---
@@ -31,6 +38,13 @@ class EquipmentDetailInline(admin.StackedInline):
     extra = 1
     verbose_name = "مشخصات ابزار"
     verbose_name_plural = "مشخصات ابزار"
+
+
+class OrderItemInline(admin.TabularInline):
+    model = OrderItem
+    extra = 0
+    can_delete = False
+    readonly_fields = ('product', 'product_title', 'product_slug', 'unit_price', 'quantity', 'total_price')
 
 
 # --- اکشن‌ها ---
@@ -70,7 +84,6 @@ class AdminCategory(admin.ModelAdmin):
     prepopulated_fields = {'slug': ('name',)}
     ordering = ('name',)
 
-    # ✅ اصلاح: استفاده از products به جای product_set (مطابق related_name در models.py)
     def get_product_count(self, obj):
         return obj.products.filter(status='published').count()
 
@@ -84,10 +97,7 @@ class AdminProduct(admin.ModelAdmin):
     list_display = ('title', 'author', 'category', 'slug', 'status', 'publish', 'price', 'stock')
     search_fields = ('title', 'description', 'author__username')
     prepopulated_fields = {'slug': ('title',)}
-
-    # ✅ رفع باگ بحرانی ۱: حذف raw_id_fields چون با autocomplete_fields تداخل دارد و باعث کرش پنل ادمین می‌شود
     autocomplete_fields = ('author',)
-
     date_hierarchy = 'publish'
     ordering = ('-publish',)
     list_display_links = ('slug',)
@@ -99,19 +109,10 @@ class AdminProduct(admin.ModelAdmin):
     actions = [make_published, make_draft]
 
     fieldsets = (
-        ('اطلاعات اصلی', {
-            'fields': ('title', 'slug', 'author', 'status')
-        }),
-        ('دسته‌بندی و قیمت', {
-            'fields': ('category', 'price', 'stock')
-        }),
-        ('محتوا', {
-            'fields': ('description', 'image')
-        }),
-        ('تاریخ‌ها', {
-            'fields': ('publish', 'created', 'updated'),
-            'classes': ('collapse',)
-        }),
+        ('اطلاعات اصلی', {'fields': ('title', 'slug', 'author', 'status')}),
+        ('دسته‌بندی و قیمت', {'fields': ('category', 'price', 'stock')}),
+        ('محتوا', {'fields': ('description', 'image')}),
+        ('تاریخ‌ها', {'fields': ('publish', 'created', 'updated'), 'classes': ('collapse',)}),
     )
 
     def save_model(self, request, obj, form, change):
@@ -119,21 +120,18 @@ class AdminProduct(admin.ModelAdmin):
             obj.author = request.user
         super().save_model(request, obj, form, change)
 
-    # ✅ رفع باگ بحرانی ۲: استفاده از slug به جای name (چون slug ثابت است اما name ممکن است تغییر کند)
     def get_inline_instances(self, request, obj=None):
         if not obj:
             return super().get_inline_instances(request)
-
         if obj.category and obj.category.slug == "fertilizer":
             return [FertilizerDetailInline(self.model, self.admin_site)]
-        elif obj.category and obj.category.slug == "pesticide":
+        if obj.category and obj.category.slug == "pesticide":
             return [PesticideDetailInline(self.model, self.admin_site)]
-        elif obj.category and obj.category.slug == "seed":
+        if obj.category and obj.category.slug == "seed":
             return [SeedDetailInline(self.model, self.admin_site)]
-        elif obj.category and obj.category.slug == "equipment":
+        if obj.category and obj.category.slug == "equipment":
             return [EquipmentDetailInline(self.model, self.admin_site)]
-        else:
-            return []
+        return []
 
 
 # --- Admin UserAccount ---
@@ -152,12 +150,202 @@ class AdminComment(admin.ModelAdmin):
     list_display = ('name', 'product', 'created', 'active', 'email')
     list_filter = ('active', 'created', 'updated')
     list_editable = ('active',)
-
-    # ✅ رفع باگ بحرانی ۳: تغییر post به product و description به body (چون در مدل Comment این فیلدها وجود ندارند)
     search_fields = ('name', 'email', 'body', 'product__title')
-
     actions = [approve_comments, disapprove_comments]
     date_hierarchy = 'created'
     ordering = ('-created',)
     readonly_fields = ('created', 'updated')
     list_per_page = 20
+
+
+# --- Commerce operations ---
+def cancel_orders_and_restore_stock(modeladmin, request, queryset):
+    cancelled = 0
+    for order in queryset:
+        try:
+            order.cancel_and_restore_stock()
+            cancelled += 1
+        except ValueError:
+            continue
+    modeladmin.message_user(request, f'{cancelled} سفارش لغو و موجودی آن‌ها آزاد شد.')
+
+
+cancel_orders_and_restore_stock.short_description = 'لغو سفارش و بازگرداندن موجودی رزروشده'
+
+
+def mark_orders_paid_and_issue_rewards(modeladmin, request, queryset):
+    completed = 0
+    for order in queryset:
+        try:
+            mark_order_paid_and_reward(order)
+            completed += 1
+        except ValueError:
+            continue
+    modeladmin.message_user(request, f'پرداخت {completed} سفارش تأیید و پاداش وفاداری ثبت شد.')
+
+
+mark_orders_paid_and_issue_rewards.short_description = 'تأیید پرداخت و صدور پاداش خرید بعدی'
+
+
+@admin.register(Order)
+class AdminOrder(admin.ModelAdmin):
+    list_display = ('code', 'customer_name', 'phone', 'total_price', 'payment_status', 'status', 'created_at')
+    list_filter = ('status', 'payment_status', 'payment_method', 'created_at')
+    search_fields = ('code', 'customer_name', 'phone', 'email')
+    list_editable = ('status', 'payment_status')
+    readonly_fields = ('code', 'user', 'subtotal', 'shipping_price', 'total_price', 'created_at', 'updated_at')
+    inlines = [OrderItemInline]
+    actions = [cancel_orders_and_restore_stock, mark_orders_paid_and_issue_rewards]
+    date_hierarchy = 'created_at'
+    ordering = ('-created_at',)
+
+
+@admin.register(ServiceRequest)
+class AdminServiceRequest(admin.ModelAdmin):
+    list_display = ('code', 'service_type', 'customer_name', 'phone', 'city', 'status', 'created_at')
+    list_filter = ('service_type', 'status', 'province', 'created_at')
+    search_fields = ('code', 'customer_name', 'phone', 'city', 'crop')
+    list_editable = ('status',)
+    readonly_fields = ('code', 'user', 'created_at', 'updated_at')
+    ordering = ('-created_at',)
+
+
+@admin.register(ProcurementRequest)
+class AdminProcurementRequest(admin.ModelAdmin):
+    list_display = ('code', 'crop_name', 'farmer_name', 'quantity', 'unit', 'city', 'status', 'created_at')
+    list_filter = ('status', 'province', 'created_at')
+    search_fields = ('code', 'farmer_name', 'phone', 'crop_name', 'city')
+    list_editable = ('status',)
+    readonly_fields = ('code', 'user', 'created_at', 'updated_at')
+    ordering = ('-created_at',)
+
+
+@admin.register(Storefront)
+class AdminStorefront(admin.ModelAdmin):
+    list_display = ('name', 'user', 'seller_type', 'city', 'is_verified', 'commission_rate', 'created_at')
+    list_filter = ('seller_type', 'is_verified', 'province')
+    search_fields = ('name', 'slug', 'user__username', 'user__email')
+    prepopulated_fields = {'slug': ('name',)}
+    list_editable = ('is_verified', 'commission_rate')
+    readonly_fields = ('created_at', 'updated_at')
+
+
+@admin.register(MarketplaceListing)
+class AdminMarketplaceListing(admin.ModelAdmin):
+    list_display = ('title', 'storefront', 'crop_name', 'price', 'unit', 'quantity_available', 'status', 'created_at')
+    list_filter = ('status', 'harvest_date', 'created_at')
+    search_fields = ('title', 'slug', 'crop_name', 'storefront__name')
+    prepopulated_fields = {'slug': ('title',)}
+    list_editable = ('status',)
+    readonly_fields = ('created_at', 'updated_at')
+    ordering = ('-created_at',)
+
+
+@admin.register(PaymentAttempt)
+class AdminPaymentAttempt(admin.ModelAdmin):
+    list_display = ('order', 'provider', 'amount', 'currency', 'status', 'external_reference', 'created_at')
+    list_filter = ('provider', 'status', 'currency', 'created_at')
+    search_fields = ('order__code', 'external_reference', 'idempotency_key')
+    readonly_fields = ('order', 'provider', 'amount', 'currency', 'idempotency_key', 'external_reference', 'checkout_url', 'provider_payload', 'created_at', 'updated_at', 'verified_at')
+
+
+@admin.register(AffiliateProfile)
+class AdminAffiliateProfile(admin.ModelAdmin):
+    list_display = ('code', 'user', 'commission_rate', 'status', 'created_at')
+    list_filter = ('status', 'created_at')
+    search_fields = ('code', 'user__username', 'user__email')
+    list_editable = ('commission_rate', 'status')
+    readonly_fields = ('created_at', 'updated_at')
+
+
+@admin.register(AffiliateConversion)
+class AdminAffiliateConversion(admin.ModelAdmin):
+    list_display = ('affiliate', 'order', 'commission_amount', 'status', 'created_at')
+    list_filter = ('status', 'created_at')
+    search_fields = ('affiliate__code', 'order__code')
+    list_editable = ('status',)
+    readonly_fields = ('created_at', 'updated_at')
+
+
+@admin.register(FinancialLedgerEntry)
+class AdminFinancialLedgerEntry(admin.ModelAdmin):
+    list_display = ('owner_type', 'user', 'storefront', 'entry_type', 'amount', 'currency', 'status', 'created_at')
+    list_filter = ('owner_type', 'entry_type', 'status', 'currency', 'created_at')
+    search_fields = ('user__username', 'storefront__name', 'order__code', 'description')
+    list_editable = ('status',)
+    readonly_fields = ('created_at',)
+
+
+@admin.register(PlatformFeedback)
+class AdminPlatformFeedback(admin.ModelAdmin):
+    list_display = ('kind', 'subject', 'name', 'user', 'status', 'created_at')
+    list_filter = ('kind', 'status', 'created_at')
+    search_fields = ('subject', 'message', 'name', 'email', 'user__username')
+    list_editable = ('status',)
+    readonly_fields = ('created_at', 'updated_at')
+
+
+@admin.register(StorefrontComplaint)
+class AdminStorefrontComplaint(admin.ModelAdmin):
+    list_display = ('storefront', 'subject', 'complainant', 'status', 'created_at')
+    list_filter = ('status', 'created_at')
+    search_fields = ('storefront__name', 'subject', 'description', 'complainant__username')
+    list_editable = ('status',)
+    readonly_fields = ('created_at', 'updated_at')
+
+
+@admin.register(VisualSearchRequest)
+class AdminVisualSearchRequest(admin.ModelAdmin):
+    list_display = ('target', 'user', 'status', 'created_at')
+    list_filter = ('target', 'status', 'created_at')
+    search_fields = ('user__username',)
+    list_editable = ('status',)
+    readonly_fields = ('created_at', 'updated_at', 'result_payload')
+
+
+@admin.register(Coupon)
+class AdminCoupon(admin.ModelAdmin):
+    list_display = ('code', 'discount_type', 'discount_value', 'min_order_amount', 'usage_count', 'usage_limit', 'is_active', 'valid_until')
+    list_filter = ('discount_type', 'is_active', 'valid_from', 'valid_until')
+    search_fields = ('code', 'description', 'issued_to_phone', 'issued_to_user__username')
+    list_editable = ('is_active',)
+    readonly_fields = ('usage_count', 'created_at', 'updated_at')
+
+
+class WalletTransactionInline(admin.TabularInline):
+    model = WalletTransaction
+    extra = 0
+    readonly_fields = ('order', 'amount', 'transaction_type', 'status', 'description', 'created_at', 'available_at')
+    can_delete = False
+
+
+@admin.register(Wallet)
+class AdminWallet(admin.ModelAdmin):
+    list_display = ('user', 'balance', 'currency', 'updated_at')
+    search_fields = ('user__username', 'user__email')
+    readonly_fields = ('balance', 'updated_at')
+    inlines = [WalletTransactionInline]
+
+
+@admin.register(StorefrontPost)
+class AdminStorefrontPost(admin.ModelAdmin):
+    list_display = ('storefront', 'post_type', 'status', 'expires_at', 'created_at')
+    list_filter = ('post_type', 'status', 'created_at')
+    search_fields = ('storefront__name', 'caption')
+    list_editable = ('status',)
+    readonly_fields = ('created_at', 'updated_at')
+
+
+@admin.register(AdminAuditLog)
+class AdminAdminAuditLog(admin.ModelAdmin):
+    list_display = ('created_at', 'actor', 'action', 'target_type', 'target_id', 'summary')
+    list_filter = ('action', 'target_type', 'created_at')
+    search_fields = ('actor__username', 'summary', 'target_id')
+    readonly_fields = ('actor', 'action', 'target_type', 'target_id', 'summary', 'metadata', 'created_at')
+    ordering = ('-created_at',)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False

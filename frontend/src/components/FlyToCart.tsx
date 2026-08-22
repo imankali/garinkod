@@ -21,7 +21,7 @@ interface FlyToCartProps {
 // ========================================
 // Constants
 // ========================================
-const DEFAULT_IMAGE = "/images/products/default.jpg";
+const DEFAULT_IMAGE = "/images/hero-farm.jpg";
 const ITEM_SIZE = 48;
 const ANIMATION_DURATION = 0.7;
 

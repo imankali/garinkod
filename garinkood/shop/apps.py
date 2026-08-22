@@ -8,12 +8,7 @@ class ShopConfig(AppConfig):
     name = 'shop'
     verbose_name = 'فروشگاه گرین کود'
 
-    # ✅ اضافه شدن ready() برای signal handlers در آینده
     def ready(self):
-        """
-        این متد هنگام شروع Django اجرا می‌شود.
-        برای ثبت signal handlers یا سایر initialization ها استفاده می‌شود.
-        """
-        # اگر در آینده signal نیاز داشتی، اینجا import کن:
-        # import shop.signals
-        pass
+        # Register database connection tuning without importing models at
+        # module load time.
+        from . import db  # noqa: F401

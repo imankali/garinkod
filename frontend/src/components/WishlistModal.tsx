@@ -116,7 +116,7 @@ export default function WishlistModal({
                         className="h-full w-full object-cover"
                         loading="lazy"
                         onError={(e) => {
-                          (e.target as HTMLImageElement).src = '/images/products/default.jpg';
+                          (e.target as HTMLImageElement).src = '/images/hero-farm.jpg';
                         }}
                       />
                     </div>
