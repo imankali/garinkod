@@ -8,7 +8,7 @@ from .models import (
     ServiceRequest, ProcurementRequest, Storefront, MarketplaceListing,
     PaymentAttempt, AffiliateProfile, AffiliateConversion, FinancialLedgerEntry,
     PlatformFeedback, StorefrontComplaint, VisualSearchRequest, Coupon, Wallet,
-    WalletTransaction, StorefrontPost
+    WalletTransaction, StorefrontPost, AdminAuditLog
 )
 
 
@@ -486,3 +486,12 @@ class StorefrontPostSerializer(serializers.ModelSerializer):
 
     def get_image_url(self, obj):
         return obj.image_url
+
+
+class AdminAuditLogSerializer(serializers.ModelSerializer):
+    actor_username = serializers.CharField(source='actor.username', read_only=True, default='system')
+
+    class Meta:
+        model = AdminAuditLog
+        fields = ['id', 'actor_username', 'action', 'target_type', 'target_id', 'summary', 'metadata', 'created_at']
+        read_only_fields = fields

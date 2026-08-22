@@ -6,7 +6,7 @@ from .models import (
     Storefront, MarketplaceListing, PaymentAttempt, AffiliateProfile,
     AffiliateConversion, FinancialLedgerEntry, PlatformFeedback,
     StorefrontComplaint, VisualSearchRequest, Coupon, Wallet, WalletTransaction,
-    StorefrontPost
+    StorefrontPost, AdminAuditLog
 )
 from .rewards import mark_order_paid_and_reward
 
@@ -334,3 +334,18 @@ class AdminStorefrontPost(admin.ModelAdmin):
     search_fields = ('storefront__name', 'caption')
     list_editable = ('status',)
     readonly_fields = ('created_at', 'updated_at')
+
+
+@admin.register(AdminAuditLog)
+class AdminAdminAuditLog(admin.ModelAdmin):
+    list_display = ('created_at', 'actor', 'action', 'target_type', 'target_id', 'summary')
+    list_filter = ('action', 'target_type', 'created_at')
+    search_fields = ('actor__username', 'summary', 'target_id')
+    readonly_fields = ('actor', 'action', 'target_type', 'target_id', 'summary', 'metadata', 'created_at')
+    ordering = ('-created_at',)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False

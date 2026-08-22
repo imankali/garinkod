@@ -1,4 +1,5 @@
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Group, User
+from django.core.management import call_command
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
@@ -305,3 +306,41 @@ class OrderAndPlatformTests(TestCase):
         self.assertEqual(response.data['status'], 'pending_review')
         self.assertIsNotNone(response.data['expires_at'])
         self.assertEqual(StorefrontPost.objects.get(storefront=storefront).post_type, 'story')
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class ManagementDashboardTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.owner = User.objects.create_superuser(username='owner', email='owner@example.test', password='safe-password-123')
+        self.staff = User.objects.create_user(username='ops', password='safe-password-123', is_staff=True)
+        self.category = Category.objects.create(name='کود', slug='management-fertilizer')
+        self.product = Product.objects.create(
+            title='کود داشبورد', slug='management-product', author=self.owner,
+            category=self.category, description='محصول تست داشبورد', status='published',
+            price=100000, stock=3, available=True,
+        )
+
+    def test_owner_can_view_dashboard_and_manage_staff_roles(self):
+        self.client.force_authenticate(self.owner)
+        dashboard = self.client.get('/api/management/dashboard/')
+        self.assertEqual(dashboard.status_code, 200)
+        self.assertEqual(dashboard.data['viewer']['username'], 'owner')
+        self.assertEqual(dashboard.data['metrics']['low_stock_products'], 1)
+
+        call_command('bootstrap_management_roles')
+        response = self.client.patch(
+            '/api/management/staff/',
+            {'username': 'ops', 'groups': ['عملیات'], 'is_active': True},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('عملیات', response.data['groups'])
+        self.staff.refresh_from_db()
+        self.assertTrue(self.staff.groups.filter(name='عملیات').exists())
+
+    def test_non_staff_cannot_view_management_dashboard(self):
+        regular = User.objects.create_user(username='regular', password='safe-password-123')
+        self.client.force_authenticate(regular)
+        response = self.client.get('/api/management/dashboard/')
+        self.assertEqual(response.status_code, 403)

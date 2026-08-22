@@ -474,3 +474,40 @@ export interface ProductQueryParams {
   min_price?: number;
   max_price?: number;
 }
+export interface ManagementMetric {
+  paid_revenue: number;
+  pending_orders: number;
+  open_complaints: number;
+  pending_posts: number;
+  pending_listings: number;
+  low_stock_products: number;
+  active_storefronts: number;
+  active_affiliates: number;
+}
+
+export interface ManagementDashboard {
+  viewer: { username: string; is_superuser: boolean; groups: string[] };
+  metrics: ManagementMetric;
+  recent_orders: Order[];
+  alerts: { type: string; count: number; label: string }[];
+}
+
+export interface ManagementStaffMember {
+  id: number;
+  username: string;
+  email: string;
+  is_superuser: boolean;
+  is_active: boolean;
+  groups: string[];
+}
+
+export interface ManagementAuditLog {
+  id: number;
+  actor_username: string;
+  action: string;
+  target_type: string;
+  target_id: string;
+  summary: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}

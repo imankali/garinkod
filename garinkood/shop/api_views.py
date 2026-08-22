@@ -10,7 +10,7 @@ from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Group, User
 from django.db import connection, transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -23,7 +23,7 @@ from .models import (
     ServiceRequest, ProcurementRequest, Storefront, MarketplaceListing,
     PaymentAttempt, AffiliateProfile, AffiliateConversion, FinancialLedgerEntry,
     PlatformFeedback, StorefrontComplaint, VisualSearchRequest, Coupon, Wallet,
-    WalletTransaction, StorefrontPost
+    WalletTransaction, StorefrontPost, AdminAuditLog
 )
 from .serializers import (
     CategorySerializer, ProductSerializer, ProductListSerializer,
@@ -33,8 +33,9 @@ from .serializers import (
     MarketplaceListingSerializer, PaymentAttemptSerializer, AffiliateProfileSerializer,
     AffiliateConversionSerializer, FinancialLedgerEntrySerializer, PlatformFeedbackSerializer,
     StorefrontComplaintSerializer, VisualSearchRequestSerializer, CouponSerializer,
-    WalletSerializer, StorefrontPostSerializer
+    WalletSerializer, StorefrontPostSerializer, AdminAuditLogSerializer
 )
+from .management_roles import ROLE_PERMISSIONS
 from .payments import get_provider, provider_options
 from .rewards import mark_order_paid_and_reward
 
@@ -844,3 +845,153 @@ class StorefrontPostViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated])
     def mine(self, request):
         return Response(self.get_serializer(self.get_queryset(), many=True).data)
+
+
+# ========================================
+# Management command centre (staff only)
+# ========================================
+def _can_manage(user, permission_codename: str) -> bool:
+    return bool(user.is_superuser or user.has_perm(f'shop.{permission_codename}'))
+
+
+def _audit(actor, action: str, target, summary: str, metadata: dict | None = None):
+    return AdminAuditLog.objects.create(
+        actor=actor,
+        action=action,
+        target_type=target.__class__.__name__,
+        target_id=str(target.pk),
+        summary=summary,
+        metadata=metadata or {},
+    )
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAdminUser])
+def management_dashboard(request):
+    paid_revenue = Order.objects.filter(payment_status='paid').aggregate(total=Sum('total_price'))['total'] or 0
+    pending_orders = Order.objects.filter(status='awaiting_review').count()
+    open_complaints = StorefrontComplaint.objects.exclude(status__in=['resolved', 'rejected']).count()
+    pending_posts = StorefrontPost.objects.filter(status='pending_review').count()
+    pending_listings = MarketplaceListing.objects.filter(status='pending_review').count()
+    low_stock = Product.objects.filter(status='published', stock__lt=10).count()
+    recent_orders = Order.objects.prefetch_related('items').all()[:8]
+    return Response({
+        'viewer': {
+            'username': request.user.username,
+            'is_superuser': request.user.is_superuser,
+            'groups': list(request.user.groups.values_list('name', flat=True)),
+        },
+        'metrics': {
+            'paid_revenue': paid_revenue,
+            'pending_orders': pending_orders,
+            'open_complaints': open_complaints,
+            'pending_posts': pending_posts,
+            'pending_listings': pending_listings,
+            'low_stock_products': low_stock,
+            'active_storefronts': Storefront.objects.filter(is_verified=True).count(),
+            'active_affiliates': AffiliateProfile.objects.filter(status='active').count(),
+        },
+        'recent_orders': OrderSerializer(recent_orders, many=True).data,
+        'alerts': [
+            {'type': 'complaint', 'count': open_complaints, 'label': 'شکایت باز'},
+            {'type': 'posts', 'count': pending_posts, 'label': 'پست/استوری در انتظار بررسی'},
+            {'type': 'listings', 'count': pending_listings, 'label': 'آگهی در انتظار بررسی'},
+            {'type': 'stock', 'count': low_stock, 'label': 'محصول با موجودی کم'},
+        ],
+    })
+
+
+@api_view(['GET', 'PATCH'])
+@permission_classes([permissions.IsAdminUser])
+def management_staff(request):
+    if not request.user.is_superuser:
+        return Response({'error': 'تنها مالک/سوپریوزر می‌تواند دسترسی کارمندان را تغییر دهد.'}, status=status.HTTP_403_FORBIDDEN)
+
+    if request.method == 'GET':
+        staff = User.objects.filter(is_staff=True).prefetch_related('groups').order_by('username')
+        return Response({
+            'roles': list(ROLE_PERMISSIONS.keys()),
+            'staff': [
+                {
+                    'id': member.id,
+                    'username': member.username,
+                    'email': member.email,
+                    'is_superuser': member.is_superuser,
+                    'is_active': member.is_active,
+                    'groups': list(member.groups.values_list('name', flat=True)),
+                }
+                for member in staff
+            ],
+        })
+
+    username = str(request.data.get('username', '')).strip()
+    groups = request.data.get('groups', [])
+    is_active = request.data.get('is_active', True)
+    if not username or not isinstance(groups, list):
+        return Response({'error': 'نام کاربری و فهرست نقش‌ها الزامی است.'}, status=status.HTTP_400_BAD_REQUEST)
+    invalid = set(groups) - set(ROLE_PERMISSIONS)
+    if invalid:
+        return Response({'error': f"نقش نامعتبر: {', '.join(sorted(invalid))}"}, status=status.HTTP_400_BAD_REQUEST)
+    member = get_object_or_404(User, username=username)
+    if member.is_superuser and member != request.user:
+        return Response({'error': 'تغییر نقش سوپریوزر دیگر از این مسیر مجاز نیست.'}, status=status.HTTP_403_FORBIDDEN)
+    member.is_staff = True
+    member.is_active = bool(is_active)
+    member.save(update_fields=['is_staff', 'is_active'])
+    member.groups.set(Group.objects.filter(name__in=groups))
+    _audit(request.user, 'staff_roles_updated', member, f'نقش‌های {member.username} به‌روزرسانی شد.', {'groups': groups, 'is_active': bool(is_active)})
+    return Response({'username': member.username, 'groups': list(member.groups.values_list('name', flat=True)), 'is_active': member.is_active})
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAdminUser])
+def management_audit(request):
+    if not request.user.is_superuser and not _can_manage(request.user, 'view_adminauditlog'):
+        return Response({'error': 'دسترسی مشاهده لاگ مدیریتی ندارید.'}, status=status.HTTP_403_FORBIDDEN)
+    return Response(AdminAuditLogSerializer(AdminAuditLog.objects.select_related('actor')[:100], many=True).data)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAdminUser])
+def management_mark_order_paid(request, code):
+    if not _can_manage(request.user, 'change_order'):
+        return Response({'error': 'مجوز مدیریت سفارش ندارید.'}, status=status.HTTP_403_FORBIDDEN)
+    order = get_object_or_404(Order, code=code)
+    try:
+        order, coupon = mark_order_paid_and_reward(order)
+    except ValueError as error:
+        return Response({'error': str(error)}, status=status.HTTP_409_CONFLICT)
+    _audit(request.user, 'order_paid', order, f'پرداخت سفارش {order.code} تأیید شد.', {'coupon': coupon.code if coupon else None})
+    return Response({'order': OrderSerializer(order).data, 'coupon': CouponSerializer(coupon).data if coupon else None})
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAdminUser])
+def management_moderate_content(request, content_type, object_id):
+    status_value = request.data.get('status')
+    if content_type == 'comment':
+        if not _can_manage(request.user, 'change_comment'):
+            return Response({'error': 'مجوز مدیریت کامنت ندارید.'}, status=status.HTTP_403_FORBIDDEN)
+        obj = get_object_or_404(Comment, id=object_id)
+        obj.active = status_value == 'published'
+        obj.save(update_fields=['active', 'updated'])
+    elif content_type == 'post':
+        if not _can_manage(request.user, 'change_storefrontpost'):
+            return Response({'error': 'مجوز مدیریت محتوا ندارید.'}, status=status.HTTP_403_FORBIDDEN)
+        if status_value not in dict(StorefrontPost.STATUS_CHOICES):
+            return Response({'error': 'وضعیت محتوا نامعتبر است.'}, status=status.HTTP_400_BAD_REQUEST)
+        obj = get_object_or_404(StorefrontPost, id=object_id)
+        obj.status = status_value
+        obj.save(update_fields=['status', 'updated_at'])
+    elif content_type == 'listing':
+        if not _can_manage(request.user, 'change_marketplacelisting'):
+            return Response({'error': 'مجوز مدیریت آگهی ندارید.'}, status=status.HTTP_403_FORBIDDEN)
+        if status_value not in dict(MarketplaceListing.STATUS_CHOICES):
+            return Response({'error': 'وضعیت آگهی نامعتبر است.'}, status=status.HTTP_400_BAD_REQUEST)
+        obj = get_object_or_404(MarketplaceListing, id=object_id)
+        obj.status = status_value
+        obj.save(update_fields=['status', 'updated_at'])
+    else:
+        return Response({'error': 'نوع محتوا نامعتبر است.'}, status=status.HTTP_400_BAD_REQUEST)
+    _audit(request.user, 'content_moderated', obj, f'{content_type} {object_id} به {status_value} تغییر کرد.', {'status': status_value})
+    return Response({'id': obj.id, 'status': status_value})

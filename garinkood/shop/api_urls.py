@@ -41,4 +41,11 @@ urlpatterns = [
     path('visual-search/', api_views.visual_search, name='api_visual_search'),
     path('rewards/me/', api_views.my_rewards, name='api_my_rewards'),
     path('wallet/me/', api_views.my_wallet, name='api_my_wallet'),
+
+    # Staff command centre
+    path('management/dashboard/', api_views.management_dashboard, name='management_dashboard'),
+    path('management/staff/', api_views.management_staff, name='management_staff'),
+    path('management/audit/', api_views.management_audit, name='management_audit'),
+    path('management/orders/<str:code>/mark-paid/', api_views.management_mark_order_paid, name='management_mark_order_paid'),
+    path('management/moderate/<str:content_type>/<int:object_id>/', api_views.management_moderate_content, name='management_moderate_content'),
 ]

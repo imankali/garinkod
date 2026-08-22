@@ -27,6 +27,9 @@ import type {
   Coupon,
   Wallet,
   StorefrontPost,
+  ManagementDashboard,
+  ManagementStaffMember,
+  ManagementAuditLog,
 } from '../types';
 
 // ========================================
@@ -314,4 +317,15 @@ export const storefrontPostsApi = {
     if (data.image) formData.append('image', data.image);
     return apiClient.post<StorefrontPost>('/marketplace/posts/', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
   },
+};
+
+export const managementApi = {
+  dashboard: () => apiClient.get<ManagementDashboard>('/management/dashboard/'),
+  staff: () => apiClient.get<{ roles: string[]; staff: ManagementStaffMember[] }>('/management/staff/'),
+  updateStaff: (username: string, groups: string[], isActive: boolean) =>
+    apiClient.patch<{ username: string; groups: string[]; is_active: boolean }>('/management/staff/', { username, groups, is_active: isActive }),
+  audit: () => apiClient.get<ManagementAuditLog[]>('/management/audit/'),
+  markOrderPaid: (code: string) => apiClient.post(`/management/orders/${code}/mark-paid/`),
+  moderate: (type: 'comment' | 'post' | 'listing', id: number, status: string) =>
+    apiClient.post(`/management/moderate/${type}/${id}/`, { status }),
 };

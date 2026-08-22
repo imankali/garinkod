@@ -42,6 +42,7 @@ const Affiliate = lazy(() => import("./pages/Affiliate"));
 const Finance = lazy(() => import("./pages/Finance"));
 const Studio = lazy(() => import("./pages/Studio"));
 const Rewards = lazy(() => import("./pages/Rewards"));
+const Management = lazy(() => import("./pages/Management"));
 
 // ========================================
 // Stores
@@ -453,6 +454,7 @@ export default function App() {
               <Route path="/finance" element={<Finance />} />
               <Route path="/studio" element={<Studio />} />
               <Route path="/rewards" element={<Rewards />} />
+              <Route path="/management" element={<Management />} />
 
               {/* ======================================== */}
               {/* Crawlable product detail route */}
