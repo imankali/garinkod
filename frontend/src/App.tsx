@@ -2,9 +2,8 @@
 // ✅ فایل اصلی اپلیکیشن - نقطه اتصال همه کامپوننت‌ها
 
 import { useEffect, useState, lazy, Suspense } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Navigate, Routes, Route } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
-import { AnimatePresence, motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 
 // ========================================
@@ -32,6 +31,7 @@ import AgriCalculator from "./components/AgriCalculator";
 // ========================================
 const Login = lazy(() => import("./pages/Login"));
 const Profile = lazy(() => import("./pages/Profile"));
+const ProductPage = lazy(() => import("./pages/ProductPage"));
 
 // ========================================
 // Stores
@@ -60,6 +60,7 @@ import type { MockProduct, ProductList } from "./types";
 function convertToMockProduct(apiProduct: ProductList): MockProduct {
   return {
     id: apiProduct.id,
+    slug: apiProduct.slug,
     name: apiProduct.title,
     category: typeof apiProduct.category === 'string' ? apiProduct.category : 'کود کشاورزی',
     categoryId: 'fertilizer',
@@ -68,7 +69,7 @@ function convertToMockProduct(apiProduct: ProductList): MockProduct {
     price: apiProduct.price,
     rating: 4.5,
     reviews: 0,
-    image: apiProduct.image_url || '/images/products/default.jpg',
+    image: apiProduct.image_url || '/images/hero-farm.jpg',
     inStock: apiProduct.is_in_stock,
     description: '',
     features: [],
@@ -114,10 +115,13 @@ export default function App() {
   const [compareOpen, setCompareOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<MockProduct | null>(null);
   const [activeCrop, setActiveCrop] = useState<string | null>(null);
-  const [activeCategory, setActiveCategory] = useState<string>("all");
+  const [activeCategory, setActiveCategory] = useState<string>(() => {
+    const category = new URLSearchParams(window.location.search).get("category");
+    return category || "all";
+  });
+  const [featuredOnly] = useState(() => new URLSearchParams(window.location.search).get("featured") === "true");
   const [sort, setSort] = useState<"popular" | "cheapest" | "expensive" | "rating">("popular");
   const [priceLimit, setPriceLimit] = useState<number>(10000000);
-  const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
   const [inStockOnly, setInStockOnly] = useState<boolean>(false);
 
   // ========================================
@@ -159,7 +163,7 @@ export default function App() {
   // Fetch Products from API
   // ========================================
   const { data: productsData, isLoading: productsLoading } = useQuery({
-    queryKey: ['products', activeCategory, sort, inStockOnly, priceLimit],
+    queryKey: ['products', activeCategory, sort, inStockOnly, featuredOnly, priceLimit],
     queryFn: async () => {
       const params: any = { page: 1 };
 
@@ -168,7 +172,11 @@ export default function App() {
       }
 
       if (inStockOnly) {
-        params.available = true;
+        params.in_stock = true;
+      }
+
+      if (featuredOnly) {
+        params.is_featured = true;
       }
 
       if (priceLimit < 10000000) {
@@ -342,6 +350,7 @@ export default function App() {
                 path="/"
                 element={
                   <>
+                    <h1 className="sr-only">گرین کود، فروشگاه تخصصی نهاده‌های کشاورزی</h1>
                     {/* Weather Widget */}
                     <WeatherWidget />
 
@@ -362,15 +371,13 @@ export default function App() {
                         priceLimit={priceLimit}
                         onPriceLimitChange={setPriceLimit}
                         resultsCount={filteredProducts.length}
-                        selectedBrand={selectedBrand}
-                        onBrandChange={setSelectedBrand}
                         inStockOnly={inStockOnly}
                         onInStockChange={setInStockOnly}
                       />
                     </div>
 
                     {/* Products Grid */}
-                    <section className="mx-auto max-w-7xl px-4 py-8">
+                    <section id="products" className="mx-auto max-w-7xl px-4 py-8" aria-label="فهرست محصولات">
                       {productsLoading ? (
                         <LoadingSpinner />
                       ) : filteredProducts.length === 0 ? (
@@ -394,7 +401,7 @@ export default function App() {
                               isComparing={compareItems.some((p) => p.id === product.id)}
                               compareDisabled={compareItems.length >= 3}
                               onToggleWishlist={handleToggleWishlist}
-                              onAddToCart={handleAddToCart}
+                              onAddToCart={(product, event) => handleAddToCart(product, 1, event)}
                               onQuickView={setSelectedProduct}
                               onToggleCompare={handleToggleCompare}
                             />
@@ -408,6 +415,14 @@ export default function App() {
                   </>
                 }
               />
+
+              {/* Keep legacy catalogue links indexable and functional. */}
+              <Route path="/products" element={<Navigate to={`/${window.location.search}`} replace />} />
+
+              {/* ======================================== */}
+              {/* Crawlable product detail route */}
+              {/* ======================================== */}
+              <Route path="/products/:slug" element={<ProductPage />} />
 
               {/* ======================================== */}
               {/* Login Page */}
@@ -499,6 +514,7 @@ export default function App() {
         {/* Compare Modal */}
         {/* ======================================== */}
         <CompareModal
+          isOpen={compareOpen}
           items={compareItems}
           onClose={() => setCompareOpen(false)}
           onAddToCart={(product) => handleAddToCart(product, 1)}

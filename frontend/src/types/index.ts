@@ -106,6 +106,8 @@ export interface ProductList {
 
 export interface MockProduct {
   id: number;
+  /** API products have a slug; static recommendation cards may not. */
+  slug?: string;
   name: string;
   category: string;
   categoryId: string;
@@ -229,6 +231,7 @@ export interface ProductQueryParams {
   ordering?: string;
   is_featured?: boolean;
   available?: boolean;
+  in_stock?: boolean;
   min_price?: number;
   max_price?: number;
 }

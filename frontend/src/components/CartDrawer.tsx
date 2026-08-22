@@ -49,7 +49,7 @@ function convertToSuggestion(apiProduct: ProductList): SuggestedProduct {
   return {
     id: apiProduct.id,
     name: apiProduct.title,
-    image: apiProduct.image_url || '/images/products/default.jpg',
+    image: apiProduct.image_url || '/images/hero-farm.jpg',
     price: apiProduct.price,
   };
 }
@@ -83,9 +83,11 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
     try {
       const response = await productsApi.getAll({ page: 1 });
       const products = response.data.results;
-      if (products && products.length > 0) {
+      if (products.length > 0) {
         const randomProduct = products[Math.floor(Math.random() * products.length)];
-        setSuggestion(convertToSuggestion(randomProduct));
+        if (randomProduct) {
+          setSuggestion(convertToSuggestion(randomProduct));
+        }
       }
     } catch (error) {
       console.error('Failed to load suggestion:', error);
@@ -293,11 +295,11 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                         {/* Product Image */}
                         <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-white shadow-inner">
                           <img
-                            src={item.product?.image_url || item.product?.image}
-                            alt={item.product?.title}
+                            src={item.product.image_url || item.product.image || '/images/hero-farm.jpg'}
+                            alt={item.product.title}
                             className="h-full w-full object-cover"
                             onError={(e) => {
-                              (e.target as HTMLImageElement).src = '/images/products/default.jpg';
+                              (e.target as HTMLImageElement).src = '/images/hero-farm.jpg';
                             }}
                           />
                         </div>
@@ -305,10 +307,10 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                         {/* Product Info */}
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-semibold text-slate-700 dark:text-white">
-                            {item.product?.title}
+                            {item.product.title}
                           </p>
                           <div className="mb-2 flex items-center gap-1.5 text-[10px] text-slate-400">
-                            <span>{typeof item.product?.category === 'string' ? item.product.category : item.product?.category?.name}</span>
+                            <span>{item.product.category}</span>
                           </div>
 
                           {/* Quantity Controls */}
@@ -372,7 +374,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                           alt={suggestion.name}
                           className="h-full w-full object-cover"
                           onError={(e) => {
-                            (e.target as HTMLImageElement).src = '/images/products/default.jpg';
+                            (e.target as HTMLImageElement).src = '/images/hero-farm.jpg';
                           }}
                         />
                       </div>

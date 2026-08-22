@@ -47,8 +47,9 @@ export default defineConfig({
     // ✅ اگر پورت اشغال بود، پورت بعدی را امتحان کن
     strictPort: false,
 
-    // ✅ باز کردن خودکار مرورگر هنگام شروع سرور
-    open: true,
+    // The development container is opened through an Arena preview hostname.
+    // Keep the local default protected while allowing only that subdomain.
+    allowedHosts: ['.e2b.app'],
 
     // ✅ فعال کردن CORS برای development
     cors: true,

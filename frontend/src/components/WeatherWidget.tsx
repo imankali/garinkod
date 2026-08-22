@@ -77,7 +77,7 @@ const weatherData: WeatherDataMap = {
 // ========================================
 export default function WeatherWidget() {
   const [province, setProvince] = useState<string>("fars");
-  const data: WeatherData = weatherData[province] || weatherData.fars;
+  const data: WeatherData = weatherData[province] ?? weatherData.fars!;
   const IconComponent = data.icon;
 
   return (

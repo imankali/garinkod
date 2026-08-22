@@ -21,8 +21,6 @@ interface FilterSortBarProps {
   priceLimit: number;
   onPriceLimitChange: (value: number) => void;
   resultsCount: number;
-  selectedBrand: string | null;
-  onBrandChange: (brand: string | null) => void;
   inStockOnly: boolean;
   onInStockChange: (value: boolean) => void;
 }
@@ -49,8 +47,6 @@ export default function FilterSortBar({
   priceLimit,
   onPriceLimitChange,
   resultsCount,
-  selectedBrand,
-  onBrandChange,
   inStockOnly,
   onInStockChange,
 }: FilterSortBarProps) {
@@ -58,7 +54,7 @@ export default function FilterSortBar({
   const [showSortDropdown, setShowSortDropdown] = useState(false);
 
   // محاسبه تعداد فیلترهای فعال
-  const activeFacets = [selectedBrand, inStockOnly, priceLimit < maxPrice].filter(Boolean).length;
+  const activeFacets = [inStockOnly, priceLimit < maxPrice].filter(Boolean).length;
 
   // ========================================
   // دریافت دسته‌بندی‌ها از API

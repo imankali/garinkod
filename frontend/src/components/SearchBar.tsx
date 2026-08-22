@@ -4,13 +4,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import {
-  ChevronDown, Search, TrendingUp, X, Clock, SlidersHorizontal,
+  Search, X, Clock, SlidersHorizontal,
   Star, PackageCheck, Mic, Sparkles, Tag, Flame
 } from "lucide-react";
 import { categories } from "../data/shopData";
 import { productsApi } from "../api/services";
 import type { ProductList, MockProduct } from "../types";
-import { formatPrice } from "../utils/formatPrice";
 
 // ========================================
 // Types
@@ -26,6 +25,7 @@ interface SearchBarProps {
 function convertProduct(apiProduct: ProductList): MockProduct {
   return {
     id: apiProduct.id,
+    slug: apiProduct.slug,
     name: apiProduct.title,
     category: typeof apiProduct.category === 'string' ? apiProduct.category : 'کود کشاورزی',
     categoryId: 'fertilizer',
@@ -34,7 +34,7 @@ function convertProduct(apiProduct: ProductList): MockProduct {
     price: apiProduct.price,
     rating: 4.5,
     reviews: 0,
-    image: apiProduct.image_url || '/images/products/default.jpg',
+    image: apiProduct.image_url || '/images/hero-farm.jpg',
     inStock: apiProduct.is_in_stock,
     description: '',
     features: [],
@@ -88,7 +88,6 @@ const trendingSearches = [
 export default function SearchBar({ variant = "desktop", onSelectProduct }: SearchBarProps) {
   const [query, setQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("all");
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -132,7 +131,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
       }
 
       if (inStockOnly) {
-        params.available = true;
+        params.in_stock = true;
       }
 
       const response = await productsApi.getAll({ ...params, page: 1 });
@@ -149,7 +148,6 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
     function handleClickOutside(event: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsFocused(false);
-        setIsFilterOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -173,9 +171,6 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
 
     return results.slice(0, 8);
   }, [searchResults, minRating]);
-
-  const activeCategoryLabel =
-    activeCategory === "all" ? "همه دسته‌ها" : categories.find((c) => c.id === activeCategory)?.label;
 
   // ========================================
   // Handlers
@@ -224,7 +219,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
 
     setTimeout(() => {
       const sampleQueries = ["کود اوره گرانوله", "سمپاش موتوری", "سم علف‌کش", "بذر گوجه‌فرنگی"];
-      const randomQuery = sampleQueries[Math.floor(Math.random() * sampleQueries.length)];
+      const randomQuery = sampleQueries[Math.floor(Math.random() * sampleQueries.length)] ?? sampleQueries[0] ?? '';
       setQuery(randomQuery);
       setIsListening(false);
     }, 2200);
@@ -535,7 +530,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
                             alt={product.name}
                             className="h-full w-full object-cover"
                             onError={(e) => {
-                              (e.target as HTMLImageElement).src = '/images/products/default.jpg';
+                              (e.target as HTMLImageElement).src = '/images/hero-farm.jpg';
                             }}
                           />
                         </span>

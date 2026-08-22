@@ -8,7 +8,6 @@ import {
   useReducedMotion,
   useScroll,
   useSpring,
-  useTransform,
   useVelocity,
 } from "framer-motion";
 import { Heart, Menu, Moon, ShoppingCart, Sun, X } from "lucide-react";
@@ -28,8 +27,6 @@ const NAV_LINKS = [
   { label: "خانه", href: "/" },
   { label: "محصولات", href: "/products" },
   { label: "تخفیف‌ها", href: "/products?featured=true" },
-  { label: "مجله", href: "/blog" },
-  { label: "تماس با ما", href: "/contact" },
 ] as const;
 
 const SPRING = { type: "spring", damping: 28, stiffness: 320, mass: 0.6 } as const;

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, Heart, LogIn, LogOut, Package, Phone, Settings, User, X } from "lucide-react";
+import { ChevronDown, Heart, LogIn, LogOut, Package, Phone, User, X } from "lucide-react";
 import { categories } from "../data/shopData";
 import { useAuthStore } from "../store/authStore";
 import SearchBar from "./SearchBar";
@@ -24,9 +24,6 @@ const quickLinks = [
   { label: "خانه", href: "/" },
   { label: "محصولات", href: "/products" },
   { label: "تخفیف‌های ویژه", href: "/products?featured=true" },
-  { label: "مجله کشاورزی", href: "/blog" },
-  { label: "درباره ما", href: "/about" },
-  { label: "تماس با ما", href: "/contact" },
 ];
 
 // ========================================
@@ -111,7 +108,7 @@ export default function MobileMenu({ isOpen, onClose, onOpenWishlist }: MobileMe
                 <div className="flex items-center gap-3">
                   {/* Avatar */}
                   <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/20 text-lg font-bold backdrop-blur">
-                    {user.first_name?.[0] || user.username[0].toUpperCase()}
+                    {user.first_name?.charAt(0) || user.username.charAt(0).toUpperCase() || '?'}
                   </div>
                   <div>
                     <p className="font-bold">

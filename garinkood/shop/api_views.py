@@ -1,13 +1,18 @@
+from contextlib import nullcontext
+from threading import Lock
+
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.models import User
+from django.db import connection, transaction
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 
+from .filters import ProductFilter
 from .models import (
     Category, Product, Comment, UserAccount, Cart, CartItem
 )
@@ -16,6 +21,12 @@ from .serializers import (
     CommentSerializer, UserAccountSerializer, CartSerializer,
     UserSerializer, RegisterSerializer
 )
+
+# SQLite is used for local development only. It permits a single writer, so a
+# process-local lock prevents its deferred transactions from upgrading into
+# "database is locked" errors under a concurrent local smoke test. PostgreSQL
+# relies on normal row locks and never takes this branch.
+_SQLITE_CART_WRITE_LOCK = Lock()
 
 
 # ========================================
@@ -99,7 +110,7 @@ def logout_view(request):
 # Category ViewSet
 # ========================================
 class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = Category.objects.all()
+    queryset = Category.objects.prefetch_related('subcategories')
     serializer_class = CategorySerializer
     lookup_field = 'slug'
 
@@ -108,9 +119,9 @@ class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
 # Product ViewSet
 # ========================================
 class ProductViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = Product.objects.filter(status='published')
+    queryset = Product.objects.filter(status='published').select_related('category', 'subcategory')
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ['category__slug', 'is_featured', 'available']
+    filterset_class = ProductFilter
     search_fields = ['title', 'description']
     ordering_fields = ['price', 'publish', 'created']
     ordering = ['-publish']
@@ -201,46 +212,52 @@ class CartViewSet(viewsets.ViewSet):
 
     def list(self, request):
         """دریافت سبد خرید"""
-        cart = self._get_or_create_cart(request)
-        serializer = CartSerializer(cart)
-        return Response(serializer.data)
+        sqlite_lock = _SQLITE_CART_WRITE_LOCK if connection.vendor == 'sqlite' else nullcontext()
+        with sqlite_lock:
+            cart = self._get_or_create_cart(request)
+            serializer = CartSerializer(cart)
+            return Response(serializer.data)
 
     @action(detail=False, methods=['post'])
     def add(self, request):
         """افزودن محصول به سبد خرید"""
         product_id = request.data.get('product_id')
-        quantity = int(request.data.get('quantity', 1))
+        if product_id in (None, ''):
+            return Response({'error': 'product_id الزامی است'}, status=status.HTTP_400_BAD_REQUEST)
 
-        if not product_id:
+        try:
+            product_id = int(product_id)
+            quantity = int(request.data.get('quantity', 1))
+        except (TypeError, ValueError):
             return Response(
-                {'error': 'product_id الزامی است'},
-                status=status.HTTP_400_BAD_REQUEST
+                {'error': 'شناسه محصول و تعداد باید عدد صحیح باشند'},
+                status=status.HTTP_400_BAD_REQUEST,
             )
+
+        if quantity < 1:
+            return Response({'error': 'تعداد باید حداقل ۱ باشد'}, status=status.HTTP_400_BAD_REQUEST)
 
         product = get_object_or_404(Product, id=product_id, status='published')
-
         if not product.is_in_stock:
-            return Response(
-                {'error': 'این محصول موجود نیست'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({'error': 'این محصول موجود نیست'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # محدودیت تعداد
         max_qty = min(10, product.stock)
-        quantity = max(1, min(quantity, max_qty))
+        quantity = min(quantity, max_qty)
 
-        cart = self._get_or_create_cart(request)
-
-        cart_item, created = CartItem.objects.get_or_create(
-            cart=cart,
-            product=product,
-            defaults={'quantity': quantity}
-        )
-
-        if not created:
-            new_qty = min(cart_item.quantity + quantity, max_qty)
-            cart_item.quantity = new_qty
-            cart_item.save()
+        # Locking the cart item makes repeated clicks and concurrent requests
+        # from one browser deterministic instead of losing an increment.
+        sqlite_lock = _SQLITE_CART_WRITE_LOCK if connection.vendor == 'sqlite' else nullcontext()
+        with sqlite_lock:
+            with transaction.atomic():
+                cart = self._get_or_create_cart(request)
+                cart_item = CartItem.objects.select_for_update().filter(
+                    cart=cart, product=product
+                ).first()
+                if cart_item:
+                    cart_item.quantity = min(cart_item.quantity + quantity, max_qty)
+                    cart_item.save(update_fields=['quantity'])
+                else:
+                    CartItem.objects.create(cart=cart, product=product, quantity=quantity)
 
         serializer = CartSerializer(cart)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -267,23 +284,33 @@ class CartViewSet(viewsets.ViewSet):
     def update_quantity(self, request):
         """به‌روزرسانی تعداد محصول در سبد خرید"""
         item_id = request.data.get('item_id')
-        quantity = int(request.data.get('quantity', 1))
+        if item_id in (None, ''):
+            return Response({'error': 'item_id الزامی است'}, status=status.HTTP_400_BAD_REQUEST)
 
-        if not item_id:
+        try:
+            item_id = int(item_id)
+            quantity = int(request.data.get('quantity', 1))
+        except (TypeError, ValueError):
             return Response(
-                {'error': 'item_id الزامی است'},
-                status=status.HTTP_400_BAD_REQUEST
+                {'error': 'شناسه آیتم و تعداد باید عدد صحیح باشند'},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
-        cart = self._get_or_create_cart(request)
-        cart_item = get_object_or_404(CartItem, id=item_id, cart=cart)
-
-        if quantity <= 0:
-            cart_item.delete()
-        else:
-            max_qty = min(10, cart_item.product.stock)
-            cart_item.quantity = min(quantity, max_qty)
-            cart_item.save()
+        sqlite_lock = _SQLITE_CART_WRITE_LOCK if connection.vendor == 'sqlite' else nullcontext()
+        with sqlite_lock:
+            cart = self._get_or_create_cart(request)
+            with transaction.atomic():
+                cart_item = get_object_or_404(
+                    CartItem.objects.select_for_update().select_related('product'),
+                    id=item_id,
+                    cart=cart,
+                )
+                if quantity <= 0:
+                    cart_item.delete()
+                else:
+                    max_qty = min(10, cart_item.product.stock)
+                    cart_item.quantity = min(quantity, max_qty)
+                    cart_item.save(update_fields=['quantity'])
 
         serializer = CartSerializer(cart)
         return Response(serializer.data)
@@ -315,35 +342,38 @@ def user_profile(request):
                 'account': None
             })
 
-    elif request.method in ['PUT', 'PATCH']:
-        # ✅ به‌روزرسانی User
-        user_serializer = UserSerializer(user, data=request.data, partial=True)
-        if user_serializer.is_valid():
-            user_serializer.save()
-
-            # ✅ به‌روزرسانی UserAccount (اگر وجود دارد)
-            account_data = {}
-            if 'phone' in request.data:
-                account_data['phone'] = request.data['phone']
-            if 'gender' in request.data:
-                account_data['gender'] = request.data['gender']
-            if 'address' in request.data:
-                account_data['address'] = request.data['address']
-
-            if account_data:
-                account, created = UserAccount.objects.get_or_create(user=user)
-                account_serializer = UserAccountSerializer(
-                    account,
-                    data=account_data,
-                    partial=True
-                )
-                if account_serializer.is_valid():
-                    account_serializer.save()
-
-            return Response({
-                'user': UserSerializer(user).data,
-                'account': UserAccountSerializer(account).data if account else None,
-                'message': 'پروفایل با موفقیت بروزرسانی شد'
-            })
-
+    # PUT/PATCH: update the core account first, then the optional profile.
+    # `account` must be initialised even when only a name/email is changed.
+    user_serializer = UserSerializer(user, data=request.data, partial=True)
+    if not user_serializer.is_valid():
         return Response(user_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    account_data = {
+        key: request.data[key]
+        for key in ('phone', 'gender', 'address')
+        if key in request.data
+    }
+
+    account = getattr(user, 'account', None)
+    account_serializer = None
+    if account_data:
+        # Validate before any database write so a bad profile payload cannot
+        # partially save the user's name/email.
+        account_serializer = UserAccountSerializer(
+            account or UserAccount(user=user), data=account_data, partial=True
+        )
+        if not account_serializer.is_valid():
+            return Response(account_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    with transaction.atomic():
+        user_serializer.save()
+        if account_serializer:
+            account, _created = UserAccount.objects.get_or_create(user=user)
+            account_serializer.instance = account
+            account_serializer.save()
+
+    return Response({
+        'user': UserSerializer(user).data,
+        'account': UserAccountSerializer(account).data if account else None,
+        'message': 'پروفایل با موفقیت بروزرسانی شد'
+    })

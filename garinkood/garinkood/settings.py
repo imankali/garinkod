@@ -1,241 +1,196 @@
-"""
-Django settings for garinkood project.
-Production-ready configuration with environment variables.
-Compatible with Django 5.2
-"""
+"""Django settings for the GarinKood API."""
 
-import os
 from pathlib import Path
-from decouple import config, Csv
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
+from decouple import Csv, config
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# ========================================
-# Security Settings
-# ========================================
-SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-me-in-production')
-DEBUG = config('DEBUG', default=True, cast=bool)
+# Never use the development defaults in a deployed environment.  The checked-in
+# .env.example documents every value that has to be set for production.
+SECRET_KEY = config("SECRET_KEY", default="django-insecure-local-development-only")
+DEBUG = config("DEBUG", default=False, cast=bool)
+SITE_URL = config("SITE_URL", default="https://garinkood.ir").rstrip("/")
+FRONTEND_URL = config("FRONTEND_URL", default=SITE_URL).rstrip("/")
+ALLOWED_HOSTS = config(
+    "ALLOWED_HOSTS",
+    default="localhost,127.0.0.1,testserver",
+    cast=Csv(),
+)
+# Arena's development preview uses a generated subdomain. It is accepted only
+# in DEBUG mode; production hosts remain explicitly allowlisted above.
+if DEBUG:
+    ALLOWED_HOSTS = [*ALLOWED_HOSTS, ".e2b.app"]
 
-# ✅ اصلاح: اجازه دسترسی از همه IP ها (فقط برای development)
-ALLOWED_HOSTS = ['*']
-
-# ========================================
-# Application definition
-# ========================================
 INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
-
-    # Third-party apps
-    'rest_framework',              # ✅ Django REST Framework
-    'rest_framework.authtoken',    # ✅ Token Authentication
-    'corsheaders',                 # ✅ CORS Headers
-    'django_filters',              # ✅ Django Filters
-    'django.contrib.humanize',
-    'django.contrib.postgres',
-
-    # Local apps
-    'shop.apps.ShopConfig',
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+    "rest_framework",
+    "rest_framework.authtoken",
+    "corsheaders",
+    "django_filters",
+    "django.contrib.humanize",
+    "django.contrib.postgres",
+    "shop.apps.ShopConfig",
 ]
 
 MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
-    'corsheaders.middleware.CorsMiddleware',  # ✅ باید قبل از CommonMiddleware باشد
-    'whitenoise.middleware.WhiteNoiseMiddleware',  # ✅ برای serving static files
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-ROOT_URLCONF = 'garinkood.urls'
+ROOT_URLCONF = "garinkood.urls"
 
 TEMPLATES = [
     {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.debug',
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.debug",
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
             ],
         },
     },
 ]
 
-WSGI_APPLICATION = 'garinkood.wsgi.application'
+WSGI_APPLICATION = "garinkood.wsgi.application"
+ASGI_APPLICATION = "garinkood.asgi.application"
 
-# ========================================
-# Database
-# ========================================
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config('DB_NAME', default='garinkood'),
-        'USER': config('DB_USER', default='postgres'),
-        'PASSWORD': config('DB_PASSWORD', default=''),
-        'HOST': config('DB_HOST', default='localhost'),
-        'PORT': config('DB_PORT', default='5432'),
+# SQLite is intentionally the zero-configuration option for local development,
+# automated tests and the load-test fixture. Production must set DB_ENGINE to
+# postgresql and provide the DB_* values below.
+DB_ENGINE = config("DB_ENGINE", default="sqlite")
+if DB_ENGINE == "sqlite":
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": config("DB_NAME", default=str(BASE_DIR / "db.sqlite3")),
+            # SQLite has a single writer. A longer local-development timeout
+            # prevents guest-cart requests from failing immediately in a
+            # controlled concurrent test; production uses PostgreSQL.
+            "OPTIONS": {"timeout": config("SQLITE_TIMEOUT", default=30, cast=int)},
+        }
     }
-}
+elif DB_ENGINE == "postgresql":
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": config("DB_NAME"),
+            "USER": config("DB_USER"),
+            "PASSWORD": config("DB_PASSWORD"),
+            "HOST": config("DB_HOST", default="localhost"),
+            "PORT": config("DB_PORT", default="5432"),
+            "CONN_MAX_AGE": config("DB_CONN_MAX_AGE", default=60, cast=int),
+        }
+    }
+else:
+    raise ValueError("DB_ENGINE must be either 'sqlite' or 'postgresql'.")
 
-# ========================================
-# Password validation
-# ========================================
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-# ========================================
-# Internationalization
-# ========================================
-LANGUAGE_CODE = 'fa-ir'
-TIME_ZONE = 'Asia/Tehran'
+LANGUAGE_CODE = "fa-ir"
+TIME_ZONE = "Asia/Tehran"
 USE_I18N = True
 USE_TZ = True
 
-# ========================================
-# Static files (CSS, JavaScript, Images)
-# ========================================
-STATIC_URL = '/static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'  # ✅ برای collectstatic
-STATICFILES_DIRS = [
-    BASE_DIR / 'shop' / 'static',  # ✅ استاتیک‌های اپ shop
-]
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+SHOP_STATIC_DIR = BASE_DIR / "shop" / "static"
+STATICFILES_DIRS = [SHOP_STATIC_DIR] if SHOP_STATIC_DIR.exists() else []
 
-# WhiteNoise for static files in production
 STORAGES = {
-    "default": {
-        "BACKEND": "django.core.files.storage.FileSystemStorage",
-    },
-    "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
-    },
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
 }
 
-# ========================================
-# Media files (User uploads)
-# ========================================
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'products'
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "products"
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# ========================================
-# Default primary key field type
-# ========================================
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
-# ========================================
-# Django REST Framework Configuration
-# ========================================
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.TokenAuthentication',
-        'rest_framework.authentication.SessionAuthentication',  # ✅ اضافه شد برای Guest Cart
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.TokenAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
     ],
-    'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',
+    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.AllowAny"],
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 12,
+    "DEFAULT_FILTER_BACKENDS": [
+        "django_filters.rest_framework.DjangoFilterBackend",
+        "rest_framework.filters.SearchFilter",
+        "rest_framework.filters.OrderingFilter",
     ],
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 12,
-    'DEFAULT_FILTER_BACKENDS': [
-        'django_filters.rest_framework.DjangoFilterBackend',
-        'rest_framework.filters.SearchFilter',
-        'rest_framework.filters.OrderingFilter',
-    ],
-    'DEFAULT_RENDERER_CLASSES': [
-        'rest_framework.renderers.JSONRenderer',
-        'rest_framework.renderers.BrowsableAPIRenderer',
-    ],
+    # Browsable API is helpful locally but unnecessarily exposes an HTML surface
+    # in production.
+    "DEFAULT_RENDERER_CLASSES": (
+        ["rest_framework.renderers.JSONRenderer", "rest_framework.renderers.BrowsableAPIRenderer"]
+        if DEBUG
+        else ["rest_framework.renderers.JSONRenderer"]
+    ),
 }
 
-# ========================================
-# CORS Configuration
-# ========================================
-# ✅ اصلاح: اجازه CORS از همه origins (فقط برای development)
-CORS_ALLOW_ALL_ORIGINS = True  # فقط برای development!
-
+# The frontend uses a same-origin reverse proxy in both development and
+# production. Cross-origin access is opt-in rather than open to every origin.
+CORS_ALLOWED_ORIGINS = config("CORS_ALLOWED_ORIGINS", default="", cast=Csv())
+CORS_ALLOW_ALL_ORIGINS = DEBUG and not CORS_ALLOWED_ORIGINS
 CORS_ALLOW_CREDENTIALS = True
-
-CORS_ALLOW_METHODS = [
-    'DELETE',
-    'GET',
-    'OPTIONS',
-    'PATCH',
-    'POST',
-    'PUT',
-]
-
+CORS_ALLOW_METHODS = ["DELETE", "GET", "OPTIONS", "PATCH", "POST", "PUT"]
 CORS_ALLOW_HEADERS = [
-    'accept',
-    'accept-encoding',
-    'authorization',
-    'content-type',
-    'dnt',
-    'origin',
-    'user-agent',
-    'x-csrftoken',
-    'x-requested-with',
+    "accept",
+    "accept-encoding",
+    "authorization",
+    "content-type",
+    "dnt",
+    "origin",
+    "user-agent",
+    "x-csrftoken",
+    "x-requested-with",
 ]
+CSRF_TRUSTED_ORIGINS = config("CSRF_TRUSTED_ORIGINS", default="", cast=Csv())
 
-# ========================================
-# CSRF Configuration
-# ========================================
-CSRF_TRUSTED_ORIGINS = [
-    'http://localhost:5173',
-    'http://127.0.0.1:5173',
-    'http://192.168.78.6:5173',  # IP لپ‌تاپ تو
-]
+SESSION_ENGINE = "django.contrib.sessions.backends.db"
+# Avoid a database write for every anonymous catalogue request. Django still
+# saves the session when it is created or modified (for example, on cart use).
+SESSION_SAVE_EVERY_REQUEST = False
+SESSION_COOKIE_AGE = 1209600
 
-# ========================================
-# Session Configuration - ✅ اضافه شد برای Guest Cart
-# ========================================
-SESSION_ENGINE = 'django.contrib.sessions.backends.db'
-SESSION_COOKIE_AGE = 1209600  # 2 weeks
-SESSION_SAVE_EVERY_REQUEST = True
-
-# ========================================
-# Security Settings for Production
-# ========================================
+# The secure settings are active only outside local development. Deployments
+# should terminate TLS before the application and set SECURE_PROXY_SSL_HEADER
+# when a reverse proxy forwards HTTPS.
 if not DEBUG:
-    SECURE_BROWSER_XSS_FILTER = True
-    SECURE_CONTENT_TYPE_NOSNIFF = True
-    SECURE_SSL_REDIRECT = True
+    SECURE_SSL_REDIRECT = config("SECURE_SSL_REDIRECT", default=True, cast=bool)
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
-    X_FRAME_OPTIONS = 'DENY'
-    SECURE_HSTS_SECONDS = 31536000
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    X_FRAME_OPTIONS = "DENY"
+    SECURE_HSTS_SECONDS = config("SECURE_HSTS_SECONDS", default=31536000, cast=int)
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
-    STORAGES["default"] = {
-        "BACKEND": "django.core.files.storage.FileSystemStorage",
-    }
+    SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
-# ========================================
-# Email Configuration
-# ========================================
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'localhost'
-EMAIL_PORT = 25
-EMAIL_USE_TLS = False
-DEFAULT_FROM_EMAIL = 'noreply@garinkood.ir'
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = config("EMAIL_HOST", default="localhost")
+EMAIL_PORT = config("EMAIL_PORT", default=25, cast=int)
+EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=False, cast=bool)
+DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="noreply@garinkood.ir")

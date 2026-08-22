@@ -62,7 +62,7 @@ function convertToMockProduct(apiProduct: ProductList): MockProduct {
     price: apiProduct.price,
     rating: 4.5,
     reviews: 0,
-    image: apiProduct.image_url || '/images/products/default.jpg',
+    image: apiProduct.image_url || '/images/hero-farm.jpg',
     inStock: apiProduct.is_in_stock,
     description: '',
     features: [],
@@ -115,7 +115,7 @@ export default function AgriCalculator({ onAddToCart }: AgriCalculatorProps) {
     }
 
     const targetProductId = PRODUCT_IDS[needType];
-    const product = products.find((p) => p.id === targetProductId) || products[0];
+    const product = products.find((p) => p.id === targetProductId) ?? products[0] ?? null;
 
     let qty: number;
     let unit: string;
@@ -326,11 +326,11 @@ export default function AgriCalculator({ onAddToCart }: AgriCalculatorProps) {
                 <div className="mb-4 flex items-center gap-3">
                   <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-white p-1">
                     <img
-                      src={result.product.image_url || result.product.image}
+                      src={result.product.image_url || result.product.image || '/images/hero-farm.jpg'}
                       alt={result.product.title}
                       className="h-full w-full object-cover rounded-lg"
                       onError={(e) => {
-                        (e.target as HTMLImageElement).src = '/images/products/default.jpg';
+                        (e.target as HTMLImageElement).src = '/images/hero-farm.jpg';
                       }}
                     />
                   </div>

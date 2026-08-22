@@ -9,6 +9,7 @@ import type { MockProduct } from "../types";
 // Types
 // ========================================
 interface CompareModalProps {
+  isOpen: boolean;
   items: MockProduct[];
   onClose: () => void;
   onAddToCart: (product: MockProduct) => void;
@@ -22,13 +23,13 @@ interface CompareRow {
 // ========================================
 // Constants
 // ========================================
-const DEFAULT_IMAGE = "/images/products/default.jpg";
+const DEFAULT_IMAGE = "/images/hero-farm.jpg";
 
 // ========================================
 // CompareModal Component
 // ✅ مودال مقایسه محصولات
 // ========================================
-export default function CompareModal({ items, onClose, onAddToCart }: CompareModalProps) {
+export default function CompareModal({ isOpen, items, onClose, onAddToCart }: CompareModalProps) {
   // ========================================
   // Comparison Rows Configuration
   // ========================================
@@ -95,7 +96,7 @@ export default function CompareModal({ items, onClose, onAddToCart }: CompareMod
 
   return (
     <AnimatePresence>
-      {items.length > 0 && (
+      {isOpen && items.length > 0 && (
         <>
           {/* ======================================== */}
           {/* Overlay */}

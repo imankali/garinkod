@@ -11,11 +11,6 @@ import toast from "react-hot-toast";
 // ========================================
 type Months = 4 | 6;
 
-interface AppliedPromo {
-  code: string;
-  percent: number;
-}
-
 // ========================================
 // Constants
 // ========================================

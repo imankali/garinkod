@@ -90,7 +90,7 @@ class Product(models.Model):
     def image_url(self):
         if self.image:
             return self.image.url
-        return '/images/products/default.jpg'
+        return '/images/hero-farm.jpg'
 
     @property
     def is_in_stock(self):

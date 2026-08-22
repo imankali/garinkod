@@ -67,8 +67,9 @@ export default function MegaMenu() {
   // تنظیم اولین دسته‌بندی به عنوان پیش‌فرض
   // ========================================
   useEffect(() => {
-    if (categories.length > 0 && !activeSlug) {
-      setActiveSlug(categories[0].slug);
+    const firstCategory = categories[0];
+    if (firstCategory && !activeSlug) {
+      setActiveSlug(firstCategory.slug);
     }
   }, [categories, activeSlug]);
 
@@ -86,9 +87,7 @@ export default function MegaMenu() {
   // ========================================
   // پیدا کردن دسته‌بندی فعال
   // ========================================
-  const activeCategory = categories.length > 0
-    ? categories.find((c) => c.slug === activeSlug) ?? categories[0]
-    : null;
+  const activeCategory = categories.find((category) => category.slug === activeSlug) ?? categories[0] ?? null;
 
   // ========================================
   // Loading State
