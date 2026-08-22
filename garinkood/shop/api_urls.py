@@ -19,6 +19,7 @@ urlpatterns = [
     path('auth/register/', api_views.register, name='api_register'),
     path('auth/login/', api_views.login_view, name='api_login'),
     path('auth/logout/', api_views.logout_view, name='api_logout'),
+    path('auth/session/', api_views.auth_session, name='api_auth_session'),
 
     # Profile Route
     path('profile/', api_views.user_profile, name='api_profile'),

@@ -211,7 +211,6 @@ export interface PaginatedResponse<T> {
 
 export interface AuthResponse {
   user: User;
-  token: string;
   message: string;
 }
 

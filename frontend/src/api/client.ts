@@ -1,6 +1,6 @@
 // frontend/src/api/client.ts
 
-import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
+import axios, { AxiosError, AxiosInstance } from 'axios';
 import toast from 'react-hot-toast';
 
 // ✅ استفاده از URL نسبی (Vite Proxy این را به Django می‌فرستد)
@@ -10,26 +10,14 @@ const API_BASE_URL = '/api';
 const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: 15000, // 15 ثانیه timeout
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// ========================================
-// Request Interceptor - اضافه کردن Token
-// ========================================
-apiClient.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
-    const token = localStorage.getItem('auth_token');
-    if (token) {
-      config.headers.Authorization = `Token ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
+// Browser authentication is cookie-based. The HttpOnly token is never exposed
+// to JavaScript; service integrations can still use Authorization headers.
 
 // ========================================
 // Response Interceptor - مدیریت خطاها
@@ -39,15 +27,12 @@ apiClient.interceptors.response.use(
   (error: AxiosError) => {
     // بررسی خطای 401 (Unauthorized)
     if (error.response?.status === 401) {
-      // اگر خطای 401 از لاگین یا ثبت‌نام نبود، توکن را پاک کن
       const url = error.config?.url || '';
-      if (!url.includes('/auth/login/') && !url.includes('/auth/register/')) {
-        localStorage.removeItem('auth_token');
+      // Session probing is expected to return 401 for visitors and must not
+      // interrupt the public catalogue by redirecting to login.
+      if (!url.includes('/auth/login/') && !url.includes('/auth/register/') && !url.includes('/auth/session/')) {
         toast.error('لطفاً دوباره وارد شوید');
-        // ریدایرکت به لاگین (اگر در صفحه لاگین نیستیم)
-        if (window.location.pathname !== '/login') {
-          window.location.href = '/login';
-        }
+        if (window.location.pathname !== '/login') window.location.href = '/login';
       }
     }
     // بررسی خطای Timeout

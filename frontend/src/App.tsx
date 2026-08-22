@@ -160,7 +160,7 @@ export default function App() {
   // Stores
   // ========================================
   const { cart, fetchCart, addToCart: addToCartStore } = useCartStore();
-  const { isAuthenticated, fetchProfile } = useAuthStore();
+  const { isAuthenticated, fetchProfile, initializeSession } = useAuthStore();
 
   // Preserve a valid affiliate referral before navigation removes query parameters.
   useEffect(() => {
@@ -171,13 +171,15 @@ export default function App() {
   }, []);
 
   // ========================================
-  // Fetch Cart on Mount
+  // Establish browser session from the HttpOnly cookie once on app start.
   // ========================================
   useEffect(() => {
+    initializeSession();
+  }, [initializeSession]);
+
+  useEffect(() => {
     fetchCart();
-    if (isAuthenticated) {
-      fetchProfile();
-    }
+    if (isAuthenticated) fetchProfile();
   }, [fetchCart, isAuthenticated, fetchProfile]);
 
   // ========================================

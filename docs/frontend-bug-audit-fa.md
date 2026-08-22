@@ -58,8 +58,9 @@ Django migration check: PASS
 
 1. **E2E browser tests نداریم.** پاسخ ۲۰۰ و build کافی نیست؛ باید Playwright/Cypress برای ثبت‌نام، checkout، coupon، مدیریت نقش، ارسال کامنت و studio اضافه شود.
 2. **ترجمه کامل نیست.** زیرساخت i18n وجود دارد، اما صفحات legacy هنوز متن فارسی دارند و باید با ترجمه انسانی تکمیل شوند.
-3. **Token در localStorage است.** برای production با سطح امنیت بالاتر، انتقال auth به HttpOnly/Secure cookie و CSRF strategy بررسی شود.
+3. **Cookie auth جایگزین token localStorage شد.** cookie با HttpOnly/SameSite/secure production تنظیم می‌شود؛ برای production باید CSRF strategy و domain/proxy cookie policy نیز مرور شود.
 4. **صفحات بزرگ فشرده‌اند.** بعضی pageها مانند Profile/Marketplace/Management باید به componentهای کوچک‌تر شکسته شوند تا نگهداری و تست آسان‌تر شود.
 5. **Accessibility audit کامل لازم است.** focus trap modalها، keyboard navigation، رنگ کنتراست و screen reader test باید با ابزار خودکار و دستی بررسی شوند.
 6. **حالت‌های offline/network ضعیف‌اند.** برخی صفحه‌ها API error را فقط toast می‌کنند و retry UI یا empty-state کامل ندارند.
-7. **Preview route ۲۰۰ به معنی تست بصری کامل نیست.** مرورگر واقعی در اندازه‌های موبایل/تبلت/دسکتاپ باید با screenshot regression کنترل شود.
+7. **Playwright suite اضافه شد اما browser binary در این sandbox به علت قطع download اجرا نشد.** در CI یا ماشین deploy، `npx playwright install chromium` و سپس `npm run test:e2e` اجرا شود.
+8. **Preview route ۲۰۰ به معنی تست بصری کامل نیست.** مرورگر واقعی در اندازه‌های موبایل/تبلت/دسکتاپ باید با screenshot regression کنترل شود.

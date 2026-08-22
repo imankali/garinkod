@@ -129,7 +129,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework.authentication.TokenAuthentication",
+        "shop.authentication.CookieTokenAuthentication",
         "rest_framework.authentication.SessionAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.AllowAny"],
@@ -173,6 +173,10 @@ SESSION_ENGINE = "django.contrib.sessions.backends.db"
 # saves the session when it is created or modified (for example, on cart use).
 SESSION_SAVE_EVERY_REQUEST = False
 SESSION_COOKIE_AGE = 1209600
+AUTH_COOKIE_NAME = 'garinkood_auth'
+AUTH_COOKIE_AGE = config("AUTH_COOKIE_AGE", default=1209600, cast=int)
+AUTH_COOKIE_SECURE = not DEBUG
+AUTH_COOKIE_SAMESITE = 'Lax'
 
 # The secure settings are active only outside local development. Deployments
 # should terminate TLS before the application and set SECURE_PROXY_SSL_HEADER

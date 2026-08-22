@@ -219,6 +219,8 @@ export const authApi = {
     return apiClient.post<{ message: string }>('/auth/logout/');
   },
 
+  session: () => apiClient.get<ProfileResponse>('/auth/session/'),
+
   /**
    * دریافت پروفایل کاربر
    * GET /api/profile/

@@ -46,6 +46,24 @@ from .rewards import mark_order_paid_and_reward
 _SQLITE_CART_WRITE_LOCK = Lock()
 
 
+def _set_auth_cookie(response, token):
+    response.set_cookie(
+        settings.AUTH_COOKIE_NAME,
+        token.key,
+        max_age=settings.AUTH_COOKIE_AGE,
+        httponly=True,
+        secure=settings.AUTH_COOKIE_SECURE,
+        samesite=settings.AUTH_COOKIE_SAMESITE,
+        path='/',
+    )
+    return response
+
+
+def _clear_auth_cookie(response):
+    response.delete_cookie(settings.AUTH_COOKIE_NAME, path='/', samesite=settings.AUTH_COOKIE_SAMESITE)
+    return response
+
+
 def _generate_affiliate_code() -> str:
     """Generate a short code while respecting the database uniqueness rule."""
     while True:
@@ -77,11 +95,11 @@ def login_view(request):
         login(request, user)
         token, created = Token.objects.get_or_create(user=user)
 
-        return Response({
+        response = Response({
             'user': UserSerializer(user).data,
-            'token': token.key,
             'message': 'ورود با موفقیت انجام شد'
         })
+        return _set_auth_cookie(response, token)
 
     return Response(
         {'error': 'نام کاربری یا رمز عبور اشتباه است'},
@@ -109,11 +127,11 @@ def register(request):
         # ساخت Token
         token, created = Token.objects.get_or_create(user=user)
 
-        return Response({
+        response = Response({
             'user': UserSerializer(user).data,
-            'token': token.key,
             'message': 'ثبت‌نام با موفقیت انجام شد'
         }, status=status.HTTP_201_CREATED)
+        return _set_auth_cookie(response, token)
 
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -122,13 +140,19 @@ def register(request):
 @permission_classes([permissions.IsAuthenticated])
 def logout_view(request):
     """خروج کاربر"""
-    try:
-        request.user.auth_token.delete()
-    except:
-        pass
-
+    Token.objects.filter(user=request.user).delete()
     logout(request)
-    return Response({'message': 'خروج با موفقیت انجام شد'})
+    return _clear_auth_cookie(Response({'message': 'خروج با موفقیت انجام شد'}))
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def auth_session(request):
+    account = getattr(request.user, 'account', None)
+    return Response({
+        'user': UserSerializer(request.user).data,
+        'account': UserAccountSerializer(account).data if account else None,
+    })
 
 
 # ========================================

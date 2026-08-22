@@ -91,6 +91,21 @@ class ProfileAndSeoTests(TestCase):
         self.assertEqual(sitemap.status_code, 200)
         self.assertIn("<urlset", sitemap.content.decode())
 
+    def test_browser_auth_uses_httponly_cookie_and_session_probe(self):
+        response = self.client.post('/api/auth/login/', {'username': 'farmer', 'password': 'safe-password-123'}, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn('token', response.data)
+        self.assertIn('garinkood_auth', response.cookies)
+        self.assertTrue(response.cookies['garinkood_auth']['httponly'])
+
+        session = self.client.get('/api/auth/session/')
+        self.assertEqual(session.status_code, 200)
+        self.assertEqual(session.data['user']['username'], 'farmer')
+
+        logout = self.client.post('/api/auth/logout/')
+        self.assertEqual(logout.status_code, 200)
+        self.assertEqual(self.client.get('/api/auth/session/').status_code, 401)
+
 
 @override_settings(SECURE_SSL_REDIRECT=False)
 class OrderAndPlatformTests(TestCase):

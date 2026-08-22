@@ -6,7 +6,7 @@ import reactRefresh from 'eslint-plugin-react-refresh';
 
 export default [
   {
-    ignores: ['dist/**', 'node_modules/**', 'coverage/**', 'vite.config.ts'], 
+    ignores: ['dist/**', 'node_modules/**', 'coverage/**', 'vite.config.ts', 'playwright.config.ts', 'e2e/**'],
   },
   js.configs.recommended,
   {
@@ -26,6 +26,7 @@ export default [
         setTimeout: 'readonly',
         clearTimeout: 'readonly',
         console: 'readonly',
+        process: 'readonly',
       },
     },
     plugins: {

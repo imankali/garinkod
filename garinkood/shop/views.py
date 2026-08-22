@@ -1,38 +1,28 @@
-from django.shortcuts import get_object_or_404
-from django.http import HttpResponseRedirect
+"""Legacy compatibility views.
+
+The active API is defined in api_views.py; these views are kept safe in case an
+older integration still imports them.
+"""
+
+from django.conf import settings
 from django.contrib.auth import logout
+from django.http import HttpResponseRedirect
+from rest_framework.authtoken.models import Token
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
-from .models import Product, Cart, CartItem
 
+def home(_request):
+    return HttpResponseRedirect(settings.FRONTEND_URL)
 
-# ====================================
-# Root Endpoint - Redirect به React
-# ====================================
-
-def home(request):
-    """
-    Root endpoint - Redirect به React Frontend
-    """
-    return HttpResponseRedirect('http://localhost:5173/')
-
-
-# ====================================
-# User Logout (برای backward compatibility)
-# ====================================
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def user_logout(request):
-    """
-    خروج کاربر
-    """
-    try:
-        request.user.auth_token.delete()
-    except:
-        pass
-
+    if request.user.is_authenticated:
+        Token.objects.filter(user=request.user).delete()
     logout(request)
-    return Response({'message': 'خروج با موفقیت انجام شد'})
+    response = Response({'message': 'خروج با موفقیت انجام شد'})
+    response.delete_cookie(settings.AUTH_COOKIE_NAME, path='/', samesite=settings.AUTH_COOKIE_SAMESITE)
+    return response

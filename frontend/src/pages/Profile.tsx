@@ -27,7 +27,7 @@ const emptyStore = { name: "", slug: "", seller_type: "farmer" as Storefront["se
 const emptyListing = { title: "", slug: "", crop_name: "", description: "", price: "", unit: "کیلوگرم", quantity_available: "", min_order_quantity: "1" };
 
 export default function Profile() {
-  const { user, account, isAuthenticated, isLoading, logout, fetchProfile, updateProfile } = useAuthStore();
+  const { user, account, isAuthenticated, isLoading, isSessionChecked, logout, fetchProfile, updateProfile } = useAuthStore();
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>(() => new URLSearchParams(window.location.search).get("tab") === "seller" ? "seller" : "overview");
@@ -72,12 +72,13 @@ export default function Profile() {
   }, []);
 
   useEffect(() => {
+    if (!isSessionChecked) return;
     if (!isAuthenticated) {
       navigate("/login", { replace: true });
       return;
     }
     fetchProfile();
-  }, [isAuthenticated, navigate, fetchProfile]);
+  }, [isSessionChecked, isAuthenticated, navigate, fetchProfile]);
 
   useEffect(() => {
     syncProfileForm();
@@ -144,7 +145,7 @@ export default function Profile() {
     navigate("/");
   }
 
-  if (!isAuthenticated || isLoading) {
+  if (!isSessionChecked || !isAuthenticated || isLoading) {
     return <main className="flex min-h-[55vh] items-center justify-center"><div className="text-center"><div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" /><p className="mt-4 text-sm text-slate-500">{t("common.loading")}</p></div></main>;
   }
 
