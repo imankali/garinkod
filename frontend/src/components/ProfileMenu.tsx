@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Heart, LogIn, LogOut, Package, Settings, User } from "lucide-react";
+import { LogIn, LogOut, Package, Store, User } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 
 // ========================================
@@ -23,10 +23,9 @@ interface ProfileMenuProps {
 // Menu Items Configuration
 // ========================================
 const menuItems: MenuItem[] = [
-  { icon: User, label: "پروفایل من", desc: "مدیریت اطلاعات حساب", href: "/profile" },
-  { icon: Package, label: "سفارش‌های من", desc: "پیگیری مرسولات", href: "/orders" },
-  { icon: Heart, label: "علاقه‌مندی‌ها", desc: "کالاهای نشان شده", href: "/wishlist" },
-  { icon: Settings, label: "تنظیمات", desc: "امنیت و اعلان‌ها", href: "/settings" },
+  { icon: User, label: "مرکز حساب", desc: "خریدها، اطلاعات و نشانی", href: "/profile" },
+  { icon: Package, label: "سفارش‌های من", desc: "پیگیری سفارش و تحویل", href: "/orders" },
+  { icon: Store, label: "غرفه و فروش", desc: "ساخت غرفه و ثبت آگهی", href: "/profile?tab=seller" },
 ];
 
 // ========================================

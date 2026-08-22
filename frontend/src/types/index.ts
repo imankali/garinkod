@@ -333,7 +333,7 @@ export interface MarketplaceListing {
 // Helper Types
 // ========================================
 
-export type SortOption = 'popular' | 'cheapest' | 'expensive' | 'rating';
+export type SortOption = 'popular' | 'cheapest' | 'expensive';
 
 export interface ProductQueryParams {
   page?: number;

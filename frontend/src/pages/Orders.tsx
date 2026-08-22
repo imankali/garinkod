@@ -38,7 +38,7 @@ export default function Orders() {
   }
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-9" dir="rtl">
+    <main className="mx-auto max-w-5xl px-4 py-9">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div><p className="text-sm font-bold text-emerald-700 dark:text-lime-300">پیگیری شفاف سفارش</p><h1 className="mt-1 text-3xl font-extrabold text-slate-800 dark:text-white">سفارش‌های من</h1></div>
         <Link to="/products" className="rounded-xl border border-emerald-200 px-4 py-2.5 text-sm font-bold text-emerald-700 dark:border-emerald-700 dark:text-lime-300">بازگشت به محصولات</Link>

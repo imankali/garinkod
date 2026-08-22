@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
+import toast from "react-hot-toast";
 import {
   Search, X, Clock, SlidersHorizontal,
-  Star, PackageCheck, Mic, Sparkles, Tag, Flame
+  PackageCheck, Mic, Sparkles, Tag, Flame
 } from "lucide-react";
 import { categories } from "../data/shopData";
 import { productsApi } from "../api/services";
@@ -32,7 +33,7 @@ function convertProduct(apiProduct: ProductList): MockProduct {
     subCategoryId: '',
     brand: 'گرین کود',
     price: apiProduct.price,
-    rating: 4.5,
+    rating: 0,
     reviews: 0,
     image: apiProduct.image_url || '/images/hero-farm.jpg',
     inStock: apiProduct.is_in_stock,
@@ -91,8 +92,6 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
   const [isFocused, setIsFocused] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
-  const [minRating, setMinRating] = useState(0);
   const [inStockOnly, setInStockOnly] = useState(false);
 
   const [recent, setRecent] = useState<string[]>(() => {
@@ -118,7 +117,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
   // دریافت محصولات از API
   // ========================================
   const { data: searchResults, isLoading } = useQuery({
-    queryKey: ['search', debouncedQuery, activeCategory, inStockOnly, minRating],
+    queryKey: ['search', debouncedQuery, activeCategory, inStockOnly],
     queryFn: async () => {
       const params: any = {};
 
@@ -137,7 +136,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
       const response = await productsApi.getAll({ ...params, page: 1 });
       return response.data.results.map(convertProduct);
     },
-    enabled: debouncedQuery.trim().length > 0 || activeCategory !== 'all' || inStockOnly || minRating > 0,
+    enabled: debouncedQuery.trim().length > 0 || activeCategory !== 'all' || inStockOnly,
     staleTime: 30000,
   });
 
@@ -157,20 +156,12 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
   // ========================================
   // محاسبات
   // ========================================
-  const activeFacetCount = [selectedBrand, minRating > 0, inStockOnly].filter(Boolean).length;
+  const activeFacetCount = [inStockOnly].filter(Boolean).length;
 
-  const filteredProducts: MockProduct[] = useMemo(() => {
-    if (!searchResults) return [];
-
-    let results = searchResults;
-
-    // فیلتر بر اساس امتیاز
-    if (minRating > 0) {
-      results = results.filter(p => p.rating >= minRating);
-    }
-
-    return results.slice(0, 8);
-  }, [searchResults, minRating]);
+  const filteredProducts: MockProduct[] = useMemo(
+    () => (searchResults || []).slice(0, 8),
+    [searchResults]
+  );
 
   // ========================================
   // Handlers
@@ -184,8 +175,6 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
   }
 
   function resetFacets() {
-    setSelectedBrand(null);
-    setMinRating(0);
     setInStockOnly(false);
     setActiveCategory("all");
   }
@@ -212,26 +201,21 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
         recognition.onend = () => setIsListening(false);
         recognition.start();
         return;
-      } catch (e) {
-        // Fallback
+      } catch {
+        setIsListening(false);
+        toast.error("شروع جستجوی صوتی ممکن نشد؛ لطفاً عبارت خود را تایپ کنید.");
+        return;
       }
     }
 
-    setTimeout(() => {
-      const sampleQueries = ["کود اوره گرانوله", "سمپاش موتوری", "سم علف‌کش", "بذر گوجه‌فرنگی"];
-      const randomQuery = sampleQueries[Math.floor(Math.random() * sampleQueries.length)] ?? sampleQueries[0] ?? '';
-      setQuery(randomQuery);
-      setIsListening(false);
-    }, 2200);
+    setIsListening(false);
+    toast("جستجوی صوتی در این مرورگر پشتیبانی نمی‌شود.");
   }
 
   function handleQuickFilter(filterType: string, value: any) {
     switch (filterType) {
       case 'inStock':
         setInStockOnly(!inStockOnly);
-        break;
-      case 'rating':
-        setMinRating(minRating === value ? 0 : value);
         break;
       case 'category':
         setActiveCategory(value);
@@ -373,20 +357,6 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
                     >
                       <PackageCheck size={13} /> فقط کالای موجود
                     </button>
-                    {[4, 3].map((rating) => (
-                      <button
-                        key={rating}
-                        onClick={() => handleQuickFilter('rating', rating)}
-                        className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${
-                          minRating === rating
-                            ? "bg-amber-500 text-white"
-                            : "bg-white text-slate-600 ring-1 ring-slate-200 dark:bg-emerald-900 dark:text-emerald-100 dark:ring-emerald-800"
-                        }`}
-                      >
-                        <Star size={12} fill={minRating === rating ? "currentColor" : "none"} />
-                        امتیاز {rating.toLocaleString("fa-IR")}+
-                      </button>
-                    ))}
                   </div>
                 </div>
 

@@ -146,20 +146,22 @@ export default function ProductCard({
           )}
         </h3>
 
-        {/* Rating & Reviews */}
-        <div className="mb-2 flex items-center gap-1 text-amber-400">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Star
-              key={i}
-              size={12}
-              fill={i < Math.round(product.rating) ? "currentColor" : "none"}
-              className={i < Math.round(product.rating) ? "" : "text-slate-200"}
-            />
-          ))}
-          <span className="mr-1 text-xs text-slate-400">
-            ({product.rating}) · {product.reviews.toLocaleString("fa-IR")} نظر
-          </span>
-        </div>
+        {/* Ratings are shown only when verified review data exists. */}
+        {product.reviews > 0 && (
+          <div className="mb-2 flex items-center gap-1 text-amber-400">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Star
+                key={i}
+                size={12}
+                fill={i < Math.round(product.rating) ? "currentColor" : "none"}
+                className={i < Math.round(product.rating) ? "" : "text-slate-200"}
+              />
+            ))}
+            <span className="mr-1 text-xs text-slate-400">
+              ({product.rating}) · {product.reviews.toLocaleString("fa-IR")} نظر
+            </span>
+          </div>
+        )}
 
         {/* Price */}
         <div className="mb-3 flex items-baseline gap-2">

@@ -10,7 +10,7 @@ import type { Category } from "../types";
 // ========================================
 // Types
 // ========================================
-export type SortOption = "popular" | "cheapest" | "expensive" | "rating";
+export type SortOption = "popular" | "cheapest" | "expensive";
 
 interface FilterSortBarProps {
   activeCategory: string;
@@ -32,7 +32,6 @@ const sortOptions: { id: SortOption; label: string }[] = [
   { id: "popular", label: "محبوب‌ترین" },
   { id: "cheapest", label: "ارزان‌ترین" },
   { id: "expensive", label: "گران‌ترین" },
-  { id: "rating", label: "بالاترین امتیاز" },
 ];
 
 // ========================================

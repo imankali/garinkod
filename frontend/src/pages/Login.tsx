@@ -91,7 +91,7 @@ export default function Login() {
   // Render
   // ========================================
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-lime-50 py-12 px-4 dark:from-emerald-950 dark:to-emerald-900" dir="rtl">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-lime-50 py-12 px-4 dark:from-emerald-950 dark:to-emerald-900">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

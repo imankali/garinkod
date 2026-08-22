@@ -60,7 +60,7 @@ function convertToMockProduct(apiProduct: ProductList): MockProduct {
     subCategoryId: '',
     brand: 'گرین کود',
     price: apiProduct.price,
-    rating: 4.5,
+    rating: 0,
     reviews: 0,
     image: apiProduct.image_url || '/images/hero-farm.jpg',
     inStock: apiProduct.is_in_stock,

@@ -19,8 +19,6 @@ const SUPPORTED_FILE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/jp
 export default function ConsultationButton() {
   const [open, setOpen] = useState(false);
   const [uploadedName, setUploadedName] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // ========================================
@@ -43,43 +41,9 @@ export default function ConsultationButton() {
     }
 
     setUploadedName(file.name);
-    setUploading(true);
-    setUploadProgress(0);
-
-    try {
-      // TODO: در آینده به API متصل شود
-      // const formData = new FormData();
-      // formData.append('image', file);
-      // await consultationApi.uploadImage(formData);
-
-      // موقتاً شبیه‌سازی آپلود با progress
-      await simulateUpload();
-
-      toast.success("عکس دریافت شد، کارشناس با شما تماس می‌گیرد ✅");
-    } catch (error) {
-      toast.error("خطا در ارسال عکس");
-      setUploadedName(null);
-      setUploadProgress(0);
-    } finally {
-      setUploading(false);
-    }
-  }
-
-  // ========================================
-  // Simulate Upload Progress
-  // ========================================
-  async function simulateUpload() {
-    return new Promise<void>((resolve) => {
-      let progress = 0;
-      const interval = setInterval(() => {
-        progress += 10;
-        setUploadProgress(progress);
-        if (progress >= 100) {
-          clearInterval(interval);
-          setTimeout(resolve, 300);
-        }
-      }, 150);
-    });
+    // There is no upload API yet. Do not pretend the diagnostic image reached
+    // an agronomist; guide the customer to a verified support channel instead.
+    toast("عکس انتخاب شد؛ برای ارسال و دریافت پاسخ، آن را از طریق واتس‌اپ برای کارشناس بفرستید.");
   }
 
   // ========================================
@@ -87,11 +51,8 @@ export default function ConsultationButton() {
   // ========================================
   function handleCloseModal() {
     setOpen(false);
-    // Reset state بعد از بستن
-    setTimeout(() => {
-      setUploadedName(null);
-      setUploadProgress(0);
-    }, 300);
+    // Reset selected filename after the close animation.
+    setTimeout(() => setUploadedName(null), 300);
   }
 
   return (
@@ -240,43 +201,19 @@ export default function ConsultationButton() {
                   {/* Upload Button */}
                   <button
                     onClick={() => fileRef.current?.click()}
-                    disabled={uploading}
-                    className="mx-auto flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-bold text-emerald-700 shadow-sm ring-1 ring-emerald-200 transition-colors hover:bg-emerald-50 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-emerald-950 dark:text-lime-300 dark:ring-emerald-700"
-                    aria-busy={uploading}
+                    className="mx-auto flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-bold text-emerald-700 shadow-sm ring-1 ring-emerald-200 transition-colors hover:bg-emerald-50 dark:bg-emerald-950 dark:text-lime-300 dark:ring-emerald-700"
                   >
-                    {uploading ? (
-                      <>
-                        <div className="h-3 w-3 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent"></div>
-                        در حال ارسال... {uploadProgress}%
-                      </>
-                    ) : (
-                      <>
-                        <Upload size={14} />
-                        {uploadedName ? uploadedName : "انتخاب عکس از گالری"}
-                      </>
-                    )}
+                    <Upload size={14} />
+                    {uploadedName ? uploadedName : "انتخاب عکس از گالری"}
                   </button>
 
-                  {/* Upload Progress Bar */}
-                  {uploading && (
-                    <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-emerald-200 dark:bg-emerald-800">
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${uploadProgress}%` }}
-                        transition={{ duration: 0.3 }}
-                        className="h-full bg-gradient-to-r from-emerald-500 to-lime-400"
-                      />
-                    </div>
-                  )}
-
-                  {/* Success Message */}
-                  {uploadedName && !uploading && (
+                  {uploadedName && (
                     <motion.p
                       initial={{ opacity: 0, y: 5 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="mt-2 text-[11px] font-semibold text-emerald-600 dark:text-lime-300"
+                      className="mt-2 text-[11px] font-semibold text-amber-700 dark:text-amber-200"
                     >
-                      عکس دریافت شد، کارشناس با شما تماس می‌گیرد ✅
+                      برای تکمیل مشاوره، این تصویر را از طریق واتس‌اپ برای کارشناس ارسال کنید.
                     </motion.p>
                   )}
                 </div>

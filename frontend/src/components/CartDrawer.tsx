@@ -196,7 +196,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
               {/* Trust mini strip */}
               <div className="relative mt-3 flex items-center justify-between text-[10px] text-white/85">
                 <span className="flex items-center gap-1">
-                  <Truck size={11} /> ارسال ۴ تا ۴۸ ساعته
+                  <Truck size={11} /> زمان ارسال پس از هماهنگی
                 </span>
                 <span className="flex items-center gap-1">
                   <ShieldCheck size={11} /> ضمانت اصالت کالا

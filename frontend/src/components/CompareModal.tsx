@@ -48,16 +48,16 @@ export default function CompareModal({ isOpen, items, onClose, onAddToCart }: Co
     },
     {
       label: "امتیاز",
-      render: (p) => (
+      render: (p) => p.reviews > 0 ? (
         <span className="flex items-center justify-center gap-1">
           <Star size={13} className="text-amber-400" fill="currentColor" />
           <span>{p.rating.toLocaleString("fa-IR")}</span>
         </span>
-      ),
+      ) : <span className="text-slate-400">—</span>,
     },
     {
       label: "تعداد نظرات",
-      render: (p) => <span>{p.reviews.toLocaleString("fa-IR")}</span>,
+      render: (p) => <span>{p.reviews > 0 ? p.reviews.toLocaleString("fa-IR") : "—"}</span>,
     },
     {
       label: "موجودی",

@@ -53,6 +53,7 @@ import { productsApi } from "./api/services";
 // Hooks
 // ========================================
 import { useDarkMode } from "./hooks/useDarkMode";
+import { useTranslation } from "./i18n";
 
 // ========================================
 // Types
@@ -72,7 +73,7 @@ function convertToMockProduct(apiProduct: ProductList): MockProduct {
     subCategoryId: '',
     brand: 'گرین کود',
     price: apiProduct.price,
-    rating: 4.5,
+    rating: 0,
     reviews: 0,
     image: apiProduct.image_url || '/images/hero-farm.jpg',
     inStock: apiProduct.is_in_stock,
@@ -110,6 +111,7 @@ export default function App() {
   // Dark Mode
   // ========================================
   const { isDark, toggle: toggleDark } = useDarkMode();
+  const { dir } = useTranslation();
 
   // ========================================
   // UI State
@@ -125,7 +127,7 @@ export default function App() {
     return category || "all";
   });
   const [featuredOnly] = useState(() => new URLSearchParams(window.location.search).get("featured") === "true");
-  const [sort, setSort] = useState<"popular" | "cheapest" | "expensive" | "rating">("popular");
+  const [sort, setSort] = useState<"popular" | "cheapest" | "expensive">("popular");
   const [priceLimit, setPriceLimit] = useState<number>(10000000);
   const [inStockOnly, setInStockOnly] = useState<boolean>(false);
 
@@ -193,7 +195,6 @@ export default function App() {
         'popular': '-publish',
         'cheapest': 'price',
         'expensive': '-price',
-        'rating': '-rating',
       };
 
       if (sort !== 'popular') {
@@ -297,7 +298,7 @@ export default function App() {
       {/* ✅ div اصلی با min-h-screen و w-full */}
       <div
         className={`min-h-screen w-full overflow-x-hidden ${isDark ? 'dark' : ''}`}
-        dir="rtl"
+        dir={dir}
       >
         {/* ======================================== */}
         {/* Scroll Progress Bar */}
@@ -359,8 +360,10 @@ export default function App() {
                     {/* Weather Widget */}
                     <WeatherWidget />
 
-                    {/* Crop Selector */}
-                    <CropSelector activeCrop={activeCrop} onSelectCrop={setActiveCrop} />
+                    {/* Crop selector is shown only when the catalogue has verified crop tags. */}
+                    {products.some((product) => product.cropTags.length > 0) && (
+                      <CropSelector activeCrop={activeCrop} onSelectCrop={setActiveCrop} />
+                    )}
 
                     {/* Installment Banner */}
                     <InstallmentBanner />
