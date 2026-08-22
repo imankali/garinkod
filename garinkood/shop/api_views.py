@@ -475,6 +475,21 @@ def order_lookup(request):
     return Response(OrderSerializer(order).data)
 
 
+@api_view(['POST'])
+@permission_classes([permissions.AllowAny])
+def cancel_order(request):
+    code = str(request.data.get('code', '')).strip().upper()
+    phone = str(request.data.get('phone', '')).strip().replace(' ', '').replace('-', '')
+    if not code or not phone:
+        return Response({'error': 'کد سفارش و شماره تماس الزامی است.'}, status=status.HTTP_400_BAD_REQUEST)
+    order = get_object_or_404(Order, code=code, phone=phone)
+    try:
+        order = order.cancel_and_restore_stock()
+    except ValueError as error:
+        return Response({'error': str(error)}, status=status.HTTP_409_CONFLICT)
+    return Response({'order': OrderSerializer(order).data, 'message': 'سفارش لغو شد و موجودی رزروشده آزاد شد.'})
+
+
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def my_orders(request):

@@ -230,6 +230,8 @@ export const ordersApi = {
     apiClient.post<{ order: Order; message: string }>('/orders/checkout/', data),
   lookup: (code: string, phone: string) =>
     apiClient.get<Order>('/orders/lookup/', { params: { code, phone } }),
+  cancel: (code: string, phone: string) =>
+    apiClient.post<{ order: Order; message: string }>('/orders/cancel/', { code, phone }),
   mine: () => apiClient.get<Order[]>('/orders/mine/'),
 };
 

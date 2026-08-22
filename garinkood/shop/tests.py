@@ -140,6 +140,12 @@ class OrderAndPlatformTests(TestCase):
         self.assertEqual(lookup.status_code, 200)
         self.assertEqual(lookup.data["code"], order["code"])
 
+        cancelled = self.client.post('/api/orders/cancel/', {"code": order["code"], "phone": "09123456789"}, format='json')
+        self.assertEqual(cancelled.status_code, 200)
+        self.assertEqual(cancelled.data['order']['status'], 'cancelled')
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock, 6)
+
     def test_checkout_requires_terms_acceptance(self):
         self._add_to_guest_cart()
         response = self.client.post(

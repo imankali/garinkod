@@ -157,6 +157,20 @@ class AdminComment(admin.ModelAdmin):
 
 
 # --- Commerce operations ---
+def cancel_orders_and_restore_stock(modeladmin, request, queryset):
+    cancelled = 0
+    for order in queryset:
+        try:
+            order.cancel_and_restore_stock()
+            cancelled += 1
+        except ValueError:
+            continue
+    modeladmin.message_user(request, f'{cancelled} سفارش لغو و موجودی آن‌ها آزاد شد.')
+
+
+cancel_orders_and_restore_stock.short_description = 'لغو سفارش و بازگرداندن موجودی رزروشده'
+
+
 @admin.register(Order)
 class AdminOrder(admin.ModelAdmin):
     list_display = ('code', 'customer_name', 'phone', 'total_price', 'payment_status', 'status', 'created_at')
@@ -165,6 +179,7 @@ class AdminOrder(admin.ModelAdmin):
     list_editable = ('status', 'payment_status')
     readonly_fields = ('code', 'user', 'subtotal', 'shipping_price', 'total_price', 'created_at', 'updated_at')
     inlines = [OrderItemInline]
+    actions = [cancel_orders_and_restore_stock]
     date_hierarchy = 'created_at'
     ordering = ('-created_at',)
 

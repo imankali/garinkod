@@ -25,6 +25,7 @@ urlpatterns = [
     # Orders and interim payment coordination
     path('orders/checkout/', api_views.checkout, name='api_checkout'),
     path('orders/lookup/', api_views.order_lookup, name='api_order_lookup'),
+    path('orders/cancel/', api_views.cancel_order, name='api_order_cancel'),
     path('orders/mine/', api_views.my_orders, name='api_my_orders'),
 
     # Agriculture services, farmer procurement and marketplace storefronts

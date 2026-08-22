@@ -345,6 +345,38 @@ class Order(models.Model):
     def total_items(self):
         return self.items.aggregate(total=Sum('quantity'))['total'] or 0
 
+    def cancel_and_restore_stock(self):
+        """Cancel an unpaid order once and atomically restore its reservation."""
+        from django.db import transaction
+
+        with transaction.atomic():
+            order = Order.objects.select_for_update().get(pk=self.pk)
+            if order.status == 'cancelled':
+                return order
+            if order.payment_status == 'paid':
+                raise ValueError('Paid orders require a refund workflow before cancellation.')
+            if order.status not in {'awaiting_review', 'confirmed'}:
+                raise ValueError('This order can no longer be self-cancelled.')
+
+            items = list(order.items.select_related('product').all())
+            product_ids = [item.product_id for item in items if item.product_id]
+            products = {
+                product.id: product
+                for product in Product.objects.select_for_update().filter(id__in=product_ids)
+            }
+            for item in items:
+                product = products.get(item.product_id)
+                if product:
+                    product.stock += item.quantity
+                    product.available = True
+                    product.save(update_fields=['stock', 'available', 'updated'])
+
+            order.status = 'cancelled'
+            order.save(update_fields=['status', 'updated_at'])
+            AffiliateConversion.objects.filter(order=order, status='pending').update(status='rejected')
+            FinancialLedgerEntry.objects.filter(order=order, status='pending').update(status='reversed')
+            return order
+
 
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items')
