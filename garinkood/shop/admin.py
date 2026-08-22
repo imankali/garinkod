@@ -5,8 +5,10 @@ from .models import (
     Comment, UserAccount, Order, OrderItem, ServiceRequest, ProcurementRequest,
     Storefront, MarketplaceListing, PaymentAttempt, AffiliateProfile,
     AffiliateConversion, FinancialLedgerEntry, PlatformFeedback,
-    StorefrontComplaint, VisualSearchRequest
+    StorefrontComplaint, VisualSearchRequest, Coupon, Wallet, WalletTransaction,
+    StorefrontPost
 )
+from .rewards import mark_order_paid_and_reward
 
 
 # --- Inline Forms ---
@@ -171,6 +173,20 @@ def cancel_orders_and_restore_stock(modeladmin, request, queryset):
 cancel_orders_and_restore_stock.short_description = 'لغو سفارش و بازگرداندن موجودی رزروشده'
 
 
+def mark_orders_paid_and_issue_rewards(modeladmin, request, queryset):
+    completed = 0
+    for order in queryset:
+        try:
+            mark_order_paid_and_reward(order)
+            completed += 1
+        except ValueError:
+            continue
+    modeladmin.message_user(request, f'پرداخت {completed} سفارش تأیید و پاداش وفاداری ثبت شد.')
+
+
+mark_orders_paid_and_issue_rewards.short_description = 'تأیید پرداخت و صدور پاداش خرید بعدی'
+
+
 @admin.register(Order)
 class AdminOrder(admin.ModelAdmin):
     list_display = ('code', 'customer_name', 'phone', 'total_price', 'payment_status', 'status', 'created_at')
@@ -179,7 +195,7 @@ class AdminOrder(admin.ModelAdmin):
     list_editable = ('status', 'payment_status')
     readonly_fields = ('code', 'user', 'subtotal', 'shipping_price', 'total_price', 'created_at', 'updated_at')
     inlines = [OrderItemInline]
-    actions = [cancel_orders_and_restore_stock]
+    actions = [cancel_orders_and_restore_stock, mark_orders_paid_and_issue_rewards]
     date_hierarchy = 'created_at'
     ordering = ('-created_at',)
 
@@ -285,3 +301,36 @@ class AdminVisualSearchRequest(admin.ModelAdmin):
     search_fields = ('user__username',)
     list_editable = ('status',)
     readonly_fields = ('created_at', 'updated_at', 'result_payload')
+
+
+@admin.register(Coupon)
+class AdminCoupon(admin.ModelAdmin):
+    list_display = ('code', 'discount_type', 'discount_value', 'min_order_amount', 'usage_count', 'usage_limit', 'is_active', 'valid_until')
+    list_filter = ('discount_type', 'is_active', 'valid_from', 'valid_until')
+    search_fields = ('code', 'description', 'issued_to_phone', 'issued_to_user__username')
+    list_editable = ('is_active',)
+    readonly_fields = ('usage_count', 'created_at', 'updated_at')
+
+
+class WalletTransactionInline(admin.TabularInline):
+    model = WalletTransaction
+    extra = 0
+    readonly_fields = ('order', 'amount', 'transaction_type', 'status', 'description', 'created_at', 'available_at')
+    can_delete = False
+
+
+@admin.register(Wallet)
+class AdminWallet(admin.ModelAdmin):
+    list_display = ('user', 'balance', 'currency', 'updated_at')
+    search_fields = ('user__username', 'user__email')
+    readonly_fields = ('balance', 'updated_at')
+    inlines = [WalletTransactionInline]
+
+
+@admin.register(StorefrontPost)
+class AdminStorefrontPost(admin.ModelAdmin):
+    list_display = ('storefront', 'post_type', 'status', 'expires_at', 'created_at')
+    list_filter = ('post_type', 'status', 'created_at')
+    search_fields = ('storefront__name', 'caption')
+    list_editable = ('status',)
+    readonly_fields = ('created_at', 'updated_at')

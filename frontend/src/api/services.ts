@@ -24,6 +24,9 @@ import type {
   PlatformFeedbackPayload,
   StorefrontComplaintPayload,
   VisualSearchResponse,
+  Coupon,
+  Wallet,
+  StorefrontPost,
 } from '../types';
 
 // ========================================
@@ -44,6 +47,10 @@ export const productsApi = {
    */
   getBySlug: (slug: string) => {
     return apiClient.get<Product>(`/products/${slug}/`);
+  },
+
+  getSimilar: (slug: string) => {
+    return apiClient.get<ProductList[]>(`/products/${slug}/similar/`);
   },
 
   /**
@@ -102,7 +109,18 @@ export const commentsApi = {
    * ثبت نظر جدید
    * POST /api/comments/
    */
-  create: (data: { product: number; name: string; email?: string; body: string }) => {
+  create: (data: { product: number; name: string; email?: string; body: string; parent?: number | null; sticker?: string; image?: File | null }) => {
+    if (data.image) {
+      const formData = new FormData();
+      formData.append('product', String(data.product));
+      formData.append('name', data.name);
+      formData.append('body', data.body);
+      if (data.email) formData.append('email', data.email);
+      if (data.parent) formData.append('parent', String(data.parent));
+      if (data.sticker) formData.append('sticker', data.sticker);
+      formData.append('image', data.image);
+      return apiClient.post<Comment>('/comments/', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+    }
     return apiClient.post<Comment>('/comments/', data);
   },
 
@@ -276,5 +294,24 @@ export const trustApi = {
     return apiClient.post<VisualSearchResponse>('/visual-search/', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
+  },
+};
+
+export const rewardsApi = {
+  myCoupons: () => apiClient.get<Coupon[]>('/rewards/me/'),
+  wallet: () => apiClient.get<Wallet>('/wallet/me/'),
+};
+
+export const storefrontPostsApi = {
+  list: (params?: { post_type?: 'post' | 'story' }) =>
+    apiClient.get<PaginatedResponse<StorefrontPost>>('/marketplace/posts/', { params }),
+  mine: () => apiClient.get<StorefrontPost[]>('/marketplace/posts/mine/'),
+  create: (data: { post_type: 'post' | 'story'; caption: string; listing?: number; image?: File | null }) => {
+    const formData = new FormData();
+    formData.append('post_type', data.post_type);
+    formData.append('caption', data.caption);
+    if (data.listing) formData.append('listing', String(data.listing));
+    if (data.image) formData.append('image', data.image);
+    return apiClient.post<StorefrontPost>('/marketplace/posts/', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
   },
 };

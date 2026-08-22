@@ -19,6 +19,7 @@ const EMPTY_FORM: CheckoutPayload = {
   postal_code: "",
   notes: "",
   payment_method: "coordination",
+  coupon_code: "",
   terms_accepted: false,
 };
 
@@ -96,6 +97,7 @@ export default function Checkout() {
           <div className="mt-6 rounded-2xl bg-emerald-50 p-4 dark:bg-emerald-900/40">
             <p className="text-xs text-slate-500 dark:text-emerald-300">کد پیگیری سفارش</p>
             <p className="mt-1 text-xl font-extrabold tracking-wider text-emerald-700 dark:text-lime-300" dir="ltr">{order.code}</p>
+            {order.discount_amount > 0 && <p className="mt-3 text-sm font-bold text-emerald-700 dark:text-lime-300">تخفیف اعمال‌شده: {formatPrice(order.discount_amount)}</p>}
             <p className="mt-3 text-sm font-bold text-slate-700 dark:text-white">مبلغ ثبت‌شده: {formatPrice(order.total_price)}</p>
           </div>
           <p className="mt-4 text-xs text-slate-400">پرداخت فقط از طریق روش فعال‌شده و تأییدشدهٔ سرور انجام می‌شود؛ هیچ درگاه غیرفعالی مبلغ دریافت نمی‌کند.</p>
@@ -160,6 +162,11 @@ export default function Checkout() {
               ))}
             </div>
           </div>
+
+          <label className="block text-sm font-bold text-slate-700 dark:text-emerald-50">
+            کد تخفیف خرید بعدی (اختیاری)
+            <input value={form.coupon_code || ''} onChange={(event) => updateField('coupon_code', event.target.value.toUpperCase())} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-normal outline-none transition focus:border-emerald-500 dark:border-emerald-700 dark:bg-emerald-900" placeholder="مثال: NEXT-..." dir="ltr" />
+          </label>
 
           <label className="block text-sm font-bold text-slate-700 dark:text-emerald-50">
             کد همکاری در فروش (اختیاری)

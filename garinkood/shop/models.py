@@ -185,6 +185,8 @@ class Comment(models.Model):
     name = models.CharField(max_length=100, verbose_name="نام")
     email = models.EmailField(blank=True, null=True, verbose_name="ایمیل")
     body = models.TextField(verbose_name="متن")
+    image = models.ImageField(upload_to='comments/%Y/%m/', blank=True, null=True, verbose_name="تصویر")
+    sticker = models.CharField(max_length=16, blank=True, verbose_name="استیکر")
     parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='replies')
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
@@ -324,6 +326,8 @@ class Order(models.Model):
     postal_code = models.CharField(max_length=20, blank=True, verbose_name='کد پستی')
     notes = models.TextField(max_length=1000, blank=True, verbose_name='توضیحات مشتری')
     subtotal = models.PositiveBigIntegerField(default=0)
+    discount_amount = models.PositiveBigIntegerField(default=0)
+    coupon_code = models.CharField(max_length=40, blank=True, db_index=True)
     shipping_price = models.PositiveBigIntegerField(default=0)
     total_price = models.PositiveBigIntegerField(default=0)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='awaiting_review', db_index=True)
@@ -373,6 +377,11 @@ class Order(models.Model):
 
             order.status = 'cancelled'
             order.save(update_fields=['status', 'updated_at'])
+            if order.coupon_code:
+                coupon = Coupon.objects.select_for_update().filter(code=order.coupon_code).first()
+                if coupon and coupon.usage_count > 0:
+                    coupon.usage_count -= 1
+                    coupon.save(update_fields=['usage_count', 'updated_at'])
             AffiliateConversion.objects.filter(order=order, status='pending').update(status='rejected')
             FinancialLedgerEntry.objects.filter(order=order, status='pending').update(status='reversed')
             return order
@@ -766,3 +775,137 @@ class VisualSearchRequest(models.Model):
 
     def __str__(self):
         return f"{self.get_target_display()} — {self.status}"
+
+# --- Promotions, wallet and storefront publishing ---
+class Coupon(models.Model):
+    DISCOUNT_TYPE_CHOICES = (
+        ('percentage', 'درصدی'),
+        ('fixed', 'مبلغ ثابت'),
+    )
+
+    code = models.CharField(max_length=40, unique=True, db_index=True)
+    description = models.CharField(max_length=255)
+    discount_type = models.CharField(max_length=20, choices=DISCOUNT_TYPE_CHOICES, default='percentage')
+    discount_value = models.PositiveBigIntegerField()
+    max_discount_amount = models.PositiveBigIntegerField(null=True, blank=True)
+    min_order_amount = models.PositiveBigIntegerField(default=0)
+    usage_limit = models.PositiveIntegerField(null=True, blank=True)
+    usage_count = models.PositiveIntegerField(default=0)
+    issued_to_user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='issued_coupons')
+    issued_to_phone = models.CharField(max_length=20, blank=True, db_index=True)
+    is_active = models.BooleanField(default=True, db_index=True)
+    valid_from = models.DateTimeField(default=timezone.now)
+    valid_until = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ('-created_at',)
+        verbose_name = 'کد تخفیف'
+        verbose_name_plural = 'کدهای تخفیف'
+
+    def __str__(self):
+        return self.code
+
+    def calculate_discount(self, subtotal: int, *, phone: str = '', user=None) -> int:
+        now = timezone.now()
+        if not self.is_active or now < self.valid_from or (self.valid_until and now > self.valid_until):
+            raise ValueError('این کد تخفیف فعال نیست یا منقضی شده است.')
+        if self.usage_limit is not None and self.usage_count >= self.usage_limit:
+            raise ValueError('ظرفیت استفاده از این کد تخفیف تمام شده است.')
+        if self.issued_to_user_id and (not user or self.issued_to_user_id != user.id):
+            raise ValueError('این کد برای حساب کاربری دیگری صادر شده است.')
+        if self.issued_to_phone and self.issued_to_phone != phone:
+            raise ValueError('این کد برای شماره تماس دیگری صادر شده است.')
+        if subtotal < self.min_order_amount:
+            raise ValueError('مبلغ سفارش به حداقل لازم برای این کد تخفیف نرسیده است.')
+        if self.discount_type == 'percentage':
+            discount = int(subtotal * self.discount_value / 100)
+            if self.max_discount_amount is not None:
+                discount = min(discount, self.max_discount_amount)
+            return discount
+        return min(subtotal, self.discount_value)
+
+
+class Wallet(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='wallet')
+    currency = models.CharField(max_length=8, default='IRR')
+    balance = models.BigIntegerField(default=0)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'کیف پول'
+        verbose_name_plural = 'کیف پول‌ها'
+
+    def __str__(self):
+        return f'{self.user.username} — {self.balance} {self.currency}'
+
+
+class WalletTransaction(models.Model):
+    TYPE_CHOICES = (
+        ('loyalty_reward', 'پاداش وفاداری'),
+        ('order_discount', 'تخفیف سفارش'),
+        ('refund', 'بازگشت وجه'),
+        ('affiliate_payout', 'تسویه همکاری در فروش'),
+        ('seller_payout', 'تسویه فروشنده'),
+        ('adjustment', 'اصلاحیه'),
+    )
+    STATUS_CHOICES = (
+        ('pending', 'در انتظار'),
+        ('available', 'قابل استفاده'),
+        ('spent', 'مصرف شده'),
+        ('reversed', 'برگشت خورده'),
+    )
+
+    wallet = models.ForeignKey(Wallet, on_delete=models.CASCADE, related_name='transactions')
+    order = models.ForeignKey(Order, null=True, blank=True, on_delete=models.SET_NULL, related_name='wallet_transactions')
+    amount = models.BigIntegerField(help_text='Positive credits and negative debits.')
+    transaction_type = models.CharField(max_length=30, choices=TYPE_CHOICES)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending', db_index=True)
+    description = models.CharField(max_length=500)
+    created_at = models.DateTimeField(auto_now_add=True)
+    available_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ('-created_at',)
+        verbose_name = 'تراکنش کیف پول'
+        verbose_name_plural = 'تراکنش‌های کیف پول'
+
+    def __str__(self):
+        return f'{self.wallet.user.username} {self.amount}'
+
+
+class StorefrontPost(models.Model):
+    POST_TYPE_CHOICES = (
+        ('post', 'پست'),
+        ('story', 'استوری'),
+    )
+    STATUS_CHOICES = (
+        ('draft', 'پیش‌نویس'),
+        ('pending_review', 'در انتظار بررسی'),
+        ('published', 'منتشر شده'),
+        ('rejected', 'رد شده'),
+        ('archived', 'بایگانی'),
+    )
+
+    storefront = models.ForeignKey(Storefront, on_delete=models.CASCADE, related_name='posts')
+    listing = models.ForeignKey(MarketplaceListing, null=True, blank=True, on_delete=models.SET_NULL, related_name='posts')
+    post_type = models.CharField(max_length=12, choices=POST_TYPE_CHOICES, default='post')
+    caption = models.TextField(max_length=2200)
+    image = models.ImageField(upload_to='storefront-posts/%Y/%m/', blank=True, null=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft', db_index=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ('-created_at',)
+        verbose_name = 'پست غرفه'
+        verbose_name_plural = 'پست‌ها و استوری‌های غرفه'
+
+    def __str__(self):
+        return f'{self.storefront.name} — {self.get_post_type_display()}'
+
+    @property
+    def image_url(self):
+        return self.image.url if self.image else '/images/hero-farm.jpg'

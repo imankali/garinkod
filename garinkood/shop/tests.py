@@ -2,7 +2,8 @@ from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
-from .models import AffiliateProfile, Category, Product, Storefront
+from .models import AffiliateProfile, Category, Coupon, Product, Storefront, StorefrontPost, Wallet
+from .rewards import mark_order_paid_and_reward
 
 
 @override_settings(SECURE_SSL_REDIRECT=False)
@@ -258,3 +259,49 @@ class OrderAndPlatformTests(TestCase):
         )
         self.assertEqual(complaint.status_code, 201)
         self.assertEqual(complaint.data['complaint']['status'], 'new')
+
+    def test_coupon_applies_once_and_paid_order_issues_wallet_reward(self):
+        coupon = Coupon.objects.create(
+            code='TEST-NEXT', description='تخفیف آزمایشی', discount_type='percentage',
+            discount_value=10, max_discount_amount=200000, usage_limit=1,
+            issued_to_phone='09123456789',
+        )
+        self._add_to_guest_cart()
+        response = self.client.post(
+            '/api/orders/checkout/',
+            {
+                'customer_name': 'کشاورز نمونه', 'phone': '09123456789', 'province': 'فارس',
+                'city': 'شیراز', 'address': 'خیابان نمونه', 'payment_method': 'coordination',
+                'coupon_code': coupon.code, 'terms_accepted': True,
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data['order']['discount_amount'], 100000)
+        self.assertEqual(response.data['order']['total_price'], 945000)
+        coupon.refresh_from_db()
+        self.assertEqual(coupon.usage_count, 1)
+
+        order_id = response.data['order']['id']
+        from .models import Order
+        order = Order.objects.get(id=order_id)
+        order.user = self.user
+        order.save(update_fields=['user'])
+        paid_order, next_coupon = mark_order_paid_and_reward(order)
+        self.assertEqual(paid_order.payment_status, 'paid')
+        self.assertIsNotNone(next_coupon)
+        wallet = Wallet.objects.get(user=self.user)
+        self.assertGreater(wallet.balance, 0)
+
+    def test_storefront_post_is_queued_for_review(self):
+        storefront = Storefront.objects.create(user=self.seller, name='غرفه محتوا', slug='content-stall')
+        self.client.force_authenticate(self.seller)
+        response = self.client.post(
+            '/api/marketplace/posts/',
+            {'post_type': 'story', 'caption': 'معرفی محصول تازه برداشت شده'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data['status'], 'pending_review')
+        self.assertIsNotNone(response.data['expires_at'])
+        self.assertEqual(StorefrontPost.objects.get(storefront=storefront).post_type, 'story')

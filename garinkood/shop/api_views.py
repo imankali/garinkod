@@ -1,9 +1,10 @@
 from contextlib import nullcontext
+from datetime import timedelta
 from secrets import token_urlsafe
 from threading import Lock
 
 from django.conf import settings
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
@@ -12,6 +13,7 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.models import User
 from django.db import connection, transaction
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 
@@ -20,7 +22,8 @@ from .models import (
     Category, Product, Comment, UserAccount, Cart, CartItem, Order, OrderItem,
     ServiceRequest, ProcurementRequest, Storefront, MarketplaceListing,
     PaymentAttempt, AffiliateProfile, AffiliateConversion, FinancialLedgerEntry,
-    PlatformFeedback, StorefrontComplaint, VisualSearchRequest
+    PlatformFeedback, StorefrontComplaint, VisualSearchRequest, Coupon, Wallet,
+    WalletTransaction, StorefrontPost
 )
 from .serializers import (
     CategorySerializer, ProductSerializer, ProductListSerializer,
@@ -29,9 +32,11 @@ from .serializers import (
     ServiceRequestSerializer, ProcurementRequestSerializer, StorefrontSerializer,
     MarketplaceListingSerializer, PaymentAttemptSerializer, AffiliateProfileSerializer,
     AffiliateConversionSerializer, FinancialLedgerEntrySerializer, PlatformFeedbackSerializer,
-    StorefrontComplaintSerializer, VisualSearchRequestSerializer
+    StorefrontComplaintSerializer, VisualSearchRequestSerializer, CouponSerializer,
+    WalletSerializer, StorefrontPostSerializer
 )
 from .payments import get_provider, provider_options
+from .rewards import mark_order_paid_and_reward
 
 # SQLite is used for local development only. It permits a single writer, so a
 # process-local lock prevents its deferred transactions from upgrading into
@@ -155,6 +160,15 @@ class ProductViewSet(viewsets.ReadOnlyModelViewSet):
     def featured(self, request):
         featured_products = self.queryset.filter(is_featured=True)[:8]
         serializer = ProductListSerializer(featured_products, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['get'])
+    def similar(self, request, slug=None):
+        product = self.get_object()
+        similar = self.queryset.exclude(id=product.id)
+        if product.category_id:
+            similar = similar.filter(category_id=product.category_id)
+        serializer = ProductListSerializer(similar[:4], many=True)
         return Response(serializer.data)
 
     @action(detail=False, methods=['get'])
@@ -394,7 +408,22 @@ def checkout(request):
                 )
 
             subtotal = sum(locked_products[item.product_id].price * item.quantity for item in cart_items)
-            shipping_price = 0 if subtotal >= SHIPPING_FREE_THRESHOLD else STANDARD_SHIPPING_PRICE
+            coupon_code = details.get('coupon_code', '').strip().upper()
+            coupon = None
+            discount_amount = 0
+            if coupon_code:
+                coupon = Coupon.objects.select_for_update().filter(code=coupon_code).first()
+                if not coupon:
+                    return Response({'error': 'کد تخفیف پیدا نشد.'}, status=status.HTTP_400_BAD_REQUEST)
+                try:
+                    discount_amount = coupon.calculate_discount(
+                        subtotal,
+                        phone=details['phone'],
+                        user=request.user if request.user.is_authenticated else None,
+                    )
+                except ValueError as error:
+                    return Response({'error': str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            shipping_price = 0 if subtotal - discount_amount >= SHIPPING_FREE_THRESHOLD else STANDARD_SHIPPING_PRICE
             affiliate_code = details.get('affiliate_code', '').strip().upper()
             affiliate = None
             if affiliate_code:
@@ -412,13 +441,19 @@ def checkout(request):
                 postal_code=details.get('postal_code', ''),
                 notes=details.get('notes', ''),
                 subtotal=subtotal,
+                discount_amount=discount_amount,
+                coupon_code=coupon_code,
                 shipping_price=shipping_price,
-                total_price=subtotal + shipping_price,
+                total_price=subtotal - discount_amount + shipping_price,
                 payment_method=details['payment_method'],
                 affiliate_code=affiliate_code,
                 payment_status='unpaid',
                 status='awaiting_review',
             )
+
+            if coupon:
+                coupon.usage_count += 1
+                coupon.save(update_fields=['usage_count', 'updated_at'])
 
             order_items = []
             for item in cart_items:
@@ -752,3 +787,60 @@ def visual_search(request):
         'request': VisualSearchRequestSerializer(search_request).data,
         'message': 'تصویر ثبت شد. تا اتصال موتور بینایی ماشین، نتیجهٔ خودکار نمایش داده نمی‌شود.'
     }, status=status.HTTP_201_CREATED)
+
+
+# ========================================
+# Loyalty rewards, wallet and seller publishing
+# ========================================
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def my_rewards(request):
+    phone = getattr(getattr(request.user, 'account', None), 'phone', '')
+    coupons = Coupon.objects.filter(is_active=True).filter(
+        Q(issued_to_user=request.user) | Q(issued_to_phone=phone)
+    )
+    return Response(CouponSerializer(coupons, many=True).data)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def my_wallet(request):
+    wallet, _ = Wallet.objects.get_or_create(user=request.user)
+    wallet = Wallet.objects.prefetch_related('transactions').get(pk=wallet.pk)
+    return Response(WalletSerializer(wallet).data)
+
+
+class StorefrontPostViewSet(viewsets.ModelViewSet):
+    serializer_class = StorefrontPostSerializer
+    filter_backends = [OrderingFilter]
+    ordering_fields = ['created_at']
+    ordering = ['-created_at']
+
+    def get_queryset(self):
+        base = StorefrontPost.objects.select_related('storefront', 'listing')
+        if self.action in {'list', 'retrieve'}:
+            now = timezone.now()
+            return base.filter(status='published').filter(
+                Q(post_type='post') |
+                Q(post_type='story', expires_at__gt=now)
+            )
+        if self.request.user.is_authenticated:
+            return base.filter(storefront__user=self.request.user)
+        return base.none()
+
+    def get_permissions(self):
+        if self.action in {'list', 'retrieve'}:
+            return [permissions.AllowAny()]
+        return [permissions.IsAuthenticated()]
+
+    def perform_create(self, serializer):
+        storefront = get_object_or_404(Storefront, user=self.request.user)
+        post_type = serializer.validated_data.get('post_type', 'post')
+        expires_at = serializer.validated_data.get('expires_at')
+        if post_type == 'story' and not expires_at:
+            expires_at = timezone.now() + timedelta(hours=24)
+        serializer.save(storefront=storefront, status='pending_review', expires_at=expires_at)
+
+    @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated])
+    def mine(self, request):
+        return Response(self.get_serializer(self.get_queryset(), many=True).data)

@@ -189,6 +189,8 @@ export interface Comment {
   name: string;
   email: string;
   body: string;
+  image: string | null;
+  sticker: string;
   parent: number | null;
   created: string;
   updated: string;
@@ -243,6 +245,8 @@ export interface Order {
   postal_code: string;
   notes: string;
   subtotal: number;
+  discount_amount: number;
+  coupon_code: string;
   shipping_price: number;
   total_price: number;
   status: string;
@@ -268,6 +272,7 @@ export interface CheckoutPayload {
   notes?: string;
   payment_method: 'coordination' | 'zarinpal' | 'stripe_card' | 'paypal' | 'crypto';
   affiliate_code?: string;
+  coupon_code?: string;
   terms_accepted: boolean;
 }
 
@@ -395,6 +400,59 @@ export interface MarketplaceListing {
   image_url: string;
   status: string;
   status_label: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Coupon {
+  id: number;
+  code: string;
+  description: string;
+  discount_type: 'percentage' | 'fixed';
+  discount_value: number;
+  max_discount_amount: number | null;
+  min_order_amount: number;
+  usage_limit: number | null;
+  usage_count: number;
+  is_active: boolean;
+  valid_from: string;
+  valid_until: string | null;
+}
+
+export interface WalletTransaction {
+  id: number;
+  order: number | null;
+  amount: number;
+  transaction_type: string;
+  type_label: string;
+  status: string;
+  status_label: string;
+  description: string;
+  created_at: string;
+  available_at: string | null;
+}
+
+export interface Wallet {
+  id: number;
+  currency: string;
+  balance: number;
+  updated_at: string;
+  transactions: WalletTransaction[];
+}
+
+export interface StorefrontPost {
+  id: number;
+  storefront: number;
+  storefront_name: string;
+  listing: number | null;
+  post_type: 'post' | 'story';
+  post_type_label: string;
+  caption: string;
+  image: string | null;
+  image_url: string;
+  status: string;
+  status_label: string;
+  expires_at: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from django.conf import settings
 from django.contrib.auth.models import User
 from .models import (
     Category, SubCategory, Product,
@@ -6,7 +7,8 @@ from .models import (
     UserAccount, Comment, Cart, CartItem, Order, OrderItem,
     ServiceRequest, ProcurementRequest, Storefront, MarketplaceListing,
     PaymentAttempt, AffiliateProfile, AffiliateConversion, FinancialLedgerEntry,
-    PlatformFeedback, StorefrontComplaint, VisualSearchRequest
+    PlatformFeedback, StorefrontComplaint, VisualSearchRequest, Coupon, Wallet,
+    WalletTransaction, StorefrontPost
 )
 
 
@@ -121,10 +123,15 @@ class CommentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
         fields = [
-            'id', 'product', 'name', 'email', 'body', 'parent',
+            'id', 'product', 'name', 'email', 'body', 'image', 'sticker', 'parent',
             'created', 'updated', 'active', 'replies'
         ]
         read_only_fields = ['created', 'updated', 'active']
+
+    def validate_image(self, image):
+        if image and image.size > settings.VISUAL_SEARCH_MAX_UPLOAD_BYTES:
+            raise serializers.ValidationError('حجم تصویر نظر از حد مجاز بیشتر است.')
+        return image
 
     def get_replies(self, obj):
         replies = obj.replies.filter(active=True)
@@ -245,8 +252,8 @@ class OrderSerializer(serializers.ModelSerializer):
         model = Order
         fields = [
             'id', 'code', 'customer_name', 'phone', 'email', 'province', 'city',
-            'address', 'postal_code', 'notes', 'subtotal', 'shipping_price',
-            'total_price', 'status', 'status_label', 'payment_status',
+            'address', 'postal_code', 'notes', 'subtotal', 'discount_amount',
+            'coupon_code', 'shipping_price', 'total_price', 'status', 'status_label', 'payment_status',
             'payment_status_label', 'payment_method', 'payment_method_label', 'affiliate_code',
             'total_items', 'items', 'created_at', 'updated_at'
         ]
@@ -269,6 +276,7 @@ class CheckoutSerializer(serializers.Serializer):
         default='coordination',
     )
     affiliate_code = serializers.CharField(max_length=32, required=False, allow_blank=True)
+    coupon_code = serializers.CharField(max_length=40, required=False, allow_blank=True)
     terms_accepted = serializers.BooleanField()
 
     def validate_phone(self, value):
@@ -424,3 +432,57 @@ class VisualSearchRequestSerializer(serializers.ModelSerializer):
         model = VisualSearchRequest
         fields = ['id', 'image', 'target', 'status', 'status_label', 'result_payload', 'created_at']
         read_only_fields = ['id', 'status', 'status_label', 'result_payload', 'created_at']
+
+
+class CouponSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Coupon
+        fields = [
+            'id', 'code', 'description', 'discount_type', 'discount_value',
+            'max_discount_amount', 'min_order_amount', 'usage_limit', 'usage_count',
+            'is_active', 'valid_from', 'valid_until'
+        ]
+        read_only_fields = fields
+
+
+class WalletTransactionSerializer(serializers.ModelSerializer):
+    status_label = serializers.CharField(source='get_status_display', read_only=True)
+    type_label = serializers.CharField(source='get_transaction_type_display', read_only=True)
+
+    class Meta:
+        model = WalletTransaction
+        fields = ['id', 'order', 'amount', 'transaction_type', 'type_label', 'status', 'status_label', 'description', 'created_at', 'available_at']
+        read_only_fields = fields
+
+
+class WalletSerializer(serializers.ModelSerializer):
+    transactions = WalletTransactionSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Wallet
+        fields = ['id', 'currency', 'balance', 'updated_at', 'transactions']
+        read_only_fields = fields
+
+
+class StorefrontPostSerializer(serializers.ModelSerializer):
+    storefront_name = serializers.CharField(source='storefront.name', read_only=True)
+    image_url = serializers.SerializerMethodField()
+    status_label = serializers.CharField(source='get_status_display', read_only=True)
+    post_type_label = serializers.CharField(source='get_post_type_display', read_only=True)
+
+    class Meta:
+        model = StorefrontPost
+        fields = [
+            'id', 'storefront', 'storefront_name', 'listing', 'post_type',
+            'post_type_label', 'caption', 'image', 'image_url', 'status',
+            'status_label', 'expires_at', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'storefront', 'storefront_name', 'image_url', 'status', 'status_label', 'created_at', 'updated_at']
+
+    def validate_image(self, image):
+        if image and image.size > settings.VISUAL_SEARCH_MAX_UPLOAD_BYTES:
+            raise serializers.ValidationError('حجم تصویر پست از حد مجاز بیشتر است.')
+        return image
+
+    def get_image_url(self, obj):
+        return obj.image_url

@@ -9,6 +9,7 @@ router.register(r'products', api_views.ProductViewSet, basename='product')
 router.register(r'comments', api_views.CommentViewSet, basename='comment')
 router.register(r'cart', api_views.CartViewSet, basename='cart')
 router.register(r'marketplace/listings', api_views.MarketplaceListingViewSet, basename='marketplace-listing')
+router.register(r'marketplace/posts', api_views.StorefrontPostViewSet, basename='marketplace-post')
 
 urlpatterns = [
     # API Routes (از Router)
@@ -38,4 +39,6 @@ urlpatterns = [
     path('feedback/', api_views.submit_feedback, name='api_feedback'),
     path('complaints/storefront/', api_views.submit_storefront_complaint, name='api_storefront_complaint'),
     path('visual-search/', api_views.visual_search, name='api_visual_search'),
+    path('rewards/me/', api_views.my_rewards, name='api_my_rewards'),
+    path('wallet/me/', api_views.my_wallet, name='api_my_wallet'),
 ]

@@ -45,11 +45,11 @@ python scripts/platform_load_test.py \
 | درخواست‌ها | ۱٬۰۰۰ |
 | پاسخ موفق | ۱٬۰۰۰ (۱۰۰٪) |
 | خطا | ۰ |
-| نرخ پردازش | ۱۴۱٫۸ درخواست بر ثانیه |
-| میانگین پاسخ | ۵۰۶٫۸ms |
-| P50 | ۴۵۴٫۵ms |
-| P95 | ۱۱۲۹٫۰ms |
-| بیشترین زمان | ۲۱۹۶٫۷ms |
+| نرخ پردازش | ۱۶۰٫۷ درخواست بر ثانیه |
+| میانگین پاسخ | ۴۴۶٫۵ms |
+| P50 | ۴۰۷٫۰ms |
+| P95 | ۱۱۲۹٫۷ms |
+| بیشترین زمان | ۱۸۰۴٫۶ms |
 | وضعیت‌ها | ۵۰۰×۲۰۰، ۵۰۰×۲۰۱ |
 
 مسیرهای پوشش‌داده‌شده: products، categories، payments/options، ai-facts، cart، cart/add، services/requests، procurement/requests، feedback و orders/checkout.
@@ -90,7 +90,7 @@ python scripts/authenticated_platform_load_test.py \
 ## کنترل‌های دیگر
 
 ```text
-Django tests:           PASS (13 tests)
+Django tests:           PASS (15 tests)
 Django system check:    PASS
 TypeScript type check:  PASS
 Vite production build:  PASS
