@@ -87,7 +87,7 @@ export default function AvatarUploader({ fallback, size = 'lg' }: AvatarUploader
           onClick={() => inputRef.current?.click()}
           disabled={busy}
           aria-label={account?.avatar_url ? 'تغییر تصویر پروفایل' : 'افزودن تصویر پروفایل'}
-          className="absolute -bottom-1 -left-1 rounded-full bg-white p-1.5 text-emerald-700 shadow disabled:opacity-60"
+          className="absolute -bottom-1 -end-1 rounded-full bg-white p-1.5 text-emerald-700 shadow disabled:opacity-60"
         >
           {busy ? <Loader2 size={13} className="animate-spin" /> : <Camera size={13} />}
         </button>
@@ -97,7 +97,7 @@ export default function AvatarUploader({ fallback, size = 'lg' }: AvatarUploader
             type="button"
             onClick={handleRemove}
             aria-label="حذف تصویر پروفایل"
-            className="absolute -bottom-1 -right-1 rounded-full bg-white p-1.5 text-rose-600 shadow"
+            className="absolute -bottom-1 -start-1 rounded-full bg-white p-1.5 text-rose-600 shadow"
           >
             <Trash2 size={13} />
           </button>

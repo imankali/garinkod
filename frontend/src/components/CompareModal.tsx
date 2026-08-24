@@ -80,7 +80,7 @@ export default function CompareModal({ isOpen, items, onClose, onAddToCart }: Co
       label: "ویژگی‌ها",
       render: (p) =>
         p.features && p.features.length > 0 ? (
-          <ul className="space-y-1 text-right text-[10px]">
+          <ul className="space-y-1 text-start text-[10px]">
             {p.features.slice(0, 3).map((feature, idx) => (
               <li key={idx} className="flex items-start gap-1">
                 <CheckCircle2 size={10} className="mt-0.5 shrink-0 text-emerald-500" />
@@ -152,7 +152,7 @@ export default function CompareModal({ isOpen, items, onClose, onAddToCart }: Co
                 {/* ======================================== */}
                 <thead>
                   <tr>
-                    <th className="w-32 text-right text-xs text-slate-400 dark:text-emerald-400"></th>
+                    <th className="w-32 text-start text-xs text-slate-400 dark:text-emerald-400"></th>
                     {items.map((p) => (
                       <th key={p.id} className="p-2">
                         <div className="mx-auto mb-2 h-20 w-20 overflow-hidden rounded-xl bg-emerald-50 dark:bg-emerald-900">
@@ -183,13 +183,13 @@ export default function CompareModal({ isOpen, items, onClose, onAddToCart }: Co
                       key={row.label}
                       className="rounded-xl bg-slate-50 dark:bg-emerald-900/50"
                     >
-                      <td className="rounded-r-xl p-3 text-right text-xs font-bold text-slate-500 dark:text-emerald-300">
+                      <td className="rounded-e-xl p-3 text-start text-xs font-bold text-slate-500 dark:text-emerald-300">
                         {row.label}
                       </td>
                       {items.map((p) => (
                         <td
                           key={p.id}
-                          className="p-3 text-xs font-semibold text-slate-700 last:rounded-l-xl dark:text-emerald-50"
+                          className="p-3 text-xs font-semibold text-slate-700 last:rounded-s-xl dark:text-emerald-50"
                         >
                           {row.render(p)}
                         </td>
@@ -201,7 +201,7 @@ export default function CompareModal({ isOpen, items, onClose, onAddToCart }: Co
                   {/* Action Row - Add to Cart Buttons */}
                   {/* ======================================== */}
                   <tr>
-                    <td className="p-2 text-right text-xs font-bold text-slate-500 dark:text-emerald-300">
+                    <td className="p-2 text-start text-xs font-bold text-slate-500 dark:text-emerald-300">
                       خرید
                     </td>
                     {items.map((p) => (

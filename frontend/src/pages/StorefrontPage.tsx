@@ -158,7 +158,7 @@ export default function StorefrontPage() {
           )}
         </div>
 
-        <div className="flex-1 text-center sm:pb-2 sm:text-right">
+        <div className="flex-1 text-center sm:pb-2 sm:text-start">
           <h1 className="flex items-center justify-center gap-1.5 text-xl font-extrabold text-slate-800 dark:text-white sm:justify-start">
             {storefront.name}
             {storefront.is_verified && (
@@ -470,7 +470,7 @@ function StoryViewer({
         type="button"
         onClick={onClose}
         aria-label="بستن استوری"
-        className="absolute left-4 top-8 z-10 rounded-full bg-white/15 p-2 text-white hover:bg-white/25"
+        className="absolute end-4 top-8 z-10 rounded-full bg-white/15 p-2 text-white hover:bg-white/25"
       >
         <X size={20} />
       </button>
@@ -492,13 +492,13 @@ function StoryViewer({
         aria-label="استوری قبلی"
         disabled={index === 0}
         onClick={() => onIndexChange(index - 1)}
-        className="absolute inset-y-0 right-0 w-1/3 cursor-pointer disabled:cursor-default"
+        className="absolute inset-y-0 start-0 w-1/3 cursor-pointer disabled:cursor-default"
       />
       <button
         type="button"
         aria-label="استوری بعدی"
         onClick={() => (index < posts.length - 1 ? onIndexChange(index + 1) : onClose())}
-        className="absolute inset-y-0 left-0 w-1/3 cursor-pointer"
+        className="absolute inset-y-0 end-0 w-1/3 cursor-pointer"
       />
     </motion.div>
   );

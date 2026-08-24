@@ -67,7 +67,7 @@ export default function ConsultationButton() {
         whileHover={{ scale: 1.06 }}
         whileTap={{ scale: 0.94 }}
         onClick={() => setOpen(true)}
-        className="fixed bottom-24 left-4 z-40 flex items-center gap-2 rounded-full bg-brand-gradient px-4 py-3 text-white shadow-xl shadow-emerald-900/30 lg:bottom-6 lg:left-6 dark:shadow-none"
+        className="fixed bottom-24 end-4 z-40 flex items-center gap-2 rounded-full bg-brand-gradient px-4 py-3 text-white shadow-xl shadow-emerald-900/30 lg:bottom-6 lg:end-6 dark:shadow-none"
         aria-label="باز کردن مشاوره رایگان"
       >
         <motion.span
@@ -79,7 +79,7 @@ export default function ConsultationButton() {
         <span className="hidden text-sm font-bold sm:inline">مشاوره رایگان</span>
 
         {/* Pulse Indicator */}
-        <span className="absolute -left-1 -top-1 flex h-3 w-3">
+        <span className="absolute -end-1 -top-1 flex h-3 w-3">
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-lime-300 opacity-75" />
           <span className="relative inline-flex h-3 w-3 rounded-full bg-lime-400" />
         </span>
@@ -107,7 +107,7 @@ export default function ConsultationButton() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 40, scale: 0.95 }}
               transition={{ type: "spring", damping: 26, stiffness: 300 }}
-              className="fixed inset-x-4 bottom-4 z-[90] mx-auto max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl sm:inset-x-auto sm:bottom-1/2 sm:right-1/2 sm:translate-x-1/2 sm:translate-y-1/2 dark:bg-emerald-950"
+              className="fixed inset-x-4 bottom-4 z-[90] mx-auto max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl sm:inset-x-auto sm:bottom-1/2 sm:start-1/2 sm:translate-x-1/2 sm:translate-y-1/2 dark:bg-emerald-950"
               role="dialog"
               aria-modal="true"
               aria-label="مشاوره تخصصی کشاورزی"
@@ -118,7 +118,7 @@ export default function ConsultationButton() {
               <div className="relative bg-brand-gradient px-5 py-5 text-white">
                 <button
                   onClick={handleCloseModal}
-                  className="absolute left-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-white/20 transition-colors hover:bg-white/30"
+                  className="absolute end-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-white/20 transition-colors hover:bg-white/30"
                   aria-label="بستن"
                 >
                   <X size={16} />

@@ -227,7 +227,7 @@ export default function Marketplace() {
             <div className="relative flex-1">
               <Search
                 size={16}
-                className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
+                className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-slate-400"
               />
               <input
                 type="search"
@@ -235,7 +235,7 @@ export default function Marketplace() {
                 onChange={(event) => setSearchInput(event.target.value)}
                 placeholder="جستجوی محصول، غرفه یا نوع کشت"
                 aria-label="جستجوی آگهی"
-                className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pr-9 pl-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-emerald-800 dark:bg-emerald-950 dark:text-white"
+                className="w-full rounded-xl border border-slate-200 bg-white py-2.5 ps-9 pe-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-emerald-800 dark:bg-emerald-950 dark:text-white"
               />
             </div>
             <button
@@ -653,7 +653,7 @@ function StorefrontForm({
               onChange={(event) => setStore({ ...store, name: event.target.value })}
               aria-invalid={Boolean(fieldErrors.name) || nameStatus?.available === false}
               aria-describedby="store-name-status"
-              className={`w-full rounded-xl border px-3 py-2.5 pl-9 outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:bg-emerald-900 ${
+              className={`w-full rounded-xl border px-3 py-2.5 pe-9 outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:bg-emerald-900 ${
                 nameStatus?.available === false || fieldErrors.name
                   ? 'border-rose-400'
                   : nameStatus?.available
@@ -661,7 +661,7 @@ function StorefrontForm({
                     : 'border-slate-200 dark:border-emerald-700'
               }`}
             />
-            <span className="absolute left-3 top-1/2 -translate-y-1/2">
+            <span className="absolute end-3 top-1/2 -translate-y-1/2">
               {checking ? (
                 <Loader2 size={16} className="animate-spin text-slate-400" />
               ) : nameStatus?.available ? (

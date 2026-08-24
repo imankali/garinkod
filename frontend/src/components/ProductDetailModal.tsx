@@ -105,7 +105,7 @@ export default function ProductDetailModal({
               onClick={onClose}
               whileHover={{ rotate: 90, scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
-              className="absolute left-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-slate-500 shadow-md backdrop-blur"
+              className="absolute end-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-slate-500 shadow-md backdrop-blur"
               aria-label="بستن"
             >
               <X size={18} />
@@ -127,14 +127,14 @@ export default function ProductDetailModal({
 
                 {/* Badge */}
                 {product.badge && (
-                  <span className="absolute right-4 top-4 rounded-full bg-brand-orange px-3 py-1 text-xs font-bold text-white shadow-lg">
+                  <span className="absolute start-4 top-4 rounded-full bg-brand-orange px-3 py-1 text-xs font-bold text-white shadow-lg">
                     {product.badge}
                   </span>
                 )}
 
                 {/* Out of Stock Badge */}
                 {!product.inStock && (
-                  <span className="absolute bottom-4 right-4 rounded-full bg-slate-800/90 px-3 py-1 text-xs font-bold text-white">
+                  <span className="absolute bottom-4 start-4 rounded-full bg-slate-800/90 px-3 py-1 text-xs font-bold text-white">
                     ناموجود
                   </span>
                 )}
@@ -163,7 +163,7 @@ export default function ProductDetailModal({
                       className={i < Math.round(product.rating) ? "" : "text-slate-200"}
                     />
                   ))}
-                  <span className="mr-1 text-xs text-slate-400">
+                  <span className="ms-1 text-xs text-slate-400">
                     ({product.rating}) · {product.reviews.toLocaleString("fa-IR")} نظر ثبت‌شده
                   </span>
                 </div>

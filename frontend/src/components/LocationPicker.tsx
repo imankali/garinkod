@@ -102,7 +102,7 @@ export default function LocationPicker({
           htmlFor={provinceId}
           className="mb-1 block text-xs font-bold text-slate-600 dark:text-emerald-100"
         >
-          <MapPin size={12} className="ml-1 inline" />
+          <MapPin size={12} className="me-1 inline" />
           استان {required && <span className="text-rose-500">*</span>}
         </label>
         <select

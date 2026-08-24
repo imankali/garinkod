@@ -214,7 +214,7 @@ export default function Checkout() {
             <p className="mt-1">فقط روش‌هایی که سرور با credential، callback verify و تست کامل فعال کرده باشد قابل انتخاب‌اند. روش‌های دیگر صرفاً برای شفافیت نمایش داده می‌شوند.</p>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
               {providers.map((provider) => (
-                <button key={provider.code} type="button" disabled={!provider.enabled} onClick={() => updateField('payment_method', provider.code)} className={`rounded-xl border p-3 text-right text-xs transition ${form.payment_method === provider.code ? 'border-emerald-600 bg-emerald-100 text-emerald-900 dark:bg-emerald-900 dark:text-lime-100' : 'border-amber-200 bg-white/80 dark:border-amber-800 dark:bg-emerald-950'} ${!provider.enabled ? 'cursor-not-allowed opacity-60' : ''}`}>
+                <button key={provider.code} type="button" disabled={!provider.enabled} onClick={() => updateField('payment_method', provider.code)} className={`rounded-xl border p-3 text-start text-xs transition ${form.payment_method === provider.code ? 'border-emerald-600 bg-emerald-100 text-emerald-900 dark:bg-emerald-900 dark:text-lime-100' : 'border-amber-200 bg-white/80 dark:border-amber-800 dark:bg-emerald-950'} ${!provider.enabled ? 'cursor-not-allowed opacity-60' : ''}`}>
                   <span className="block font-extrabold">{provider.label}</span>
                   <span className="mt-1 block text-[10px]">{provider.enabled ? 'فعال' : provider.reason}</span>
                 </button>

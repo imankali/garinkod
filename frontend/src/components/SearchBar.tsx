@@ -316,14 +316,14 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
             setShowAdvanced((v) => !v);
             setIsFocused(true);
           }}
-          className={`relative flex items-center gap-1 border-r border-emerald-100 px-3 text-slate-500 transition-colors hover:text-[#0F8A5F] dark:border-emerald-900 dark:text-emerald-400 ${
+          className={`relative flex items-center gap-1 border-s border-emerald-100 px-3 text-slate-500 transition-colors hover:text-[#0F8A5F] dark:border-emerald-900 dark:text-emerald-400 ${
             showAdvanced ? "text-[#0F8A5F] dark:text-lime-300" : ""
           }`}
           aria-label="فیلترهای پیشرفته"
         >
           <SlidersHorizontal size={16} />
           {activeFacetCount > 0 && (
-            <span className="absolute -left-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-brand-orange text-[9px] font-bold text-white">
+            <span className="absolute -end-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-brand-orange text-[9px] font-bold text-white">
               {activeFacetCount}
             </span>
           )}
@@ -351,7 +351,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.98 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
-            className="absolute right-0 top-[calc(100%+10px)] z-40 w-full overflow-hidden rounded-2xl border border-emerald-100 bg-white/95 p-3 shadow-2xl shadow-emerald-900/10 backdrop-blur-xl dark:border-emerald-800 dark:bg-emerald-950/95"
+            className="absolute start-0 top-[calc(100%+10px)] z-40 w-full overflow-hidden rounded-2xl border border-emerald-100 bg-white/95 p-3 shadow-2xl shadow-emerald-900/10 backdrop-blur-xl dark:border-emerald-800 dark:bg-emerald-950/95"
           >
             {/* Voice Search Listening Indicator */}
             {isListening && (
@@ -526,7 +526,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
                           onSelectProduct?.(product);
                           setIsFocused(false);
                         }}
-                        className="flex w-full items-center gap-3 rounded-xl p-2 text-right transition-colors hover:bg-emerald-50 dark:hover:bg-emerald-900/50"
+                        className="flex w-full items-center gap-3 rounded-xl p-2 text-start transition-colors hover:bg-emerald-50 dark:hover:bg-emerald-900/50"
                       >
                         <span className="h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-emerald-50">
                           <img

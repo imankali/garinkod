@@ -156,7 +156,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", damping: 30, stiffness: 280 }}
-            className="fixed inset-y-0 left-0 z-[70] flex w-full max-w-md flex-col bg-white shadow-2xl dark:bg-emerald-950"
+            className="fixed inset-y-0 end-0 z-[70] flex w-full max-w-md flex-col bg-white shadow-2xl dark:bg-emerald-950"
           >
             {/* ======================================== */}
             {/* Header */}
@@ -202,7 +202,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                       initial={{ width: 0 }}
                       animate={{ width: `${shippingProgress}%` }}
                       transition={{ duration: 0.6, ease: "easeOut" }}
-                      className="absolute inset-y-0 right-0 rounded-full bg-gradient-to-l from-lime-300 to-white"
+                      className="absolute inset-y-0 start-0 rounded-full bg-gradient-to-l from-lime-300 to-white"
                     />
                   </div>
                 </div>
@@ -327,7 +327,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                                     Math.min(item.quantity + 1, quantityBounds(item).max),
                                   )
                                 }
-                                className="flex h-8 w-8 items-center justify-center rounded-r-lg text-emerald-600 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40 dark:text-lime-300 dark:hover:bg-emerald-800"
+                                className="flex h-8 w-8 items-center justify-center rounded-e-lg text-emerald-600 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40 dark:text-lime-300 dark:hover:bg-emerald-800"
                               >
                                 <Plus size={14} />
                               </motion.button>
@@ -349,7 +349,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                                     Math.max(quantityBounds(item).min, item.quantity - 1),
                                   )
                                 }
-                                className="flex h-8 w-8 items-center justify-center rounded-l-lg text-slate-500 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 dark:text-emerald-400 dark:hover:bg-emerald-800"
+                                className="flex h-8 w-8 items-center justify-center rounded-s-lg text-slate-500 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 dark:text-emerald-400 dark:hover:bg-emerald-800"
                               >
                                 <Minus size={14} />
                               </motion.button>

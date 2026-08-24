@@ -19,7 +19,7 @@ export default function ScrollProgressBar() {
 
   return (
     <motion.div
-      className="fixed left-0 right-0 top-0 z-[100] h-1 origin-right bg-gradient-to-l from-emerald-500 via-lime-400 to-emerald-600 shadow-[0_0_10px_rgba(16,185,129,0.6)]"
+      className="fixed end-0 start-0 top-0 z-[100] h-1 origin-right bg-gradient-to-l from-emerald-500 via-lime-400 to-emerald-600 shadow-[0_0_10px_rgba(16,185,129,0.6)]"
       style={{ scaleX }}
       role="progressbar"
       aria-label="نوار پیشرفت اسکرول صفحه"

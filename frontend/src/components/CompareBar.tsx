@@ -72,7 +72,7 @@ export default function CompareBar({
                     {/* Remove Button */}
                     <button
                       onClick={() => onRemove(item.id)}
-                      className="absolute -left-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-white shadow-md transition-transform hover:scale-110"
+                      className="absolute -end-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-white shadow-md transition-transform hover:scale-110"
                       aria-label={`حذف ${item.name} از مقایسه`}
                     >
                       <X size={11} />
@@ -96,7 +96,7 @@ export default function CompareBar({
             {/* ======================================== */}
             {/* Actions */}
             {/* ======================================== */}
-            <div className="mr-auto flex shrink-0 items-center gap-2">
+            <div className="ms-auto flex shrink-0 items-center gap-2">
               {/* Clear Button */}
               <button
                 onClick={onClear}

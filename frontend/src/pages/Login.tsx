@@ -130,7 +130,7 @@ export default function Login() {
                 نام کاربری
               </label>
               <div className="relative">
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
+                <span className="absolute start-3 top-1/2 -translate-y-1/2 text-slate-400">
                   <User size={18} />
                 </span>
                 <input
@@ -139,7 +139,7 @@ export default function Login() {
                   value={formData.username}
                   onChange={handleChange}
                   required
-                  className="w-full rounded-xl border-2 border-slate-200 bg-white pr-10 pl-4 py-3 text-sm transition-colors focus:border-emerald-500 focus:outline-none dark:border-emerald-800 dark:bg-emerald-950 dark:text-white"
+                  className="w-full rounded-xl border-2 border-slate-200 bg-white ps-10 pe-4 py-3 text-sm transition-colors focus:border-emerald-500 focus:outline-none dark:border-emerald-800 dark:bg-emerald-950 dark:text-white"
                   placeholder="نام کاربری خود را وارد کنید"
                   autoComplete="username"
                 />
@@ -185,7 +185,7 @@ export default function Login() {
                     ایمیل
                   </label>
                   <div className="relative">
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
+                    <span className="absolute start-3 top-1/2 -translate-y-1/2 text-slate-400">
                       <Mail size={18} />
                     </span>
                     <input
@@ -194,7 +194,7 @@ export default function Login() {
                       value={formData.email}
                       onChange={handleChange}
                       required
-                      className="w-full rounded-xl border-2 border-slate-200 bg-white pr-10 pl-4 py-3 text-sm transition-colors focus:border-emerald-500 focus:outline-none dark:border-emerald-800 dark:bg-emerald-950 dark:text-white"
+                      className="w-full rounded-xl border-2 border-slate-200 bg-white ps-10 pe-4 py-3 text-sm transition-colors focus:border-emerald-500 focus:outline-none dark:border-emerald-800 dark:bg-emerald-950 dark:text-white"
                       placeholder="example@email.com"
                       dir="ltr"
                       autoComplete="email"
@@ -210,7 +210,7 @@ export default function Login() {
                 رمز عبور
               </label>
               <div className="relative">
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
+                <span className="absolute start-3 top-1/2 -translate-y-1/2 text-slate-400">
                   <Lock size={18} />
                 </span>
                 <input
@@ -219,7 +219,7 @@ export default function Login() {
                   value={formData.password}
                   onChange={handleChange}
                   required
-                  className="w-full rounded-xl border-2 border-slate-200 bg-white pr-10 pl-12 py-3 text-sm transition-colors focus:border-emerald-500 focus:outline-none dark:border-emerald-800 dark:bg-emerald-950 dark:text-white"
+                  className="w-full rounded-xl border-2 border-slate-200 bg-white ps-10 pe-12 py-3 text-sm transition-colors focus:border-emerald-500 focus:outline-none dark:border-emerald-800 dark:bg-emerald-950 dark:text-white"
                   placeholder="رمز عبور"
                   dir="ltr"
                   autoComplete={isRegister ? "new-password" : "current-password"}
@@ -227,7 +227,7 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-emerald-300"
+                  className="absolute end-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-emerald-300"
                   aria-label={showPassword ? "مخفی کردن رمز عبور" : "نمایش رمز عبور"}
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -242,7 +242,7 @@ export default function Login() {
                   تکرار رمز عبور
                 </label>
                 <div className="relative">
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
+                  <span className="absolute start-3 top-1/2 -translate-y-1/2 text-slate-400">
                     <Lock size={18} />
                   </span>
                   <input
@@ -251,7 +251,7 @@ export default function Login() {
                     value={formData.password2}
                     onChange={handleChange}
                     required
-                    className="w-full rounded-xl border-2 border-slate-200 bg-white pr-10 pl-12 py-3 text-sm transition-colors focus:border-emerald-500 focus:outline-none dark:border-emerald-800 dark:bg-emerald-950 dark:text-white"
+                    className="w-full rounded-xl border-2 border-slate-200 bg-white ps-10 pe-12 py-3 text-sm transition-colors focus:border-emerald-500 focus:outline-none dark:border-emerald-800 dark:bg-emerald-950 dark:text-white"
                     placeholder="تکرار رمز عبور"
                     dir="ltr"
                     autoComplete="new-password"
@@ -259,7 +259,7 @@ export default function Login() {
                   <button
                     type="button"
                     onClick={() => setShowPassword2(!showPassword2)}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-emerald-300"
+                    className="absolute end-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-emerald-300"
                     aria-label={showPassword2 ? "مخفی کردن رمز عبور" : "نمایش رمز عبور"}
                   >
                     {showPassword2 ? <EyeOff size={18} /> : <Eye size={18} />}

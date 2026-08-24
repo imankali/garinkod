@@ -135,7 +135,7 @@ export default function Storefronts() {
           <div className="relative flex-1">
             <Search
               size={16}
-              className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
+              className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-slate-400"
             />
             <input
               type="search"
@@ -143,7 +143,7 @@ export default function Storefronts() {
               onChange={(event) => setSearchInput(event.target.value)}
               placeholder="جستجوی نام غرفه، شهر یا توضیحات…"
               aria-label="جستجوی غرفه"
-              className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pr-9 pl-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-emerald-800 dark:bg-emerald-950 dark:text-white"
+              className="w-full rounded-xl border border-slate-200 bg-white py-2.5 ps-9 pe-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-emerald-800 dark:bg-emerald-950 dark:text-white"
             />
           </div>
           <button

@@ -13,6 +13,7 @@ import { useQuery } from "@tanstack/react-query";
 // ========================================
 import Header from "./components/Header";
 import MobileBottomNav from "./components/MobileBottomNav";
+import SiteFooter from "./components/SiteFooter";
 import CartDrawer from "./components/CartDrawer";
 import ProductCard from "./components/ProductCard";
 import ProductDetailModal from "./components/ProductDetailModal";
@@ -366,7 +367,20 @@ export default function App() {
         {/* ✅ pb-24 برای MobileBottomNav در موبایل */}
         {/* ✅ lg:pb-8 برای دسکتاپ */}
         {/* ======================================== */}
-        <main className="pb-24 lg:pb-8">
+        {/*
+          Skip link: the first thing a keyboard or screen-reader user reaches,
+          letting them jump past the header and navigation straight to content.
+        */}
+        <a href="#main-content" className="skip-link">
+          پرش به محتوای اصلی
+        </a>
+
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className="outline-none"
+          style={{ paddingBottom: 'var(--mobile-nav-clearance)' }}
+        >
           <Suspense fallback={<LoadingSpinner />}>
             <Routes>
               {/* ======================================== */}
@@ -530,15 +544,16 @@ export default function App() {
           </Suspense>
         </main>
 
+        {/* Site map footer — the fallback route to every destination. */}
+        <SiteFooter />
+
         {/* ======================================== */}
         {/* Mobile Bottom Nav */}
         {/* ======================================== */}
         <MobileBottomNav
           cartCount={cart?.total_items || 0}
-          wishlistCount={wishlist.length}
           onOpenCart={() => setCartOpen(true)}
           onOpenMenu={() => setMobileOpen(true)}
-          onOpenWishlist={() => setWishlistOpen(true)}
         />
 
         {/* ======================================== */}

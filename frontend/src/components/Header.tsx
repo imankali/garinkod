@@ -11,6 +11,10 @@ import {
   useVelocity,
 } from "framer-motion";
 import { Globe2, Heart, Menu, Moon, ShoppingCart, Sun, X } from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
+
+import { PRIMARY_ITEMS, SELLER_ITEMS, STAFF_ITEMS, visibleItems } from "../config/navigation";
+import { useAuthStore, useUserLevel } from "../store/authStore";
 import TopBar from "./TopBar";
 import Logo from "./Logo";
 import MegaMenu from "./MegaMenu";
@@ -24,14 +28,6 @@ import { useTranslation } from "../i18n";
 // ========================================
 // Constants
 // ========================================
-const NAV_LINKS = [
-  { key: "nav.home", href: "/" },
-  { key: "nav.products", href: "/products" },
-  { key: "nav.services", href: "/services" },
-  { key: "nav.marketplace", href: "/marketplace" },
-  { key: "nav.offers", href: "/products?featured=true" },
-] as const;
-
 const SPRING = { type: "spring", damping: 28, stiffness: 320, mass: 0.6 } as const;
 const SPRING_SOFT = { type: "spring", damping: 22, stiffness: 260 } as const;
 
@@ -140,8 +136,8 @@ const CartButton = memo(function CartButton({
               transition={{ ...SPRING_SOFT, damping: 15 }}
               className={`absolute flex items-center justify-center rounded-full bg-white font-bold text-[#0F8A5F] shadow ring-2 ring-emerald-500/20 ${
                 mobile
-                  ? "-left-2 -top-2.5 h-4 min-w-4 px-0.5 text-[9px]"
-                  : "-left-2 -top-2.5 h-4 min-w-4 px-0.5 text-[9px] sm:-left-2.5 sm:-top-3 sm:h-5 sm:min-w-5 sm:text-[10px]"
+                  ? "-end-2 -top-2.5 h-4 min-w-4 px-0.5 text-[9px]"
+                  : "-end-2 -top-2.5 h-4 min-w-4 px-0.5 text-[9px] sm:-end-2.5 sm:-top-3 sm:h-5 sm:min-w-5 sm:text-[10px]"
               }`}
             >
               <AnimatedCount value={count} />
@@ -200,10 +196,19 @@ const IconButton = memo(function IconButton({
 // ✅ Nav Link با underline هوشمند (layoutId)
 // ========================================
 const DesktopNav = memo(function DesktopNav() {
-  const { t } = useTranslation();
   const [hoveredHref, setHoveredHref] = useState<string | null>(null);
-  const activeHref =
-    typeof window !== "undefined" ? window.location.pathname : "/";
+  // The router's location, not window.location: reading the global directly
+  // meant the active link never updated during client-side navigation.
+  const { pathname } = useLocation();
+  const { isAuthenticated } = useAuthStore();
+  const level = useUserLevel();
+
+  // Primary destinations plus whatever this viewer is entitled to see, so a
+  // seller or moderator reaches their console without hunting for it.
+  const contextualItems = visibleItems(
+    [...SELLER_ITEMS, ...STAFF_ITEMS],
+    { level, isAuthenticated },
+  ).filter((item) => item.minLevel);
 
   return (
     <nav
@@ -211,31 +216,28 @@ const DesktopNav = memo(function DesktopNav() {
       aria-label="ناوبری اصلی"
     >
       <ul
-        className="mx-auto flex max-w-7xl items-center gap-1 px-4"
+        className="mx-auto flex max-w-7xl flex-wrap items-center gap-1 px-4"
         onMouseLeave={() => setHoveredHref(null)}
       >
-        {NAV_LINKS.map((link) => {
-          const isActive = activeHref === link.href.split("?")[0] && link.href !== "/"
-            ? true
-            : activeHref === "/" && link.href === "/";
-          const showUnderline = hoveredHref === link.href || (!hoveredHref && isActive);
+        {PRIMARY_ITEMS.map((item) => {
+          const base = item.to.split("?")[0]!;
+          const isActive = base === "/" ? pathname === "/" : pathname.startsWith(base);
+          const showUnderline = hoveredHref === item.to || (!hoveredHref && isActive);
 
           return (
-            <li key={link.href} className="relative">
-              <motion.a
-                href={link.href}
-                onMouseEnter={() => setHoveredHref(link.href)}
-                onFocus={() => setHoveredHref(link.href)}
-                whileTap={{ scale: 0.97 }}
-                className={`relative block px-3.5 py-2.5 text-sm font-medium transition-colors duration-200 ${
+            <li key={item.id} className="relative">
+              <Link
+                to={item.to}
+                onMouseEnter={() => setHoveredHref(item.to)}
+                onFocus={() => setHoveredHref(item.to)}
+                className={`relative flex min-h-11 items-center px-3.5 text-fluid-sm font-medium transition-colors duration-200 ${
                   isActive
                     ? "text-[#0F8A5F] dark:text-lime-300"
                     : "text-slate-600 hover:text-[#0F8A5F] dark:text-emerald-100 dark:hover:text-lime-300"
                 }`}
                 aria-current={isActive ? "page" : undefined}
               >
-                {t(link.key)}
-                {/* ✨ underline سیال که بین لینک‌ها حرکت می‌کند */}
+                {item.label}
                 {showUnderline && (
                   <motion.span
                     layoutId="nav-underline"
@@ -243,12 +245,37 @@ const DesktopNav = memo(function DesktopNav() {
                     className="absolute inset-x-3 bottom-1.5 h-0.5 rounded-full bg-brand-gradient-accent"
                   />
                 )}
-              </motion.a>
+              </Link>
             </li>
           );
         })}
 
-        <li className="mr-auto flex items-center gap-1.5 py-1 text-xs font-semibold text-[#0F8A5F] dark:text-lime-300">
+        {/* Role-specific shortcuts, visually separated from the shop links. */}
+        {contextualItems.length > 0 && (
+          <li aria-hidden="true" className="mx-1 h-5 w-px bg-emerald-200 dark:bg-emerald-800" />
+        )}
+        {contextualItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = pathname.startsWith(item.to);
+          return (
+            <li key={item.id}>
+              <Link
+                to={item.to}
+                aria-current={isActive ? "page" : undefined}
+                className={`flex min-h-11 items-center gap-1.5 rounded-lg px-3 text-fluid-xs font-bold transition-colors ${
+                  isActive
+                    ? "bg-emerald-600 text-white"
+                    : "text-emerald-700 hover:bg-emerald-100 dark:text-lime-300 dark:hover:bg-emerald-900"
+                }`}
+              >
+                <Icon size={14} aria-hidden="true" />
+                {item.label}
+              </Link>
+            </li>
+          );
+        })}
+
+        <li className="ms-auto hidden items-center gap-1.5 py-1 text-fluid-2xs font-semibold text-[#0F8A5F] dark:text-lime-300 xl:flex">
           <span className="relative flex h-2 w-2">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
             <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
@@ -402,7 +429,7 @@ export default function Header({
                   : { x: [0, 20, 0], y: [0, -10, 0], opacity: [0.15, 0.3, 0.15] }
               }
               transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
-              className="absolute -right-10 -top-16 h-40 w-40 rounded-full bg-emerald-200/25 blur-3xl dark:bg-emerald-500/10"
+              className="absolute -start-10 -top-16 h-40 w-40 rounded-full bg-emerald-200/25 blur-3xl dark:bg-emerald-500/10"
             />
           </div>
 
@@ -450,7 +477,7 @@ export default function Header({
             </div>
 
             {/* Desktop Actions */}
-            <div className="mr-auto hidden items-center gap-1 sm:flex sm:gap-1.5 md:gap-2 lg:gap-3">
+            <div className="ms-auto hidden items-center gap-1 sm:flex sm:gap-1.5 md:gap-2 lg:gap-3">
               <div className="hidden lg:block">
                 <MegaMenu />
               </div>
@@ -496,7 +523,7 @@ export default function Header({
                       animate={{ scale: 1, y: 0 }}
                       exit={{ scale: 0 }}
                       transition={{ ...SPRING_SOFT, damping: 15 }}
-                      className="absolute -left-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-orange px-0.5 text-[9px] font-bold text-white shadow-md sm:h-5 sm:min-w-5 sm:text-[10px]"
+                      className="absolute -end-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-orange px-0.5 text-[9px] font-bold text-white shadow-md sm:h-5 sm:min-w-5 sm:text-[10px]"
                     >
                       <AnimatedCount value={wishlistCount} />
                     </motion.span>
@@ -559,8 +586,11 @@ export default function Header({
       </motion.header>
 
       <MobileMenu
-        isOpen={mobileOpen}
+        open={mobileOpen}
         onClose={() => onMobileOpenChange(false)}
+        dark={isDark}
+        onToggleDark={onToggleDark}
+        wishlistCount={wishlistCount}
         onOpenWishlist={onOpenWishlist}
       />
 

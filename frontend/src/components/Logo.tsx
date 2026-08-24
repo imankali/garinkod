@@ -55,7 +55,7 @@ export default function Logo({ compact = false }: LogoProps) {
           <motion.span
             animate={{ scale: [1, 1.3, 1] }}
             transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute -left-1 -top-1 h-3 w-3 rounded-full bg-lime-400 shadow-lg shadow-lime-400/50"
+            className="absolute -end-1 -top-1 h-3 w-3 rounded-full bg-lime-400 shadow-lg shadow-lime-400/50"
           />
         </motion.div>
       </div>

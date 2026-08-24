@@ -121,7 +121,7 @@ export default function HighlightManager({ storefrontSlug, stories }: HighlightM
                   type="button"
                   onClick={() => removeHighlight(highlight)}
                   aria-label={`حذف هایلایت ${highlight.title}`}
-                  className="absolute -bottom-1 -left-1 rounded-full bg-white p-1 text-rose-600 shadow dark:bg-emerald-900"
+                  className="absolute -bottom-1 -end-1 rounded-full bg-white p-1 text-rose-600 shadow dark:bg-emerald-900"
                 >
                   <Trash2 size={11} />
                 </button>

@@ -215,14 +215,14 @@ export default function AgriCalculator({ onAddToCart }: AgriCalculatorProps) {
           جستجوی کود یا سم
         </label>
         <div className="relative">
-          <Search size={15} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search size={15} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             id="agri-search"
             type="search"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="مثلاً اوره، آبامکتین، مانکوزب…"
-            className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pr-9 pl-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-emerald-800 dark:bg-emerald-950 dark:text-white"
+            className="w-full rounded-xl border border-slate-200 bg-white py-2.5 ps-9 pe-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-emerald-800 dark:bg-emerald-950 dark:text-white"
           />
         </div>
 
@@ -239,7 +239,7 @@ export default function AgriCalculator({ onAddToCart }: AgriCalculatorProps) {
                     type="button"
                     onClick={() => setSelected(item)}
                     aria-pressed={selected?.id === item.id}
-                    className={`flex w-full items-center gap-2 border-b border-slate-50 px-3 py-2 text-right text-xs transition last:border-0 dark:border-emerald-900 ${
+                    className={`flex w-full items-center gap-2 border-b border-slate-50 px-3 py-2 text-start text-xs transition last:border-0 dark:border-emerald-900 ${
                       selected?.id === item.id
                         ? 'bg-emerald-50 font-bold text-emerald-800 dark:bg-emerald-900 dark:text-lime-200'
                         : 'hover:bg-slate-50 dark:hover:bg-emerald-900/50'

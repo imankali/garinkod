@@ -140,7 +140,7 @@ export default function ProductCard({
               {product.name}
             </a>
           ) : (
-            <button type="button" onClick={() => onQuickView(product)} className="text-right transition-colors hover:text-[#0F8A5F]">
+            <button type="button" onClick={() => onQuickView(product)} className="text-start transition-colors hover:text-[#0F8A5F]">
               {product.name}
             </button>
           )}
@@ -157,7 +157,7 @@ export default function ProductCard({
                 className={i < Math.round(product.rating) ? "" : "text-slate-200"}
               />
             ))}
-            <span className="mr-1 text-xs text-slate-400">
+            <span className="ms-1 text-xs text-slate-400">
               ({product.rating}) · {product.reviews.toLocaleString("fa-IR")} نظر
             </span>
           </div>
