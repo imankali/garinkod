@@ -3,6 +3,8 @@
 import { Link } from 'react-router-dom';
 import { ArrowLeft, PackageCheck, ShieldCheck, Truck } from 'lucide-react';
 
+import { useTranslation } from '../../i18n';
+
 /**
  * The opening statement of the shop window.
  *
@@ -16,6 +18,8 @@ import { ArrowLeft, PackageCheck, ShieldCheck, Truck } from 'lucide-react';
  * each other.
  */
 export default function HomeHero() {
+  const { t } = useTranslation();
+
   return (
     <section
       className="relative overflow-hidden bg-gradient-to-bl from-emerald-800 via-emerald-700 to-lime-600 text-white"
@@ -41,12 +45,11 @@ export default function HomeHero() {
           id="hero-heading"
           className="mt-2 max-w-3xl text-fluid-3xl font-extrabold leading-tight"
         >
-          کود، سم، بذر و ادوات — و بازار مستقیم محصول کشاورزان
+          {t('home.heroTitle')}
         </h2>
 
         <p className="mt-4 max-w-2xl text-fluid-base leading-8 text-emerald-50">
-          از فروشگاه تخصصی خرید کنید یا مستقیم از غرفه کشاورزان و تعاونی‌ها سفارش بگیرید.
-          هر آگهی پیش از انتشار بررسی می‌شود.
+          {t('home.heroSubtitle')}
         </p>
 
         <div className="mt-7 flex flex-wrap gap-3">
@@ -54,14 +57,14 @@ export default function HomeHero() {
             to="/products"
             className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-white px-6 text-fluid-sm font-extrabold text-emerald-800 shadow-lg transition hover:bg-emerald-50"
           >
-            خرید از فروشگاه
+            {t('home.buyFromShop')}
             <ArrowLeft size={17} aria-hidden="true" />
           </Link>
           <Link
             to="/marketplace"
             className="inline-flex min-h-12 items-center gap-2 rounded-xl border-2 border-white/70 px-6 text-fluid-sm font-extrabold text-white transition hover:bg-white/10"
           >
-            بازار کشاورزان
+            {t('home.farmersMarket')}
             <ArrowLeft size={17} aria-hidden="true" />
           </Link>
         </div>

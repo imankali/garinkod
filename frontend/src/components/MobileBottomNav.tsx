@@ -2,34 +2,31 @@
 
 import { NavLink, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Menu, ShoppingCart } from 'lucide-react';
+import { ShoppingCart } from 'lucide-react';
 
 import { MOBILE_BAR_ITEMS } from '../config/navigation';
 import { cn } from '../utils/cn';
+import { useTranslation } from '../i18n';
 
 interface MobileBottomNavProps {
   cartCount: number;
   onOpenCart: () => void;
-  onOpenMenu: () => void;
 }
 
 /**
- * The mobile bottom bar.
+ * The mobile bottom bar — exactly five destinations: the four pinned links
+ * plus the cart in the middle. The previous sixth "more" entry was removed;
+ * the full menu stays reachable from the header's menu button.
  *
- * Two deliberate changes from the previous version:
- *
- * 1. Destinations are real `NavLink`s rather than buttons calling `navigate`.
- *    A button cannot be opened in a new tab, long-pressed, or read as a link
- *    by assistive technology — and it loses the automatic active state.
- * 2. Every control is at least 44px tall and the bar reserves the iOS home
- *    indicator area, so nothing sits under the system gesture strip.
+ * Every control is at least 44px tall and the bar reserves the iOS home
+ * indicator area, so nothing sits under the system gesture strip.
  */
 export default function MobileBottomNav({
   cartCount,
   onOpenCart,
-  onOpenMenu,
 }: MobileBottomNavProps) {
   const { pathname } = useLocation();
+  const { t } = useTranslation();
 
   return (
     <nav
@@ -50,7 +47,7 @@ export default function MobileBottomNav({
             type="button"
             onClick={onOpenCart}
             className="group flex min-h-[3.5rem] w-full flex-col items-center justify-center gap-1 rounded-xl py-1.5 text-emerald-700 transition-colors dark:text-lime-300"
-            aria-label={`سبد خرید${cartCount > 0 ? ` — ${cartCount} کالا` : ' — خالی'}`}
+            aria-label={`${t('nav.cart')}${cartCount > 0 ? ` — ${cartCount} کالا` : ' — خالی'}`}
           >
             <span className="relative flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-600 text-white transition-transform group-active:scale-95">
               <ShoppingCart size={16} aria-hidden="true" />
@@ -68,7 +65,7 @@ export default function MobileBottomNav({
                 )}
               </AnimatePresence>
             </span>
-            <span className="text-fluid-2xs font-bold">سبد</span>
+            <span className="text-fluid-2xs font-bold">{t('nav.cart')}</span>
           </button>
         </li>
 
@@ -77,19 +74,6 @@ export default function MobileBottomNav({
             <BarLink item={item} pathname={pathname} />
           </li>
         ))}
-
-        {/* "More" opens the full menu, so nothing is unreachable on mobile. */}
-        <li className="flex-1">
-          <button
-            type="button"
-            onClick={onOpenMenu}
-            className="flex min-h-[3.5rem] w-full flex-col items-center justify-center gap-1 rounded-xl py-1.5 text-slate-500 transition-colors hover:text-emerald-700 dark:text-emerald-200"
-            aria-label="باز کردن منوی کامل"
-          >
-            <Menu size={19} aria-hidden="true" />
-            <span className="text-fluid-2xs font-bold">بیشتر</span>
-          </button>
-        </li>
       </ul>
     </nav>
   );
@@ -103,8 +87,15 @@ function BarLink({
   pathname: string;
 }) {
   const Icon = item.icon;
+  const { t } = useTranslation();
   // `/` would otherwise match every route, so the home link is compared exactly.
   const isActive = item.to === '/' ? pathname === '/' : pathname.startsWith(item.to);
+
+  const label = (() => {
+    const key = `nav.${item.id}`;
+    const translated = t(key);
+    return translated === key ? item.label : translated;
+  })();
 
   return (
     <NavLink
@@ -126,7 +117,7 @@ function BarLink({
           />
         )}
       </span>
-      <span className="text-fluid-2xs font-bold">{item.label}</span>
+      <span className="text-fluid-2xs font-bold">{label}</span>
     </NavLink>
   );
 }

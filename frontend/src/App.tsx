@@ -32,6 +32,7 @@ import HomeHero from "./components/home/HomeHero";
 import ServiceShortcuts from "./components/home/ServiceShortcuts";
 import CategoryGrid from "./components/home/CategoryGrid";
 import FeaturedStorefronts from "./components/home/FeaturedStorefronts";
+import DirectMessagesDrawer from "./components/direct/DirectMessagesDrawer";
 
 // ========================================
 // Pages (Lazy Loaded)
@@ -52,12 +53,15 @@ const Rewards = lazy(() => import("./pages/Rewards"));
 const Management = lazy(() => import("./pages/Management"));
 const Storefronts = lazy(() => import("./pages/Storefronts"));
 const StorefrontPage = lazy(() => import("./pages/StorefrontPage"));
+const Shop = lazy(() => import("./pages/Shop"));
+const Messages = lazy(() => import("./pages/Messages"));
 
 // ========================================
 // Stores
 // ========================================
 import { useCartStore } from "./store/cartStore";
 import { useAuthStore } from "./store/authStore";
+import { useWishlistStore } from "./store/wishlistStore";
 
 // ========================================
 // API Services
@@ -67,45 +71,14 @@ import { productsApi } from "./api/services";
 // ========================================
 // Hooks
 // ========================================
-import { useDarkMode } from "./hooks/useDarkMode";
+import { useThemeStore, applyThemeClass } from "./store/themeStore";
 import { useTranslation } from "./i18n";
 
 // ========================================
 // Types
 // ========================================
-import type { MockProduct, ProductList } from "./types";
-
-// ========================================
-// Helper: تبدیل ProductList به MockProduct
-// ========================================
-function convertToMockProduct(apiProduct: ProductList): MockProduct {
-  return {
-    id: apiProduct.id,
-    slug: apiProduct.slug,
-    name: apiProduct.title,
-    category: typeof apiProduct.category === 'string' ? apiProduct.category : 'کود کشاورزی',
-    categoryId: 'fertilizer',
-    subCategoryId: '',
-    brand: 'گرین کود',
-    price: apiProduct.price,
-    rating: 0,
-    reviews: 0,
-    image: apiProduct.image_url || '/images/hero-farm.jpg',
-    inStock: apiProduct.is_in_stock,
-    description: '',
-    features: [],
-    cropTags: [],
-    pestTags: [],
-    usage: {
-      dosage: '',
-      method: '',
-      timing: '',
-    },
-    warnings: [],
-    compatibleWith: [],
-    brochureAvailable: false,
-  };
-}
+import type { MockProduct } from "./types";
+import { convertToMockProduct } from "./utils/convertProduct";
 
 // ========================================
 // Loading Spinner Component
@@ -123,10 +96,15 @@ function LoadingSpinner() {
 // ========================================
 export default function App() {
   // ========================================
-  // Dark Mode
+  // Dark Mode (shared store so the profile settings stay in sync)
   // ========================================
-  const { isDark, toggle: toggleDark } = useDarkMode();
+  const isDark = useThemeStore((state) => state.isDark);
+  const toggleDark = useThemeStore((state) => state.toggle);
   const { dir } = useTranslation();
+
+  useEffect(() => {
+    applyThemeClass(isDark);
+  }, [isDark]);
 
   // ========================================
   // UI State
@@ -147,16 +125,11 @@ export default function App() {
   const [inStockOnly, setInStockOnly] = useState<boolean>(false);
 
   // ========================================
-  // Wishlist & Compare (LocalStorage)
+  // Wishlist (shared store) & Compare
   // ========================================
-  const [wishlist, setWishlist] = useState<MockProduct[]>(() => {
-    try {
-      const stored = localStorage.getItem('wishlist');
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  });
+  const wishlist = useWishlistStore((state) => state.wishlist);
+  const toggleWishlist = useWishlistStore((state) => state.toggle);
+  const removeFromWishlist = useWishlistStore((state) => state.remove);
 
   const [compareItems, setCompareItems] = useState<MockProduct[]>([]);
 
@@ -243,23 +216,10 @@ export default function App() {
     : products;
 
   // ========================================
-  // Save Wishlist to LocalStorage
-  // ========================================
-  useEffect(() => {
-    localStorage.setItem('wishlist', JSON.stringify(wishlist));
-  }, [wishlist]);
-
-  // ========================================
   // Handlers
   // ========================================
   function handleToggleWishlist(product: MockProduct) {
-    setWishlist((prev) => {
-      const exists = prev.find((p) => p.id === product.id);
-      if (exists) {
-        return prev.filter((p) => p.id !== product.id);
-      }
-      return [...prev, product];
-    });
+    toggleWishlist(product);
   }
 
   function handleToggleCompare(product: MockProduct) {
@@ -484,8 +444,9 @@ export default function App() {
                 }
               />
 
-              {/* Keep legacy catalogue links indexable and functional. */}
-              <Route path="/products" element={<Navigate to={`/${window.location.search}`} replace />} />
+              {/* The standalone shop: only the site's own products, with
+                  categories, pagination and curated sections. */}
+              <Route path="/products" element={<Shop />} />
 
               {/* ======================================== */}
               {/* Platform routes */}
@@ -503,6 +464,9 @@ export default function App() {
               {/* Public storefront directory and profiles */}
               <Route path="/storefronts" element={<Storefronts />} />
               <Route path="/storefronts/:slug" element={<StorefrontPage />} />
+
+              {/* Direct messages centre (buyers and storefront owners) */}
+              <Route path="/messages" element={<Messages />} />
 
               {/* Seller studio is for storefront owners (level 2+). */}
               <Route
@@ -579,8 +543,12 @@ export default function App() {
         <MobileBottomNav
           cartCount={cart?.total_items || 0}
           onOpenCart={() => setCartOpen(true)}
-          onOpenMenu={() => setMobileOpen(true)}
         />
+
+        {/* ======================================== */}
+        {/* Direct Messages Drawer */}
+        {/* ======================================== */}
+        <DirectMessagesDrawer />
 
         {/* ======================================== */}
         {/* Cart Drawer */}
@@ -606,7 +574,7 @@ export default function App() {
           <WishlistModal
             wishlist={wishlist}
             onClose={() => setWishlistOpen(false)}
-            onRemove={(id) => setWishlist((prev) => prev.filter((p) => p.id !== id))}
+            onRemove={removeFromWishlist}
             onAddToCart={handleAddToCart}
           />
         )}

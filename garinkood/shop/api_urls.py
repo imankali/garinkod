@@ -45,6 +45,19 @@ urlpatterns = [
     path('marketplace/storefront/', api_views.my_storefront, name='api_my_storefront'),
     path('marketplace/storefront/availability/', marketplace_views.storefront_name_available, name='api_storefront_availability'),
     path('marketplace/following/', marketplace_views.my_following, name='api_my_following'),
+
+    # Direct messages between buyers and storefronts
+    path('marketplace/conversations/', marketplace_views.my_conversations, name='api_my_conversations'),
+    path(
+        'marketplace/conversations/<int:conversation_id>/messages/',
+        marketplace_views.conversation_messages,
+        name='api_conversation_messages',
+    ),
+    path(
+        'marketplace/storefronts/<str:slug>/conversation/',
+        marketplace_views.storefront_conversation,
+        name='api_storefront_conversation',
+    ),
     path('marketplace/finance/', api_views.storefront_finance, name='api_storefront_finance'),
     path('marketplace/finance/export/', api_views.storefront_finance_export, name='api_storefront_finance_export'),
     path('payments/options/', api_views.payment_options_view, name='api_payment_options'),

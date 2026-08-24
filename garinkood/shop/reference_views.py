@@ -66,7 +66,10 @@ def locations(request):
     if search:
         queryset = queryset.filter(name__icontains=search)
 
-    queryset = queryset.select_related('parent').order_by('kind', 'name')[:200]
+    # The cap is a safety net for the unconstrained `?search=` query, not for
+    # the standard province/city lookups: a full province list is 31 rows and
+    # the largest province has ~45 cities, all far below the limit.
+    queryset = queryset.select_related('parent').order_by('kind', 'name')[:1000]
     return Response({
         'count': len(queryset),
         'results': LocationSerializer(queryset, many=True).data,

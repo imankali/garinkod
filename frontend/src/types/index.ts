@@ -97,6 +97,9 @@ export interface ProductList {
   image: string | null;
   image_url: string;
   is_in_stock: boolean;
+  discount_percent: number;
+  sales_count: number;
+  discounted_price: number;
 }
 
 // ========================================
@@ -444,6 +447,7 @@ export interface Storefront {
   followers_count: number;
   listing_count: number;
   is_following: boolean;
+  is_owner: boolean;
   owner_name: string;
   created_at: string;
 }
@@ -510,8 +514,49 @@ export interface MarketplaceListing {
   status: string;
   status_label: string;
   is_purchasable: boolean;
+  discount_percent: number;
+  sales_count: number;
+  discounted_price: number;
   rejection_reason: string;
   reviewed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// ========================================
+// Direct messages between buyers and storefronts
+// ========================================
+
+export interface AttachedListing {
+  id: number;
+  title: string;
+  slug: string;
+  price: number;
+  discounted_price: number;
+  unit: string;
+  image_url: string;
+  storefront_name: string;
+  storefront_slug: string;
+}
+
+export interface StorefrontMessage {
+  id: number;
+  conversation: number;
+  sender: number;
+  sender_name: string;
+  is_mine: boolean;
+  body: string;
+  listing: AttachedListing | null;
+  is_read: boolean;
+  created_at: string;
+}
+
+export interface StorefrontConversation {
+  id: number;
+  storefront: Storefront;
+  counterpart_name: string;
+  last_message: StorefrontMessage | null;
+  unread_count: number;
   created_at: string;
   updated_at: string;
 }
@@ -633,12 +678,14 @@ export type SortOption = 'popular' | 'cheapest' | 'expensive';
 
 export interface ProductQueryParams {
   page?: number;
+  page_size?: number;
   category?: string;
   search?: string;
   ordering?: string;
   is_featured?: boolean;
   available?: boolean;
   in_stock?: boolean;
+  has_discount?: boolean;
   min_price?: number;
   max_price?: number;
 }

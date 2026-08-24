@@ -17,12 +17,13 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 
 from .models import (
-    MarketplaceListing, Storefront, StorefrontFollow, StorefrontHighlight,
-    StorefrontHighlightItem, StorefrontPost,
+    MarketplaceListing, Storefront, StorefrontConversation, StorefrontFollow,
+    StorefrontHighlight, StorefrontHighlightItem, StorefrontMessage, StorefrontPost,
 )
 from .permissions import IsStorefrontOwnerOrReadOnly
 from .serializers import (
-    MarketplaceListingSerializer, StorefrontHighlightSerializer,
+    MarketplaceListingSerializer, StorefrontConversationSerializer,
+    StorefrontHighlightSerializer, StorefrontMessageSerializer,
     StorefrontPostSerializer, StorefrontSerializer,
 )
 from .slugs import slugify_fa
@@ -315,3 +316,143 @@ class StorefrontHighlightViewSet(viewsets.ModelViewSet):
             highlight = serializer.save()
             if post_ids is not None:
                 self._sync_items(highlight, post_ids)
+
+
+# ============================================================
+# Direct messages (DM) between buyers and storefronts
+# ============================================================
+
+class MessagePagination(PageNumberPagination):
+    page_size = 40
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
+
+def _participant_conversations(user):
+    """Every conversation the user can see, newest activity first."""
+    return (
+        StorefrontConversation.objects
+        .filter(Q(storefront__user=user) | Q(customer=user))
+        .select_related('storefront', 'storefront__user', 'customer')
+        .prefetch_related(Prefetch(
+            'messages',
+            queryset=StorefrontMessage.objects.order_by('-created_at').select_related('sender', 'listing', 'listing__storefront'),
+        ))
+        .order_by('-updated_at')
+        .distinct()
+    )
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def my_conversations(request):
+    """All direct conversations the caller participates in — as a buyer or as a
+    storefront owner — with unread counts for the messages section."""
+    context = {'request': request}
+    conversations = _participant_conversations(request.user)
+    data = StorefrontConversationSerializer(conversations, many=True, context=context).data
+    unread_total = sum(conv.unread_count_for(request.user) for conv in conversations)
+    return Response({'count': len(data), 'results': data, 'unread_total': unread_total})
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([permissions.IsAuthenticated])
+def storefront_conversation(request, slug):
+    """Get or create the caller's private conversation with a storefront.
+
+    GET returns the existing conversation (or ``null`` when there is none).
+    POST opens one if needed and returns it, so a buyer's first message and
+    the thread it belongs to are created in one round trip.
+    """
+    storefront = get_object_or_404(Storefront, slug=slug, is_active=True)
+    if storefront.user_id == request.user.id:
+        return Response(
+            {'error': 'این غرفه متعلق به خود شماست؛ برای پاسخ به مشتریان از بخش پیام‌ها استفاده کنید.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    conversation = StorefrontConversation.objects.filter(
+        storefront=storefront, customer=request.user
+    ).first()
+
+    if request.method == 'GET':
+        context = {'request': request}
+        data = (
+            StorefrontConversationSerializer(conversation, context=context).data
+            if conversation else None
+        )
+        return Response(data)
+
+    if conversation is None:
+        conversation, _created = StorefrontConversation.objects.get_or_create(
+            storefront=storefront, customer=request.user
+        )
+
+    context = {'request': request}
+    return Response(
+        StorefrontConversationSerializer(conversation, context=context).data,
+        status=status.HTTP_201_CREATED,
+    )
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([permissions.IsAuthenticated])
+def conversation_messages(request, conversation_id):
+    """Read a thread (GET) or send a message into it (POST).
+
+    Only the two participants — the storefront owner and the buyer — can
+    access a thread. Reading marks the other party's messages as read, so the
+    unread badge clears as soon as the owner opens the conversation.
+    """
+    conversation = get_object_or_404(
+        StorefrontConversation.objects.select_related('storefront', 'customer'),
+        pk=conversation_id,
+    )
+    if request.user.id != conversation.customer_id and request.user.id != conversation.storefront.user_id:
+        return Response({'error': 'شما عضو این گفتگو نیستید.'}, status=status.HTTP_403_FORBIDDEN)
+
+    if request.method == 'GET':
+        messages = conversation.messages.select_related(
+            'sender', 'listing', 'listing__storefront'
+        ).order_by('created_at')
+        # Fetching a thread means the viewer has seen it.
+        StorefrontMessage.objects.filter(conversation=conversation, is_read=False).exclude(
+            sender=request.user
+        ).update(is_read=True)
+        paginator = MessagePagination()
+        page = paginator.paginate_queryset(messages, request)
+        context = {'request': request}
+        response = paginator.get_paginated_response(
+            StorefrontMessageSerializer(page, many=True, context=context).data
+        )
+        response.data['conversation'] = StorefrontConversationSerializer(
+            conversation, context=context
+        ).data
+        return response
+
+    body = (request.data.get('body') or '').strip()
+    listing_id = request.data.get('listing') or request.data.get('listing_id')
+    listing = None
+    if listing_id:
+        listing = get_object_or_404(MarketplaceListing, pk=listing_id)
+        if listing.storefront_id != conversation.storefront_id:
+            return Response(
+                {'error': 'محصول انتخابی متعلق به این غرفه نیست.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+    if not body and listing is None:
+        return Response(
+            {'error': 'متن پیام یا محصول پیوست الزامی است.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    message = StorefrontMessage.objects.create(
+        conversation=conversation, sender=request.user,
+        body=body[:2000], listing=listing,
+    )
+    conversation.save(update_fields=['updated_at'])
+    context = {'request': request}
+    return Response(
+        StorefrontMessageSerializer(message, context=context).data,
+        status=status.HTTP_201_CREATED,
+    )

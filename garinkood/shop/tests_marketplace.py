@@ -10,6 +10,7 @@ import threading
 from django.contrib.auth.models import User
 from django.db import OperationalError, connections
 from django.test import TestCase, TransactionTestCase, override_settings
+from rest_framework import status
 from rest_framework.test import APIClient
 
 from .models import (
@@ -41,11 +42,13 @@ def make_seller(username='seller', *, commission=10):
     return user, storefront
 
 
-def make_listing(storefront, *, price=100_000, quantity=50, minimum=1, status='published', title='گندم درجه یک'):
+def make_listing(storefront, *, price=100_000, quantity=50, minimum=1, status='published',
+                 title='گندم درجه یک', discount_percent=0, sales_count=0):
     return MarketplaceListing.objects.create(
         storefront=storefront, title=title, slug=f'listing-{title}-{storefront.id}',
         crop_name='گندم', description='محصول سالم و تازه', price=price, unit='کیلوگرم',
         quantity_available=quantity, min_order_quantity=minimum, status=status,
+        discount_percent=discount_percent, sales_count=sales_count,
     )
 
 
@@ -1265,3 +1268,98 @@ class QueryEfficiencyTests(TestCase):
         # An absurd page size must be clamped, never used to dump the table.
         huge = self.client.get('/api/marketplace/listings/?page_size=100000')
         self.assertLessEqual(len(huge.data['results']), 48)
+
+
+class StorefrontMessagingTests(TestCase):
+    """Direct messages between a buyer and a storefront owner."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner, cls.storefront = make_seller('msg-owner')
+        cls.listing = make_listing(cls.storefront, title='پرتقال تامسون')
+        cls.other, cls.other_storefront = make_seller('msg-other')
+        cls.buyer = User.objects.create_user(username='msg-buyer', password='safe-password-123')
+
+    def _client(self, username):
+        client = APIClient()
+        client.force_authenticate(user=User.objects.get(username=username))
+        return client
+
+    def test_buyer_starts_conversation_and_sends_listing_attachment(self):
+        client = self._client('msg-buyer')
+        response = client.post(f'/api/marketplace/storefronts/{self.storefront.slug}/conversation/')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        conversation_id = response.data['id']
+
+        response = client.post(
+            f'/api/marketplace/conversations/{conversation_id}/messages/',
+            {'body': 'قیمت عمده چند است؟', 'listing': self.listing.id},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['listing']['id'], self.listing.id)
+
+    def test_owner_sees_unread_badge_and_reply_clears_it(self):
+        buyer = self._client('msg-buyer')
+        owner = self._client('msg-owner')
+        conversation_id = buyer.post(
+            f'/api/marketplace/storefronts/{self.storefront.slug}/conversation/'
+        ).data['id']
+        buyer.post(
+            f'/api/marketplace/conversations/{conversation_id}/messages/',
+            {'body': 'سلام، موجودی دارید؟'}, format='json',
+        )
+
+        conversations = owner.get('/api/marketplace/conversations/').data
+        self.assertEqual(conversations['unread_total'], 1)
+
+        owner.get(f'/api/marketplace/conversations/{conversation_id}/messages/')
+        conversations = owner.get('/api/marketplace/conversations/').data
+        self.assertEqual(conversations['unread_total'], 0)
+
+    def test_outsiders_cannot_read_a_thread(self):
+        buyer = self._client('msg-buyer')
+        other = self._client('msg-other')
+        conversation_id = buyer.post(
+            f'/api/marketplace/storefronts/{self.storefront.slug}/conversation/'
+        ).data['id']
+        response = other.get(f'/api/marketplace/conversations/{conversation_id}/messages/')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_foreign_listing_cannot_be_attached(self):
+        buyer = self._client('msg-buyer')
+        conversation_id = buyer.post(
+            f'/api/marketplace/storefronts/{self.storefront.slug}/conversation/'
+        ).data['id']
+        foreign = make_listing(self.other_storefront, title='گندم دوروم')
+        response = buyer.post(
+            f'/api/marketplace/conversations/{conversation_id}/messages/',
+            {'body': 'این محصول چطور؟', 'listing': foreign.id}, format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_owner_cannot_open_a_conversation_with_their_own_storefront(self):
+        owner = self._client('msg-owner')
+        response = owner.post(f'/api/marketplace/storefronts/{self.storefront.slug}/conversation/')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class StorefrontOffersTests(TestCase):
+    """Best-seller and most-discounted listing ordering."""
+
+    @classmethod
+    def setUpTestData(cls):
+        _, storefront = make_seller('offers-seller')
+        for index, (discount, sales) in enumerate([(0, 5), (10, 120), (30, 8)]):
+            make_listing(
+                storefront, title=f'آگهی {index}',
+                discount_percent=discount, sales_count=sales,
+            )
+
+    def test_listings_order_by_sales_and_discount(self):
+        by_sales = self.client.get('/api/marketplace/listings/?ordering=-sales_count').data['results']
+        self.assertEqual(by_sales[0]['title'], 'آگهی 1')
+
+        by_discount = self.client.get('/api/marketplace/listings/?ordering=-discount_percent').data['results']
+        self.assertEqual(by_discount[0]['title'], 'آگهی 2')
+        self.assertEqual(by_discount[0]['discounted_price'], by_discount[0]['price'] * 70 // 100)

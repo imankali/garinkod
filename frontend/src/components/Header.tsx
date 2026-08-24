@@ -8,21 +8,35 @@ import {
   useReducedMotion,
   useScroll,
   useSpring,
-  useVelocity,
 } from "framer-motion";
-import { Globe2, Heart, Menu, Moon, ShoppingCart, Sun, X } from "lucide-react";
-import { Link, useLocation } from "react-router-dom";
+import {
+  Gift,
+  Heart,
+  LogIn,
+  LogOut,
+  Menu,
+  MessageCircle,
+  Moon,
+  MoreHorizontal,
+  Package,
+  ShoppingCart,
+  Store,
+  Sun,
+  UserRound,
+  X,
+} from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
-import { PRIMARY_ITEMS, SELLER_ITEMS, STAFF_ITEMS, visibleItems } from "../config/navigation";
+import { PRIMARY_ITEMS, SELLER_ITEMS, STAFF_ITEMS, visibleItems, type NavItem } from "../config/navigation";
 import { useAuthStore, useUserLevel } from "../store/authStore";
 import TopBar from "./TopBar";
 import Logo from "./Logo";
 import MegaMenu from "./MegaMenu";
 import SearchBar from "./SearchBar";
-import ProfileMenu from "./ProfileMenu";
 import MobileMenu from "./MobileMenu";
 import CartDrawer from "./CartDrawer";
 import { useCartStore } from "../store/cartStore";
+import { messagesApi } from "../api/services";
 import { useTranslation } from "../i18n";
 
 // ========================================
@@ -30,6 +44,13 @@ import { useTranslation } from "../i18n";
 // ========================================
 const SPRING = { type: "spring", damping: 28, stiffness: 320, mass: 0.6 } as const;
 const SPRING_SOFT = { type: "spring", damping: 22, stiffness: 260 } as const;
+
+/** Nav labels come from the dictionaries when available. */
+function navLabel(t: (key: string) => string, item: NavItem): string {
+  const key = `nav.${item.id}`;
+  const translated = t(key);
+  return translated === key ? item.label : translated;
+}
 
 // ========================================
 // ✅ Animated Number - انیمیشن flip برای تغییر عدد
@@ -202,6 +223,7 @@ const DesktopNav = memo(function DesktopNav() {
   const { pathname } = useLocation();
   const { isAuthenticated } = useAuthStore();
   const level = useUserLevel();
+  const { t } = useTranslation();
 
   // Primary destinations plus whatever this viewer is entitled to see, so a
   // seller or moderator reaches their console without hunting for it.
@@ -237,7 +259,7 @@ const DesktopNav = memo(function DesktopNav() {
                 }`}
                 aria-current={isActive ? "page" : undefined}
               >
-                {item.label}
+                {navLabel(t, item)}
                 {showUnderline && (
                   <motion.span
                     layoutId="nav-underline"
@@ -269,7 +291,7 @@ const DesktopNav = memo(function DesktopNav() {
                 }`}
               >
                 <Icon size={14} aria-hidden="true" />
-                {item.label}
+                {navLabel(t, item)}
               </Link>
             </li>
           );
@@ -288,25 +310,200 @@ const DesktopNav = memo(function DesktopNav() {
 });
 
 // ========================================
-// Language selector
+// ✅ منوی «بیشتر» دسکتاپ: شب، پیام‌ها و حساب کاربری
 // ========================================
-function LanguageSelector({ compact = false }: { compact?: boolean }) {
-  const { locale, setLocale, t } = useTranslation();
+function MoreMenu({ isDark, onToggleDark }: { isDark: boolean; onToggleDark: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [unread, setUnread] = useState(0);
+  const ref = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
+  const { t } = useTranslation();
+  const { user, isAuthenticated, logout } = useAuthStore();
+
+  useEffect(() => {
+    function handleClick(event: MouseEvent) {
+      if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false);
+    }
+    function handleKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, []);
+
+  // Live unread count for the direct-messages shortcut.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let cancelled = false;
+    const refresh = () =>
+      messagesApi
+        .conversations()
+        .then((response) => {
+          if (!cancelled) setUnread(response.data.unread_total || 0);
+        })
+        .catch(() => undefined);
+    void refresh();
+    const interval = setInterval(() => void refresh(), 20000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [isAuthenticated]);
+
+  const fullName = [user?.first_name, user?.last_name].filter(Boolean).join(" ") || user?.username;
+
+  async function signOut() {
+    setOpen(false);
+    await logout();
+    navigate("/");
+  }
+
+  const items = [
+    { icon: MessageCircle, label: t("nav.messages"), desc: t("direct.title"), href: "/messages" },
+    { icon: UserRound, label: t("nav.profile"), desc: t("account.title"), href: "/profile" },
+    { icon: Package, label: t("nav.orders"), desc: t("account.orders"), href: "/orders" },
+    { icon: Store, label: t("account.seller"), desc: t("account.sellerDescription"), href: "/profile?tab=seller" },
+    { icon: Gift, label: t("nav.offers"), desc: "Rewards", href: "/rewards" },
+  ];
+
   return (
-    <label className={`relative flex items-center gap-1 rounded-xl border border-emerald-100 bg-emerald-50 px-2 py-1.5 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/50 dark:text-lime-300 ${compact ? "px-1.5" : ""}`}>
-      <Globe2 size={compact ? 16 : 15} aria-hidden="true" />
-      <span className="sr-only">{t("language.label")}</span>
-      <select
-        value={locale}
-        onChange={(event) => setLocale(event.target.value as "fa" | "en" | "ar")}
-        className="max-w-20 cursor-pointer appearance-none rounded bg-transparent text-xs font-bold outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
-        aria-label={t("language.label")}
+    <div ref={ref} className="relative">
+      <IconButton
+        onClick={() => setOpen((current) => !current)}
+        label={t("nav.more")}
+        rotateOnHover
+        className={`text-slate-500 hover:bg-emerald-50 dark:text-emerald-200 dark:hover:bg-emerald-900/50 ${open ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/60" : ""}`}
       >
-        <option value="fa">FA</option>
-        <option value="en">EN</option>
-        <option value="ar">AR</option>
-      </select>
-    </label>
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.span
+            key={open ? "close" : "more"}
+            initial={{ rotate: -90, opacity: 0 }}
+            animate={{ rotate: 0, opacity: 1 }}
+            exit={{ rotate: 90, opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="flex"
+          >
+            {open ? <X size={18} /> : <MoreHorizontal size={18} />}
+          </motion.span>
+        </AnimatePresence>
+      </IconButton>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: 8, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.96 }}
+            transition={SPRING_SOFT}
+            className="absolute end-0 top-[calc(100%+10px)] z-50 w-72 overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-2xl shadow-emerald-900/10 dark:border-emerald-800 dark:bg-emerald-950"
+            role="menu"
+            aria-label={t("nav.more")}
+          >
+            {/* Theme */}
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                onToggleDark();
+                setOpen(false);
+              }}
+              className="flex w-full items-center gap-3 px-4 py-3 text-start text-sm font-bold text-slate-700 transition-colors hover:bg-emerald-50 dark:text-emerald-100 dark:hover:bg-emerald-900/60"
+            >
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 text-amber-600 dark:bg-amber-950/50 dark:text-amber-300">
+                {isDark ? <Sun size={17} /> : <Moon size={17} />}
+              </span>
+              <span className="flex-1">{isDark ? t("header.themeToLight") : t("header.themeToDark")}</span>
+              <span
+                aria-hidden="true"
+                className={`relative h-5 w-9 rounded-full transition-colors ${isDark ? "bg-emerald-600" : "bg-slate-300"}`}
+              >
+                <span
+                  className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${isDark ? "start-[18px]" : "start-0.5"}`}
+                />
+              </span>
+            </button>
+
+            <div className="mx-4 h-px bg-slate-100 dark:bg-emerald-900" />
+
+            {/* Direct messages */}
+            <Link
+              to="/messages"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-3 px-4 py-3 text-start transition-colors hover:bg-emerald-50 dark:hover:bg-emerald-900/60"
+            >
+              <span className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-sky-100 text-sky-600 dark:bg-sky-950/50 dark:text-sky-300">
+                <MessageCircle size={17} />
+                {unread > 0 && (
+                  <span className="absolute -end-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-fluid-2xs font-bold text-white">
+                    {unread > 9 ? "۹+" : unread.toLocaleString("fa-IR")}
+                  </span>
+                )}
+              </span>
+              <span className="flex-1">
+                <span className="block text-sm font-bold text-slate-700 dark:text-emerald-50">{t("nav.messages")}</span>
+                <span className="block text-fluid-2xs text-slate-400 dark:text-emerald-300/70">{t("direct.title")}</span>
+              </span>
+            </Link>
+
+            <div className="mx-4 h-px bg-slate-100 dark:bg-emerald-900" />
+
+            {/* Account */}
+            {isAuthenticated ? (
+              <>
+                <div className="flex items-center gap-3 px-4 py-3">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-gradient text-sm font-extrabold text-white">
+                    {(fullName || "؟").charAt(0)}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-bold text-slate-800 dark:text-white">{fullName}</span>
+                    <span className="block truncate text-fluid-2xs text-slate-400 dark:text-emerald-300/70">{user?.email || user?.username}</span>
+                  </span>
+                </div>
+                {items.map(({ icon: Icon, label, desc, href }) => (
+                  <Link
+                    key={href}
+                    to={href}
+                    role="menuitem"
+                    onClick={() => setOpen(false)}
+                    className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-emerald-50 dark:hover:bg-emerald-900/60"
+                  >
+                    <Icon size={16} className="text-emerald-600 dark:text-lime-300" />
+                    <span className="flex-1">
+                      <span className="block text-sm font-bold text-slate-700 dark:text-emerald-50">{label}</span>
+                      <span className="block text-fluid-2xs text-slate-400 dark:text-emerald-300/70">{desc}</span>
+                    </span>
+                  </Link>
+                ))}
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={signOut}
+                  className="flex w-full items-center gap-3 border-t border-slate-100 px-4 py-3 text-start text-sm font-bold text-rose-600 transition-colors hover:bg-rose-50 dark:border-emerald-900 dark:text-rose-300 dark:hover:bg-rose-950/40"
+                >
+                  <LogOut size={16} />
+                  {t("nav.logout")}
+                </button>
+              </>
+            ) : (
+              <Link
+                to="/login"
+                role="menuitem"
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-3 px-4 py-3 text-sm font-bold text-emerald-700 transition-colors hover:bg-emerald-50 dark:text-lime-300 dark:hover:bg-emerald-900/60"
+              >
+                <LogIn size={16} />
+                {t("nav.login")}
+              </Link>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 
@@ -338,13 +535,12 @@ export default function Header({
   onOpenWishlist,
 }: HeaderProps) {
   const [scrolled, setScrolled] = useState(false);
-  const [hidden, setHidden] = useState(false);
   const [bump, setBump] = useState(false);
   const prefersReducedMotion = useReducedMotion();
   const prevCountRef = useRef<number>(0);
+  const { t } = useTranslation();
 
   const { scrollY } = useScroll();
-  const scrollVelocity = useVelocity(scrollY);
   const cartCount = useCartStore((state) => state.cart?.total_items || 0);
 
   // ✨ نوار پیشرفت اسکرول
@@ -356,24 +552,11 @@ export default function Header({
   });
 
   // ========================================
-  // ✅ مخفی‌سازی هوشمند بر اساس سرعت اسکرول
-  //    - اسکرول سریع به پایین → مخفی
-  //    - کوچک‌ترین اسکرول به بالا → نمایان
-  //    - وقتی منو/سبد باز است هرگز مخفی نشو
+  // ✅ هدر همیشه در دسترس است و هرگز مخفی نمی‌شود —
+  //    سرچ‌باکس در همه حالت‌ها (حتی حین اسکرول) بالا می‌ماند.
+  //    فقط فاصله‌های داخلی هنگام اسکرول جمع می‌شوند.
   // ========================================
   useMotionValueEvent(scrollY, "change", (latest) => {
-    if (mobileOpen || cartOpen) {
-      setHidden(false);
-      setScrolled(latest > 60);
-      return;
-    }
-    const velocity = scrollVelocity.get();
-
-    if (latest > 160 && velocity > 250) {
-      setHidden(true);
-    } else if (velocity < -150 || latest < 100) {
-      setHidden(false);
-    }
     setScrolled(latest > 60);
   });
 
@@ -383,36 +566,18 @@ export default function Header({
   useEffect(() => {
     if (cartCount > prevCountRef.current) {
       setBump(true);
-      const t = setTimeout(() => setBump(false), 550);
+      const timeout = setTimeout(() => setBump(false), 550);
       prevCountRef.current = cartCount;
-      return () => clearTimeout(t);
+      return () => clearTimeout(timeout);
     }
     prevCountRef.current = cartCount;
   }, [cartCount]);
-
-  // ✅ وقتی منوی موبایل باز شد، هدر قفل شود
-  useEffect(() => {
-    if (mobileOpen) setHidden(false);
-  }, [mobileOpen]);
 
   const openCart = () => onCartOpenChange(true);
 
   return (
     <>
-      <motion.header
-        className="sticky top-0 z-50"
-        variants={{
-          visible: { y: 0 },
-          hidden: { y: "-100%" },
-        }}
-        animate={hidden ? "hidden" : "visible"}
-        initial="visible"
-        transition={
-          prefersReducedMotion
-            ? { duration: 0 }
-            : { type: "spring", damping: 26, stiffness: 240, mass: 0.7 }
-        }
-      >
+      <header className="sticky top-0 z-50">
         <TopBar isDark={isDark} onToggleDark={onToggleDark} />
 
         <div
@@ -448,7 +613,7 @@ export default function Header({
               whileTap={{ scale: 0.92 }}
               transition={SPRING}
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-[#0F8A5F] transition-colors hover:bg-emerald-100 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300 sm:h-10 sm:w-10 lg:hidden"
-              aria-label={mobileOpen ? "بستن منو" : "باز کردن منو"}
+              aria-label={mobileOpen ? t("header.closeMenu") : t("header.openMenu")}
               aria-expanded={mobileOpen}
               aria-controls="mobile-menu"
             >
@@ -471,44 +636,22 @@ export default function Header({
               <Logo compact={scrolled} />
             </div>
 
-            {/* Search (Desktop) */}
-            <div className="hidden flex-1 md:block">
+            {/* Search (Desktop) — بیشترین عرض برای فیلد جستجو */}
+            <div className="hidden min-w-0 flex-1 md:block">
               <SearchBar />
             </div>
 
-            {/* Desktop Actions */}
+            {/* Desktop Actions: تنها علاقه‌مندی و سبد بیرون می‌مانند؛
+                حالت شب، پیام‌ها و حساب کاربری داخل منوی «بیشتر» قرار گرفته‌اند. */}
             <div className="ms-auto hidden items-center gap-1 sm:flex sm:gap-1.5 md:gap-2 lg:gap-3">
               <div className="hidden lg:block">
                 <MegaMenu />
               </div>
 
-              <LanguageSelector />
-
-              {/* Dark Mode */}
-              <IconButton
-                onClick={onToggleDark}
-                rotateOnHover
-                label={isDark ? "تغییر به حالت روز" : "تغییر به حالت شب"}
-                className="text-slate-500 hover:bg-emerald-50 dark:text-emerald-200 dark:hover:bg-emerald-900/50"
-              >
-                <AnimatePresence mode="wait" initial={false}>
-                  <motion.span
-                    key={isDark ? "sun" : "moon"}
-                    initial={{ rotate: -120, opacity: 0, scale: 0.5 }}
-                    animate={{ rotate: 0, opacity: 1, scale: 1 }}
-                    exit={{ rotate: 120, opacity: 0, scale: 0.5 }}
-                    transition={SPRING_SOFT}
-                    className="flex"
-                  >
-                    {isDark ? <Sun size={18} className="sm:h-[19px] sm:w-[19px]" /> : <Moon size={18} className="sm:h-[19px] sm:w-[19px]" />}
-                  </motion.span>
-                </AnimatePresence>
-              </IconButton>
-
               {/* Wishlist */}
               <IconButton
                 onClick={onOpenWishlist}
-                label="علاقه‌مندی‌ها"
+                label={t("nav.wishlist")}
                 className="group text-slate-500 hover:bg-rose-50 hover:text-rose-500 dark:text-emerald-200 dark:hover:bg-rose-950/40"
               >
                 <Heart
@@ -531,7 +674,8 @@ export default function Header({
                 </AnimatePresence>
               </IconButton>
 
-              <ProfileMenu />
+              {/* منوی «بیشتر»: حالت شب / پیام‌ها / حساب کاربری */}
+              <MoreMenu isDark={isDark} onToggleDark={onToggleDark} />
 
               {/* Cart - Desktop */}
               <CartButton
@@ -542,9 +686,8 @@ export default function Header({
               />
             </div>
 
-            {/* Language + cart on compact screens */}
+            {/* Cart on compact screens */}
             <div className="flex items-center gap-1 sm:hidden">
-              <LanguageSelector compact />
               <CartButton
                 mobile
                 count={cartCount}
@@ -555,23 +698,10 @@ export default function Header({
             </div>
           </div>
 
-          {/* ✅ Mobile Search - هنگام اسکرول جمع می‌شود تا فضا آزاد شود */}
-          <AnimatePresence initial={false}>
-            {!scrolled && (
-              <motion.div
-                key="mobile-search"
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
-                className="overflow-hidden md:hidden"
-              >
-                <div className="border-t border-emerald-50 px-2.5 py-2 dark:border-emerald-900/50 sm:px-4 sm:py-2.5">
-                  <SearchBar variant="mobile" />
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {/* ✅ Mobile Search - همیشه در دسترس، حتی هنگام اسکرول */}
+          <div className="border-t border-emerald-50 px-2.5 py-2 dark:border-emerald-900/50 sm:px-4 sm:py-2.5 md:hidden">
+            <SearchBar variant="mobile" />
+          </div>
 
           {/* Desktop Navigation */}
           <DesktopNav />
@@ -583,7 +713,7 @@ export default function Header({
             className="absolute inset-x-0 bottom-0 h-[2px] bg-brand-gradient-accent"
           />
         </div>
-      </motion.header>
+      </header>
 
       <MobileMenu
         open={mobileOpen}

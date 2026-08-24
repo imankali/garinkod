@@ -1,14 +1,19 @@
 // frontend/src/pages/StorefrontPage.tsx
 
-import { useCallback, useEffect, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   BadgeCheck,
+  Camera,
   Grid3x3,
   Heart,
   ImageIcon,
   MapPin,
+  MessageCircle,
+  Pencil,
+  Save,
+  Send,
   ShoppingBasket,
   Star,
   UserPlus,
@@ -16,10 +21,12 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-import { storefrontsApi } from '../api/services';
+import { agricultureApi, messagesApi, storefrontPostsApi, storefrontsApi } from '../api/services';
 import { parseApiError } from '../api/errors';
 import { useAuthStore } from '../store/authStore';
 import { useCartStore } from '../store/cartStore';
+import { useDirectStore } from '../store/directStore';
+import { useTranslation } from '../i18n';
 import { formatPrice } from '../utils/formatPrice';
 import type { StorefrontProfile } from '../types';
 
@@ -34,29 +41,38 @@ interface ViewableStory {
   caption: string;
 }
 
-type TabKey = 'listings' | 'posts' | 'stories';
+type TabKey = 'listings' | 'posts' | 'stories' | 'messages';
 
-const TABS: { key: TabKey; label: string; icon: typeof Grid3x3 }[] = [
-  { key: 'listings', label: 'آگهی‌ها', icon: ShoppingBasket },
-  { key: 'posts', label: 'پست‌ها', icon: Grid3x3 },
-  { key: 'stories', label: 'استوری‌ها', icon: ImageIcon },
+const TABS: { key: TabKey; labelKey: string; icon: typeof Grid3x3 }[] = [
+  { key: 'listings', labelKey: 'storefront.tab.listings', icon: ShoppingBasket },
+  { key: 'posts', labelKey: 'storefront.tab.posts', icon: Grid3x3 },
+  { key: 'stories', labelKey: 'storefront.tab.stories', icon: ImageIcon },
 ];
 
 /**
  * The public page for one storefront: avatar, name, follow button, highlights
  * and tabbed listings/posts/stories, plus an Instagram-style story viewer.
+ *
+ * For the owner the same page doubles as the management surface: name, bio,
+ * avatar and cover are editable inline, posts/stories can be published from a
+ * composer, and the direct-message inbox lives on the same page. Buyers get a
+ * "گفتگو با غرفه‌دار" button and can send any listing straight to the direct
+ * messages to ask for advice.
  */
 export default function StorefrontPage() {
   const { slug = '' } = useParams<{ slug: string }>();
+  const { t } = useTranslation();
   const [profile, setProfile] = useState<StorefrontProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [tab, setTab] = useState<TabKey>('listings');
   const [followBusy, setFollowBusy] = useState(false);
   const [viewer, setViewer] = useState<{ posts: ViewableStory[]; index: number } | null>(null);
+  const [unread, setUnread] = useState(0);
 
   const { isAuthenticated } = useAuthStore();
   const addListingToCart = useCartStore((state) => state.addListingToCart);
+  const openDirect = useDirectStore((state) => state.openDirect);
 
   const load = useCallback(async () => {
     if (!slug) return;
@@ -75,6 +91,25 @@ export default function StorefrontPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Owners see a live unread badge for the storefront inbox.
+  useEffect(() => {
+    if (!profile?.storefront.is_owner) return;
+    let cancelled = false;
+    const refresh = () =>
+      messagesApi
+        .conversations()
+        .then((response) => {
+          if (!cancelled) setUnread(response.data.unread_total || 0);
+        })
+        .catch(() => undefined);
+    void refresh();
+    const interval = setInterval(() => void refresh(), 15000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [profile?.storefront.is_owner]);
 
   async function toggleFollow() {
     if (!profile) return;
@@ -102,6 +137,23 @@ export default function StorefrontPage() {
     } finally {
       setFollowBusy(false);
     }
+  }
+
+  function sendListingToDirect(listing: StorefrontProfile['listings'][number]) {
+    openDirect({
+      storefrontSlug: listing.storefront.slug,
+      listing: {
+        id: listing.id,
+        title: listing.title,
+        slug: listing.slug,
+        price: listing.price,
+        discounted_price: listing.discounted_price,
+        unit: listing.unit,
+        image_url: listing.image_url,
+        storefront_name: listing.storefront.name,
+        storefront_slug: listing.storefront.slug,
+      },
+    });
   }
 
   if (loading) {
@@ -132,6 +184,7 @@ export default function StorefrontPage() {
   }
 
   const { storefront, listings, posts, stories, highlights, counts } = profile;
+  const isOwner = storefront.is_owner;
 
   return (
     <div className="mx-auto max-w-5xl px-[var(--page-gutter)] py-6">
@@ -182,28 +235,59 @@ export default function StorefrontPage() {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={toggleFollow}
-          disabled={followBusy}
-          aria-pressed={storefront.is_following}
-          className={`flex items-center gap-1.5 rounded-xl px-5 py-2.5 text-sm font-bold transition disabled:opacity-60 ${
-            storefront.is_following
-              ? 'border border-emerald-300 bg-white text-emerald-700 dark:border-emerald-700 dark:bg-emerald-950 dark:text-lime-300'
-              : 'bg-emerald-600 text-white hover:bg-emerald-700'
-          }`}
-        >
-          {storefront.is_following ? <Heart size={15} fill="currentColor" /> : <UserPlus size={15} />}
-          {storefront.is_following ? 'دنبال می‌کنید' : 'دنبال کردن'}
-        </button>
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          {isOwner ? (
+            <>
+              <button
+                type="button"
+                onClick={() => openDirect()}
+                className="relative flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-white px-5 py-2.5 text-sm font-bold text-emerald-700 transition hover:bg-emerald-50 dark:border-emerald-700 dark:bg-emerald-950 dark:text-lime-300"
+              >
+                <MessageCircle size={15} />
+                {t('direct.title')}
+                {unread > 0 && (
+                  <span className="absolute -top-2 -end-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-600 px-1 text-fluid-2xs font-bold text-white">
+                    {unread.toLocaleString('fa-IR')}
+                  </span>
+                )}
+              </button>
+              <OwnerEditor storefront={storefront} onSaved={load} />
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={toggleFollow}
+                disabled={followBusy}
+                aria-pressed={storefront.is_following}
+                className={`flex items-center gap-1.5 rounded-xl px-5 py-2.5 text-sm font-bold transition disabled:opacity-60 ${
+                  storefront.is_following
+                    ? 'border border-emerald-300 bg-white text-emerald-700 dark:border-emerald-700 dark:bg-emerald-950 dark:text-lime-300'
+                    : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                }`}
+              >
+                {storefront.is_following ? <Heart size={15} fill="currentColor" /> : <UserPlus size={15} />}
+                {storefront.is_following ? t('storefront.unfollow') : t('storefront.follow')}
+              </button>
+              <button
+                type="button"
+                onClick={() => openDirect({ storefrontSlug: storefront.slug })}
+                className="flex items-center gap-1.5 rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-sky-700"
+              >
+                <MessageCircle size={15} />
+                {t('storefront.message')}
+              </button>
+            </>
+          )}
+        </div>
       </header>
 
       {/* Counters */}
       <dl className="mt-5 grid grid-cols-3 gap-2 rounded-2xl border border-slate-100 bg-white p-3 text-center dark:border-emerald-900 dark:bg-emerald-950/40">
         {[
-          { label: 'آگهی', value: counts.listings },
-          { label: 'پست', value: counts.posts },
-          { label: 'دنبال‌کننده', value: counts.followers },
+          { label: t('storefronts.listings'), value: counts.listings },
+          { label: t('storefront.tab.posts'), value: counts.posts },
+          { label: t('storefronts.followers'), value: counts.followers },
         ].map((entry) => (
           <div key={entry.label}>
             <dt className="text-fluid-xs text-slate-400 dark:text-emerald-300">{entry.label}</dt>
@@ -235,7 +319,7 @@ export default function StorefrontPage() {
                     </span>
                   </span>
                   <span className="w-full truncate text-center text-fluid-2xs text-slate-600 dark:text-emerald-100">
-                    استوری‌ها
+                    {t('storefront.tab.stories')}
                   </span>
                 </button>
               </li>
@@ -270,9 +354,12 @@ export default function StorefrontPage() {
         </section>
       )}
 
+      {/* Owner composer: publish a post or story from this page */}
+      {isOwner && <OwnerComposer onPublished={load} />}
+
       {/* Tabs */}
       <div role="tablist" aria-label="محتوای غرفه" className="mt-6 flex border-b border-slate-200 dark:border-emerald-900">
-        {TABS.map(({ key, label, icon: Icon }) => (
+        {TABS.map(({ key, labelKey, icon: Icon }) => (
           <button
             key={key}
             role="tab"
@@ -287,7 +374,7 @@ export default function StorefrontPage() {
             }`}
           >
             <Icon size={15} />
-            {label}
+            {t(labelKey)}
           </button>
         ))}
       </div>
@@ -304,26 +391,52 @@ export default function StorefrontPage() {
                   key={listing.id}
                   className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm dark:border-emerald-900 dark:bg-emerald-950/40"
                 >
-                  <img src={listing.image_url} alt="" className="h-32 w-full object-cover" />
+                  <div className="relative">
+                    <img src={listing.image_url} alt="" className="h-32 w-full object-cover" />
+                    {listing.discount_percent > 0 && (
+                      <span className="absolute start-2 top-2 rounded-full bg-brand-orange px-2 py-0.5 text-fluid-2xs font-bold text-white">
+                        {listing.discount_percent.toLocaleString('fa-IR')}{t('shop.discount')}
+                      </span>
+                    )}
+                  </div>
                   <div className="p-3">
                     <h3 className="truncate text-sm font-bold text-slate-800 dark:text-white">
                       {listing.title}
                     </h3>
-                    <p className="mt-1 text-xs text-slate-500 dark:text-emerald-200">
-                      {formatPrice(listing.price)} / {listing.unit}
+                    <p className="mt-1 flex items-baseline gap-1.5 text-xs text-slate-500 dark:text-emerald-200">
+                      <strong className="text-emerald-700 dark:text-lime-300">
+                        {formatPrice(listing.discounted_price)}
+                      </strong>
+                      {listing.discount_percent > 0 && (
+                        <del className="text-fluid-2xs text-slate-400">{formatPrice(listing.price)}</del>
+                      )}
+                      / {listing.unit}
                     </p>
                     <p className="mt-0.5 text-fluid-xs text-slate-400">
                       موجودی {listing.quantity_available} {listing.unit}
                       {listing.minimum_order > 1 && ` · حداقل ${listing.minimum_order}`}
                     </p>
-                    <button
-                      type="button"
-                      disabled={!listing.is_purchasable}
-                      onClick={() => addListingToCart(listing.id).catch(() => undefined)}
-                      className="mt-2 w-full rounded-xl bg-emerald-600 py-2 text-xs font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-                    >
-                      {listing.is_purchasable ? 'افزودن به سبد' : 'ناموجود'}
-                    </button>
+                    <div className="mt-2 flex gap-2">
+                      <button
+                        type="button"
+                        disabled={!listing.is_purchasable}
+                        onClick={() => addListingToCart(listing.id).catch(() => undefined)}
+                        className="flex-1 rounded-xl bg-emerald-600 py-2 text-xs font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                      >
+                        {listing.is_purchasable ? t('shop.buy') : 'ناموجود'}
+                      </button>
+                      {!isOwner && (
+                        <button
+                          type="button"
+                          title={t('storefront.sendToDirectHint')}
+                          onClick={() => sendListingToDirect(listing)}
+                          className="flex w-10 items-center justify-center rounded-xl border border-sky-200 text-sky-600 transition hover:bg-sky-50 dark:border-sky-900 dark:text-sky-300 dark:hover:bg-sky-950"
+                          aria-label={t('storefront.sendToDirect')}
+                        >
+                          <Send size={14} aria-hidden="true" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </li>
               ))}
@@ -400,6 +513,331 @@ export default function StorefrontPage() {
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+/** Inline editor for the owner: name, bio, avatar and cover. */
+function OwnerEditor({
+  storefront,
+  onSaved,
+}: {
+  storefront: StorefrontProfile['storefront'];
+  onSaved: () => void | Promise<void>;
+}) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState(storefront.name);
+  const [bio, setBio] = useState(storefront.bio);
+  const [avatar, setAvatar] = useState<File | null>(null);
+  const [cover, setCover] = useState<File | null>(null);
+  const [saving, setSaving] = useState(false);
+  const avatarInput = useRef<HTMLInputElement>(null);
+  const coverInput = useRef<HTMLInputElement>(null);
+
+  async function save(event: FormEvent) {
+    event.preventDefault();
+    if (!name.trim()) return;
+    setSaving(true);
+    const formData = new FormData();
+    formData.append('name', name.trim());
+    formData.append('bio', bio.trim());
+    if (avatar) formData.append('avatar', avatar);
+    if (cover) formData.append('cover', cover);
+    try {
+      await agricultureApi.updateStorefront(formData);
+      toast.success(t('storefront.updated'));
+      setOpen(false);
+      await onSaved();
+    } catch {
+      // The API client reports the failure.
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-white px-5 py-2.5 text-sm font-bold text-emerald-700 transition hover:bg-emerald-50 dark:border-emerald-700 dark:bg-emerald-950 dark:text-lime-300"
+      >
+        <Pencil size={15} />
+        {t('storefront.editStore')}
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[80] flex items-end justify-center bg-emerald-950/40 p-3 backdrop-blur-sm sm:items-center"
+            role="dialog"
+            aria-modal="true"
+            aria-label={t('storefront.editStore')}
+          >
+            <motion.form
+              initial={{ y: 40, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 40, opacity: 0 }}
+              onSubmit={save}
+              className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-emerald-100 bg-white p-5 shadow-2xl dark:border-emerald-800 dark:bg-emerald-950 sm:p-6"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-lg font-extrabold text-slate-800 dark:text-white">
+                  {t('storefront.myStore')}
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-emerald-900"
+                  aria-label={t('common.close')}
+                >
+                  <X size={17} />
+                </button>
+              </div>
+              <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-emerald-200">
+                {t('storefront.editHint')}
+              </p>
+
+              <div className="mt-4 space-y-4">
+                <label className="block text-sm font-bold text-slate-700 dark:text-emerald-50">
+                  {t('storefront.storeName')}
+                  <input
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    required
+                    maxLength={150}
+                    className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-normal outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-emerald-700 dark:bg-emerald-900"
+                  />
+                </label>
+
+                <label className="block text-sm font-bold text-slate-700 dark:text-emerald-50">
+                  {t('storefront.storeBio')}
+                  <textarea
+                    value={bio}
+                    onChange={(event) => setBio(event.target.value)}
+                    maxLength={1000}
+                    rows={3}
+                    className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-normal outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-emerald-700 dark:bg-emerald-900"
+                  />
+                </label>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <span className="text-sm font-bold text-slate-700 dark:text-emerald-50">
+                      {t('storefront.storeAvatar')}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => avatarInput.current?.click()}
+                      className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-emerald-300 px-3 py-4 text-xs font-bold text-emerald-700 hover:bg-emerald-50 dark:border-emerald-700 dark:text-lime-300 dark:hover:bg-emerald-900/50"
+                    >
+                      <Camera size={15} />
+                      {avatar ? avatar.name.slice(0, 24) : t('storefront.storeAvatar')}
+                    </button>
+                    <input
+                      ref={avatarInput}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      onChange={(event) => setAvatar(event.target.files?.[0] ?? null)}
+                    />
+                  </div>
+                  <div>
+                    <span className="text-sm font-bold text-slate-700 dark:text-emerald-50">
+                      {t('storefront.storeCover')}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => coverInput.current?.click()}
+                      className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-emerald-300 px-3 py-4 text-xs font-bold text-emerald-700 hover:bg-emerald-50 dark:border-emerald-700 dark:text-lime-300 dark:hover:bg-emerald-900/50"
+                    >
+                      <ImageIcon size={15} />
+                      {cover ? cover.name.slice(0, 24) : t('storefront.storeCover')}
+                    </button>
+                    <input
+                      ref={coverInput}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      onChange={(event) => setCover(event.target.files?.[0] ?? null)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={saving}
+                className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+              >
+                <Save size={16} />
+                {saving ? t('common.loading') : t('common.save')}
+              </button>
+            </motion.form>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
+
+/** Owner-only composer: publish a post or story with an image from this page. */
+function OwnerComposer({ onPublished }: { onPublished: () => void | Promise<void> }) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const [postType, setPostType] = useState<'post' | 'story'>('post');
+  const [caption, setCaption] = useState('');
+  const [image, setImage] = useState<File | null>(null);
+  const [preview, setPreview] = useState('');
+  const [publishing, setPublishing] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
+
+  function choose(file: File | null) {
+    setImage(file);
+    setPreview(file ? URL.createObjectURL(file) : '');
+  }
+
+  async function publish(event: FormEvent) {
+    event.preventDefault();
+    if (!caption.trim() || !image) return;
+    setPublishing(true);
+    try {
+      await storefrontPostsApi.create({ post_type: postType, caption: caption.trim(), image });
+      toast.success(t('storefront.postPublished'));
+      setCaption('');
+      setImage(null);
+      setPreview('');
+      setOpen(false);
+      await onPublished();
+    } catch {
+      // The API client reports the failure.
+    } finally {
+      setPublishing(false);
+    }
+  }
+
+  return (
+    <section className="mt-5 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4 dark:border-emerald-900 dark:bg-emerald-900/20">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="flex items-center gap-1.5 text-sm font-extrabold text-slate-800 dark:text-white">
+            <Camera size={15} className="text-emerald-600 dark:text-lime-300" />
+            {t('storefront.newPost')} / {t('storefront.newStory')}
+          </h2>
+          <p className="mt-1 text-xs text-slate-500 dark:text-emerald-200">{t('storefront.composerHint')}</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-4 text-xs font-bold text-white transition hover:bg-emerald-700"
+        >
+          <Pencil size={14} />
+          {t('storefront.newPost')}
+        </button>
+      </div>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[80] flex items-end justify-center bg-emerald-950/40 p-3 backdrop-blur-sm sm:items-center"
+            role="dialog"
+            aria-modal="true"
+            aria-label={t('storefront.newPost')}
+          >
+            <motion.form
+              initial={{ y: 40, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 40, opacity: 0 }}
+              onSubmit={publish}
+              className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-3xl border border-emerald-100 bg-white p-5 shadow-2xl dark:border-emerald-800 dark:bg-emerald-950"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-lg font-extrabold text-slate-800 dark:text-white">
+                  {postType === 'story' ? t('storefront.newStory') : t('storefront.newPost')}
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-emerald-900"
+                  aria-label={t('common.close')}
+                >
+                  <X size={17} />
+                </button>
+              </div>
+
+              <div className="mt-4 flex gap-2" role="radiogroup" aria-label={t('common.status')}>
+                {(['post', 'story'] as const).map((kind) => (
+                  <button
+                    key={kind}
+                    type="button"
+                    role="radio"
+                    aria-checked={postType === kind}
+                    onClick={() => setPostType(kind)}
+                    className={`flex-1 rounded-xl border px-3 py-2 text-xs font-bold transition ${
+                      postType === kind
+                        ? 'border-emerald-600 bg-emerald-600 text-white'
+                        : 'border-slate-200 text-slate-600 dark:border-emerald-800 dark:text-emerald-100'
+                    }`}
+                  >
+                    {kind === 'story' ? t('storefront.newStory') : t('storefront.newPost')}
+                  </button>
+                ))}
+              </div>
+
+              <label className="mt-4 block text-sm font-bold text-slate-700 dark:text-emerald-50">
+                {t('storefront.newPost')}
+                <textarea
+                  value={caption}
+                  onChange={(event) => setCaption(event.target.value)}
+                  maxLength={2200}
+                  rows={3}
+                  required
+                  className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-normal outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-emerald-700 dark:bg-emerald-900"
+                />
+              </label>
+
+              <button
+                type="button"
+                onClick={() => fileInput.current?.click()}
+                className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-emerald-300 px-3 py-6 text-xs font-bold text-emerald-700 hover:bg-emerald-50 dark:border-emerald-700 dark:text-lime-300 dark:hover:bg-emerald-900/50"
+              >
+                <ImageIcon size={16} />
+                {image ? image.name : t('storefront.storeCover')}
+              </button>
+              <input
+                ref={fileInput}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={(event) => choose(event.target.files?.[0] ?? null)}
+              />
+              {preview && (
+                <img
+                  src={preview}
+                  alt=""
+                  className="mt-3 h-40 w-full rounded-xl object-cover"
+                />
+              )}
+
+              <button
+                type="submit"
+                disabled={publishing || !image}
+                className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+              >
+                <Send size={15} />
+                {publishing ? t('common.loading') : t('common.send')}
+              </button>
+            </motion.form>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </section>
   );
 }
 

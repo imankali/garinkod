@@ -38,6 +38,8 @@ import type {
   StorefrontAvailability,
   StorefrontHighlight,
   FollowedStorefront,
+  StorefrontConversation,
+  StorefrontMessage,
   UserAccount,
 } from '../types';
 
@@ -288,7 +290,7 @@ export const agricultureApi = {
   getStorefront: () => apiClient.get<Storefront | null>('/marketplace/storefront/'),
   createStorefront: (data: Pick<Storefront, 'name' | 'slug' | 'seller_type' | 'bio' | 'province' | 'city'>) =>
     apiClient.post<Storefront>('/marketplace/storefront/', data),
-  updateStorefront: (data: Partial<Storefront>) =>
+  updateStorefront: (data: Partial<Storefront> | FormData) =>
     apiClient.patch<Storefront>('/marketplace/storefront/', data),
 
   /** بررسی زنده آزاد بودن نام و آدرس غرفه هنگام تایپ */
@@ -446,6 +448,42 @@ export const trustApi = {
 export const rewardsApi = {
   myCoupons: () => apiClient.get<Coupon[]>('/rewards/me/'),
   wallet: () => apiClient.get<Wallet>('/wallet/me/'),
+};
+
+// ========================================
+// Direct messages (DM) between buyers and storefronts
+// ========================================
+export const messagesApi = {
+  /** All conversations the caller participates in, with unread counts. */
+  conversations: () =>
+    apiClient.get<{ count: number; results: StorefrontConversation[]; unread_total: number }>(
+      '/marketplace/conversations/',
+    ),
+
+  /** Get or create the caller's private thread with one storefront. */
+  openStorefrontConversation: (storefrontSlug: string) =>
+    apiClient.post<StorefrontConversation>(
+      `/marketplace/storefronts/${storefrontSlug}/conversation/`,
+    ),
+
+  getStorefrontConversation: (storefrontSlug: string) =>
+    apiClient.get<StorefrontConversation | null>(
+      `/marketplace/storefronts/${storefrontSlug}/conversation/`,
+    ),
+
+  /** Messages of one conversation, oldest first. Reading marks them as seen. */
+  messages: (conversationId: number, page = 1) =>
+    apiClient.get<PaginatedResponse<StorefrontMessage> & { conversation: StorefrontConversation }>(
+      `/marketplace/conversations/${conversationId}/messages/`,
+      { params: { page } },
+    ),
+
+  /** Send a text message, optionally attaching a marketplace listing. */
+  send: (conversationId: number, data: { body?: string; listing?: number }) =>
+    apiClient.post<StorefrontMessage>(
+      `/marketplace/conversations/${conversationId}/messages/`,
+      data,
+    ),
 };
 
 export const storefrontPostsApi = {

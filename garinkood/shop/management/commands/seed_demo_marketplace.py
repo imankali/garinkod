@@ -83,6 +83,10 @@ DEMO_SELLERS = [
 class Command(BaseCommand):
     help = "Seed demo storefronts, listings and posts for local development."
 
+    # Development-only credential so the owner/buyer flows can be exercised
+    # locally without a manual password reset.
+    DEMO_PASSWORD = 'demo-12345'
+
     @transaction.atomic
     def handle(self, *args, **options):
         created_sellers = created_listings = created_posts = 0
@@ -92,6 +96,11 @@ class Command(BaseCommand):
                 username=entry['username'],
                 defaults={'email': f"{entry['username']}@example.com"},
             )
+            # Local demo credential: resetting it every run keeps the sample
+            # sellers signable after any fixture change. Never run in production.
+            if not user.check_password(self.DEMO_PASSWORD):
+                user.set_password(self.DEMO_PASSWORD)
+                user.save(update_fields=['password'])
             storefront, created = Storefront.objects.get_or_create(
                 user=user,
                 defaults={
@@ -107,7 +116,7 @@ class Command(BaseCommand):
             )
             created_sellers += int(created)
 
-            for title, crop, price, unit, quantity, minimum in entry['listings']:
+            for index, (title, crop, price, unit, quantity, minimum) in enumerate(entry['listings']):
                 _, listing_created = MarketplaceListing.objects.get_or_create(
                     storefront=storefront,
                     title=title,
@@ -120,6 +129,8 @@ class Command(BaseCommand):
                         'quantity_available': quantity,
                         'min_order_quantity': minimum,
                         'status': 'published',
+                        'discount_percent': (0, 10, 15, 20, 30, 25)[index % 6],
+                        'sales_count': (9 + index * 23) % 180,
                     },
                 )
                 created_listings += int(listing_created)

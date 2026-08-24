@@ -3,11 +3,11 @@
 import { useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { ChevronLeft, Heart, LogIn, LogOut, Moon, Sun, X } from 'lucide-react';
+import { ChevronLeft, Heart, LogIn, LogOut, MessageCircle, Moon, Sun, X } from 'lucide-react';
 
 import { visibleSections } from '../config/navigation';
 import { useAuthStore, useUserLevel } from '../store/authStore';
-import { useTranslation, type Locale } from '../i18n';
+import { useTranslation } from '../i18n';
 import { cn } from '../utils/cn';
 import { IconButton } from './ui/Button';
 import Logo from './Logo';
@@ -45,7 +45,7 @@ export default function MobileMenu({
   const { pathname } = useLocation();
   const { isAuthenticated, user, account, logout } = useAuthStore();
   const level = useUserLevel();
-  const { locale, setLocale, t } = useTranslation();
+  const { t } = useTranslation();
   const panelRef = useRef<HTMLDivElement>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
   const reduceMotion = useReducedMotion();
@@ -211,6 +211,16 @@ export default function MobileMenu({
                 </div>
               ))}
 
+              {/* Direct messages shortcut. */}
+              <Link
+                to="/messages"
+                onClick={onClose}
+                className="flex min-h-11 w-full items-center gap-3 rounded-xl px-2 text-slate-600 transition-colors hover:bg-emerald-50 dark:text-emerald-100 dark:hover:bg-emerald-900"
+              >
+                <MessageCircle size={17} aria-hidden="true" className="shrink-0" />
+                <span className="flex-1 text-start text-fluid-sm font-bold">{t('nav.messages')}</span>
+              </Link>
+
               {/* Wishlist lives here now that the bottom bar shows "more". */}
               {onOpenWishlist && (
                 <button
@@ -222,7 +232,7 @@ export default function MobileMenu({
                   className="flex min-h-11 w-full items-center gap-3 rounded-xl px-2 text-slate-600 transition-colors hover:bg-emerald-50 dark:text-emerald-100 dark:hover:bg-emerald-900"
                 >
                   <Heart size={17} aria-hidden="true" className="shrink-0" />
-                  <span className="flex-1 text-start text-fluid-sm font-bold">علاقه‌مندی‌ها</span>
+                  <span className="flex-1 text-start text-fluid-sm font-bold">{t('nav.wishlist')}</span>
                   {wishlistCount > 0 && (
                     <span className="rounded-full bg-rose-500 px-2 py-0.5 text-fluid-2xs font-bold text-white">
                       {wishlistCount.toLocaleString('fa-IR')}
@@ -237,30 +247,15 @@ export default function MobileMenu({
               className="space-y-2 border-t border-slate-100 p-4 dark:border-emerald-900"
               style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))' }}
             >
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={onToggleDark}
-                  className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-slate-100 text-fluid-xs font-bold text-slate-700 dark:bg-emerald-900 dark:text-emerald-100"
-                  aria-pressed={dark}
-                >
-                  {dark ? <Sun size={15} aria-hidden="true" /> : <Moon size={15} aria-hidden="true" />}
-                  {dark ? 'حالت روشن' : 'حالت تیره'}
-                </button>
-
-                <label className="flex-1">
-                  <span className="sr-only">{t('language.label')}</span>
-                  <select
-                    value={locale}
-                    onChange={(event) => setLocale(event.target.value as Locale)}
-                    className="min-h-11 w-full rounded-xl bg-slate-100 px-3 text-fluid-xs font-bold text-slate-700 dark:bg-emerald-900 dark:text-emerald-100"
-                  >
-                    <option value="fa">فارسی</option>
-                    <option value="en">English</option>
-                    <option value="ar">العربية</option>
-                  </select>
-                </label>
-              </div>
+              <button
+                type="button"
+                onClick={onToggleDark}
+                className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-slate-100 text-fluid-xs font-bold text-slate-700 dark:bg-emerald-900 dark:text-emerald-100"
+                aria-pressed={dark}
+              >
+                {dark ? <Sun size={15} aria-hidden="true" /> : <Moon size={15} aria-hidden="true" />}
+                {dark ? t('settings.light') : t('settings.dark')}
+              </button>
 
               {isAuthenticated && (
                 <button

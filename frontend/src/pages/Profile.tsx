@@ -2,18 +2,20 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   AlertTriangle, BadgeCheck, BarChart3, Building2, ClipboardList, Edit3, Leaf,
-  LogOut, Package, Plus, Save, Settings2, ShoppingBag,
-  Store, UserRound, X,
+  LogOut, Moon, Package, Plus, Save, Settings2, ShoppingBag,
+  Store, Sun, UserRound, X,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
 import { agricultureApi, ordersApi } from "../api/services";
 import AvatarUploader from "../components/AvatarUploader";
 import LocationPicker from "../components/LocationPicker";
-import { useTranslation } from "../i18n";
+import { LANGUAGES, useTranslation } from "../i18n";
 import { useAuthStore } from "../store/authStore";
+import { useThemeStore } from "../store/themeStore";
 import type { MarketplaceListing, Order, Storefront } from "../types";
 import { formatPrice } from "../utils/formatPrice";
+import { cn } from "../utils/cn";
 
 type Tab = "overview" | "buyer" | "seller" | "settings";
 
@@ -178,12 +180,28 @@ export default function Profile() {
           </div>
         </section>
 
-        <div className="mt-6 grid gap-6 lg:grid-cols-[230px_1fr]">
+        <div className="mt-6 grid gap-6 lg:grid-cols-[240px_1fr]">
           <aside className="h-fit rounded-3xl border border-emerald-100 bg-white p-3 shadow-sm dark:border-emerald-900 dark:bg-emerald-950 lg:sticky lg:top-5">
-            <nav className="flex gap-2 overflow-x-auto lg:flex-col" aria-label="Account sections">
-              {navItems.map(({ id, label, icon: Icon }) => <button key={id} onClick={() => setTab(id)} className={`flex shrink-0 items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold transition ${tab === id ? "bg-emerald-600 text-white shadow-md" : "text-slate-600 hover:bg-emerald-50 dark:text-emerald-100 dark:hover:bg-emerald-900/50"}`}><Icon size={18} />{label}</button>)}
+            <nav
+              className="no-scrollbar -mx-1 flex snap-x gap-2 overflow-x-auto px-1 lg:flex-col lg:overflow-visible"
+              aria-label="Account sections"
+            >
+              {navItems.map(({ id, label, icon: Icon }) => (
+                <button
+                  key={id}
+                  onClick={() => setTab(id)}
+                  aria-current={tab === id ? "page" : undefined}
+                  className={`flex min-h-12 shrink-0 snap-start items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold transition lg:w-full ${tab === id ? "bg-emerald-600 text-white shadow-md" : "text-slate-600 hover:bg-emerald-50 dark:text-emerald-100 dark:hover:bg-emerald-900/50"}`}
+                >
+                  <Icon size={18} />
+                  {label}
+                </button>
+              ))}
             </nav>
-            <div className="mt-3 rounded-2xl bg-emerald-50 p-4 text-xs leading-6 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-100"><Leaf size={16} className="mb-1" />حساب شما می‌تواند هم‌زمان خریدار و فروشنده باشد؛ نقش فروشنده با ساخت غرفه فعال می‌شود.</div>
+            <div className="mt-3 hidden rounded-2xl bg-emerald-50 p-4 text-xs leading-6 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-100 lg:block">
+              <Leaf size={16} className="mb-1" />
+              حساب شما می‌تواند هم‌زمان خریدار و فروشنده باشد؛ نقش فروشنده با ساخت غرفه فعال می‌شود.
+            </div>
           </aside>
 
           <section>
@@ -235,7 +253,134 @@ function SellerPanel({ storefront, listings, loading, storeForm, setStoreForm, l
 }
 
 function SettingsPanel({ form, setForm, editing, setEditing, saving, onSave, onCancel, t, username }: { form: ProfileForm; setForm: (value: ProfileForm) => void; editing: boolean; setEditing: (value: boolean) => void; saving: boolean; onSave: (event: FormEvent) => Promise<void>; onCancel: () => void; t: (key: string) => string; username: string }) {
-  return <section className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm dark:border-emerald-900 dark:bg-emerald-950"><div className="flex flex-col justify-between gap-3 sm:flex-row"><div><h2 className="text-xl font-extrabold text-slate-800 dark:text-white">{t("account.settings")}</h2><p className="mt-2 text-sm text-slate-500 dark:text-emerald-200">اطلاعات تحویل برای خریدهای بعدی از اینجا تکمیل می‌شود.</p></div>{!editing ? <button onClick={() => setEditing(true)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white"><Edit3 size={16} />{t("common.edit")}</button> : <div className="flex gap-2"><button onClick={onCancel} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold dark:border-emerald-700"><X size={16} className="me-1 inline" />{t("common.cancel")}</button></div>}</div><form onSubmit={onSave} className="mt-6 grid gap-4 sm:grid-cols-2"><InfoField label={t("profile.firstName")} value={form.first_name} editing={editing} onChange={(value) => setForm({ ...form, first_name: value })} /><InfoField label={t("profile.lastName")} value={form.last_name} editing={editing} onChange={(value) => setForm({ ...form, last_name: value })} /><InfoField label={t("profile.email")} value={form.email} editing={editing} type="email" onChange={(value) => setForm({ ...form, email: value })} /><InfoField label={t("profile.phone")} value={form.phone} editing={editing} onChange={(value) => setForm({ ...form, phone: value })} /><InfoField label={t("profile.address")} value={form.address} editing={editing} multiline onChange={(value) => setForm({ ...form, address: value })} /><div className="rounded-2xl bg-slate-50 p-4 text-sm dark:bg-emerald-900/40"><p className="text-xs text-slate-500 dark:text-emerald-200">{t("profile.username")}</p><p className="mt-1 font-bold text-slate-800 dark:text-white">{username}</p></div>{editing && <button disabled={saving} className="inline-flex w-fit items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white disabled:opacity-50 sm:col-span-2"><Save size={16} />{saving ? t("common.loading") : t("common.save")}</button>}</form></section>;
+  return (
+    <div className="space-y-6">
+      {/* Account settings */}
+      <section className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm dark:border-emerald-900 dark:bg-emerald-950 sm:p-6">
+        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+          <div>
+            <h2 className="text-xl font-extrabold text-slate-800 dark:text-white">{t("account.settings")}</h2>
+            <p className="mt-2 text-sm text-slate-500 dark:text-emerald-200">اطلاعات تحویل برای خریدهای بعدی از اینجا تکمیل می‌شود.</p>
+          </div>
+          {!editing ? (
+            <button onClick={() => setEditing(true)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white">
+              <Edit3 size={16} />
+              {t("common.edit")}
+            </button>
+          ) : (
+            <div className="flex gap-2">
+              <button onClick={onCancel} className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold dark:border-emerald-700">
+                <X size={16} className="me-1 inline" />
+                {t("common.cancel")}
+              </button>
+            </div>
+          )}
+        </div>
+        <form onSubmit={onSave} className="mt-6 grid gap-4 sm:grid-cols-2">
+          <InfoField label={t("profile.firstName")} value={form.first_name} editing={editing} onChange={(value) => setForm({ ...form, first_name: value })} />
+          <InfoField label={t("profile.lastName")} value={form.last_name} editing={editing} onChange={(value) => setForm({ ...form, last_name: value })} />
+          <InfoField label={t("profile.email")} value={form.email} editing={editing} type="email" onChange={(value) => setForm({ ...form, email: value })} />
+          <InfoField label={t("profile.phone")} value={form.phone} editing={editing} onChange={(value) => setForm({ ...form, phone: value })} />
+          <InfoField label={t("profile.address")} value={form.address} editing={editing} multiline onChange={(value) => setForm({ ...form, address: value })} />
+          <div className="rounded-2xl bg-slate-50 p-4 text-sm dark:bg-emerald-900/40">
+            <p className="text-xs text-slate-500 dark:text-emerald-200">{t("profile.username")}</p>
+            <p className="mt-1 font-bold text-slate-800 dark:text-white">{username}</p>
+          </div>
+          {editing && (
+            <button disabled={saving} className="inline-flex w-fit items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white disabled:opacity-50 sm:col-span-2">
+              <Save size={16} />
+              {saving ? t("common.loading") : t("common.save")}
+            </button>
+          )}
+        </form>
+      </section>
+
+      {/* Site settings: language + theme */}
+      <SiteSettingsSection t={t} />
+    </div>
+  );
+}
+
+/** زبان نمایش و حالت شب/روز — طبق درخواست، انتخاب زبان از هدر به اینجا منتقل شده است. */
+function SiteSettingsSection({ t }: { t: (key: string) => string }) {
+  const { locale, setLocale } = useTranslation();
+  const isDark = useThemeStore((state) => state.isDark);
+  const toggleDark = useThemeStore((state) => state.toggle);
+
+  return (
+    <section className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm dark:border-emerald-900 dark:bg-emerald-950 sm:p-6">
+      <h2 className="flex items-center gap-2 text-xl font-extrabold text-slate-800 dark:text-white">
+        <Settings2 size={19} className="text-emerald-600 dark:text-lime-300" />
+        {t("settings.site")}
+      </h2>
+      <p className="mt-2 text-sm text-slate-500 dark:text-emerald-200">{t("settings.siteDescription")}</p>
+
+      <div className="mt-5 space-y-6">
+        {/* Language */}
+        <div>
+          <h3 className="text-sm font-bold text-slate-700 dark:text-emerald-50">{t("language.label")}</h3>
+          <p className="mt-1 text-xs text-slate-400 dark:text-emerald-300/70">{t("language.description")}</p>
+          <div role="radiogroup" aria-label={t("language.label")} className="mt-3 grid grid-cols-3 gap-2 sm:max-w-md">
+            {LANGUAGES.map((language) => (
+              <button
+                key={language.value}
+                type="button"
+                role="radio"
+                aria-checked={locale === language.value}
+                onClick={() => setLocale(language.value)}
+                className={cn(
+                  "flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-2xl border-2 px-3 py-2 transition",
+                  locale === language.value
+                    ? "border-emerald-600 bg-emerald-50 text-emerald-800 dark:bg-emerald-900/50 dark:text-lime-200"
+                    : "border-slate-100 text-slate-500 hover:border-emerald-300 dark:border-emerald-900 dark:text-emerald-100",
+                )}
+              >
+                <span className="text-lg leading-none">{language.flag}</span>
+                <span className="text-xs font-bold">{t(language.labelKey)}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Theme */}
+        <div>
+          <h3 className="text-sm font-bold text-slate-700 dark:text-emerald-50">{t("settings.theme")}</h3>
+          <div role="radiogroup" aria-label={t("settings.theme")} className="mt-3 grid grid-cols-2 gap-2 sm:max-w-xs">
+            <button
+              type="button"
+              role="radio"
+              aria-checked={!isDark}
+              onClick={() => isDark && toggleDark()}
+              className={cn(
+                "flex min-h-12 items-center justify-center gap-2 rounded-2xl border-2 px-3 text-sm font-bold transition",
+                !isDark
+                  ? "border-amber-400 bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-200"
+                  : "border-slate-100 text-slate-500 dark:border-emerald-900 dark:text-emerald-100",
+              )}
+            >
+              <Sun size={16} />
+              {t("settings.light")}
+            </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={isDark}
+              onClick={() => !isDark && toggleDark()}
+              className={cn(
+                "flex min-h-12 items-center justify-center gap-2 rounded-2xl border-2 px-3 text-sm font-bold transition",
+                isDark
+                  ? "border-emerald-500 bg-emerald-900/60 text-lime-200"
+                  : "border-slate-100 text-slate-500 dark:border-emerald-900 dark:text-emerald-100",
+              )}
+            >
+              <Moon size={16} />
+              {t("settings.dark")}
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
 }
 
 function Stat({ icon: Icon, label, value }: { icon: typeof BarChart3; label: string; value: string }) { return <div className="rounded-3xl border border-emerald-100 bg-white p-5 shadow-sm dark:border-emerald-900 dark:bg-emerald-950"><Icon size={20} className="text-emerald-600 dark:text-lime-300" /><p className="mt-4 text-2xl font-extrabold text-slate-800 dark:text-white">{value}</p><p className="mt-1 text-xs text-slate-500 dark:text-emerald-200">{label}</p></div>; }

@@ -88,7 +88,7 @@ const trendingSearches = [
 // SearchBar Component
 // ========================================
 export default function SearchBar({ variant = "desktop", onSelectProduct }: SearchBarProps) {
-  const { locale } = useTranslation();
+  const { locale, t } = useTranslation();
   const [query, setQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("all");
   const [isFocused, setIsFocused] = useState(false);
@@ -264,7 +264,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => setIsFocused(true)}
-          placeholder={isListening ? "در حال شنیدن صدای شما..." : "جستجوی سم، کود، بذر، ادوات و..."}
+          placeholder={isListening ? "در حال شنیدن صدای شما..." : t("header.searchPlaceholder")}
           className="w-full flex-1 bg-transparent px-4 py-2.5 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none dark:text-white dark:placeholder:text-emerald-400 md:py-3 md:text-base"
           aria-label="جستجوی محصولات"
         />
@@ -351,7 +351,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.98 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
-            className="absolute start-0 top-[calc(100%+10px)] z-40 w-full overflow-hidden rounded-2xl border border-emerald-100 bg-white/95 p-3 shadow-2xl shadow-emerald-900/10 backdrop-blur-xl dark:border-emerald-800 dark:bg-emerald-950/95"
+            className="absolute start-0 top-[calc(100%+10px)] z-50 w-full overflow-hidden rounded-2xl border border-emerald-100 bg-white/95 p-3 shadow-2xl shadow-emerald-900/10 backdrop-blur-xl dark:border-emerald-800 dark:bg-emerald-950/95"
           >
             {/* Voice Search Listening Indicator */}
             {isListening && (

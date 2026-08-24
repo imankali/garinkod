@@ -73,6 +73,8 @@ class Product(models.Model):
     available = models.BooleanField(default=True, verbose_name="موجود")
     is_featured = models.BooleanField(default=False, verbose_name="ویژه")
     image = models.ImageField(upload_to='products/', blank=True, null=True, verbose_name="تصویر")
+    discount_percent = models.PositiveSmallIntegerField(default=0, verbose_name="درصد تخفیف")
+    sales_count = models.PositiveIntegerField(default=0, verbose_name="تعداد فروش")
 
     objects = ProductManager()
 
@@ -96,6 +98,13 @@ class Product(models.Model):
     @property
     def is_in_stock(self):
         return self.stock > 0 and self.available
+
+    @property
+    def discounted_price(self) -> int:
+        """The price after the site-wide discount, rounded down to the rial."""
+        if self.discount_percent and self.discount_percent > 0:
+            return max(int(self.price * (100 - self.discount_percent) / 100), 0)
+        return self.price
 
 
 # --- مشخصات اختصاصی برای هر دسته ---
@@ -768,6 +777,8 @@ class MarketplaceListing(models.Model):
     harvest_date = models.DateField(null=True, blank=True)
     image = models.ImageField(upload_to='marketplace/', blank=True, null=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft', db_index=True)
+    discount_percent = models.PositiveSmallIntegerField(default=0, verbose_name='درصد تخفیف')
+    sales_count = models.PositiveIntegerField(default=0, verbose_name='تعداد فروش')
     rejection_reason = models.TextField(max_length=1000, blank=True, verbose_name='دلیل رد آگهی')
     reviewed_at = models.DateTimeField(null=True, blank=True)
     reviewed_by = models.ForeignKey(
@@ -794,6 +805,13 @@ class MarketplaceListing(models.Model):
     @property
     def is_purchasable(self) -> bool:
         return self.status == 'published' and self.quantity_available > 0
+
+    @property
+    def discounted_price(self) -> int:
+        """The price after the storefront's discount, rounded down."""
+        if self.discount_percent and self.discount_percent > 0:
+            return max(int(self.price * (100 - self.discount_percent) / 100), 0)
+        return self.price
 
     @property
     def minimum_order(self) -> int:
@@ -1165,6 +1183,76 @@ class StorefrontPost(models.Model):
     @property
     def image_url(self):
         return self.image.url if self.image else '/images/hero-farm.jpg'
+
+
+class StorefrontConversation(models.Model):
+    """A private thread between one buyer and one storefront.
+
+    There is exactly one conversation per (storefront, customer) pair, so a
+    buyer asking about several products keeps one continuous history, and the
+    owner sees one entry per customer rather than one per question.
+    """
+
+    storefront = models.ForeignKey(Storefront, on_delete=models.CASCADE, related_name='conversations')
+    customer = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='storefront_conversations'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'گفتگوی غرفه'
+        verbose_name_plural = 'گفتگوهای غرفه'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['storefront', 'customer'], name='unique_storefront_customer_conversation'
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.storefront.name} ↔ {self.customer.username}'
+
+    def unread_count_for(self, user) -> int:
+        """Messages the given participant has not read yet."""
+        if user.is_authenticated:
+            return self.messages.filter(is_read=False).exclude(sender=user).count()
+        return 0
+
+    def last_message(self):
+        return self.messages.order_by('-created_at').first()
+
+
+class StorefrontMessage(models.Model):
+    """One message in a storefront conversation.
+
+    ``listing`` attaches a marketplace product the buyer is asking about, so
+    the owner sees exactly which offering the question refers to.
+    """
+
+    conversation = models.ForeignKey(
+        StorefrontConversation, on_delete=models.CASCADE, related_name='messages'
+    )
+    sender = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='sent_storefront_messages'
+    )
+    body = models.TextField(max_length=2000, blank=True)
+    listing = models.ForeignKey(
+        MarketplaceListing, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='direct_messages',
+    )
+    is_read = models.BooleanField(default=False, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ('created_at',)
+        verbose_name = 'پیام غرفه'
+        verbose_name_plural = 'پیام‌های غرفه'
+        indexes = [
+            models.Index(fields=['conversation', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f'{self.sender.username}: {self.body[:40]}'
 
 
 # --- Agricultural input reference data (dose calculator) ---
