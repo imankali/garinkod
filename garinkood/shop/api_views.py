@@ -1,12 +1,13 @@
 from contextlib import nullcontext
+from decimal import Decimal, InvalidOperation
 from datetime import timedelta
 from secrets import token_urlsafe
 from threading import Lock
 
 from django.conf import settings
-from django.db.models import Q, Sum
+from django.db.models import Count, F, Q, Sum
 from rest_framework import viewsets, permissions, status
-from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.decorators import action, api_view, permission_classes, throttle_classes
 from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate, login, logout
@@ -23,7 +24,9 @@ from .models import (
     ServiceRequest, ProcurementRequest, Storefront, MarketplaceListing,
     PaymentAttempt, AffiliateProfile, AffiliateConversion, FinancialLedgerEntry,
     PlatformFeedback, StorefrontComplaint, VisualSearchRequest, Coupon, Wallet,
-    WalletTransaction, StorefrontPost, AdminAuditLog
+    WalletTransaction, StorefrontPost, AdminAuditLog, Location, AgriInput,
+    AgriInputDose, StorefrontFollow, StorefrontHighlight, StorefrontHighlightItem,
+    UserAccount, account_level
 )
 from .serializers import (
     CategorySerializer, ProductSerializer, ProductListSerializer,
@@ -33,11 +36,19 @@ from .serializers import (
     MarketplaceListingSerializer, PaymentAttemptSerializer, AffiliateProfileSerializer,
     AffiliateConversionSerializer, FinancialLedgerEntrySerializer, PlatformFeedbackSerializer,
     StorefrontComplaintSerializer, VisualSearchRequestSerializer, CouponSerializer,
-    WalletSerializer, StorefrontPostSerializer, AdminAuditLogSerializer
+    WalletSerializer, StorefrontPostSerializer, AdminAuditLogSerializer,
+    LocationSerializer, AgriInputSerializer, StorefrontHighlightSerializer
 )
 from .management_roles import ROLE_PERMISSIONS
 from .payments import get_provider, provider_options
 from .rewards import mark_order_paid_and_reward
+from .settlements import record_marketplace_sale, reverse_marketplace_sale, restore_listing_quantities
+from .permissions import IsModerator, IsAdminLevel, IsOwnerLevel
+from .slugs import slugify_fa, unique_storefront_slug, unique_listing_slug
+from .throttling import (
+    LoginRateThrottle, RegisterRateThrottle, SearchRateThrottle,
+    CheckoutRateThrottle, UploadRateThrottle, FeedbackRateThrottle,
+)
 
 # SQLite is used for local development only. It permits a single writer, so a
 # process-local lock prevents its deferred transactions from upgrading into
@@ -78,6 +89,7 @@ def _generate_affiliate_code() -> str:
 
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
+@throttle_classes([LoginRateThrottle])
 def login_view(request):
     """ورود کاربر"""
     username = request.data.get('username')
@@ -109,6 +121,7 @@ def login_view(request):
 
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
+@throttle_classes([RegisterRateThrottle])
 def register(request):
     """ثبت‌نام کاربر"""
     serializer = RegisterSerializer(data=request.data)
@@ -117,11 +130,15 @@ def register(request):
         user = serializer.save()
 
         # ساخت UserAccount
-        UserAccount.objects.create(
+        # A level-1 account row already exists (created by the post_save
+        # signal); fill in the optional profile details the form supplied.
+        UserAccount.objects.update_or_create(
             user=user,
-            phone=request.data.get('phone', ''),
-            gender=request.data.get('gender', 'male'),
-            address=request.data.get('address', '')
+            defaults={
+                'phone': request.data.get('phone', ''),
+                'gender': request.data.get('gender', 'male'),
+                'address': request.data.get('address', ''),
+            },
         )
 
         # ساخت Token
@@ -175,6 +192,7 @@ class ProductViewSet(viewsets.ReadOnlyModelViewSet):
     ordering_fields = ['price', 'publish', 'created']
     ordering = ['-publish']
     lookup_field = 'slug'
+    throttle_classes = [SearchRateThrottle]
 
     def get_serializer_class(self):
         if self.action == 'list':
@@ -249,16 +267,21 @@ class CartViewSet(viewsets.ViewSet):
                     session_id=session_id
                 ).exclude(user__isnull=False).first()
                 if guest_cart and guest_cart.id != cart.id:
-                    for guest_item in guest_cart.items.all():
+                    for guest_item in guest_cart.items.select_related('product', 'listing'):
+                        # A row references either a product or a listing; merge
+                        # on whichever it is and cap at what is still available.
+                        lookup = (
+                            {'listing': guest_item.listing}
+                            if guest_item.listing_id
+                            else {'product': guest_item.product}
+                        )
                         cart_item, created = CartItem.objects.get_or_create(
-                            cart=cart,
-                            product=guest_item.product,
-                            defaults={'quantity': guest_item.quantity}
+                            cart=cart, **lookup, defaults={'quantity': guest_item.quantity}
                         )
                         if not created:
                             new_qty = cart_item.quantity + guest_item.quantity
-                            cart_item.quantity = min(new_qty, guest_item.product.stock)
-                            cart_item.save()
+                            cart_item.quantity = max(min(new_qty, guest_item.available_quantity), 1)
+                            cart_item.save(update_fields=['quantity'])
                     guest_cart.delete()
             return cart
         else:
@@ -273,7 +296,7 @@ class CartViewSet(viewsets.ViewSet):
         sqlite_lock = _SQLITE_CART_WRITE_LOCK if connection.vendor == 'sqlite' else nullcontext()
         with sqlite_lock:
             cart = self._get_or_create_cart(request)
-            serializer = CartSerializer(cart)
+            serializer = CartSerializer(cart, context={'request': request})
             return Response(serializer.data)
 
     @action(detail=False, methods=['post'])
@@ -317,8 +340,78 @@ class CartViewSet(viewsets.ViewSet):
                 else:
                     CartItem.objects.create(cart=cart, product=product, quantity=quantity)
 
-        serializer = CartSerializer(cart)
+        serializer = CartSerializer(cart, context={'request': request})
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=['post'], url_path='add-listing')
+    def add_listing(self, request):
+        """Add a storefront listing to the cart.
+
+        Unlike catalogue products, a listing carries a seller-defined minimum
+        order, so a quantity below it is rejected rather than silently raised,
+        and the ceiling is whatever the seller still has available.
+        """
+        listing_id = request.data.get('listing_id')
+        if listing_id in (None, ''):
+            return Response({'error': 'listing_id الزامی است.'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            listing_id = int(listing_id)
+            quantity = int(request.data.get('quantity', 0) or 0)
+        except (TypeError, ValueError):
+            return Response(
+                {'error': 'شناسه آگهی و تعداد باید عدد صحیح باشند.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        listing = get_object_or_404(
+            MarketplaceListing.objects.select_related('storefront'), id=listing_id
+        )
+        if not listing.is_purchasable:
+            return Response(
+                {'error': 'این آگهی در حال حاضر قابل خرید نیست.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        minimum = listing.minimum_order
+        available = int(listing.quantity_available)
+        if quantity <= 0:
+            quantity = minimum
+        if quantity < minimum:
+            return Response(
+                {
+                    'error': f'حداقل سفارش این آگهی {minimum} {listing.unit} است.',
+                    'fields': {'quantity': [f'حداقل سفارش {minimum} {listing.unit} است.']},
+                    'min_order_quantity': minimum,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if quantity > available:
+            return Response(
+                {
+                    'error': f'موجودی این آگهی {available} {listing.unit} است.',
+                    'fields': {'quantity': [f'حداکثر {available} {listing.unit} قابل سفارش است.']},
+                    'available_quantity': available,
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        sqlite_lock = _SQLITE_CART_WRITE_LOCK if connection.vendor == 'sqlite' else nullcontext()
+        with sqlite_lock:
+            with transaction.atomic():
+                cart = self._get_or_create_cart(request)
+                cart_item = CartItem.objects.select_for_update().filter(
+                    cart=cart, listing=listing
+                ).first()
+                if cart_item:
+                    cart_item.quantity = min(cart_item.quantity + quantity, available)
+                    cart_item.save(update_fields=['quantity'])
+                else:
+                    CartItem.objects.create(cart=cart, listing=listing, quantity=quantity)
+
+        return Response(
+            CartSerializer(cart, context={'request': request}).data,
+            status=status.HTTP_201_CREATED,
+        )
 
     @action(detail=False, methods=['post'])
     def remove(self, request):
@@ -335,7 +428,7 @@ class CartViewSet(viewsets.ViewSet):
         cart_item = get_object_or_404(CartItem, id=item_id, cart=cart)
         cart_item.delete()
 
-        serializer = CartSerializer(cart)
+        serializer = CartSerializer(cart, context={'request': request})
         return Response(serializer.data)
 
     @action(detail=False, methods=['post'], url_path='update_quantity')
@@ -359,18 +452,42 @@ class CartViewSet(viewsets.ViewSet):
             cart = self._get_or_create_cart(request)
             with transaction.atomic():
                 cart_item = get_object_or_404(
-                    CartItem.objects.select_for_update().select_related('product'),
+                    CartItem.objects.select_for_update().select_related('product', 'listing'),
                     id=item_id,
                     cart=cart,
                 )
                 if quantity <= 0:
                     cart_item.delete()
+                elif cart_item.listing_id:
+                    # Listings honour the seller's minimum order and stock, not
+                    # the catalogue's flat cap of ten.
+                    listing = cart_item.listing
+                    minimum = listing.minimum_order
+                    available = int(listing.quantity_available)
+                    if quantity < minimum:
+                        return Response(
+                            {
+                                'error': f'حداقل سفارش این آگهی {minimum} {listing.unit} است.',
+                                'fields': {'quantity': [f'حداقل سفارش {minimum} {listing.unit} است.']},
+                            },
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
+                    if quantity > available:
+                        return Response(
+                            {
+                                'error': f'موجودی این آگهی {available} {listing.unit} است.',
+                                'fields': {'quantity': [f'حداکثر {available} {listing.unit} قابل سفارش است.']},
+                            },
+                            status=status.HTTP_409_CONFLICT,
+                        )
+                    cart_item.quantity = quantity
+                    cart_item.save(update_fields=['quantity'])
                 else:
                     max_qty = min(10, cart_item.product.stock)
                     cart_item.quantity = min(quantity, max_qty)
                     cart_item.save(update_fields=['quantity'])
 
-        serializer = CartSerializer(cart)
+        serializer = CartSerializer(cart, context={'request': request})
         return Response(serializer.data)
 
 
@@ -388,6 +505,7 @@ def _checkout_cart(request):
 
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
+@throttle_classes([CheckoutRateThrottle])
 def checkout(request):
     """Create a reviewable order from the caller's cart.
 
@@ -410,21 +528,53 @@ def checkout(request):
         with transaction.atomic():
             cart = _checkout_cart(request)
             cart_items = list(
-                CartItem.objects.select_related('product').filter(cart=cart).order_by('product_id')
+                CartItem.objects
+                .select_related('product', 'listing', 'listing__storefront', 'listing__storefront__user')
+                .filter(cart=cart)
+                .order_by('product_id', 'listing_id')
             )
             if not cart_items:
                 return Response({'error': 'سبد خرید شما خالی است.'}, status=status.HTTP_400_BAD_REQUEST)
 
-            product_ids = [item.product_id for item in cart_items]
+            product_items = [item for item in cart_items if item.product_id]
+            listing_items = [item for item in cart_items if item.listing_id]
+
+            # Rows are locked in a stable order (products, then listings, each
+            # by ascending id) so two concurrent checkouts can never deadlock.
+            product_ids = [item.product_id for item in product_items]
             locked_products = {
                 product.id: product
                 for product in Product.objects.select_for_update().filter(id__in=product_ids).order_by('id')
             }
+            listing_ids = [item.listing_id for item in listing_items]
+            locked_listings = {
+                listing.id: listing
+                for listing in MarketplaceListing.objects
+                .select_for_update()
+                .select_related('storefront', 'storefront__user')
+                .filter(id__in=listing_ids)
+                .order_by('id')
+            }
+
             missing_or_unavailable = []
-            for item in cart_items:
+            for item in product_items:
                 product = locked_products.get(item.product_id)
                 if not product or product.status != 'published' or not product.available or product.stock < item.quantity:
                     missing_or_unavailable.append(item.product.title)
+            for item in listing_items:
+                listing = locked_listings.get(item.listing_id)
+                if not listing or listing.status != 'published' or int(listing.quantity_available) < item.quantity:
+                    missing_or_unavailable.append(item.listing.title)
+                elif item.quantity < listing.minimum_order:
+                    return Response(
+                        {
+                            'error': (
+                                f'حداقل سفارش «{listing.title}» برابر '
+                                f'{listing.minimum_order} {listing.unit} است.'
+                            )
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
 
             if missing_or_unavailable:
                 return Response(
@@ -432,7 +582,10 @@ def checkout(request):
                     status=status.HTTP_409_CONFLICT,
                 )
 
-            subtotal = sum(locked_products[item.product_id].price * item.quantity for item in cart_items)
+            subtotal = (
+                sum(locked_products[item.product_id].price * item.quantity for item in product_items)
+                + sum(locked_listings[item.listing_id].price * item.quantity for item in listing_items)
+            )
             coupon_code = details.get('coupon_code', '').strip().upper()
             coupon = None
             discount_amount = 0
@@ -481,7 +634,7 @@ def checkout(request):
                 coupon.save(update_fields=['usage_count', 'updated_at'])
 
             order_items = []
-            for item in cart_items:
+            for item in product_items:
                 product = locked_products[item.product_id]
                 product.stock -= item.quantity
                 if product.stock == 0:
@@ -490,12 +643,47 @@ def checkout(request):
                 order_items.append(OrderItem(
                     order=order,
                     product=product,
+                    kind='product',
                     product_title=product.title,
                     product_slug=product.slug,
                     unit_price=product.price,
                     quantity=item.quantity,
                 ))
+
+            for item in listing_items:
+                listing = locked_listings[item.listing_id]
+                storefront = listing.storefront
+                listing.quantity_available = F('quantity_available') - item.quantity
+                listing.save(update_fields=['quantity_available', 'updated_at'])
+                listing.refresh_from_db(fields=['quantity_available'])
+                if listing.quantity_available <= 0:
+                    listing.status = 'sold_out'
+                    listing.save(update_fields=['status', 'updated_at'])
+
+                line_total = listing.price * item.quantity
+                commission_rate = storefront.commission_rate or 0
+                order_items.append(OrderItem(
+                    order=order,
+                    listing=listing,
+                    storefront=storefront,
+                    seller=storefront.user,
+                    kind='listing',
+                    product_title=listing.title,
+                    product_slug=listing.slug,
+                    storefront_name=storefront.name,
+                    storefront_slug=storefront.slug,
+                    unit=listing.unit,
+                    unit_price=listing.price,
+                    quantity=item.quantity,
+                    commission_rate=commission_rate,
+                    commission_amount=int(line_total * commission_rate / 100),
+                ))
+
             OrderItem.objects.bulk_create(order_items)
+            # Record the seller/platform split now; it stays pending until the
+            # order is actually paid.
+            if listing_items:
+                record_marketplace_sale(order)
             if affiliate:
                 commission_amount = int(subtotal * affiliate.commission_rate / 100)
                 conversion = AffiliateConversion.objects.create(
@@ -592,25 +780,85 @@ class MarketplaceListingViewSet(viewsets.ModelViewSet):
     lookup_field = 'slug'
     filter_backends = [SearchFilter, OrderingFilter]
     search_fields = ['title', 'crop_name', 'description', 'storefront__name']
-    ordering_fields = ['price', 'created_at', 'harvest_date']
+    ordering_fields = ['price', 'created_at', 'harvest_date', 'quantity_available']
     ordering = ['-created_at']
+    throttle_classes = [SearchRateThrottle]
 
     def get_queryset(self):
         base = MarketplaceListing.objects.select_related('storefront', 'storefront__user')
         if self.action in {'list', 'retrieve'}:
-            return base.filter(status='published')
+            queryset = base.filter(status='published')
+            return self._apply_marketplace_filters(queryset)
         if self.request.user.is_authenticated:
             return base.filter(storefront__user=self.request.user)
         return base.none()
+
+    def _apply_marketplace_filters(self, queryset):
+        """Server-side filters shared by the marketplace list view.
+
+        Everything the buyer can narrow by lives here rather than in the
+        client, so a filtered result set is paginated correctly instead of
+        being trimmed after the fact.
+        """
+        params = self.request.query_params
+
+        province = params.get('province', '').strip()
+        if province:
+            queryset = queryset.filter(storefront__province__iexact=province)
+        city = params.get('city', '').strip()
+        if city:
+            queryset = queryset.filter(storefront__city__iexact=city)
+        seller_type = params.get('seller_type', '').strip()
+        if seller_type:
+            queryset = queryset.filter(storefront__seller_type=seller_type)
+        storefront_slug = params.get('storefront', '').strip()
+        if storefront_slug:
+            queryset = queryset.filter(storefront__slug=storefront_slug)
+        crop = params.get('crop', '').strip()
+        if crop:
+            queryset = queryset.filter(crop_name__icontains=crop)
+        unit = params.get('unit', '').strip()
+        if unit:
+            queryset = queryset.filter(unit__iexact=unit)
+        if params.get('verified') in {'1', 'true', 'True'}:
+            queryset = queryset.filter(storefront__is_verified=True)
+        if params.get('in_stock') in {'1', 'true', 'True'}:
+            queryset = queryset.filter(quantity_available__gt=0)
+
+        for param, lookup in (('min_price', 'price__gte'), ('max_price', 'price__lte'),
+                              ('min_quantity', 'quantity_available__gte')):
+            raw = params.get(param, '').strip()
+            if raw:
+                try:
+                    queryset = queryset.filter(**{lookup: Decimal(raw)})
+                except (InvalidOperation, ValueError):
+                    # An unparsable bound is ignored rather than 500-ing the
+                    # whole listing page.
+                    continue
+        return queryset
 
     def get_permissions(self):
         if self.action in {'list', 'retrieve'}:
             return [permissions.AllowAny()]
         return [permissions.IsAuthenticated()]
 
+    def get_serializer_context(self):
+        return {**super().get_serializer_context(), 'request': self.request}
+
     def perform_create(self, serializer):
         storefront = get_object_or_404(Storefront, user=self.request.user)
-        serializer.save(storefront=storefront, status='pending_review')
+        # The seller never supplies an address; it is derived from the title and
+        # de-duplicated with a numeric suffix.
+        serializer.save(
+            storefront=storefront,
+            status='pending_review',
+            slug=unique_listing_slug(serializer.validated_data.get('title', '')),
+        )
+
+    def perform_update(self, serializer):
+        # Editing a rejected or published listing sends it back for review, and
+        # clears the previous rejection note so stale feedback is not shown.
+        serializer.save(status='pending_review', rejection_reason='')
 
     @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated])
     def mine(self, request):
@@ -656,7 +904,7 @@ def user_profile(request):
         user_serializer = UserSerializer(user)
         try:
             account = user.account
-            account_serializer = UserAccountSerializer(account)
+            account_serializer = UserAccountSerializer(account, context={'request': request})
             return Response({
                 'user': user_serializer.data,
                 'account': account_serializer.data
@@ -675,7 +923,7 @@ def user_profile(request):
 
     account_data = {
         key: request.data[key]
-        for key in ('phone', 'gender', 'address')
+        for key in ('phone', 'gender', 'address', 'avatar')
         if key in request.data
     }
 
@@ -685,7 +933,8 @@ def user_profile(request):
         # Validate before any database write so a bad profile payload cannot
         # partially save the user's name/email.
         account_serializer = UserAccountSerializer(
-            account or UserAccount(user=user), data=account_data, partial=True
+            account or UserAccount(user=user), data=account_data, partial=True,
+            context={'request': request},
         )
         if not account_serializer.is_valid():
             return Response(account_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -699,9 +948,45 @@ def user_profile(request):
 
     return Response({
         'user': UserSerializer(user).data,
-        'account': UserAccountSerializer(account).data if account else None,
+        'account': UserAccountSerializer(account, context={'request': request}).data if account else None,
         'message': 'پروفایل با موفقیت بروزرسانی شد'
     })
+
+@api_view(['POST', 'DELETE'])
+@permission_classes([permissions.IsAuthenticated])
+@throttle_classes([UploadRateThrottle])
+def user_avatar(request):
+    """Upload (POST) or remove (DELETE) the caller's profile picture.
+
+    Validation lives in the serializer so the same MIME/size/dimension rules
+    apply whether the avatar arrives here or through the profile endpoint.
+    """
+    account, _ = UserAccount.objects.get_or_create(user=request.user, defaults={'phone': ''})
+
+    if request.method == 'DELETE':
+        if account.avatar:
+            account.avatar.delete(save=False)
+            account.avatar = None
+            account.save(update_fields=['avatar', 'updated'])
+        return Response(UserAccountSerializer(account, context={'request': request}).data)
+
+    upload = request.FILES.get('avatar')
+    if not upload:
+        return Response(
+            {'error': 'فایل تصویر ارسال نشده است.', 'fields': {'avatar': ['تصویری انتخاب کنید.']}},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    serializer = UserAccountSerializer(
+        account, data={'avatar': upload}, partial=True, context={'request': request}
+    )
+    serializer.is_valid(raise_exception=True)
+    # Replacing an avatar should not leave the previous file behind.
+    old_file = account.avatar
+    serializer.save()
+    if old_file and old_file.name != account.avatar.name:
+        old_file.delete(save=False)
+    return Response(serializer.data)
+
 
 # ========================================
 # Payments, affiliate, finance and trust centre
@@ -772,6 +1057,7 @@ def storefront_finance(request):
 
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
+@throttle_classes([FeedbackRateThrottle])
 def submit_feedback(request):
     serializer = PlatformFeedbackSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
@@ -784,6 +1070,7 @@ def submit_feedback(request):
 
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
+@throttle_classes([FeedbackRateThrottle])
 def submit_storefront_complaint(request):
     serializer = StorefrontComplaintSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
@@ -796,6 +1083,7 @@ def submit_storefront_complaint(request):
 
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
+@throttle_classes([UploadRateThrottle])
 def visual_search(request):
     upload = request.FILES.get('image')
     if not upload:
@@ -890,10 +1178,8 @@ def _audit(actor, action: str, target, summary: str, metadata: dict | None = Non
 
 
 @api_view(['GET'])
-@permission_classes([permissions.IsAdminUser])
+@permission_classes([IsModerator])
 def management_dashboard(request):
-    if not request.user.is_superuser and not request.user.groups.exists():
-        return Response({'error': 'برای مرکز مدیریت باید یک نقش سازمانی داشته باشید.'}, status=status.HTTP_403_FORBIDDEN)
     can_view_orders = _can_manage(request.user, 'view_order')
     can_view_finance = _can_manage(request.user, 'view_financialledgerentry')
     paid_revenue = Order.objects.filter(payment_status='paid').aggregate(total=Sum('total_price'))['total'] or 0 if can_view_finance else None
@@ -920,6 +1206,21 @@ def management_dashboard(request):
             'active_affiliates': AffiliateProfile.objects.filter(status='active').count() if _can_manage(request.user, 'view_affiliateprofile') else None,
         },
         'recent_orders': OrderSerializer(recent_orders, many=True).data,
+        # The review queue is surfaced on the dashboard itself so a moderator
+        # sees pending work without first opening a separate tab.
+        'pending_review': {
+            'listings': MarketplaceListingSerializer(
+                MarketplaceListing.objects.select_related('storefront')
+                .filter(status='pending_review').order_by('-created_at')[:8],
+                many=True, context={'request': request},
+            ).data if _can_manage(request.user, 'view_marketplacelisting') else [],
+            'posts': StorefrontPostSerializer(
+                StorefrontPost.objects.select_related('storefront')
+                .filter(status='pending_review').order_by('-created_at')[:8],
+                many=True, context={'request': request},
+            ).data if _can_manage(request.user, 'view_storefrontpost') else [],
+        },
+        'viewer_level': account_level(request.user),
         'alerts': [
             {'type': 'complaint', 'count': open_complaints, 'label': 'شکایت باز'},
             {'type': 'posts', 'count': pending_posts, 'label': 'پست/استوری در انتظار بررسی'},
@@ -930,9 +1231,9 @@ def management_dashboard(request):
 
 
 @api_view(['GET', 'PATCH'])
-@permission_classes([permissions.IsAdminUser])
+@permission_classes([IsAdminLevel])
 def management_staff(request):
-    if not request.user.is_superuser:
+    if account_level(request.user) < UserAccount.LEVEL_OWNER:
         return Response({'error': 'تنها مالک/سوپریوزر می‌تواند دسترسی کارمندان را تغییر دهد.'}, status=status.HTTP_403_FORBIDDEN)
 
     if request.method == 'GET':
@@ -972,7 +1273,7 @@ def management_staff(request):
 
 
 @api_view(['GET'])
-@permission_classes([permissions.IsAdminUser])
+@permission_classes([IsModerator])
 def management_audit(request):
     if not request.user.is_superuser and not _can_manage(request.user, 'view_adminauditlog'):
         return Response({'error': 'دسترسی مشاهده لاگ مدیریتی ندارید.'}, status=status.HTTP_403_FORBIDDEN)
@@ -980,7 +1281,7 @@ def management_audit(request):
 
 
 @api_view(['POST'])
-@permission_classes([permissions.IsAdminUser])
+@permission_classes([IsModerator])
 def management_mark_order_paid(request, code):
     if not _can_manage(request.user, 'change_order'):
         return Response({'error': 'مجوز مدیریت سفارش ندارید.'}, status=status.HTTP_403_FORBIDDEN)
@@ -994,9 +1295,26 @@ def management_mark_order_paid(request, code):
 
 
 @api_view(['POST'])
-@permission_classes([permissions.IsAdminUser])
+@permission_classes([IsModerator])
 def management_moderate_content(request, content_type, object_id):
+    """Approve or reject one piece of content.
+
+    Rejecting requires a reason: it is stored on the listing so the seller can
+    read *why* it was rejected, and mirrored into the audit log so the decision
+    is attributable.
+    """
     status_value = request.data.get('status')
+    reason = str(request.data.get('reason', '')).strip()
+    rejecting = status_value == 'rejected'
+    if rejecting and len(reason) < 5:
+        return Response(
+            {
+                'error': 'برای رد محتوا باید دلیل بنویسید.',
+                'fields': {'reason': ['دلیل رد باید حداقل ۵ کاراکتر باشد.']},
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
     if content_type == 'comment':
         if not _can_manage(request.user, 'change_comment'):
             return Response({'error': 'مجوز مدیریت کامنت ندارید.'}, status=status.HTTP_403_FORBIDDEN)
@@ -1018,8 +1336,360 @@ def management_moderate_content(request, content_type, object_id):
             return Response({'error': 'وضعیت آگهی نامعتبر است.'}, status=status.HTTP_400_BAD_REQUEST)
         obj = get_object_or_404(MarketplaceListing, id=object_id)
         obj.status = status_value
-        obj.save(update_fields=['status', 'updated_at'])
+        obj.rejection_reason = reason if rejecting else ''
+        obj.reviewed_at = timezone.now()
+        obj.reviewed_by = request.user
+        obj.save(update_fields=[
+            'status', 'rejection_reason', 'reviewed_at', 'reviewed_by', 'updated_at',
+        ])
     else:
         return Response({'error': 'نوع محتوا نامعتبر است.'}, status=status.HTTP_400_BAD_REQUEST)
-    _audit(request.user, 'content_moderated', obj, f'{content_type} {object_id} به {status_value} تغییر کرد.', {'status': status_value})
-    return Response({'id': obj.id, 'status': status_value})
+
+    _audit(
+        request.user,
+        'content_rejected' if rejecting else 'content_moderated',
+        obj,
+        f'{content_type} {object_id} به {status_value} تغییر کرد.',
+        {'status': status_value, 'reason': reason},
+    )
+    return Response({'id': obj.id, 'status': status_value, 'reason': reason})
+
+
+@api_view(['POST'])
+@permission_classes([IsModerator])
+def management_bulk_moderate(request):
+    """Approve or reject many items of one type in a single transaction.
+
+    Either the whole batch applies or none of it does, so a partially-moderated
+    queue cannot result from one failing row.
+    """
+    content_type = str(request.data.get('content_type', '')).strip()
+    ids = request.data.get('ids') or []
+    status_value = request.data.get('status')
+    reason = str(request.data.get('reason', '')).strip()
+
+    if content_type not in {'listing', 'post', 'comment'}:
+        return Response({'error': 'نوع محتوا نامعتبر است.'}, status=status.HTTP_400_BAD_REQUEST)
+    if not isinstance(ids, list) or not ids:
+        return Response(
+            {'error': 'حداقل یک مورد را انتخاب کنید.', 'fields': {'ids': ['فهرست شناسه‌ها خالی است.']}},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if len(ids) > 100:
+        return Response({'error': 'در هر درخواست حداکثر ۱۰۰ مورد قابل بررسی است.'}, status=status.HTTP_400_BAD_REQUEST)
+    rejecting = status_value == 'rejected'
+    if rejecting and len(reason) < 5:
+        return Response(
+            {'error': 'برای رد گروهی باید دلیل بنویسید.', 'fields': {'reason': ['دلیل رد الزامی است.']}},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    permission_map = {
+        'listing': 'change_marketplacelisting',
+        'post': 'change_storefrontpost',
+        'comment': 'change_comment',
+    }
+    if not _can_manage(request.user, permission_map[content_type]):
+        return Response({'error': 'مجوز لازم برای این عملیات را ندارید.'}, status=status.HTTP_403_FORBIDDEN)
+
+    with transaction.atomic():
+        if content_type == 'listing':
+            if status_value not in dict(MarketplaceListing.STATUS_CHOICES):
+                return Response({'error': 'وضعیت آگهی نامعتبر است.'}, status=status.HTTP_400_BAD_REQUEST)
+            updated = MarketplaceListing.objects.filter(id__in=ids).update(
+                status=status_value,
+                rejection_reason=reason if rejecting else '',
+                reviewed_at=timezone.now(),
+                reviewed_by=request.user,
+                updated_at=timezone.now(),
+            )
+        elif content_type == 'post':
+            if status_value not in dict(StorefrontPost.STATUS_CHOICES):
+                return Response({'error': 'وضعیت محتوا نامعتبر است.'}, status=status.HTTP_400_BAD_REQUEST)
+            updated = StorefrontPost.objects.filter(id__in=ids).update(
+                status=status_value, updated_at=timezone.now()
+            )
+        else:
+            updated = Comment.objects.filter(id__in=ids).update(
+                active=status_value == 'published', updated=timezone.now()
+            )
+
+        AdminAuditLog.objects.create(
+            actor=request.user,
+            action='content_bulk_rejected' if rejecting else 'content_bulk_moderated',
+            target_type=content_type,
+            target_id=','.join(str(i) for i in ids[:20]),
+            summary=f'{updated} مورد {content_type} به {status_value} تغییر کرد.',
+            metadata={'ids': ids, 'status': status_value, 'reason': reason},
+        )
+
+    return Response({'updated': updated, 'status': status_value})
+
+
+@api_view(['GET'])
+@permission_classes([IsModerator])
+def management_moderation_queue(request):
+    """A single paginated queue across listings, posts, comments and reports.
+
+    ``?type=`` narrows to one content type and ``?status=`` to one state;
+    without them the caller gets everything currently awaiting review.
+    """
+    content_type = request.query_params.get('type', 'all')
+    status_filter = request.query_params.get('status', 'pending')
+    search = request.query_params.get('search', '').strip()
+    try:
+        page = max(int(request.query_params.get('page', 1)), 1)
+        page_size = min(max(int(request.query_params.get('page_size', 20)), 1), 100)
+    except (TypeError, ValueError):
+        return Response({'error': 'پارامترهای صفحه‌بندی نامعتبر است.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    rows = []
+
+    if content_type in {'all', 'listing'} and _can_manage(request.user, 'view_marketplacelisting'):
+        listings = MarketplaceListing.objects.select_related('storefront')
+        if status_filter == 'pending':
+            listings = listings.filter(status='pending_review')
+        elif status_filter != 'all':
+            listings = listings.filter(status=status_filter)
+        if search:
+            listings = listings.filter(Q(title__icontains=search) | Q(storefront__name__icontains=search))
+        for listing in listings.order_by('-created_at')[:500]:
+            rows.append({
+                'type': 'listing',
+                'id': listing.id,
+                'title': listing.title,
+                'excerpt': listing.description[:160],
+                'status': listing.status,
+                'status_label': listing.get_status_display(),
+                'storefront': listing.storefront.name,
+                'storefront_slug': listing.storefront.slug,
+                'image_url': listing.image_url,
+                'rejection_reason': listing.rejection_reason,
+                'created_at': listing.created_at,
+            })
+
+    if content_type in {'all', 'post'} and _can_manage(request.user, 'view_storefrontpost'):
+        posts = StorefrontPost.objects.select_related('storefront')
+        if status_filter == 'pending':
+            posts = posts.filter(status='pending_review')
+        elif status_filter != 'all':
+            posts = posts.filter(status=status_filter)
+        if search:
+            posts = posts.filter(Q(caption__icontains=search) | Q(storefront__name__icontains=search))
+        for post in posts.order_by('-created_at')[:500]:
+            rows.append({
+                'type': 'post',
+                'id': post.id,
+                'title': post.get_post_type_display(),
+                'excerpt': post.caption[:160],
+                'status': post.status,
+                'status_label': post.get_status_display(),
+                'storefront': post.storefront.name,
+                'storefront_slug': post.storefront.slug,
+                'image_url': post.image_url,
+                'rejection_reason': '',
+                'created_at': post.created_at,
+            })
+
+    if content_type in {'all', 'comment'} and _can_manage(request.user, 'view_comment'):
+        comments = Comment.objects.select_related('product')
+        if status_filter == 'pending':
+            comments = comments.filter(active=False)
+        elif status_filter == 'published':
+            comments = comments.filter(active=True)
+        if search:
+            comments = comments.filter(Q(body__icontains=search) | Q(name__icontains=search))
+        for comment in comments.order_by('-created')[:500]:
+            rows.append({
+                'type': 'comment',
+                'id': comment.id,
+                'title': f'نظر {comment.name}',
+                'excerpt': comment.body[:160],
+                'status': 'published' if comment.active else 'pending_review',
+                'status_label': 'منتشر شده' if comment.active else 'در انتظار بررسی',
+                'storefront': '',
+                'storefront_slug': '',
+                'image_url': comment.image.url if comment.image else '',
+                'rejection_reason': '',
+                'created_at': comment.created,
+            })
+
+    if content_type in {'all', 'feedback'} and _can_manage(request.user, 'view_platformfeedback'):
+        feedback = PlatformFeedback.objects.all()
+        if status_filter == 'pending':
+            feedback = feedback.filter(status='new')
+        elif status_filter != 'all':
+            feedback = feedback.filter(status=status_filter)
+        if search:
+            feedback = feedback.filter(Q(subject__icontains=search) | Q(message__icontains=search))
+        for entry in feedback.order_by('-created_at')[:500]:
+            rows.append({
+                'type': 'feedback',
+                'id': entry.id,
+                'title': entry.subject,
+                'excerpt': entry.message[:160],
+                'status': entry.status,
+                'status_label': entry.get_status_display(),
+                'storefront': '',
+                'storefront_slug': '',
+                'image_url': '',
+                'rejection_reason': '',
+                'created_at': entry.created_at,
+            })
+
+    if content_type in {'all', 'complaint'} and _can_manage(request.user, 'view_storefrontcomplaint'):
+        complaints = StorefrontComplaint.objects.select_related('storefront')
+        if status_filter == 'pending':
+            complaints = complaints.exclude(status__in=['resolved', 'rejected'])
+        elif status_filter != 'all':
+            complaints = complaints.filter(status=status_filter)
+        if search:
+            complaints = complaints.filter(Q(subject__icontains=search) | Q(description__icontains=search))
+        for complaint in complaints.order_by('-created_at')[:500]:
+            rows.append({
+                'type': 'complaint',
+                'id': complaint.id,
+                'title': complaint.subject,
+                'excerpt': complaint.description[:160],
+                'status': complaint.status,
+                'status_label': complaint.get_status_display(),
+                'storefront': complaint.storefront.name,
+                'storefront_slug': complaint.storefront.slug,
+                'image_url': '',
+                'rejection_reason': complaint.resolution_note,
+                'created_at': complaint.created_at,
+            })
+
+    rows.sort(key=lambda row: row['created_at'], reverse=True)
+    total = len(rows)
+    start = (page - 1) * page_size
+    return Response({
+        'count': total,
+        'page': page,
+        'page_size': page_size,
+        'total_pages': (total + page_size - 1) // page_size or 1,
+        'results': rows[start:start + page_size],
+    })
+
+
+@api_view(['GET', 'PATCH'])
+@permission_classes([IsAdminLevel])
+def management_users(request):
+    """List platform users and change their access level.
+
+    Guardrails encoded here rather than left to the UI:
+    * only a level-5 owner may create or modify another owner;
+    * an owner can never be demoted or deactivated through this endpoint —
+      including by themselves, which would otherwise lock the platform out.
+    """
+    actor_level = account_level(request.user)
+
+    if request.method == 'GET':
+        search = request.query_params.get('search', '').strip()
+        level_filter = request.query_params.get('level', '').strip()
+        try:
+            page = max(int(request.query_params.get('page', 1)), 1)
+            page_size = min(max(int(request.query_params.get('page_size', 20)), 1), 100)
+        except (TypeError, ValueError):
+            return Response({'error': 'پارامترهای صفحه‌بندی نامعتبر است.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        queryset = User.objects.select_related('account').prefetch_related('groups').order_by('-date_joined')
+        if search:
+            queryset = queryset.filter(
+                Q(username__icontains=search) | Q(email__icontains=search) |
+                Q(first_name__icontains=search) | Q(last_name__icontains=search)
+            )
+        if level_filter.isdigit():
+            queryset = queryset.filter(account__level=int(level_filter))
+
+        total = queryset.count()
+        start = (page - 1) * page_size
+        members = queryset[start:start + page_size]
+        return Response({
+            'count': total,
+            'page': page,
+            'page_size': page_size,
+            'total_pages': (total + page_size - 1) // page_size or 1,
+            'levels': [{'value': value, 'label': label} for value, label in UserAccount.LEVEL_CHOICES],
+            'results': [
+                {
+                    'id': member.id,
+                    'username': member.username,
+                    'email': member.email,
+                    'full_name': member.get_full_name(),
+                    'level': account_level(member),
+                    'level_label': dict(UserAccount.LEVEL_CHOICES).get(account_level(member), ''),
+                    'is_active': member.is_active,
+                    'is_staff': member.is_staff,
+                    'is_superuser': member.is_superuser,
+                    'groups': list(member.groups.values_list('name', flat=True)),
+                    'date_joined': member.date_joined,
+                }
+                for member in members
+            ],
+        })
+
+    username = str(request.data.get('username', '')).strip()
+    if not username:
+        return Response(
+            {'error': 'نام کاربری الزامی است.', 'fields': {'username': ['نام کاربری را وارد کنید.']}},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    member = get_object_or_404(User.objects.select_related('account'), username=username)
+    member_level = account_level(member)
+
+    if member_level >= UserAccount.LEVEL_OWNER:
+        return Response(
+            {'error': 'حساب مالک سیستم قابل تغییر یا حذف نیست.'},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    new_level = request.data.get('level')
+    if new_level is not None:
+        try:
+            new_level = int(new_level)
+        except (TypeError, ValueError):
+            return Response(
+                {'error': 'سطح دسترسی نامعتبر است.', 'fields': {'level': ['سطح باید عددی بین ۱ تا ۵ باشد.']}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if new_level not in dict(UserAccount.LEVEL_CHOICES):
+            return Response(
+                {'error': 'سطح دسترسی نامعتبر است.', 'fields': {'level': ['سطح باید عددی بین ۱ تا ۵ باشد.']}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if new_level >= UserAccount.LEVEL_OWNER and actor_level < UserAccount.LEVEL_OWNER:
+            return Response(
+                {'error': 'تنها مالک سیستم می‌تواند مالک جدید تعیین کند.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if new_level >= actor_level and actor_level < UserAccount.LEVEL_OWNER:
+            return Response(
+                {'error': 'نمی‌توانید سطحی برابر یا بالاتر از سطح خودتان اعطا کنید.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        with transaction.atomic():
+            account, _ = UserAccount.objects.get_or_create(user=member, defaults={'phone': ''})
+            account.level = new_level
+            account.save(update_fields=['level', 'updated'])
+            # Staff levels need the Django flag too so the admin site and any
+            # IsAdminUser-protected endpoint stay consistent with the level.
+            member.is_staff = new_level in UserAccount.STAFF_LEVELS
+            if new_level >= UserAccount.LEVEL_OWNER:
+                member.is_superuser = True
+            member.save(update_fields=['is_staff', 'is_superuser'])
+        _audit(request.user, 'user_level_changed', member, f'سطح {member.username} به {new_level} تغییر کرد.', {'level': new_level})
+
+    if 'is_active' in request.data:
+        member.is_active = bool(request.data.get('is_active'))
+        member.save(update_fields=['is_active'])
+        _audit(request.user, 'user_activation_changed', member, f'وضعیت فعال بودن {member.username} تغییر کرد.', {'is_active': member.is_active})
+
+    member.refresh_from_db()
+    return Response({
+        'username': member.username,
+        'level': account_level(member),
+        'is_active': member.is_active,
+        'is_staff': member.is_staff,
+    })

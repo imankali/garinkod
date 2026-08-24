@@ -11,6 +11,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from .models import Coupon, Order, Wallet, WalletTransaction
+from .settlements import release_seller_earnings
 
 LOYALTY_PERCENT = 2
 LOYALTY_MAX_REWARD = 100_000
@@ -39,6 +40,9 @@ def mark_order_paid_and_reward(order: Order) -> tuple[Order, Coupon | None]:
         if order.status == 'awaiting_review':
             order.status = 'confirmed'
         order.save(update_fields=['payment_status', 'status', 'updated_at'])
+
+        # Marketplace sellers are credited only once the money has arrived.
+        release_seller_earnings(order)
 
         reward = min(int(order.subtotal * LOYALTY_PERCENT / 100), LOYALTY_MAX_REWARD)
         if order.user and reward:

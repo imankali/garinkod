@@ -101,6 +101,31 @@ elif DB_ENGINE == "postgresql":
 else:
     raise ValueError("DB_ENGINE must be either 'sqlite' or 'postgresql'.")
 
+# Throttling counters live in the cache. The in-memory backend is per-process
+# and therefore only correct for a single-worker development server; any
+# multi-worker deployment must set CACHE_URL to a shared Redis/Memcached so the
+# limits are enforced globally rather than per worker.
+CACHE_URL = config("CACHE_URL", default="")
+if CACHE_URL:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": CACHE_URL,
+            "KEY_PREFIX": "garinkood",
+        }
+    }
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "garinkood-local",
+        }
+    }
+
+# Throttling is disabled by default under the test runner so unrelated tests do
+# not exhaust one another's rate budgets; see shop/test_runner.py.
+TEST_RUNNER = "shop.test_runner.GarinKoodTestRunner"
+
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
@@ -135,6 +160,24 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.AllowAny"],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 12,
+    # One envelope for every error, with Persian copy and field-level details.
+    "EXCEPTION_HANDLER": "shop.exception_handlers.api_exception_handler",
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    # Each sensitive endpoint gets its own budget so exhausting one cannot
+    # block another. Rates are environment-tunable for load testing.
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": config("THROTTLE_ANON", default="120/hour"),
+        "user": config("THROTTLE_USER", default="600/hour"),
+        "login": config("THROTTLE_LOGIN", default="10/min"),
+        "register": config("THROTTLE_REGISTER", default="5/hour"),
+        "search": config("THROTTLE_SEARCH", default="60/min"),
+        "checkout": config("THROTTLE_CHECKOUT", default="12/hour"),
+        "upload": config("THROTTLE_UPLOAD", default="20/hour"),
+        "feedback": config("THROTTLE_FEEDBACK", default="10/hour"),
+    },
     "DEFAULT_FILTER_BACKENDS": [
         "django_filters.rest_framework.DjangoFilterBackend",
         "rest_framework.filters.SearchFilter",
@@ -224,3 +267,12 @@ PAYMENT_PROVIDER_CONFIG = {
 
 # Upload limits are enforced before media is accepted by visual-search APIs.
 VISUAL_SEARCH_MAX_UPLOAD_BYTES = config("VISUAL_SEARCH_MAX_UPLOAD_BYTES", default=5 * 1024 * 1024, cast=int)
+
+# Avatar and storefront imagery limits, validated in the serializer before the
+# file is written to storage.
+AVATAR_MAX_UPLOAD_BYTES = config("AVATAR_MAX_UPLOAD_BYTES", default=2 * 1024 * 1024, cast=int)
+AVATAR_ALLOWED_CONTENT_TYPES = config(
+    "AVATAR_ALLOWED_CONTENT_TYPES",
+    default="image/jpeg,image/png,image/webp",
+    cast=Csv(),
+)
