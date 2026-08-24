@@ -74,7 +74,7 @@ ASGI_APPLICATION = "garinkood.asgi.application"
 # SQLite is intentionally the zero-configuration option for local development,
 # automated tests and the load-test fixture. Production must set DB_ENGINE to
 # postgresql and provide the DB_* values below.
-DB_ENGINE = config("DB_ENGINE", default="sqlite")
+DB_ENGINE = config("DB_ENGINE", default="postgresql")
 if DB_ENGINE == "sqlite":
     DATABASES = {
         "default": {
