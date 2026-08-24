@@ -1,108 +1,59 @@
 // frontend/src/components/MobileBottomNav.tsx
 
-import { AnimatePresence, motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
-import { Heart, Home, LayoutGrid, ShoppingCart, User } from "lucide-react";
+import { NavLink, useLocation } from 'react-router-dom';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Menu, ShoppingCart } from 'lucide-react';
 
-// ========================================
-// Types
-// ========================================
+import { MOBILE_BAR_ITEMS } from '../config/navigation';
+import { cn } from '../utils/cn';
+
 interface MobileBottomNavProps {
   cartCount: number;
-  wishlistCount: number;
   onOpenCart: () => void;
   onOpenMenu: () => void;
-  onOpenWishlist?: () => void;
 }
 
-interface NavButtonProps {
-  icon: typeof Home;
-  label: string;
-  badge?: number;
-  onClick?: () => void;
-}
-
-// ========================================
-// NavButton Helper Component
-// ========================================
-function NavButton({ icon: Icon, label, badge, onClick }: NavButtonProps) {
-  return (
-    <motion.button
-      onClick={onClick}
-      whileTap={{ scale: 0.9 }}
-      className="relative flex flex-col items-center gap-1 px-2 py-1 text-slate-500 focus:outline-none dark:text-emerald-300"
-      aria-label={label}
-    >
-      <Icon size={20} />
-      {!!badge && (
-        <span className="absolute -right-1 top-0 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-bold text-white">
-          {badge}
-        </span>
-      )}
-      <span className="text-[10px] font-medium">{label}</span>
-    </motion.button>
-  );
-}
-
-// ========================================
-// MobileBottomNav Component
-// ========================================
+/**
+ * The mobile bottom bar.
+ *
+ * Two deliberate changes from the previous version:
+ *
+ * 1. Destinations are real `NavLink`s rather than buttons calling `navigate`.
+ *    A button cannot be opened in a new tab, long-pressed, or read as a link
+ *    by assistive technology — and it loses the automatic active state.
+ * 2. Every control is at least 44px tall and the bar reserves the iOS home
+ *    indicator area, so nothing sits under the system gesture strip.
+ */
 export default function MobileBottomNav({
   cartCount,
-  wishlistCount,
   onOpenCart,
   onOpenMenu,
-  onOpenWishlist,
 }: MobileBottomNavProps) {
-  const navigate = useNavigate();
+  const { pathname } = useLocation();
+
   return (
-    <motion.nav
-      initial={{ y: 100, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      transition={{ delay: 0.3, type: "spring", damping: 20 }}
-      className="fixed bottom-0 left-0 right-0 z-50 px-3 pb-3 lg:hidden"
-      style={{
-        paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom, 0px))',
-      }}
-      aria-label="منوی پایین موبایل"
+    <nav
+      className="fixed inset-x-0 bottom-0 z-50 border-t border-emerald-100 bg-white/95 backdrop-blur-xl dark:border-emerald-800 dark:bg-emerald-950/95 lg:hidden"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+      aria-label="منوی اصلی موبایل"
     >
-      {/* ======================================== */}
-      {/* Nav Container */}
-      {/* ======================================== */}
-      <div className="relative mx-auto max-w-md overflow-visible rounded-2xl border border-emerald-100 bg-white/95 px-2 py-3 shadow-2xl shadow-emerald-900/10 backdrop-blur-xl dark:border-emerald-800 dark:bg-emerald-950/95">
-        <div className="flex items-end justify-around">
+      <ul className="mx-auto flex max-w-lg items-stretch justify-around px-1">
+        {MOBILE_BAR_ITEMS.slice(0, 2).map((item) => (
+          <li key={item.id} className="flex-1">
+            <BarLink item={item} pathname={pathname} />
+          </li>
+        ))}
 
-          {/* ======================================== */}
-          {/* دکمه خانه */}
-          {/* ======================================== */}
-          <NavButton
-            icon={Home}
-            label="خانه"
-            onClick={() => navigate('/')}
-          />
-
-          {/* ======================================== */}
-          {/* دکمه دسته‌ها */}
-          {/* ======================================== */}
-          <NavButton
-            icon={LayoutGrid}
-            label="دسته‌ها"
-            onClick={onOpenMenu}
-          />
-
-          {/* ======================================== */}
-          {/* دکمه مرکزی سبد خرید (برجسته) */}
-          {/* ======================================== */}
-          <div className="relative flex flex-col items-center">
-            <motion.button
-              whileTap={{ scale: 0.9 }}
-              onClick={onOpenCart}
-              className="relative -mt-6 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-600 to-lime-500 text-white shadow-lg shadow-emerald-300/50 ring-4 ring-white dark:ring-emerald-950"
-              aria-label="سبد خرید"
-            >
-              <ShoppingCart size={20} />
-
-              {/* Cart Count Badge */}
+        {/* Cart sits in the middle: the easiest spot to reach with a thumb. */}
+        <li className="flex-1">
+          <button
+            type="button"
+            onClick={onOpenCart}
+            className="group flex min-h-[3.5rem] w-full flex-col items-center justify-center gap-1 rounded-xl py-1.5 text-emerald-700 transition-colors dark:text-lime-300"
+            aria-label={`سبد خرید${cartCount > 0 ? ` — ${cartCount} کالا` : ' — خالی'}`}
+          >
+            <span className="relative flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-600 text-white transition-transform group-active:scale-95">
+              <ShoppingCart size={16} aria-hidden="true" />
               <AnimatePresence>
                 {cartCount > 0 && (
                   <motion.span
@@ -110,38 +61,72 @@ export default function MobileBottomNav({
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
                     exit={{ scale: 0 }}
-                    className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-brand-orange text-[10px] font-bold text-white shadow-md"
+                    className="absolute -end-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-orange-500 px-1 text-fluid-2xs font-bold text-white"
                   >
-                    {cartCount}
+                    {cartCount > 9 ? '۹+' : cartCount.toLocaleString('fa-IR')}
                   </motion.span>
                 )}
               </AnimatePresence>
-            </motion.button>
-            <span className="mt-1 text-[10px] font-semibold text-emerald-700 dark:text-emerald-200">
-              سبد خرید
             </span>
-          </div>
+            <span className="text-fluid-2xs font-bold">سبد</span>
+          </button>
+        </li>
 
-          {/* ======================================== */}
-          {/* دکمه علاقه‌مندی */}
-          {/* ======================================== */}
-          <NavButton
-            icon={Heart}
-            label="علاقه‌مندی"
-            badge={wishlistCount}
-            onClick={onOpenWishlist}
-          />
+        {MOBILE_BAR_ITEMS.slice(2, 4).map((item) => (
+          <li key={item.id} className="flex-1">
+            <BarLink item={item} pathname={pathname} />
+          </li>
+        ))}
 
-          {/* ======================================== */}
-          {/* دکمه حساب من */}
-          {/* ======================================== */}
-          <NavButton
-            icon={User}
-            label="حساب من"
-            onClick={() => navigate('/profile')}
+        {/* "More" opens the full menu, so nothing is unreachable on mobile. */}
+        <li className="flex-1">
+          <button
+            type="button"
+            onClick={onOpenMenu}
+            className="flex min-h-[3.5rem] w-full flex-col items-center justify-center gap-1 rounded-xl py-1.5 text-slate-500 transition-colors hover:text-emerald-700 dark:text-emerald-200"
+            aria-label="باز کردن منوی کامل"
+          >
+            <Menu size={19} aria-hidden="true" />
+            <span className="text-fluid-2xs font-bold">بیشتر</span>
+          </button>
+        </li>
+      </ul>
+    </nav>
+  );
+}
+
+function BarLink({
+  item,
+  pathname,
+}: {
+  item: (typeof MOBILE_BAR_ITEMS)[number];
+  pathname: string;
+}) {
+  const Icon = item.icon;
+  // `/` would otherwise match every route, so the home link is compared exactly.
+  const isActive = item.to === '/' ? pathname === '/' : pathname.startsWith(item.to);
+
+  return (
+    <NavLink
+      to={item.to}
+      aria-current={isActive ? 'page' : undefined}
+      className={cn(
+        'flex min-h-[3.5rem] w-full flex-col items-center justify-center gap-1 rounded-xl py-1.5 transition-colors',
+        isActive
+          ? 'text-emerald-700 dark:text-lime-300'
+          : 'text-slate-500 hover:text-emerald-700 dark:text-emerald-200',
+      )}
+    >
+      <span className="relative">
+        <Icon size={19} aria-hidden="true" />
+        {isActive && (
+          <motion.span
+            layoutId="mobile-nav-active"
+            className="absolute -bottom-1.5 start-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-emerald-600 dark:bg-lime-400"
           />
-        </div>
-      </div>
-    </motion.nav>
+        )}
+      </span>
+      <span className="text-fluid-2xs font-bold">{item.label}</span>
+    </NavLink>
   );
 }

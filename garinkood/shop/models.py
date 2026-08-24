@@ -4,6 +4,7 @@ from django.contrib.auth.models import User
 from django.urls import reverse
 from django.conf import settings
 from django.db.models import Sum, F
+from django.db.models.functions import Lower
 
 
 # --- Managers ---
@@ -163,10 +164,35 @@ class UserAccount(models.Model):
         ('male', 'آقا'),
         ('female', 'خانم'),
     )
+
+    # Access levels 1..5.  The level is authoritative for coarse-grained access
+    # (for example the /poshtiban console); Django groups still express the
+    # fine-grained "which model may I change" permissions on top of it.
+    LEVEL_BUYER = 1
+    LEVEL_SELLER = 2
+    LEVEL_MODERATOR = 3
+    LEVEL_ADMIN = 4
+    LEVEL_OWNER = 5
+    LEVEL_CHOICES = (
+        (LEVEL_BUYER, 'سطح ۱ — خریدار'),
+        (LEVEL_SELLER, 'سطح ۲ — غرفه‌دار'),
+        (LEVEL_MODERATOR, 'سطح ۳ — ناظر محتوا'),
+        (LEVEL_ADMIN, 'سطح ۴ — مدیر'),
+        (LEVEL_OWNER, 'سطح ۵ — مالک سیستم'),
+    )
+    STAFF_LEVELS = (LEVEL_MODERATOR, LEVEL_ADMIN, LEVEL_OWNER)
+
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='account')
     phone = models.CharField(max_length=11, verbose_name="شماره تلفن")
     gender = models.CharField(max_length=15, choices=GENDER_CHOICES, default='male', verbose_name="جنسیت")
     address = models.TextField(max_length=250, blank=True, null=True, verbose_name="آدرس")
+    avatar = models.ImageField(upload_to='avatars/%Y/%m/', blank=True, null=True, verbose_name="تصویر پروفایل")
+    level = models.PositiveSmallIntegerField(
+        choices=LEVEL_CHOICES,
+        default=LEVEL_BUYER,
+        db_index=True,
+        verbose_name="سطح دسترسی",
+    )
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
 
@@ -176,6 +202,38 @@ class UserAccount(models.Model):
 
     def __str__(self):
         return f"{self.user.get_full_name() or self.user.username}"
+
+    @property
+    def avatar_url(self):
+        return self.avatar.url if self.avatar else ''
+
+    @property
+    def is_staff_level(self) -> bool:
+        return self.level in self.STAFF_LEVELS
+
+    def promote_to(self, level: int, *, save: bool = True) -> 'UserAccount':
+        """Raise the level, never silently lowering an existing one."""
+        if level > self.level:
+            self.level = level
+            if save:
+                self.save(update_fields=['level', 'updated'])
+        return self
+
+
+def account_level(user) -> int:
+    """Resolve a user's level without assuming the profile row exists.
+
+    Superusers are always owners so a fresh `createsuperuser` account can
+    reach the console before any profile row has been written.
+    """
+    if not user or not user.is_authenticated:
+        return 0
+    if user.is_superuser:
+        return UserAccount.LEVEL_OWNER
+    account = getattr(user, 'account', None)
+    if account:
+        return account.level
+    return UserAccount.LEVEL_BUYER
 
 
 # --- Comment ---
@@ -233,10 +291,9 @@ class Cart(models.Model):
 
     @property
     def total_price(self):
-        result = self.items.aggregate(
-            total=Sum(F('quantity') * F('product__price'))
-        )
-        return result['total'] or 0
+        # Items may reference either a catalogue product or a marketplace
+        # listing, so the sum is computed per row rather than in one aggregate.
+        return sum(item.total_price for item in self.items.all())
 
     @property
     def total_items(self):
@@ -251,24 +308,73 @@ class Cart(models.Model):
 
 
 class CartItem(models.Model):
+    """A cart row holding either a catalogue product or a storefront listing.
+
+    Exactly one of `product` / `listing` is set. The pair of partial unique
+    constraints keeps "one row per product" and "one row per listing" without
+    a NULL column defeating a plain unique_together.
+    """
+
     cart = models.ForeignKey(Cart, related_name='items', on_delete=models.CASCADE)
-    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    product = models.ForeignKey(Product, null=True, blank=True, on_delete=models.CASCADE)
+    listing = models.ForeignKey(
+        'MarketplaceListing', null=True, blank=True, on_delete=models.CASCADE, related_name='cart_items'
+    )
     quantity = models.PositiveIntegerField(default=1)
 
     class Meta:
-        unique_together = ('cart', 'product')
         verbose_name = "آیتم سبد"
         verbose_name_plural = "آیتم‌های سبد"
+        constraints = [
+            models.UniqueConstraint(
+                fields=['cart', 'product'],
+                condition=models.Q(product__isnull=False),
+                name='unique_cart_product',
+            ),
+            models.UniqueConstraint(
+                fields=['cart', 'listing'],
+                condition=models.Q(listing__isnull=False),
+                name='unique_cart_listing',
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(product__isnull=False, listing__isnull=True) |
+                    models.Q(product__isnull=True, listing__isnull=False)
+                ),
+                name='cart_item_exactly_one_target',
+            ),
+        ]
 
     def __str__(self):
-        return f"{self.quantity} × {self.product.title}"
+        return f"{self.quantity} × {self.title}"
+
+    @property
+    def kind(self) -> str:
+        return 'listing' if self.listing_id else 'product'
+
+    @property
+    def title(self) -> str:
+        return self.listing.title if self.listing_id else self.product.title
+
+    @property
+    def unit_price(self) -> int:
+        source = self.listing if self.listing_id else self.product
+        return int(getattr(source, 'price', 0) or 0)
 
     @property
     def total_price(self):
-        return self.quantity * (self.product.price or 0)
+        return self.quantity * self.unit_price
+
+    @property
+    def available_quantity(self) -> int:
+        if self.listing_id:
+            return int(self.listing.quantity_available)
+        return int(self.product.stock)
 
     @property
     def is_in_stock(self):
+        if self.listing_id:
+            return self.listing.is_purchasable and self.quantity <= int(self.listing.quantity_available)
         return self.product.is_in_stock and self.quantity <= self.product.stock
 
 
@@ -362,7 +468,7 @@ class Order(models.Model):
             if order.status not in {'awaiting_review', 'confirmed'}:
                 raise ValueError('This order can no longer be self-cancelled.')
 
-            items = list(order.items.select_related('product').all())
+            items = list(order.items.select_related('product', 'listing').all())
             product_ids = [item.product_id for item in items if item.product_id]
             products = {
                 product.id: product
@@ -374,6 +480,13 @@ class Order(models.Model):
                     product.stock += item.quantity
                     product.available = True
                     product.save(update_fields=['stock', 'available', 'updated'])
+
+            # Storefront listings reserve their own quantity, so release it and
+            # unwind any pending seller earnings for the same order.
+            from .settlements import restore_listing_quantities, reverse_marketplace_sale
+
+            restore_listing_quantities(order)
+            reverse_marketplace_sale(order, reason=f'لغو سفارش {order.code}')
 
             order.status = 'cancelled'
             order.save(update_fields=['status', 'updated_at'])
@@ -388,12 +501,39 @@ class Order(models.Model):
 
 
 class OrderItem(models.Model):
+    """A purchased line.
+
+    Product/listing/storefront/seller are all SET_NULL references so history is
+    never destroyed by a later deletion, while the denormalised title, slug and
+    storefront name keep the invoice readable regardless.
+    """
+
+    KIND_CHOICES = (
+        ('product', 'محصول فروشگاه'),
+        ('listing', 'آگهی غرفه'),
+    )
+
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items')
     product = models.ForeignKey(Product, null=True, blank=True, on_delete=models.SET_NULL, related_name='order_items')
+    listing = models.ForeignKey(
+        'MarketplaceListing', null=True, blank=True, on_delete=models.SET_NULL, related_name='order_items'
+    )
+    storefront = models.ForeignKey(
+        'Storefront', null=True, blank=True, on_delete=models.SET_NULL, related_name='order_items'
+    )
+    seller = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='sold_items'
+    )
+    kind = models.CharField(max_length=10, choices=KIND_CHOICES, default='product', db_index=True)
     product_title = models.CharField(max_length=250)
     product_slug = models.SlugField(max_length=250)
+    storefront_name = models.CharField(max_length=150, blank=True, verbose_name='نام غرفه')
+    storefront_slug = models.SlugField(max_length=180, blank=True)
+    unit = models.CharField(max_length=30, blank=True)
     unit_price = models.PositiveBigIntegerField()
     quantity = models.PositiveIntegerField()
+    commission_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    commission_amount = models.PositiveBigIntegerField(default=0)
 
     class Meta:
         verbose_name = 'آیتم سفارش'
@@ -405,6 +545,11 @@ class OrderItem(models.Model):
     @property
     def total_price(self):
         return self.unit_price * self.quantity
+
+    @property
+    def seller_net_amount(self) -> int:
+        """What the storefront owner earns once the platform fee is taken."""
+        return max(self.total_price - self.commission_amount, 0)
 
 
 # --- Agricultural service and procurement leads ---
@@ -493,22 +638,112 @@ class Storefront(models.Model):
 
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='storefront')
     name = models.CharField(max_length=150)
+    # Case-insensitive uniqueness is enforced by a functional constraint below so
+    # two sellers cannot register visually identical storefront names.
     slug = models.SlugField(max_length=180, unique=True)
     seller_type = models.CharField(max_length=20, choices=SELLER_TYPE_CHOICES, default='farmer')
     bio = models.TextField(max_length=1000, blank=True)
+    avatar = models.ImageField(upload_to='storefronts/%Y/%m/', blank=True, null=True, verbose_name='تصویر غرفه')
+    cover = models.ImageField(upload_to='storefronts/covers/%Y/%m/', blank=True, null=True, verbose_name='کاور غرفه')
     province = models.CharField(max_length=80, blank=True)
     city = models.CharField(max_length=80, blank=True)
+    location = models.ForeignKey(
+        'Location', null=True, blank=True, on_delete=models.SET_NULL, related_name='storefronts'
+    )
     is_verified = models.BooleanField(default=False, db_index=True)
+    is_active = models.BooleanField(default=True, db_index=True)
     commission_rate = models.DecimalField(max_digits=5, decimal_places=2, default=8)
+    rating = models.DecimalField(max_digits=3, decimal_places=2, default=0)
+    sales_count = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         verbose_name = 'غرفه'
         verbose_name_plural = 'غرفه‌ها'
+        constraints = [
+            models.UniqueConstraint(
+                Lower('name'), name='unique_storefront_name_ci'
+            ),
+        ]
 
     def __str__(self):
         return self.name
+
+    @property
+    def avatar_url(self):
+        return self.avatar.url if self.avatar else ''
+
+    @property
+    def cover_url(self):
+        return self.cover.url if self.cover else ''
+
+    @property
+    def followers_count(self) -> int:
+        return self.followers.count()
+
+    @property
+    def published_listing_count(self) -> int:
+        return self.listings.filter(status='published').count()
+
+
+class StorefrontFollow(models.Model):
+    """A buyer following a storefront, used for the feed and follower counts."""
+
+    storefront = models.ForeignKey(Storefront, on_delete=models.CASCADE, related_name='followers')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='followed_storefronts')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'دنبال‌کننده غرفه'
+        verbose_name_plural = 'دنبال‌کنندگان غرفه'
+        constraints = [
+            models.UniqueConstraint(fields=['storefront', 'user'], name='unique_storefront_follow'),
+        ]
+
+    def __str__(self):
+        return f'{self.user} → {self.storefront}'
+
+
+class StorefrontHighlight(models.Model):
+    """A named, ordered collection of stories kept beyond their expiry."""
+
+    storefront = models.ForeignKey(Storefront, on_delete=models.CASCADE, related_name='highlights')
+    title = models.CharField(max_length=60)
+    cover = models.ImageField(upload_to='storefront-highlights/%Y/%m/', blank=True, null=True)
+    position = models.PositiveSmallIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ('position', 'created_at')
+        verbose_name = 'هایلایت غرفه'
+        verbose_name_plural = 'هایلایت‌های غرفه'
+
+    def __str__(self):
+        return f'{self.storefront.name} — {self.title}'
+
+    @property
+    def cover_url(self):
+        if self.cover:
+            return self.cover.url
+        first = self.items.select_related('post').first()
+        return first.post.image_url if first else '/images/hero-farm.jpg'
+
+
+class StorefrontHighlightItem(models.Model):
+    highlight = models.ForeignKey(StorefrontHighlight, on_delete=models.CASCADE, related_name='items')
+    post = models.ForeignKey('StorefrontPost', on_delete=models.CASCADE, related_name='highlight_items')
+    position = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ('position', 'id')
+        constraints = [
+            models.UniqueConstraint(fields=['highlight', 'post'], name='unique_highlight_post'),
+        ]
+
+    def __str__(self):
+        return f'{self.highlight.title} #{self.position}'
 
 
 class MarketplaceListing(models.Model):
@@ -533,6 +768,11 @@ class MarketplaceListing(models.Model):
     harvest_date = models.DateField(null=True, blank=True)
     image = models.ImageField(upload_to='marketplace/', blank=True, null=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft', db_index=True)
+    rejection_reason = models.TextField(max_length=1000, blank=True, verbose_name='دلیل رد آگهی')
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='reviewed_listings'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -540,6 +780,9 @@ class MarketplaceListing(models.Model):
         ordering = ('-created_at',)
         verbose_name = 'آگهی بازار کشاورزان'
         verbose_name_plural = 'آگهی‌های بازار کشاورزان'
+        indexes = [
+            models.Index(fields=['status', '-created_at']),
+        ]
 
     def __str__(self):
         return self.title
@@ -547,6 +790,19 @@ class MarketplaceListing(models.Model):
     @property
     def image_url(self):
         return self.image.url if self.image else '/images/hero-farm.jpg'
+
+    @property
+    def is_purchasable(self) -> bool:
+        return self.status == 'published' and self.quantity_available > 0
+
+    @property
+    def minimum_order(self) -> int:
+        """The listing's minimum order, never below one whole unit."""
+        return max(int(self.min_order_quantity or 1), 1)
+
+    def commission_for(self, amount: int) -> int:
+        rate = self.storefront.commission_rate or 0
+        return int(amount * rate / 100)
 
 
 # --- Payments, finance and growth ---
@@ -909,6 +1165,125 @@ class StorefrontPost(models.Model):
     @property
     def image_url(self):
         return self.image.url if self.image else '/images/hero-farm.jpg'
+
+
+# --- Agricultural input reference data (dose calculator) ---
+class AgriInput(models.Model):
+    """A fertiliser or pesticide with the dose rates the calculator relies on.
+
+    Recommendations are never invented at runtime: a dose is returned only when
+    a matching `AgriInputDose` row exists, so the UI cannot suggest an unsafe or
+    unverified rate.
+    """
+
+    KIND_CHOICES = (
+        ('fertilizer', 'کود'),
+        ('pesticide', 'سم'),
+    )
+
+    name = models.CharField(max_length=150, db_index=True)
+    slug = models.SlugField(max_length=180, unique=True)
+    kind = models.CharField(max_length=20, choices=KIND_CHOICES, db_index=True)
+    active_ingredient = models.CharField(max_length=150, blank=True)
+    formulation = models.CharField(max_length=100, blank=True, verbose_name='فرمولاسیون')
+    unit = models.CharField(max_length=20, default='کیلوگرم', verbose_name='واحد اندازه‌گیری')
+    product = models.ForeignKey(
+        Product, null=True, blank=True, on_delete=models.SET_NULL, related_name='agri_inputs'
+    )
+    safety_notes = models.TextField(max_length=1500, blank=True, verbose_name='هشدارهای ایمنی')
+    preharvest_interval_days = models.PositiveSmallIntegerField(
+        null=True, blank=True, verbose_name='دوره کارنس (روز)'
+    )
+    is_active = models.BooleanField(default=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ('kind', 'name')
+        verbose_name = 'نهاده کشاورزی'
+        verbose_name_plural = 'نهاده‌های کشاورزی'
+
+    def __str__(self):
+        return f'{self.get_kind_display()}: {self.name}'
+
+
+class AgriInputDose(models.Model):
+    """A verified dose range for one input on one target crop."""
+
+    BASIS_CHOICES = (
+        ('per_hectare', 'به ازای هکتار'),
+        ('per_1000_liter', 'به ازای ۱۰۰۰ لیتر آب'),
+    )
+
+    agri_input = models.ForeignKey(AgriInput, on_delete=models.CASCADE, related_name='doses')
+    crop_name = models.CharField(max_length=120, db_index=True, verbose_name='محصول هدف')
+    target = models.CharField(max_length=150, blank=True, verbose_name='آفت/نیاز هدف')
+    basis = models.CharField(max_length=20, choices=BASIS_CHOICES, default='per_hectare')
+    min_rate = models.DecimalField(max_digits=10, decimal_places=3, verbose_name='حداقل دوز')
+    max_rate = models.DecimalField(max_digits=10, decimal_places=3, verbose_name='حداکثر دوز')
+    rate_unit = models.CharField(max_length=20, default='کیلوگرم')
+    notes = models.CharField(max_length=500, blank=True)
+
+    class Meta:
+        ordering = ('crop_name',)
+        verbose_name = 'دوز مصرف نهاده'
+        verbose_name_plural = 'دوزهای مصرف نهاده'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['agri_input', 'crop_name', 'target', 'basis'],
+                name='unique_dose_per_input_crop_target',
+            ),
+            models.CheckConstraint(
+                condition=models.Q(max_rate__gte=models.F('min_rate')),
+                name='dose_max_rate_gte_min_rate',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.agri_input.name} — {self.crop_name}'
+
+
+# --- Geography ---
+class Location(models.Model):
+    """Provinces and their cities in one self-referencing table.
+
+    A province row has `parent = None`; a city row points at its province. This
+    keeps a single endpoint, a single foreign key target and lets the tree grow
+    (districts, villages) without another migration.
+    """
+
+    KIND_CHOICES = (
+        ('province', 'استان'),
+        ('city', 'شهر'),
+    )
+
+    name = models.CharField(max_length=80, db_index=True)
+    slug = models.SlugField(max_length=100)
+    kind = models.CharField(max_length=10, choices=KIND_CHOICES, db_index=True)
+    parent = models.ForeignKey(
+        'self', null=True, blank=True, on_delete=models.CASCADE, related_name='children'
+    )
+    is_active = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        ordering = ('kind', 'name')
+        verbose_name = 'موقعیت جغرافیایی'
+        verbose_name_plural = 'موقعیت‌های جغرافیایی'
+        constraints = [
+            models.UniqueConstraint(fields=['parent', 'name'], name='unique_location_name_per_parent'),
+        ]
+        indexes = [
+            models.Index(fields=['kind', 'name']),
+        ]
+
+    def __str__(self):
+        if self.parent_id:
+            return f'{self.parent.name} / {self.name}'
+        return self.name
+
+    @property
+    def province_name(self) -> str:
+        return self.parent.name if self.parent_id else self.name
 
 
 # --- Management audit trail ---

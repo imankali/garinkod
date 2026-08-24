@@ -12,3 +12,4 @@ class ShopConfig(AppConfig):
         # Register database connection tuning without importing models at
         # module load time.
         from . import db  # noqa: F401
+        from . import signals  # noqa: F401

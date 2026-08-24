@@ -1,276 +1,283 @@
 // frontend/src/components/MobileMenu.tsx
 
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, Heart, LogIn, LogOut, Package, Phone, User, X } from "lucide-react";
-import { categories } from "../data/shopData";
-import { useAuthStore } from "../store/authStore";
-import SearchBar from "./SearchBar";
-import Logo from "./Logo";
+import { useEffect, useRef } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { ChevronLeft, Heart, LogIn, LogOut, Moon, Sun, X } from 'lucide-react';
 
-// ========================================
-// Types
-// ========================================
+import { visibleSections } from '../config/navigation';
+import { useAuthStore, useUserLevel } from '../store/authStore';
+import { useTranslation, type Locale } from '../i18n';
+import { cn } from '../utils/cn';
+import { IconButton } from './ui/Button';
+import Logo from './Logo';
+
 interface MobileMenuProps {
-  isOpen: boolean;
+  open: boolean;
   onClose: () => void;
+  dark: boolean;
+  onToggleDark: () => void;
+  wishlistCount?: number;
   onOpenWishlist?: () => void;
 }
 
-// ========================================
-// Quick Links Configuration
-// ========================================
-const quickLinks = [
-  { label: "خانه", href: "/" },
-  { label: "محصولات", href: "/products" },
-  { label: "خدمات کشاورزی", href: "/services" },
-  { label: "بازار کشاورزان", href: "/marketplace" },
-  { label: "همکاری در فروش", href: "/affiliate" },
-  { label: "پشتیبانی و بازخورد", href: "/support" },
-  { label: "فروش محصول به گرین کود", href: "/farmer-sell" },
-  { label: "تخفیف‌های ویژه", href: "/products?featured=true" },
-];
+const FOCUSABLE =
+  'a[href], button:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-// ========================================
-// MobileMenu Component
-// ========================================
-export default function MobileMenu({ isOpen, onClose, onOpenWishlist }: MobileMenuProps) {
-  const [expanded, setExpanded] = useState<string | null>(null);
-  const navigate = useNavigate();
+/**
+ * The full mobile navigation drawer.
+ *
+ * This is the guarantee that nothing is unreachable on a phone: it lists every
+ * section the viewer is permitted to see, plus the account, theme and language
+ * controls that live in the desktop header.
+ *
+ * Focus is trapped while open and restored on close, and the panel scrolls
+ * independently of the page behind it.
+ */
+export default function MobileMenu({
+  open,
+  onClose,
+  dark,
+  onToggleDark,
+  wishlistCount = 0,
+  onOpenWishlist,
+}: MobileMenuProps) {
+  const { pathname } = useLocation();
+  const { isAuthenticated, user, account, logout } = useAuthStore();
+  const level = useUserLevel();
+  const { locale, setLocale, t } = useTranslation();
+  const panelRef = useRef<HTMLDivElement>(null);
+  const previouslyFocused = useRef<HTMLElement | null>(null);
+  const reduceMotion = useReducedMotion();
 
-  // دریافت اطلاعات کاربر از auth store
-  const { user, isAuthenticated, logout } = useAuthStore();
+  const sections = visibleSections({ level, isAuthenticated });
 
-  // ========================================
-  // Handlers
-  // ========================================
-  async function handleLogout() {
-    await logout();
-    onClose();
-    navigate('/');
-  }
+  // Close automatically when the route changes, so a tap always feels final.
+  useEffect(() => {
+    if (open) onClose();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
 
-  function handleCategoryClick(categorySlug: string) {
-    onClose();
-    navigate(`/products?category=${categorySlug}`);
-  }
+  useEffect(() => {
+    if (!open) return undefined;
 
-  function handleLinkClick(href: string) {
-    onClose();
-    navigate(href);
-  }
+    previouslyFocused.current = document.activeElement as HTMLElement;
+    const { overflow } = document.body.style;
+    document.body.style.overflow = 'hidden';
 
-  function handleWishlistClick() {
-    onClose();
-    if (onOpenWishlist) {
-      onOpenWishlist();
+    const timer = window.setTimeout(() => {
+      panelRef.current?.querySelector<HTMLElement>(FOCUSABLE)?.focus();
+    }, 40);
+
+    function handleKey(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        onClose();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const items = Array.from(panelRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? [])
+        .filter((element) => element.offsetParent !== null);
+      if (items.length === 0) return;
+      const first = items[0]!;
+      const last = items[items.length - 1]!;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     }
-  }
+
+    document.addEventListener('keydown', handleKey, true);
+    return () => {
+      document.removeEventListener('keydown', handleKey, true);
+      window.clearTimeout(timer);
+      document.body.style.overflow = overflow;
+      previouslyFocused.current?.focus?.();
+    };
+  }, [open, onClose]);
+
+  const fullName = user
+    ? `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username
+    : '';
 
   return (
     <AnimatePresence>
-      {isOpen && (
-        <>
-          {/* ======================================== */}
-          {/* Overlay */}
-          {/* ======================================== */}
+      {open && (
+        <div className="fixed inset-0 z-[110] lg:hidden">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 z-[60] bg-slate-900/40 backdrop-blur-sm lg:hidden"
+            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+            aria-hidden="true"
           />
 
-          {/* ======================================== */}
-          {/* Menu Panel */}
-          {/* ======================================== */}
-          <motion.aside
-            initial={{ x: "-100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "-100%" }}
-            transition={{ type: "spring", damping: 30, stiffness: 260 }}
-            className="fixed inset-y-0 right-0 z-[70] flex w-full max-w-sm flex-col bg-white shadow-2xl lg:hidden dark:bg-emerald-950"
+          <motion.div
+            ref={panelRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="منوی اصلی"
+            initial={reduceMotion ? { opacity: 0 } : { x: '100%' }}
+            animate={reduceMotion ? { opacity: 1 } : { x: 0 }}
+            exit={reduceMotion ? { opacity: 0 } : { x: '100%' }}
+            transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+            className="absolute inset-y-0 end-0 flex w-[min(22rem,90vw)] flex-col bg-white shadow-2xl dark:bg-emerald-950"
           >
-            {/* ======================================== */}
-            {/* Header */}
-            {/* ======================================== */}
-            <div className="flex items-center justify-between border-b border-emerald-100 bg-gradient-to-l from-emerald-50 to-lime-50 px-4 py-4 dark:border-emerald-800 dark:from-emerald-950 dark:to-emerald-900/50">
-              <Logo compact />
-              <button
-                onClick={onClose}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-500 shadow transition-transform hover:rotate-90 dark:bg-emerald-900 dark:text-emerald-200"
-                aria-label="بستن منو"
-              >
-                <X size={18} />
-              </button>
-            </div>
+            <header className="flex items-center justify-between gap-2 border-b border-slate-100 p-4 dark:border-emerald-900">
+              <Logo />
+              <IconButton icon={X} label="بستن منو" onClick={onClose} size="sm" />
+            </header>
 
-            {/* ======================================== */}
-            {/* User Info (اگر لاگین کرده) */}
-            {/* ======================================== */}
-            {isAuthenticated && user && (
-              <div className="border-b border-emerald-100 bg-gradient-to-l from-emerald-600 to-lime-500 p-4 text-white dark:border-emerald-800">
-                <div className="flex items-center gap-3">
-                  {/* Avatar */}
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/20 text-lg font-bold backdrop-blur">
-                    {user.first_name?.charAt(0) || user.username.charAt(0).toUpperCase() || '?'}
-                  </div>
-                  <div>
-                    <p className="font-bold">
-                      {user.first_name || user.username}
-                    </p>
-                    <p className="text-xs text-white/80">{user.email}</p>
-                  </div>
-                </div>
-
-                {/* Quick Actions */}
-                <div className="mt-3 flex gap-2">
-                  <button
-                    onClick={() => handleLinkClick('/profile')}
-                    className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-white/15 py-2 text-xs font-medium backdrop-blur hover:bg-white/25"
-                  >
-                    <User size={14} /> پروفایل
-                  </button>
-                  <button
-                    onClick={() => handleLinkClick('/orders')}
-                    className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-white/15 py-2 text-xs font-medium backdrop-blur hover:bg-white/25"
-                  >
-                    <Package size={14} /> سفارش‌ها
-                  </button>
-                  <button
-                    onClick={handleWishlistClick}
-                    className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-white/15 py-2 text-xs font-medium backdrop-blur hover:bg-white/25"
-                  >
-                    <Heart size={14} /> علاقه‌مندی
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* ======================================== */}
-            {/* Search Bar */}
-            {/* ======================================== */}
-            <div className="border-b border-slate-100 p-4 dark:border-emerald-800">
-              <SearchBar variant="mobile" />
-            </div>
-
-            {/* ======================================== */}
-            {/* Scrollable Content */}
-            {/* ======================================== */}
-            <div className="flex-1 overflow-y-auto p-4">
-              {/* ======================================== */}
-              {/* Categories */}
-              {/* ======================================== */}
-              <p className="mb-2 px-1 text-xs font-semibold text-slate-400 dark:text-emerald-300">
-                دسته‌بندی محصولات
-              </p>
-              <ul className="space-y-1.5">
-                {categories.map((cat) => (
-                  <li key={cat.id} className="overflow-hidden rounded-xl border border-slate-100 dark:border-emerald-800">
-                    {/* Category Header */}
-                    <button
-                      onClick={() => setExpanded(expanded === cat.id ? null : cat.id)}
-                      className="flex w-full items-center justify-between gap-2 bg-slate-50/60 px-3 py-3 text-right dark:bg-emerald-900/40"
-                      aria-expanded={expanded === cat.id}
-                    >
-                      <span className="flex items-center gap-2.5">
-                        <span
-                          className={`flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br ${cat.color} text-white`}
-                        >
-                          <cat.icon size={16} />
-                        </span>
-                        <span className="text-sm font-medium text-slate-700 dark:text-emerald-50">
-                          {cat.label}
-                        </span>
-                      </span>
-                      <ChevronDown
-                        size={16}
-                        className={`text-slate-400 transition-transform duration-300 dark:text-emerald-400 ${
-                          expanded === cat.id ? "rotate-180" : ""
-                        }`}
-                      />
-                    </button>
-
-                    {/* Subcategories */}
-                    <AnimatePresence>
-                      {expanded === cat.id && (
-                        <motion.ul
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: "auto", opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          transition={{ duration: 0.25 }}
-                          className="bg-white dark:bg-emerald-950"
-                        >
-                          {cat.items.map((sub) => (
-                            <li key={sub.id}>
-                              <button
-                                onClick={() => handleCategoryClick(sub.id)}
-                                className="block w-full border-t border-dashed border-slate-100 py-2.5 pr-11 text-right text-sm text-slate-500 hover:bg-emerald-50 hover:text-emerald-600 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-900"
-                              >
-                                {sub.label}
-                              </button>
-                            </li>
-                          ))}
-                        </motion.ul>
-                      )}
-                    </AnimatePresence>
-                  </li>
-                ))}
-              </ul>
-
-              {/* ======================================== */}
-              {/* Quick Links */}
-              {/* ======================================== */}
-              <p className="mb-2 mt-5 px-1 text-xs font-semibold text-slate-400 dark:text-emerald-300">
-                دسترسی سریع
-              </p>
-              <ul className="space-y-1">
-                {quickLinks.map((link) => (
-                  <li key={link.label}>
-                    <button
-                      onClick={() => handleLinkClick(link.href)}
-                      className="block w-full rounded-lg px-3 py-2.5 text-right text-sm text-slate-600 transition-colors hover:bg-emerald-50 hover:text-emerald-700 dark:text-emerald-100 dark:hover:bg-emerald-900"
-                    >
-                      {link.label}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* ======================================== */}
-            {/* Footer Actions */}
-            {/* ======================================== */}
-            <div className="space-y-2 border-t border-slate-100 p-4 dark:border-emerald-800">
-              {/* Contact Support */}
-              <a
-                href="tel:02112345678"
-                className="flex items-center justify-center gap-2 rounded-xl bg-emerald-50 py-3 text-sm font-medium text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/50 dark:text-lime-300"
-              >
-                <Phone size={16} /> تماس با پشتیبانی
-              </a>
-
-              {/* Auth Button */}
+            {/* Identity block: who am I, and at what level. */}
+            <div className="border-b border-slate-100 p-4 dark:border-emerald-900">
               {isAuthenticated ? (
-                <button
-                  onClick={handleLogout}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-rose-50 py-3 text-sm font-medium text-rose-500 hover:bg-rose-100 dark:bg-rose-950/40 dark:text-rose-300"
+                <Link
+                  to="/profile"
+                  className="flex items-center gap-3 rounded-2xl p-2 transition-colors hover:bg-emerald-50 dark:hover:bg-emerald-900"
                 >
-                  <LogOut size={16} /> خروج از حساب
-                </button>
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-emerald-600 text-fluid-sm font-extrabold text-white">
+                    {account?.avatar_url ? (
+                      <img src={account.avatar_url} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      fullName.charAt(0) || '؟'
+                    )}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-fluid-sm font-bold text-slate-800 dark:text-white">
+                      {fullName}
+                    </span>
+                    <span className="block text-fluid-2xs text-emerald-700 dark:text-lime-300">
+                      {account?.level_label ?? 'خریدار'}
+                    </span>
+                  </span>
+                  <ChevronLeft size={16} aria-hidden="true" className="shrink-0 text-slate-400 rtl:rotate-0" />
+                </Link>
               ) : (
-                <button
-                  onClick={() => handleLinkClick('/login')}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-lime-500 py-3 text-sm font-bold text-white shadow-lg hover:shadow-xl"
+                <Link
+                  to="/login"
+                  className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-fluid-sm font-bold text-white"
                 >
-                  <LogIn size={16} /> ورود / ثبت‌نام
-                </button>
+                  <LogIn size={16} aria-hidden="true" />
+                  ورود یا ثبت‌نام
+                </Link>
               )}
             </div>
-          </motion.aside>
-        </>
+
+            <nav aria-label="پیمایش اصلی" className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
+              {sections.map((section) => (
+                <div key={section.id} className="mb-5 last:mb-0">
+                  <h2 className="mb-1.5 px-2 text-fluid-2xs font-extrabold uppercase tracking-wide text-slate-400 dark:text-emerald-400">
+                    {section.title}
+                  </h2>
+                  <ul className="space-y-0.5">
+                    {section.items.map((item) => {
+                      const Icon = item.icon;
+                      const isActive =
+                        item.to === '/' ? pathname === '/' : pathname.startsWith(item.to.split('?')[0]!);
+                      return (
+                        <li key={item.id}>
+                          <Link
+                            to={item.to}
+                            aria-current={isActive ? 'page' : undefined}
+                            className={cn(
+                              'flex min-h-11 items-center gap-3 rounded-xl px-2 transition-colors',
+                              isActive
+                                ? 'bg-emerald-600 text-white'
+                                : 'text-slate-600 hover:bg-emerald-50 dark:text-emerald-100 dark:hover:bg-emerald-900',
+                            )}
+                          >
+                            <Icon size={17} aria-hidden="true" className="shrink-0" />
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-fluid-sm font-bold">{item.label}</span>
+                              {item.description && (
+                                <span
+                                  className={cn(
+                                    'block truncate text-fluid-2xs',
+                                    isActive ? 'text-emerald-50' : 'text-slate-400 dark:text-emerald-300',
+                                  )}
+                                >
+                                  {item.description}
+                                </span>
+                              )}
+                            </span>
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ))}
+
+              {/* Wishlist lives here now that the bottom bar shows "more". */}
+              {onOpenWishlist && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenWishlist();
+                  }}
+                  className="flex min-h-11 w-full items-center gap-3 rounded-xl px-2 text-slate-600 transition-colors hover:bg-emerald-50 dark:text-emerald-100 dark:hover:bg-emerald-900"
+                >
+                  <Heart size={17} aria-hidden="true" className="shrink-0" />
+                  <span className="flex-1 text-start text-fluid-sm font-bold">علاقه‌مندی‌ها</span>
+                  {wishlistCount > 0 && (
+                    <span className="rounded-full bg-rose-500 px-2 py-0.5 text-fluid-2xs font-bold text-white">
+                      {wishlistCount.toLocaleString('fa-IR')}
+                    </span>
+                  )}
+                </button>
+              )}
+            </nav>
+
+            {/* Preferences and sign-out pinned to the bottom. */}
+            <footer
+              className="space-y-2 border-t border-slate-100 p-4 dark:border-emerald-900"
+              style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))' }}
+            >
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={onToggleDark}
+                  className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-slate-100 text-fluid-xs font-bold text-slate-700 dark:bg-emerald-900 dark:text-emerald-100"
+                  aria-pressed={dark}
+                >
+                  {dark ? <Sun size={15} aria-hidden="true" /> : <Moon size={15} aria-hidden="true" />}
+                  {dark ? 'حالت روشن' : 'حالت تیره'}
+                </button>
+
+                <label className="flex-1">
+                  <span className="sr-only">{t('language.label')}</span>
+                  <select
+                    value={locale}
+                    onChange={(event) => setLocale(event.target.value as Locale)}
+                    className="min-h-11 w-full rounded-xl bg-slate-100 px-3 text-fluid-xs font-bold text-slate-700 dark:bg-emerald-900 dark:text-emerald-100"
+                  >
+                    <option value="fa">فارسی</option>
+                    <option value="en">English</option>
+                    <option value="ar">العربية</option>
+                  </select>
+                </label>
+              </div>
+
+              {isAuthenticated && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    void logout();
+                  }}
+                  className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-rose-200 text-fluid-xs font-bold text-rose-600 dark:border-rose-800 dark:text-rose-300"
+                >
+                  <LogOut size={15} aria-hidden="true" />
+                  خروج از حساب
+                </button>
+              )}
+            </footer>
+          </motion.div>
+        </div>
       )}
     </AnimatePresence>
   );

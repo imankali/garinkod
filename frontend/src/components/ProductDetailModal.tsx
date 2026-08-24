@@ -1,6 +1,7 @@
 // frontend/src/components/ProductDetailModal.tsx
 
 import { useState } from "react";
+import { useFocusTrap } from "../hooks/useFocusTrap";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,
@@ -58,6 +59,7 @@ export default function ProductDetailModal({
   isWishlisted,
   onToggleWishlist,
 }: ProductDetailModalProps) {
+  const panelRef = useFocusTrap<HTMLDivElement>(Boolean(product), { onEscape: onClose });
   const [qty, setQty] = useState(1);
   const [activeTab, setActiveTab] = useState<Tab>("description");
 
@@ -98,14 +100,19 @@ export default function ProductDetailModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 40 }}
             transition={{ type: "spring", damping: 26, stiffness: 300 }}
-            className="fixed inset-x-4 top-1/2 z-[90] mx-auto max-h-[90vh] max-w-3xl -translate-y-1/2 overflow-y-auto rounded-3xl bg-white shadow-2xl md:inset-x-auto"
+            ref={panelRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label={product?.name ?? "جزئیات محصول"}
+            tabIndex={-1}
+            className="fixed inset-x-4 top-1/2 z-[90] mx-auto max-h-[90vh] max-w-3xl -translate-y-1/2 overflow-y-auto rounded-3xl bg-white shadow-2xl outline-none md:inset-x-auto"
           >
             {/* Close Button */}
             <motion.button
               onClick={onClose}
               whileHover={{ rotate: 90, scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
-              className="absolute left-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-slate-500 shadow-md backdrop-blur"
+              className="absolute end-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-slate-500 shadow-md backdrop-blur"
               aria-label="بستن"
             >
               <X size={18} />
@@ -127,14 +134,14 @@ export default function ProductDetailModal({
 
                 {/* Badge */}
                 {product.badge && (
-                  <span className="absolute right-4 top-4 rounded-full bg-brand-orange px-3 py-1 text-xs font-bold text-white shadow-lg">
+                  <span className="absolute start-4 top-4 rounded-full bg-brand-orange px-3 py-1 text-xs font-bold text-white shadow-lg">
                     {product.badge}
                   </span>
                 )}
 
                 {/* Out of Stock Badge */}
                 {!product.inStock && (
-                  <span className="absolute bottom-4 right-4 rounded-full bg-slate-800/90 px-3 py-1 text-xs font-bold text-white">
+                  <span className="absolute bottom-4 start-4 rounded-full bg-slate-800/90 px-3 py-1 text-xs font-bold text-white">
                     ناموجود
                   </span>
                 )}
@@ -163,7 +170,7 @@ export default function ProductDetailModal({
                       className={i < Math.round(product.rating) ? "" : "text-slate-200"}
                     />
                   ))}
-                  <span className="mr-1 text-xs text-slate-400">
+                  <span className="ms-1 text-xs text-slate-400">
                     ({product.rating}) · {product.reviews.toLocaleString("fa-IR")} نظر ثبت‌شده
                   </span>
                 </div>
@@ -184,7 +191,7 @@ export default function ProductDetailModal({
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
-                      className={`relative flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 text-[11px] font-bold transition-colors ${
+                      className={`relative flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 text-fluid-xs font-bold transition-colors ${
                         activeTab === tab.id ? "text-white" : "text-slate-500 hover:text-[#0F8A5F]"
                       }`}
                     >
@@ -264,7 +271,7 @@ export default function ProductDetailModal({
                             <p className="mb-1.5 font-bold text-slate-600">محصولات سازگار برای مصرف همراه</p>
                             <div className="flex flex-wrap gap-1.5">
                               {product.compatibleWith.map((c) => (
-                                <span key={c} className="rounded-full bg-white px-2.5 py-1 text-[10px] text-slate-600 ring-1 ring-slate-200">
+                                <span key={c} className="rounded-full bg-white px-2.5 py-1 text-fluid-2xs text-slate-600 ring-1 ring-slate-200">
                                   {c}
                                 </span>
                               ))}
