@@ -142,3 +142,70 @@ test.describe('touch targets', () => {
     }
   });
 });
+
+test.describe('home page as the shop window', () => {
+  /**
+   * The home page previously surfaced only the product catalogue and the dose
+   * calculator; the marketplace, storefront directory, services, procurement,
+   * loyalty club, affiliate scheme, order tracking and support were all
+   * invisible without opening a menu. These tests keep the shop window full.
+   */
+  const EXPECTED_ON_HOME = [
+    '/marketplace',
+    '/storefronts',
+    '/services',
+    '/farmer-sell',
+    '/orders',
+    '/rewards',
+    '/affiliate',
+    '/support',
+    '/products',
+  ];
+
+  test('every public capability is linked from the home page', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    const links = await page.$$eval('a[href^="/"]', (anchors) =>
+      anchors.map((anchor) => (anchor as HTMLAnchorElement).getAttribute('href')?.split('?')[0]),
+    );
+
+    const missing = EXPECTED_ON_HOME.filter((destination) => !links.includes(destination));
+    expect(missing, `not linked from the home page: ${missing.join(', ')}`).toEqual([]);
+  });
+
+  test('the hero states what the site is and offers a way in', async ({ page }) => {
+    await page.goto('/');
+
+    const hero = page.getByRole('region', { name: /کود، سم، بذر/ });
+    await expect(hero).toBeVisible();
+    await expect(hero.getByRole('link', { name: /خرید از فروشگاه/ })).toBeVisible();
+    await expect(hero.getByRole('link', { name: /بازار کشاورزان/ })).toBeVisible();
+  });
+
+  test('the marketplace is represented on the home page', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    // Either real sellers render, or the section hides itself — never an
+    // empty heading with nothing under it.
+    const heading = page.getByRole('heading', { name: /مستقیم از غرفه کشاورزان/ });
+    if (await heading.count()) {
+      await expect(page.locator('a[href^="/storefronts/"]').first()).toBeVisible();
+    }
+  });
+
+  test('the home page has one h1 and an ordered heading structure', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    const levels = await page.$$eval('h1, h2, h3', (headings) =>
+      headings.map((heading) => Number(heading.tagName.slice(1))),
+    );
+
+    expect(levels.filter((level) => level === 1)).toHaveLength(1);
+    for (let index = 1; index < levels.length; index += 1) {
+      expect(levels[index]! - levels[index - 1]!).toBeLessThanOrEqual(1);
+    }
+  });
+});

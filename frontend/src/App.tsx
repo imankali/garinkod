@@ -28,6 +28,10 @@ import FlyToCart, { type FlyingItem } from "./components/FlyToCart";
 import ConsultationButton from "./components/ConsultationButton";
 import CropSelector from "./components/CropSelector";
 import AgriCalculator from "./components/AgriCalculator";
+import HomeHero from "./components/home/HomeHero";
+import ServiceShortcuts from "./components/home/ServiceShortcuts";
+import CategoryGrid from "./components/home/CategoryGrid";
+import FeaturedStorefronts from "./components/home/FeaturedStorefronts";
 
 // ========================================
 // Pages (Lazy Loaded)
@@ -391,6 +395,28 @@ export default function App() {
                 element={
                   <>
                     <h1 className="sr-only">گرین کود، فروشگاه تخصصی نهاده‌های کشاورزی</h1>
+
+                    {/*
+                      Shop-window order, chosen deliberately:
+                      1. Hero  — what this site is and where to start.
+                      2. Services — the nine things the platform does beyond
+                         the catalogue, none of which were visible before.
+                      3. Categories — how buyers actually think about produce.
+                      4. Storefronts — the marketplace, our differentiator.
+                      5. Weather/crop/installments — helpful context, but not
+                         the first thing a stranger should meet.
+                      6. Catalogue — the deep browse, with filters.
+                      7. Calculator — a tool for people who already know what
+                         they need.
+                    */}
+                    <HomeHero />
+
+                    <ServiceShortcuts />
+
+                    <CategoryGrid />
+
+                    <FeaturedStorefronts />
+
                     {/* Weather Widget */}
                     <WeatherWidget />
 
