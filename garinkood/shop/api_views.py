@@ -5,7 +5,7 @@ from secrets import token_urlsafe
 from threading import Lock
 
 from django.conf import settings
-from django.db.models import Count, F, Q, Sum
+from django.db.models import Count, F, Prefetch, Q, Sum
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action, api_view, permission_classes, throttle_classes
 from rest_framework.response import Response
@@ -17,6 +17,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
+from rest_framework.pagination import PageNumberPagination
 
 from .filters import ProductFilter
 from .models import (
@@ -49,6 +50,17 @@ from .throttling import (
     LoginRateThrottle, RegisterRateThrottle, SearchRateThrottle,
     CheckoutRateThrottle, UploadRateThrottle, FeedbackRateThrottle,
 )
+
+class ClientConfigurablePagination(PageNumberPagination):
+    """Page size the client may choose, with a ceiling.
+
+    The cap matters: without it a single request could ask for every row and
+    turn a paginated endpoint into an accidental full-table export.
+    """
+
+    page_size_query_param = 'page_size'
+    max_page_size = 48
+
 
 # SQLite is used for local development only. It permits a single writer, so a
 # process-local lock prevents its deferred transactions from upgrading into
@@ -783,9 +795,27 @@ class MarketplaceListingViewSet(viewsets.ModelViewSet):
     ordering_fields = ['price', 'created_at', 'harvest_date', 'quantity_available']
     ordering = ['-created_at']
     throttle_classes = [SearchRateThrottle]
+    # Without this the ?page_size= parameter is silently ignored and every
+    # caller is stuck with the global default.
+    pagination_class = ClientConfigurablePagination
 
     def get_queryset(self):
-        base = MarketplaceListing.objects.select_related('storefront', 'storefront__user')
+        # The nested storefront serializer reports follower and listing counts.
+        # Annotating them here turns two extra queries *per row* into one join,
+        # which is the difference between 16 queries and 2 on a full page.
+        # The nested storefront serializer reports follower and listing counts.
+        # Those counts must be annotated on the *storefront* rows the
+        # serializer actually reads, so the storefronts are prefetched from an
+        # annotated queryset rather than joined onto the listing.
+        annotated_storefronts = Storefront.objects.select_related('user').annotate(
+            followers_total=Count('followers', distinct=True),
+            listings_total=Count(
+                'listings', filter=Q(listings__status='published'), distinct=True
+            ),
+        )
+        base = MarketplaceListing.objects.prefetch_related(
+            Prefetch('storefront', queryset=annotated_storefronts)
+        )
         if self.action in {'list', 'retrieve'}:
             queryset = base.filter(status='published')
             return self._apply_marketplace_filters(queryset)

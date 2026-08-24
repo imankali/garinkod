@@ -407,7 +407,11 @@ class StorefrontSerializer(serializers.ModelSerializer):
     avatar_url = serializers.SerializerMethodField()
     cover_url = serializers.SerializerMethodField()
     seller_type_label = serializers.CharField(source='get_seller_type_display', read_only=True)
-    followers_count = serializers.IntegerField(read_only=True)
+    # These read an annotation when the queryset provides one and fall back to
+    # a COUNT only for a single object. Without the fallback a detail view
+    # would break; without the annotation a list view would run two extra
+    # queries per row.
+    followers_count = serializers.SerializerMethodField()
     listing_count = serializers.SerializerMethodField()
     is_following = serializers.SerializerMethodField()
 
@@ -434,8 +438,13 @@ class StorefrontSerializer(serializers.ModelSerializer):
     def get_cover_url(self, obj):
         return obj.cover_url
 
+    def get_followers_count(self, obj):
+        annotated = getattr(obj, 'followers_total', None)
+        return annotated if annotated is not None else obj.followers_count
+
     def get_listing_count(self, obj):
-        return obj.published_listing_count
+        annotated = getattr(obj, 'listings_total', None)
+        return annotated if annotated is not None else obj.published_listing_count
 
     def get_is_following(self, obj):
         request = self.context.get('request')

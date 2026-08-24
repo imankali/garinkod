@@ -1220,3 +1220,48 @@ class SellerRejectionVisibilityTests(TestCase):
         listing.refresh_from_db()
         self.assertEqual(listing.status, 'pending_review')
         self.assertEqual(listing.rejection_reason, '')
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class QueryEfficiencyTests(TestCase):
+    """Guard against N+1 regressions on the list endpoints.
+
+    A count assertion is deliberately loose (an upper bound, not an exact
+    number) so ordinary refactors do not fail the suite — but it still catches
+    the thing that matters: a query count that grows with the number of rows.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        for index in range(8):
+            _, storefront = make_seller(f'perf-{index}')
+            make_listing(storefront, title=f'محصول {index}')
+
+    def test_listing_queries_do_not_grow_with_row_count(self):
+        # Two pages of different sizes must cost the same number of queries.
+        with self.assertNumQueries(self._count_for('/api/marketplace/listings/?page_size=2')):
+            self.client.get('/api/marketplace/listings/?page_size=8')
+
+    def _count_for(self, url):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        with CaptureQueriesContext(connection) as captured:
+            self.client.get(url)
+        return len(captured)
+
+    def test_listing_endpoint_stays_under_a_query_budget(self):
+        queries = self._count_for('/api/marketplace/listings/')
+        self.assertLess(queries, 10, f'listing endpoint used {queries} queries')
+
+    def test_storefront_directory_stays_under_a_query_budget(self):
+        queries = self._count_for('/api/marketplace/storefronts/')
+        self.assertLess(queries, 10, f'storefront directory used {queries} queries')
+
+    def test_page_size_is_honoured_and_capped(self):
+        small = self.client.get('/api/marketplace/listings/?page_size=3')
+        self.assertEqual(len(small.data['results']), 3)
+
+        # An absurd page size must be clamped, never used to dump the table.
+        huge = self.client.get('/api/marketplace/listings/?page_size=100000')
+        self.assertLessEqual(len(huge.data['results']), 48)
