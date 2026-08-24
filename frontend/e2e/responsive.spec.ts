@@ -97,3 +97,68 @@ test.describe('zoomed layout', () => {
     expect(overflow).toBeLessThanOrEqual(OVERFLOW_TOLERANCE);
   });
 });
+
+test.describe('layout primitives', () => {
+  test('page content is never hidden behind the fixed mobile bar', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+
+    for (const route of ['/', '/marketplace', '/orders']) {
+      await page.goto(route);
+      await page.waitForLoadState('networkidle');
+
+      // Scroll to the very bottom, then confirm the last piece of footer
+      // content sits above the navigation bar rather than underneath it.
+      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+      const overlap = await page.evaluate(() => {
+        const nav = document.querySelector('nav[aria-label="منوی اصلی موبایل"]');
+        const footer = document.querySelector('footer');
+        if (!nav || !footer) return 0;
+        const navBox = nav.getBoundingClientRect();
+        const footerBox = footer.getBoundingClientRect();
+        // Positive means the footer's last pixel is under the bar.
+        return Math.round(footerBox.bottom - navBox.top);
+      });
+      expect(overlap, `${route}: content is hidden behind the mobile bar`).toBeLessThanOrEqual(0);
+    }
+  });
+
+  test('the layout mirrors correctly in English', async ({ page }) => {
+    await page.goto('/');
+    await page.getByLabel('زبان').first().selectOption('en');
+
+    await expect(page.locator('html')).toHaveAttribute('dir', 'ltr');
+
+    // With logical properties the switch must not introduce overflow.
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(overflow, 'switching to LTR caused horizontal overflow').toBeLessThanOrEqual(2);
+  });
+
+  test('body text is at least 12px everywhere', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    const tiny = await page.$$eval('*', (elements) =>
+      elements
+        .filter((element) => {
+          const el = element as HTMLElement;
+          if (el.offsetParent === null) return false;
+          // Only elements holding their own text.
+          const ownText = Array.from(el.childNodes)
+            .filter((node) => node.nodeType === Node.TEXT_NODE)
+            .map((node) => node.textContent?.trim() ?? '')
+            .join('');
+          return ownText.length > 2;
+        })
+        .map((element) => ({
+          size: parseFloat(window.getComputedStyle(element).fontSize),
+          text: (element.textContent ?? '').trim().slice(0, 40),
+        }))
+        .filter((entry) => entry.size > 0 && entry.size < 11.5),
+    );
+
+    expect(tiny, `text below 12px:\n${JSON.stringify(tiny.slice(0, 10), null, 2)}`).toEqual([]);
+  });
+});
