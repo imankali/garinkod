@@ -16,6 +16,7 @@ import {
   Truck,
   X,
 } from "lucide-react";
+import { useFocusTrap } from "../hooks/useFocusTrap";
 import { useCartStore } from "../store/cartStore";
 import { productsApi } from "../api/services";
 import type { CartItem, ProductList } from "../types";
@@ -57,6 +58,9 @@ function convertToSuggestion(apiProduct: ProductList): SuggestedProduct {
 // CartDrawer Component
 // ========================================
 export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
+  // Traps Tab inside the drawer, closes on Escape, locks background scrolling
+  // and returns focus to the cart button when it closes.
+  const drawerRef = useFocusTrap<HTMLElement>(isOpen, { onEscape: onClose });
   const [suggestion, setSuggestion] = useState<SuggestedProduct | null>(null);
   const navigate = useNavigate();
 
@@ -152,11 +156,16 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
 
           {/* Drawer Panel */}
           <motion.aside
+            ref={drawerRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="سبد خرید"
+            tabIndex={-1}
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", damping: 30, stiffness: 280 }}
-            className="fixed inset-y-0 end-0 z-[70] flex w-full max-w-md flex-col bg-white shadow-2xl dark:bg-emerald-950"
+            className="fixed inset-y-0 end-0 z-[70] flex w-full max-w-md flex-col bg-white shadow-2xl outline-none dark:bg-emerald-950"
           >
             {/* ======================================== */}
             {/* Header */}

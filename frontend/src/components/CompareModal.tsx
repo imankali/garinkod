@@ -1,6 +1,7 @@
 // frontend/src/components/CompareModal.tsx
 
 import { AnimatePresence, motion } from "framer-motion";
+import { useFocusTrap } from "../hooks/useFocusTrap";
 import { CheckCircle2, ShoppingCart, Star, X, XCircle } from "lucide-react";
 import { formatPrice } from "../utils/formatPrice";
 import type { MockProduct } from "../types";
@@ -30,6 +31,7 @@ const DEFAULT_IMAGE = "/images/hero-farm.jpg";
 // ✅ مودال مقایسه محصولات
 // ========================================
 export default function CompareModal({ isOpen, items, onClose, onAddToCart }: CompareModalProps) {
+  const panelRef = useFocusTrap<HTMLDivElement>(isOpen, { onEscape: onClose });
   // ========================================
   // Comparison Rows Configuration
   // ========================================
@@ -119,6 +121,8 @@ export default function CompareModal({ isOpen, items, onClose, onAddToCart }: Co
             exit={{ opacity: 0, scale: 0.92, y: 30 }}
             transition={{ type: "spring", damping: 26, stiffness: 280 }}
             className="fixed inset-x-4 top-1/2 z-[90] mx-auto max-h-[85vh] max-w-4xl -translate-y-1/2 overflow-y-auto rounded-3xl bg-white shadow-2xl dark:bg-emerald-950"
+            ref={panelRef}
+            tabIndex={-1}
             role="dialog"
             aria-modal="true"
             aria-label="مقایسه محصولات"

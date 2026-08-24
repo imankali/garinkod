@@ -299,7 +299,7 @@ function LanguageSelector({ compact = false }: { compact?: boolean }) {
       <select
         value={locale}
         onChange={(event) => setLocale(event.target.value as "fa" | "en" | "ar")}
-        className="max-w-20 cursor-pointer appearance-none bg-transparent text-xs font-bold outline-none"
+        className="max-w-20 cursor-pointer appearance-none rounded bg-transparent text-xs font-bold outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
         aria-label={t("language.label")}
       >
         <option value="fa">FA</option>

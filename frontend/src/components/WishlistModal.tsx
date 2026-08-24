@@ -1,6 +1,7 @@
 // frontend/src/components/WishlistModal.tsx
 
 import { AnimatePresence, motion } from "framer-motion";
+import { useFocusTrap } from "../hooks/useFocusTrap";
 import { Heart, ShoppingBag, Trash2, X } from "lucide-react";
 import type { MockProduct } from "../types";
 import { formatPrice } from "../utils/formatPrice";
@@ -24,6 +25,9 @@ export default function WishlistModal({
   onRemove,
   onAddToCart,
 }: WishlistModalProps) {
+  // The parent mounts this only while it should be visible, so the trap is
+  // always active for the component's lifetime.
+  const panelRef = useFocusTrap<HTMLDivElement>(true, { onEscape: onClose });
   return (
     <AnimatePresence>
       <>
@@ -47,6 +51,8 @@ export default function WishlistModal({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.9, y: 30 }}
           className="fixed inset-x-4 top-1/2 z-[90] mx-auto max-w-2xl -translate-y-1/2 overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-emerald-950"
+          ref={panelRef}
+          tabIndex={-1}
           role="dialog"
           aria-modal="true"
           aria-label="لیست علاقه‌مندی‌ها"

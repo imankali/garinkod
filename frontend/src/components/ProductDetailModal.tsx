@@ -1,6 +1,7 @@
 // frontend/src/components/ProductDetailModal.tsx
 
 import { useState } from "react";
+import { useFocusTrap } from "../hooks/useFocusTrap";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,
@@ -58,6 +59,7 @@ export default function ProductDetailModal({
   isWishlisted,
   onToggleWishlist,
 }: ProductDetailModalProps) {
+  const panelRef = useFocusTrap<HTMLDivElement>(Boolean(product), { onEscape: onClose });
   const [qty, setQty] = useState(1);
   const [activeTab, setActiveTab] = useState<Tab>("description");
 
@@ -98,7 +100,12 @@ export default function ProductDetailModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 40 }}
             transition={{ type: "spring", damping: 26, stiffness: 300 }}
-            className="fixed inset-x-4 top-1/2 z-[90] mx-auto max-h-[90vh] max-w-3xl -translate-y-1/2 overflow-y-auto rounded-3xl bg-white shadow-2xl md:inset-x-auto"
+            ref={panelRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label={product?.name ?? "جزئیات محصول"}
+            tabIndex={-1}
+            className="fixed inset-x-4 top-1/2 z-[90] mx-auto max-h-[90vh] max-w-3xl -translate-y-1/2 overflow-y-auto rounded-3xl bg-white shadow-2xl outline-none md:inset-x-auto"
           >
             {/* Close Button */}
             <motion.button
