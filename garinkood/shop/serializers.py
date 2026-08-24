@@ -9,7 +9,8 @@ from .models import (
     ServiceRequest, ProcurementRequest, Storefront, MarketplaceListing,
     PaymentAttempt, AffiliateProfile, AffiliateConversion, FinancialLedgerEntry,
     PlatformFeedback, StorefrontComplaint, VisualSearchRequest, Coupon, Wallet,
-    WalletTransaction, StorefrontPost, AdminAuditLog
+    WalletTransaction, StorefrontPost, StorefrontConversation, StorefrontMessage,
+    FarmLand, FarmCalendarEvent, FarmConsultationRequest, AdminAuditLog
 )
 from .slugs import slugify_fa, unique_storefront_slug
 
@@ -78,16 +79,22 @@ class ProductSerializer(serializers.ModelSerializer):
     seed_detail = SeedDetailSerializer(read_only=True, source='seed_detail')
     equipment_detail = EquipmentDetailSerializer(read_only=True, source='equipment_detail')
 
+    discounted_price = serializers.SerializerMethodField()
+
     class Meta:
         model = Product
         fields = [
             'id', 'title', 'slug', 'author', 'category', 'subcategory',
             'description', 'publish', 'created', 'updated', 'status',
             'price', 'stock', 'available', 'is_featured', 'image', 'image_url',
-            'is_in_stock', 'fertilizer_detail', 'pesticide_detail',
+            'is_in_stock', 'discount_percent', 'sales_count', 'discounted_price',
+            'fertilizer_detail', 'pesticide_detail',
             'seed_detail', 'equipment_detail'
         ]
         read_only_fields = ['created', 'updated']
+
+    def get_discounted_price(self, obj):
+        return obj.discounted_price
 
     def get_image_url(self, obj):
         return obj.image_url
@@ -102,11 +109,14 @@ class ProductListSerializer(serializers.ModelSerializer):
     image_url = serializers.SerializerMethodField()
     is_in_stock = serializers.SerializerMethodField()
 
+    discounted_price = serializers.SerializerMethodField()
+
     class Meta:
         model = Product
         fields = [
             'id', 'title', 'slug', 'category', 'price', 'stock',
-            'available', 'is_featured', 'image', 'image_url', 'is_in_stock'
+            'available', 'is_featured', 'image', 'image_url', 'is_in_stock',
+            'discount_percent', 'sales_count', 'discounted_price',
         ]
 
     def get_image_url(self, obj):
@@ -114,6 +124,9 @@ class ProductListSerializer(serializers.ModelSerializer):
 
     def get_is_in_stock(self, obj):
         return obj.is_in_stock
+
+    def get_discounted_price(self, obj):
+        return obj.discounted_price
 
 
 # ========================================
@@ -414,6 +427,7 @@ class StorefrontSerializer(serializers.ModelSerializer):
     followers_count = serializers.SerializerMethodField()
     listing_count = serializers.SerializerMethodField()
     is_following = serializers.SerializerMethodField()
+    is_owner = serializers.SerializerMethodField()
 
     class Meta:
         model = Storefront
@@ -421,16 +435,21 @@ class StorefrontSerializer(serializers.ModelSerializer):
             'id', 'name', 'slug', 'seller_type', 'seller_type_label', 'bio',
             'avatar', 'avatar_url', 'cover', 'cover_url', 'province', 'city',
             'is_verified', 'is_active', 'commission_rate', 'rating', 'sales_count',
-            'followers_count', 'listing_count', 'is_following', 'owner_name', 'created_at'
+            'followers_count', 'listing_count', 'is_following', 'is_owner',
+            'owner_name', 'created_at'
         ]
         read_only_fields = [
             'id', 'is_verified', 'is_active', 'commission_rate', 'rating', 'sales_count',
             'owner_name', 'created_at', 'avatar_url', 'cover_url', 'seller_type_label',
-            'followers_count', 'listing_count', 'is_following',
+            'followers_count', 'listing_count', 'is_following', 'is_owner',
         ]
 
     def get_owner_name(self, obj):
         return obj.user.get_full_name() or obj.user.username
+
+    def get_is_owner(self, obj):
+        request = self.context.get('request')
+        return bool(request and request.user.is_authenticated and obj.user_id == request.user.id)
 
     def get_avatar_url(self, obj):
         return obj.avatar_url
@@ -560,6 +579,7 @@ class MarketplaceListingSerializer(serializers.ModelSerializer):
 
     is_purchasable = serializers.BooleanField(read_only=True)
     minimum_order = serializers.IntegerField(read_only=True)
+    discounted_price = serializers.SerializerMethodField()
 
     class Meta:
         model = MarketplaceListing
@@ -567,17 +587,22 @@ class MarketplaceListingSerializer(serializers.ModelSerializer):
             'id', 'storefront', 'title', 'slug', 'crop_name', 'description',
             'price', 'unit', 'quantity_available', 'min_order_quantity', 'minimum_order',
             'harvest_date', 'image', 'image_url', 'status', 'status_label',
-            'is_purchasable', 'rejection_reason', 'reviewed_at',
+            'is_purchasable', 'discount_percent', 'sales_count', 'discounted_price',
+            'rejection_reason', 'reviewed_at',
             'created_at', 'updated_at'
         ]
         read_only_fields = [
             'id', 'storefront', 'slug', 'status', 'status_label', 'image_url',
-            'is_purchasable', 'minimum_order', 'rejection_reason', 'reviewed_at',
+            'is_purchasable', 'minimum_order', 'discount_percent', 'sales_count',
+            'discounted_price', 'rejection_reason', 'reviewed_at',
             'created_at', 'updated_at',
         ]
 
     def get_image_url(self, obj):
         return obj.image_url
+
+    def get_discounted_price(self, obj):
+        return obj.discounted_price
 
     def validate_min_order_quantity(self, value):
         if value is None:
@@ -790,6 +815,170 @@ class StorefrontPostSerializer(serializers.ModelSerializer):
 
     def get_image_url(self, obj):
         return obj.image_url
+
+
+class StorefrontMessageSerializer(serializers.ModelSerializer):
+    sender_name = serializers.SerializerMethodField()
+    is_mine = serializers.SerializerMethodField()
+    listing = serializers.SerializerMethodField()
+
+    class Meta:
+        model = StorefrontMessage
+        fields = [
+            'id', 'conversation', 'sender', 'sender_name', 'is_mine', 'body',
+            'listing', 'is_read', 'created_at',
+        ]
+        read_only_fields = ['id', 'conversation', 'sender', 'sender_name', 'is_mine', 'is_read', 'created_at']
+
+    def get_sender_name(self, obj):
+        return obj.sender.get_full_name() or obj.sender.username
+
+    def get_is_mine(self, obj):
+        request = self.context.get('request')
+        return bool(request and request.user.is_authenticated and obj.sender_id == request.user.id)
+
+    def get_listing(self, obj):
+        if not obj.listing:
+            return None
+        return {
+            'id': obj.listing.id,
+            'title': obj.listing.title,
+            'slug': obj.listing.slug,
+            'price': obj.listing.price,
+            'discounted_price': obj.listing.discounted_price,
+            'unit': obj.listing.unit,
+            'image_url': obj.listing.image_url,
+            'storefront_name': obj.listing.storefront.name,
+            'storefront_slug': obj.listing.storefront.slug,
+        }
+
+    def validate_listing(self, value):
+        """A listing may only be attached to messages in its own storefront."""
+        conversation = getattr(self.instance, 'conversation', None)
+        if value is not None and conversation is not None and value.storefront_id != conversation.storefront_id:
+            raise serializers.ValidationError('محصول انتخابی متعلق به این غرفه نیست.')
+        return value
+
+
+class StorefrontConversationSerializer(serializers.ModelSerializer):
+    storefront = serializers.SerializerMethodField()
+    counterpart_name = serializers.SerializerMethodField()
+    last_message = serializers.SerializerMethodField()
+    unread_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = StorefrontConversation
+        fields = [
+            'id', 'storefront', 'counterpart_name', 'last_message', 'unread_count',
+            'created_at', 'updated_at',
+        ]
+        read_only_fields = fields
+
+    def get_storefront(self, obj):
+        return StorefrontSerializer(obj.storefront, context=self.context).data
+
+    def get_counterpart_name(self, obj):
+        request = self.context.get('request')
+        user = request.user if request else None
+        if user and obj.storefront.user_id == user.id:
+            return obj.customer.get_full_name() or obj.customer.username
+        return obj.storefront.name
+
+    def get_last_message(self, obj):
+        # The queryset prefetches messages newest-first, so the first cached
+        # row is the latest — no extra query per conversation.
+        message = next(iter(obj.messages.all()), None)
+        return StorefrontMessageSerializer(message, context=self.context).data if message else None
+
+    def get_unread_count(self, obj):
+        request = self.context.get('request')
+        return obj.unread_count_for(request.user) if request else 0
+
+
+class FarmLandSerializer(serializers.ModelSerializer):
+    land_type_label = serializers.CharField(source='get_land_type_display', read_only=True)
+    soil_type_label = serializers.CharField(source='get_soil_type_display', read_only=True)
+    irrigation_type_label = serializers.CharField(source='get_irrigation_type_display', read_only=True)
+    area_unit_label = serializers.CharField(source='get_area_unit_display', read_only=True)
+    owner_name = serializers.CharField(source='owner.get_full_name', read_only=True)
+    event_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = FarmLand
+        fields = [
+            'id', 'owner', 'owner_name', 'name', 'land_type', 'land_type_label',
+            'area', 'area_unit', 'area_unit_label', 'area_label',
+            'crop_type', 'crop_variety', 'province', 'city',
+            'soil_type', 'soil_type_label', 'irrigation_type', 'irrigation_type_label',
+            'planting_date', 'notes', 'is_active', 'event_count',
+            'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'owner', 'owner_name', 'event_count', 'created_at', 'updated_at']
+
+    def get_event_count(self, obj):
+        return obj.calendar_events.count()
+
+
+class FarmCalendarEventSerializer(serializers.ModelSerializer):
+    kind_label = serializers.CharField(source='get_kind_display', read_only=True)
+    status_label = serializers.CharField(source='get_status_display', read_only=True)
+    land_name = serializers.CharField(source='land.name', read_only=True)
+    created_by_name = serializers.SerializerMethodField()
+    is_consultant_note = serializers.SerializerMethodField()
+
+    class Meta:
+        model = FarmCalendarEvent
+        fields = [
+            'id', 'land', 'land_name', 'kind', 'kind_label', 'title', 'date',
+            'notes', 'status', 'status_label', 'created_by', 'created_by_name',
+            'is_consultant_note', 'created_at', 'updated_at',
+        ]
+        read_only_fields = [
+            'id', 'land', 'land_name', 'created_by', 'created_by_name',
+            'is_consultant_note', 'created_at', 'updated_at',
+        ]
+
+    def get_created_by_name(self, obj):
+        return obj.created_by.get_full_name() or obj.created_by.username
+
+    def get_is_consultant_note(self, obj):
+        return obj.created_by_id != obj.land.owner_id
+
+    def validate_date(self, value):
+        return value
+
+
+class FarmConsultationRequestSerializer(serializers.ModelSerializer):
+    subject_label = serializers.CharField(source='get_subject_display', read_only=True)
+    status_label = serializers.CharField(source='get_status_display', read_only=True)
+    land = FarmLandSerializer(read_only=True)
+    land_id = serializers.PrimaryKeyRelatedField(
+        queryset=FarmLand.objects.all(), source='land', write_only=True
+    )
+    farmer_name = serializers.SerializerMethodField()
+    farmer_username = serializers.CharField(source='farmer.username', read_only=True)
+
+    class Meta:
+        model = FarmConsultationRequest
+        fields = [
+            'id', 'farmer', 'farmer_name', 'farmer_username', 'land', 'land_id',
+            'subject', 'subject_label', 'message', 'reply', 'status', 'status_label',
+            'replied_by', 'created_at', 'updated_at',
+        ]
+        read_only_fields = [
+            'id', 'farmer', 'farmer_name', 'farmer_username', 'land', 'reply',
+            'status', 'status_label', 'replied_by', 'created_at', 'updated_at',
+        ]
+
+    def get_farmer_name(self, obj):
+        return obj.farmer.get_full_name() or obj.farmer.username
+
+    def validate_land_id(self, value):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            if value.owner_id != request.user.id:
+                raise serializers.ValidationError('پرونده انتخابی متعلق به حساب شما نیست.')
+        return value
 
 
 class AdminAuditLogSerializer(serializers.ModelSerializer):

@@ -97,6 +97,9 @@ export interface ProductList {
   image: string | null;
   image_url: string;
   is_in_stock: boolean;
+  discount_percent: number;
+  sales_count: number;
+  discounted_price: number;
 }
 
 // ========================================
@@ -444,6 +447,7 @@ export interface Storefront {
   followers_count: number;
   listing_count: number;
   is_following: boolean;
+  is_owner: boolean;
   owner_name: string;
   created_at: string;
 }
@@ -510,10 +514,145 @@ export interface MarketplaceListing {
   status: string;
   status_label: string;
   is_purchasable: boolean;
+  discount_percent: number;
+  sales_count: number;
+  discounted_price: number;
   rejection_reason: string;
   reviewed_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+// ========================================
+// Direct messages between buyers and storefronts
+// ========================================
+
+export interface AttachedListing {
+  id: number;
+  title: string;
+  slug: string;
+  price: number;
+  discounted_price: number;
+  unit: string;
+  image_url: string;
+  storefront_name: string;
+  storefront_slug: string;
+}
+
+export interface StorefrontMessage {
+  id: number;
+  conversation: number;
+  sender: number;
+  sender_name: string;
+  is_mine: boolean;
+  body: string;
+  listing: AttachedListing | null;
+  is_read: boolean;
+  created_at: string;
+}
+
+export interface StorefrontConversation {
+  id: number;
+  storefront: Storefront;
+  counterpart_name: string;
+  last_message: StorefrontMessage | null;
+  unread_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// ========================================
+// Farm profile: lands, calendars and consultation
+// ========================================
+
+export type LandType = 'orchard' | 'farmland' | 'greenhouse';
+export type FarmEventKind = 'spraying' | 'fertilizing' | 'irrigation';
+
+export interface FarmLand {
+  id: number;
+  owner: number;
+  owner_name: string;
+  name: string;
+  land_type: LandType;
+  land_type_label: string;
+  area: string;
+  area_unit: string;
+  area_unit_label: string;
+  area_label: string;
+  crop_type: string;
+  crop_variety: string;
+  province: string;
+  city: string;
+  soil_type: string;
+  soil_type_label: string;
+  irrigation_type: string;
+  irrigation_type_label: string;
+  planting_date: string | null;
+  notes: string;
+  is_active: boolean;
+  event_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FarmCalendarEvent {
+  id: number;
+  land: number;
+  land_name: string;
+  kind: FarmEventKind;
+  kind_label: string;
+  title: string;
+  date: string;
+  notes: string;
+  status: 'planned' | 'done' | 'cancelled';
+  status_label: string;
+  created_by: number;
+  created_by_name: string;
+  is_consultant_note: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FarmConsultationRequest {
+  id: number;
+  farmer: number;
+  farmer_name: string;
+  farmer_username: string;
+  land: FarmLand;
+  land_id?: number;
+  subject: string;
+  subject_label: string;
+  message: string;
+  reply: string;
+  status: 'pending' | 'answered' | 'closed';
+  status_label: string;
+  replied_by: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ConsultantFarmerSummary {
+  id: number;
+  username: string;
+  full_name: string;
+  phone: string;
+  lands: FarmLand[];
+  land_count: number;
+  pending_requests: number;
+}
+
+export interface ConsultantFarmerDossier {
+  farmer: {
+    id: number;
+    username: string;
+    full_name: string;
+    email: string;
+    phone: string;
+    address: string;
+    level_label: string;
+  };
+  lands: (FarmLand & { events: FarmCalendarEvent[] })[];
+  requests: FarmConsultationRequest[];
 }
 
 // ========================================
@@ -633,12 +772,14 @@ export type SortOption = 'popular' | 'cheapest' | 'expensive';
 
 export interface ProductQueryParams {
   page?: number;
+  page_size?: number;
   category?: string;
   search?: string;
   ordering?: string;
   is_featured?: boolean;
   available?: boolean;
   in_stock?: boolean;
+  has_discount?: boolean;
   min_price?: number;
   max_price?: number;
 }

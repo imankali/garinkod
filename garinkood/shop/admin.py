@@ -6,7 +6,8 @@ from .models import (
     Storefront, MarketplaceListing, PaymentAttempt, AffiliateProfile,
     AffiliateConversion, FinancialLedgerEntry, PlatformFeedback,
     StorefrontComplaint, VisualSearchRequest, Coupon, Wallet, WalletTransaction,
-    StorefrontPost, AdminAuditLog
+    StorefrontPost, FarmLand, FarmCalendarEvent, FarmConsultationRequest,
+    AdminAuditLog
 )
 from .rewards import mark_order_paid_and_reward
 
@@ -349,3 +350,26 @@ class AdminAdminAuditLog(admin.ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         return False
+
+
+# --- Farm profile: lands, calendars and consultation ---
+@admin.register(FarmLand)
+class AdminFarmLand(admin.ModelAdmin):
+    list_display = ('name', 'land_type', 'crop_type', 'owner', 'city', 'created_at')
+    list_filter = ('land_type', 'soil_type', 'irrigation_type', 'created_at')
+    search_fields = ('name', 'crop_type', 'owner__username', 'city')
+
+
+@admin.register(FarmCalendarEvent)
+class AdminFarmCalendarEvent(admin.ModelAdmin):
+    list_display = ('date', 'land', 'kind', 'title', 'status', 'created_by')
+    list_filter = ('kind', 'status', 'date')
+    search_fields = ('title', 'land__name', 'land__owner__username')
+
+
+@admin.register(FarmConsultationRequest)
+class AdminFarmConsultationRequest(admin.ModelAdmin):
+    list_display = ('created_at', 'farmer', 'land', 'subject', 'status', 'replied_by')
+    list_filter = ('subject', 'status', 'created_at')
+    search_fields = ('farmer__username', 'land__name', 'message', 'reply')
+    readonly_fields = ('created_at', 'updated_at')

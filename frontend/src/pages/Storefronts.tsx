@@ -2,13 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { BadgeCheck, MapPin, Search, SlidersHorizontal, Star, Store, Users, X } from 'lucide-react';
+import { BadgeCheck, MapPin, Search, SlidersHorizontal, Sparkles, Star, Store, TrendingUp, Users, X } from 'lucide-react';
 
-import { locationsApi, storefrontsApi } from '../api/services';
+import { agricultureApi, locationsApi, storefrontsApi } from '../api/services';
 import { parseApiError } from '../api/errors';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { useUrlFilters } from '../hooks/useUrlFilters';
-import type { Location, Storefront } from '../types';
+import MarketplaceListingCard from '../components/MarketplaceListingCard';
+import { useTranslation } from '../i18n';
+import { cn } from '../utils/cn';
+import type { Location, MarketplaceListing, Storefront } from '../types';
 
 const DEFAULT_FILTERS = {
   search: '',
@@ -40,8 +43,19 @@ const ORDERINGS = [
 
 const PAGE_SIZE = 12;
 
-/** The full, filterable directory of storefronts. */
+type Section = 'stores' | 'bestsellers' | 'discounted';
+
+const SECTIONS: { key: Section; icon: typeof Store; labelKey: string }[] = [
+  { key: 'stores', icon: Store, labelKey: 'storefronts.tab.stores' },
+  { key: 'bestsellers', icon: TrendingUp, labelKey: 'storefronts.tab.bestSellers' },
+  { key: 'discounted', icon: Sparkles, labelKey: 'storefronts.tab.discounted' },
+];
+
+/** The full, filterable directory of storefronts, plus the sellers' best-selling
+ *  and most-discounted products. */
 export default function Storefronts() {
+  const { t } = useTranslation();
+  const [section, setSection] = useState<Section>('stores');
   const { filters, setFilter, setFilters, resetFilters, activeCount } = useUrlFilters(DEFAULT_FILTERS);
   const [searchInput, setSearchInput] = useState(filters.search);
   const debouncedSearch = useDebouncedValue(searchInput, 350);
@@ -122,14 +136,45 @@ export default function Storefronts() {
       <header className="mb-5">
         <h1 className="flex items-center gap-2 text-2xl font-extrabold text-slate-800 dark:text-white">
           <Store size={22} className="text-emerald-600" />
-          همه غرفه‌داران
+          {t('storefronts.title')}
         </h1>
         <p className="mt-1 text-sm text-slate-500 dark:text-emerald-200">
-          کشاورزان، تعاونی‌ها و شرکت‌هایی که مستقیم در گرین کود می‌فروشند.
+          {t('storefronts.subtitle')}
         </p>
+
+        {/* Section tabs */}
+        <div role="tablist" aria-label={t('storefronts.title')} className="no-scrollbar mt-4 flex gap-2 overflow-x-auto pb-1">
+          {SECTIONS.map(({ key, icon: Icon, labelKey }) => (
+            <button
+              key={key}
+              role="tab"
+              aria-selected={section === key}
+              onClick={() => setSection(key)}
+              className={cn(
+                'flex shrink-0 items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-bold transition',
+                section === key
+                  ? 'border-emerald-600 bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
+                  : 'border-emerald-100 bg-white text-slate-600 hover:border-emerald-300 hover:text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-100 dark:hover:border-emerald-600',
+              )}
+            >
+              <Icon size={16} aria-hidden="true" />
+              {t(labelKey)}
+            </button>
+          ))}
+        </div>
       </header>
 
+      {section !== 'stores' && (
+        <ListingSection
+          key={section}
+          ordering={section === 'bestsellers' ? '-sales_count' : '-discount_percent'}
+          onlyDiscounted={section === 'discounted'}
+        />
+      )}
+
       {/* Search + filter toggle */}
+      {section === 'stores' && (
+      <>
       <div className="sticky top-0 z-10 -mx-4 mb-4 bg-white/95 px-4 py-3 backdrop-blur dark:bg-emerald-950/95">
         <div className="flex gap-2">
           <div className="relative flex-1">
@@ -282,7 +327,76 @@ export default function Storefronts() {
           )}
         </>
       )}
+      </>
+      )}
     </div>
+  );
+}
+
+/**
+ * The sellers' best-selling / most-discounted listings, fetched live from the
+ * marketplace API with the matching ordering.
+ */
+function ListingSection({ ordering, onlyDiscounted }: { ordering: string; onlyDiscounted?: boolean }) {
+  const { t } = useTranslation();
+  const [listings, setListings] = useState<MarketplaceListing[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError('');
+    agricultureApi
+      .listMarketplace({
+        ordering,
+        page: 1,
+        page_size: 24,
+        in_stock: '1',
+        ...(onlyDiscounted ? { max_price: undefined } : {}),
+      })
+      .then((response) => {
+        if (cancelled) return;
+        const rows = (response.data.results || []).filter(
+          (listing) => !onlyDiscounted || listing.discount_percent > 0,
+        );
+        setListings(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setError(t('shop.noProducts'));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [ordering, onlyDiscounted, t]);
+
+  if (loading) {
+    return (
+      <p role="status" aria-live="polite" className="py-12 text-center text-sm text-slate-500">
+        {t('common.loading')}
+      </p>
+    );
+  }
+
+  if (error || listings.length === 0) {
+    return (
+      <p className="rounded-2xl border border-dashed border-slate-200 py-12 text-center text-sm text-slate-400 dark:border-emerald-800">
+        {error || t('shop.noProducts')}
+      </p>
+    );
+  }
+
+  return (
+    <ul className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
+      {listings.map((listing, index) => (
+        <li key={listing.id}>
+          <MarketplaceListingCard listing={listing} index={index} />
+        </li>
+      ))}
+    </ul>
   );
 }
 

@@ -12,7 +12,7 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
 
-from shop.models import MarketplaceListing, Storefront, StorefrontPost
+from shop.models import MarketplaceListing, Storefront, StorefrontPost, UserAccount
 from shop.slugs import slugify_fa
 
 DEMO_SELLERS = [
@@ -83,15 +83,37 @@ DEMO_SELLERS = [
 class Command(BaseCommand):
     help = "Seed demo storefronts, listings and posts for local development."
 
+    # Development-only credential so the owner/buyer flows can be exercised
+    # locally without a manual password reset.
+    DEMO_PASSWORD = 'demo-12345'
+
     @transaction.atomic
     def handle(self, *args, **options):
         created_sellers = created_listings = created_posts = 0
+
+        # A demo consultant (level 3) who can open the farmer-support desk.
+        consultant, _ = User.objects.get_or_create(
+            username='moshaver',
+            defaults={'email': 'moshaver@example.com', 'first_name': 'کارشناس', 'last_name': 'گرین کود'},
+        )
+        if not consultant.check_password(self.DEMO_PASSWORD):
+            consultant.set_password(self.DEMO_PASSWORD)
+            consultant.save(update_fields=['password'])
+        consultant_account, _ = UserAccount.objects.get_or_create(user=consultant)
+        if consultant_account.level < UserAccount.LEVEL_MODERATOR:
+            consultant_account.level = UserAccount.LEVEL_MODERATOR
+            consultant_account.save(update_fields=['level'])
 
         for entry in DEMO_SELLERS:
             user, _ = User.objects.get_or_create(
                 username=entry['username'],
                 defaults={'email': f"{entry['username']}@example.com"},
             )
+            # Local demo credential: resetting it every run keeps the sample
+            # sellers signable after any fixture change. Never run in production.
+            if not user.check_password(self.DEMO_PASSWORD):
+                user.set_password(self.DEMO_PASSWORD)
+                user.save(update_fields=['password'])
             storefront, created = Storefront.objects.get_or_create(
                 user=user,
                 defaults={
@@ -107,7 +129,7 @@ class Command(BaseCommand):
             )
             created_sellers += int(created)
 
-            for title, crop, price, unit, quantity, minimum in entry['listings']:
+            for index, (title, crop, price, unit, quantity, minimum) in enumerate(entry['listings']):
                 _, listing_created = MarketplaceListing.objects.get_or_create(
                     storefront=storefront,
                     title=title,
@@ -120,6 +142,8 @@ class Command(BaseCommand):
                         'quantity_available': quantity,
                         'min_order_quantity': minimum,
                         'status': 'published',
+                        'discount_percent': (0, 10, 15, 20, 30, 25)[index % 6],
+                        'sales_count': (9 + index * 23) % 180,
                     },
                 )
                 created_listings += int(listing_created)

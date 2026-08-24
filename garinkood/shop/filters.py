@@ -16,10 +16,14 @@ class ProductFilter(django_filters.FilterSet):
     min_price = django_filters.NumberFilter(field_name="price", lookup_expr="gte")
     max_price = django_filters.NumberFilter(field_name="price", lookup_expr="lte")
     in_stock = django_filters.BooleanFilter(method="filter_in_stock")
+    has_discount = django_filters.BooleanFilter(field_name="discount_percent", lookup_expr="gt", label="دارای تخفیف")
 
     class Meta:
         model = Product
-        fields = ["category", "is_featured", "available", "in_stock", "min_price", "max_price"]
+        fields = [
+            "category", "is_featured", "available", "in_stock", "has_discount",
+            "min_price", "max_price",
+        ]
 
     @staticmethod
     def filter_in_stock(queryset: QuerySet, _name: str, value: bool | None) -> QuerySet:

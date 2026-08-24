@@ -6,18 +6,21 @@ moderate — rather than restating the serializers' field lists.
 """
 
 import threading
+from datetime import timedelta
 
 from django.contrib.auth.models import User
 from django.db import OperationalError, connections
 from django.test import TestCase, TransactionTestCase, override_settings
+from django.utils import timezone
+from rest_framework import status
 from rest_framework.test import APIClient
 
 from .models import (
     AdminAuditLog, AgriInput, AgriInputDose, Cart, CartItem, Category,
-    FinancialLedgerEntry, Location,
-    MarketplaceListing, Order, OrderItem, Product, Storefront, StorefrontFollow,
-    StorefrontHighlight, StorefrontPost, UserAccount, Wallet, WalletTransaction,
-    account_level,
+    FarmCalendarEvent, FarmConsultationRequest, FarmLand, FinancialLedgerEntry,
+    Location, MarketplaceListing, Order, OrderItem, Product, Storefront,
+    StorefrontFollow, StorefrontHighlight, StorefrontPost, UserAccount, Wallet,
+    WalletTransaction, account_level,
 )
 from .rewards import mark_order_paid_and_reward
 
@@ -41,11 +44,13 @@ def make_seller(username='seller', *, commission=10):
     return user, storefront
 
 
-def make_listing(storefront, *, price=100_000, quantity=50, minimum=1, status='published', title='گندم درجه یک'):
+def make_listing(storefront, *, price=100_000, quantity=50, minimum=1, status='published',
+                 title='گندم درجه یک', discount_percent=0, sales_count=0):
     return MarketplaceListing.objects.create(
         storefront=storefront, title=title, slug=f'listing-{title}-{storefront.id}',
         crop_name='گندم', description='محصول سالم و تازه', price=price, unit='کیلوگرم',
         quantity_available=quantity, min_order_quantity=minimum, status=status,
+        discount_percent=discount_percent, sales_count=sales_count,
     )
 
 
@@ -1265,3 +1270,280 @@ class QueryEfficiencyTests(TestCase):
         # An absurd page size must be clamped, never used to dump the table.
         huge = self.client.get('/api/marketplace/listings/?page_size=100000')
         self.assertLessEqual(len(huge.data['results']), 48)
+
+
+class StorefrontMessagingTests(TestCase):
+    """Direct messages between a buyer and a storefront owner."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner, cls.storefront = make_seller('msg-owner')
+        cls.listing = make_listing(cls.storefront, title='پرتقال تامسون')
+        cls.other, cls.other_storefront = make_seller('msg-other')
+        cls.buyer = User.objects.create_user(username='msg-buyer', password='safe-password-123')
+
+    def _client(self, username):
+        client = APIClient()
+        client.force_authenticate(user=User.objects.get(username=username))
+        return client
+
+    def test_buyer_starts_conversation_and_sends_listing_attachment(self):
+        client = self._client('msg-buyer')
+        response = client.post(f'/api/marketplace/storefronts/{self.storefront.slug}/conversation/')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        conversation_id = response.data['id']
+
+        response = client.post(
+            f'/api/marketplace/conversations/{conversation_id}/messages/',
+            {'body': 'قیمت عمده چند است؟', 'listing': self.listing.id},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['listing']['id'], self.listing.id)
+
+    def test_owner_sees_unread_badge_and_reply_clears_it(self):
+        buyer = self._client('msg-buyer')
+        owner = self._client('msg-owner')
+        conversation_id = buyer.post(
+            f'/api/marketplace/storefronts/{self.storefront.slug}/conversation/'
+        ).data['id']
+        buyer.post(
+            f'/api/marketplace/conversations/{conversation_id}/messages/',
+            {'body': 'سلام، موجودی دارید؟'}, format='json',
+        )
+
+        conversations = owner.get('/api/marketplace/conversations/').data
+        self.assertEqual(conversations['unread_total'], 1)
+
+        owner.get(f'/api/marketplace/conversations/{conversation_id}/messages/')
+        conversations = owner.get('/api/marketplace/conversations/').data
+        self.assertEqual(conversations['unread_total'], 0)
+
+    def test_outsiders_cannot_read_a_thread(self):
+        buyer = self._client('msg-buyer')
+        other = self._client('msg-other')
+        conversation_id = buyer.post(
+            f'/api/marketplace/storefronts/{self.storefront.slug}/conversation/'
+        ).data['id']
+        response = other.get(f'/api/marketplace/conversations/{conversation_id}/messages/')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_foreign_listing_cannot_be_attached(self):
+        buyer = self._client('msg-buyer')
+        conversation_id = buyer.post(
+            f'/api/marketplace/storefronts/{self.storefront.slug}/conversation/'
+        ).data['id']
+        foreign = make_listing(self.other_storefront, title='گندم دوروم')
+        response = buyer.post(
+            f'/api/marketplace/conversations/{conversation_id}/messages/',
+            {'body': 'این محصول چطور؟', 'listing': foreign.id}, format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_owner_cannot_open_a_conversation_with_their_own_storefront(self):
+        owner = self._client('msg-owner')
+        response = owner.post(f'/api/marketplace/storefronts/{self.storefront.slug}/conversation/')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class StorefrontOffersTests(TestCase):
+    """Best-seller and most-discounted listing ordering."""
+
+    @classmethod
+    def setUpTestData(cls):
+        _, storefront = make_seller('offers-seller')
+        for index, (discount, sales) in enumerate([(0, 5), (10, 120), (30, 8)]):
+            make_listing(
+                storefront, title=f'آگهی {index}',
+                discount_percent=discount, sales_count=sales,
+            )
+
+    def test_listings_order_by_sales_and_discount(self):
+        by_sales = self.client.get('/api/marketplace/listings/?ordering=-sales_count').data['results']
+        self.assertEqual(by_sales[0]['title'], 'آگهی 1')
+
+        by_discount = self.client.get('/api/marketplace/listings/?ordering=-discount_percent').data['results']
+        self.assertEqual(by_discount[0]['title'], 'آگهی 2')
+        self.assertEqual(by_discount[0]['discounted_price'], by_discount[0]['price'] * 70 // 100)
+
+
+class FarmProfileTests(TestCase):
+    """Lands, calendars and the consultation flow between farmer and consultant."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.farmer = User.objects.create_user(username='farm-owner', password='safe-password-123')
+        cls.consultant = User.objects.create_user(
+            username='farm-consultant', password='safe-password-123', is_staff=True
+        )
+        UserAccount.objects.update_or_create(
+            user=cls.consultant,
+            defaults={'phone': '09121111111'},
+        )
+        from .models import UserAccount as UA
+        account = cls.consultant.account
+        account.level = UA.LEVEL_MODERATOR
+        account.save(update_fields=['level'])
+        cls.buyer = User.objects.create_user(username='farm-buyer', password='safe-password-123')
+
+    def _client(self, username):
+        client = APIClient()
+        client.force_authenticate(user=User.objects.get(username=username))
+        return client
+
+    def _make_land(self, farmer, name='باغ پسته شمالی', land_type='orchard'):
+        return FarmLand.objects.create(
+            owner=farmer, name=name, land_type=land_type, area=2.5,
+            area_unit='hectare', crop_type='پسته', crop_variety='اکبری',
+            province='کرمان', city='رفسنجان', soil_type='sandy',
+            irrigation_type='drip',
+        )
+
+    def test_farmer_can_keep_many_lands_of_any_type(self):
+        client = self._client('farm-owner')
+        for name, kind in [('باغ پسته', 'orchard'), ('مزرعه گندم', 'farmland'), ('گلخانه گوجه', 'greenhouse')]:
+            response = client.post('/api/farm/lands/', {
+                'name': name, 'land_type': kind, 'area': 1, 'area_unit': 'hectare',
+                'crop_type': 'محصول نمونه',
+            }, format='json')
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+
+        response = client.get('/api/farm/lands/')
+        self.assertEqual(len(response.data), 3)
+        self.assertEqual(response.data[0]['land_type_label'], 'گلخانه')
+
+    def test_consultation_flow_with_land_case_file_and_calendar(self):
+        land = self._make_land(self.farmer)
+        farmer = self._client('farm-owner')
+
+        # The farmer files a request against a chosen land.
+        response = farmer.post('/api/farm/consultations/', {
+            'land_id': land.id, 'subject': 'spraying',
+            'message': 'برگ‌های درختان پسته زرد شده‌اند؛ چه سمی بزنم؟',
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        consultation_id = response.data['id']
+        self.assertEqual(response.data['status'], 'pending')
+
+        # A buyer cannot open the consultant queue.
+        buyer = self._client('farm-buyer')
+        self.assertEqual(buyer.get('/api/farm/consulting/requests/').status_code, status.HTTP_403_FORBIDDEN)
+
+        # The consultant sees the request with the full land record attached.
+        consultant = self._client('farm-consultant')
+        queue = consultant.get('/api/farm/consulting/requests/').data
+        self.assertEqual(len(queue), 1)
+        self.assertEqual(queue[0]['land']['name'], 'باغ پسته شمالی')
+        self.assertEqual(queue[0]['land']['crop_type'], 'پسته')
+
+        # The dossier exposes every land and its calendar.
+        dossier = consultant.get(f'/api/farm/consulting/farmers/{self.farmer.id}/').data
+        self.assertEqual(dossier['farmer']['username'], 'farm-owner')
+        self.assertEqual(len(dossier['lands']), 1)
+        self.assertEqual(dossier['lands'][0]['events'], [])
+
+        # The consultant writes a spraying event into the land calendar…
+        event = consultant.post(f'/api/farm/consulting/lands/{land.id}/events/', {
+            'kind': 'spraying', 'title': 'سمپاشی کنه‌کش', 'date': '2026-09-01',
+            'notes': 'دوز: ۲ در هزار؛ صبح زود انجام شود.',
+        }, format='json')
+        self.assertEqual(event.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(event.data['is_consultant_note'])
+
+        # …answers the request…
+        reply = consultant.patch(f'/api/farm/consulting/requests/{consultation_id}/reply/', {
+            'reply': 'ابتدا آبیاری را اصلاح کنید؛ سمپاشی در تقویم شما ثبت شد.',
+            'status': 'answered',
+        }, format='json')
+        self.assertEqual(reply.status_code, status.HTTP_200_OK)
+        self.assertEqual(reply.data['status'], 'answered')
+
+        # …and the farmer sees the answer plus the consultant's calendar note.
+        detail = farmer.get(f'/api/farm/lands/{land.id}/').data
+        self.assertEqual(len(detail['events']), 1)
+        self.assertTrue(detail['events'][0]['is_consultant_note'])
+        self.assertEqual(detail['events'][0]['kind_label'], 'سم‌پاشی')
+
+        requests = farmer.get('/api/farm/consultations/').data
+        self.assertEqual(requests[0]['reply'], 'ابتدا آبیاری را اصلاح کنید؛ سمپاشی در تقویم شما ثبت شد.')
+
+    def test_request_must_reference_own_land(self):
+        other = User.objects.create_user(username='farm-other', password='safe-password-123')
+        land = self._make_land(other, name='مزرعه دیگری')
+        client = self._client('farm-owner')
+        response = client.post('/api/farm/consultations/', {
+            'land_id': land.id, 'subject': 'general', 'message': 'سلام',
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_outsider_cannot_edit_land_calendar(self):
+        land = self._make_land(self.farmer)
+        buyer = self._client('farm-buyer')
+        response = buyer.post(f'/api/farm/lands/{land.id}/events/', {
+            'kind': 'irrigation', 'title': 'تخریب', 'date': '2026-09-01',
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_calendar_filters_by_kind_and_date(self):
+        land = self._make_land(self.farmer)
+        client = self._client('farm-owner')
+        for kind, title, day in [
+            ('spraying', 'سمپاشی', '2026-09-01'),
+            ('fertilizing', 'کوددهی', '2026-09-05'),
+            ('irrigation', 'آبیاری', '2026-09-10'),
+        ]:
+            client.post(f'/api/farm/lands/{land.id}/events/', {
+                'kind': kind, 'title': title, 'date': day,
+            }, format='json')
+
+        spraying = client.get('/api/farm/calendar/?kind=spraying').data
+        self.assertEqual(len(spraying), 1)
+        self.assertEqual(spraying[0]['title'], 'سمپاشی')
+
+        window = client.get('/api/farm/calendar/?from=2026-09-05&to=2026-09-10').data
+        self.assertEqual(len(window), 2)
+
+
+class StorefrontContentSearchTests(TestCase):
+    """Buyers can search inside one storefront's posts and stories."""
+
+    @classmethod
+    def setUpTestData(cls):
+        _, cls.storefront = make_seller('content-search')
+        StorefrontPost.objects.create(
+            storefront=cls.storefront, post_type='post', status='published',
+            caption='آموزش نحوه اصلاح درخت گردو در زمستان',
+        )
+        StorefrontPost.objects.create(
+            storefront=cls.storefront, post_type='story', status='published',
+            caption='سمپاشی بهاره؛ نکات ایمنی',
+            expires_at=timezone.now() + timedelta(days=1),
+        )
+        StorefrontPost.objects.create(
+            storefront=cls.storefront, post_type='post', status='published',
+            caption='برداشت گوجه فرنگی گلخانه‌ای',
+        )
+
+    def test_search_matches_post_captions(self):
+        response = self.client.get(
+            f'/api/marketplace/storefronts/{self.storefront.slug}/search-content/?q=اصلاح درخت'
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['posts']), 1)
+        self.assertEqual(response.data['posts'][0]['caption'], 'آموزش نحوه اصلاح درخت گردو در زمستان')
+        self.assertEqual(len(response.data['stories']), 0)
+
+    def test_search_matches_stories_too(self):
+        response = self.client.get(
+            f'/api/marketplace/storefronts/{self.storefront.slug}/search-content/?q=سمپاشی'
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['stories']), 1)
+        self.assertEqual(len(response.data['posts']), 0)
+
+    def test_empty_query_returns_everything(self):
+        response = self.client.get(
+            f'/api/marketplace/storefronts/{self.storefront.slug}/search-content/'
+        )
+        self.assertEqual(len(response.data['posts']), 2)
+        self.assertEqual(len(response.data['stories']), 1)

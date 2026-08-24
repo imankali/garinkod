@@ -5,6 +5,7 @@ import { Mail, MapPin, Phone, ShieldCheck } from 'lucide-react';
 
 import { visibleSections } from '../config/navigation';
 import { useAuthStore, useUserLevel } from '../store/authStore';
+import { useTranslation } from '../i18n';
 import Logo from './Logo';
 
 /**
@@ -18,6 +19,7 @@ import Logo from './Logo';
 export default function SiteFooter() {
   const { isAuthenticated } = useAuthStore();
   const level = useUserLevel();
+  const { t } = useTranslation();
   const sections = visibleSections({ level, isAuthenticated });
   const year = new Date().toLocaleDateString('fa-IR', { year: 'numeric' });
 
@@ -32,7 +34,7 @@ export default function SiteFooter() {
           <div>
             <Logo />
             <p className="mt-3 max-w-sm text-fluid-sm leading-7 text-slate-500 dark:text-emerald-200">
-              گرین کود، بازار تخصصی نهاده‌های کشاورزی و پل ارتباط مستقیم کشاورز با خریدار.
+              {t('home.heroSubtitle')}
             </p>
 
             <ul className="mt-5 space-y-2 text-fluid-xs text-slate-500 dark:text-emerald-200">
@@ -50,7 +52,7 @@ export default function SiteFooter() {
               </li>
               <li className="flex items-start gap-2">
                 <MapPin size={14} aria-hidden="true" className="mt-1 shrink-0 text-emerald-600" />
-                <span>ایران — ارسال به سراسر کشور</span>
+                <span>{t('footer.shipping')}</span>
               </li>
             </ul>
           </div>
@@ -69,7 +71,11 @@ export default function SiteFooter() {
                         to={item.to}
                         className="-mx-2 flex min-h-9 items-center rounded-lg px-2 text-fluid-xs text-slate-500 transition-colors hover:bg-emerald-50 hover:text-emerald-700 dark:text-emerald-200 dark:hover:bg-emerald-900 dark:hover:text-lime-300"
                       >
-                        {item.label}
+                        {(() => {
+                          const key = `nav.${item.id}`;
+                          const translated = t(key);
+                          return translated === key ? item.label : translated;
+                        })()}
                       </Link>
                     </li>
                   ))}
@@ -80,7 +86,7 @@ export default function SiteFooter() {
         </div>
 
         <div className="mt-9 flex flex-col items-center justify-between gap-3 border-t border-slate-100 pt-5 text-fluid-2xs text-slate-400 dark:border-emerald-900 sm:flex-row">
-          <p>© {year} گرین کود — تمامی حقوق محفوظ است.</p>
+          <p>© {year} — {t('footer.rights')}</p>
           <p className="flex items-center gap-1.5">
             <ShieldCheck size={13} aria-hidden="true" className="text-emerald-600" />
             پرداخت امن و بازگشت وجه طبق قوانین پلتفرم

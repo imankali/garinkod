@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from . import api_views, marketplace_views, reference_views
+from . import api_views, marketplace_views, reference_views, farm_views
 
 # ساخت Router
 router = DefaultRouter()
@@ -45,6 +45,34 @@ urlpatterns = [
     path('marketplace/storefront/', api_views.my_storefront, name='api_my_storefront'),
     path('marketplace/storefront/availability/', marketplace_views.storefront_name_available, name='api_storefront_availability'),
     path('marketplace/following/', marketplace_views.my_following, name='api_my_following'),
+
+    # Direct messages between buyers and storefronts
+    path('marketplace/conversations/', marketplace_views.my_conversations, name='api_my_conversations'),
+    path(
+        'marketplace/conversations/<int:conversation_id>/messages/',
+        marketplace_views.conversation_messages,
+        name='api_conversation_messages',
+    ),
+    path(
+        'marketplace/storefronts/<str:slug>/conversation/',
+        marketplace_views.storefront_conversation,
+        name='api_storefront_conversation',
+    ),
+
+    # Farm profile: lands, calendars and consultation
+    path('farm/lands/', farm_views.my_lands, name='api_farm_lands'),
+    path('farm/lands/<int:land_id>/', farm_views.land_detail, name='api_farm_land_detail'),
+    path('farm/lands/<int:land_id>/events/', farm_views.land_events, name='api_farm_land_events'),
+    path('farm/events/<int:event_id>/', farm_views.event_detail, name='api_farm_event_detail'),
+    path('farm/calendar/', farm_views.my_calendar, name='api_farm_calendar'),
+    path('farm/consultations/', farm_views.my_consultations, name='api_farm_consultations'),
+
+    # Consultant side (level 3+)
+    path('farm/consulting/requests/', farm_views.consulting_requests, name='api_consulting_requests'),
+    path('farm/consulting/requests/<int:consultation_id>/reply/', farm_views.consulting_reply, name='api_consulting_reply'),
+    path('farm/consulting/farmers/', farm_views.consulting_farmers, name='api_consulting_farmers'),
+    path('farm/consulting/farmers/<int:user_id>/', farm_views.consulting_farmer_dossier, name='api_consulting_farmer_dossier'),
+    path('farm/consulting/lands/<int:land_id>/events/', farm_views.consulting_land_event, name='api_consulting_land_event'),
     path('marketplace/finance/', api_views.storefront_finance, name='api_storefront_finance'),
     path('marketplace/finance/export/', api_views.storefront_finance_export, name='api_storefront_finance_export'),
     path('payments/options/', api_views.payment_options_view, name='api_payment_options'),

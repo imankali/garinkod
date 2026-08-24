@@ -182,6 +182,14 @@ export const STAFF_ITEMS: NavItem[] = [
     icon: ShieldCheck,
     minLevel: USER_LEVEL.MODERATOR,
   },
+  {
+    id: 'farmers',
+    label: 'پشتیبانی کشاورزان',
+    description: 'درخواست مشاوره، پرونده زمین‌ها و تقویم کشاورزی',
+    to: '/farmers',
+    icon: Sprout,
+    minLevel: USER_LEVEL.MODERATOR,
+  },
 ];
 
 /** Help and tools — always available. */

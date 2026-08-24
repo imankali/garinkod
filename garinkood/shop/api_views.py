@@ -201,7 +201,7 @@ class ProductViewSet(viewsets.ReadOnlyModelViewSet):
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class = ProductFilter
     search_fields = ['title', 'description']
-    ordering_fields = ['price', 'publish', 'created']
+    ordering_fields = ['price', 'publish', 'created', 'sales_count', 'discount_percent']
     ordering = ['-publish']
     lookup_field = 'slug'
     throttle_classes = [SearchRateThrottle]
@@ -792,7 +792,10 @@ class MarketplaceListingViewSet(viewsets.ModelViewSet):
     lookup_field = 'slug'
     filter_backends = [SearchFilter, OrderingFilter]
     search_fields = ['title', 'crop_name', 'description', 'storefront__name']
-    ordering_fields = ['price', 'created_at', 'harvest_date', 'quantity_available']
+    ordering_fields = [
+        'price', 'created_at', 'harvest_date', 'quantity_available',
+        'sales_count', 'discount_percent',
+    ]
     ordering = ['-created_at']
     throttle_classes = [SearchRateThrottle]
     # Without this the ?page_size= parameter is silently ignored and every

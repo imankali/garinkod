@@ -6,6 +6,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { X } from 'lucide-react';
 
 import { cn } from '../../utils/cn';
+import { acquireScrollLock } from '../../utils/scrollLock';
 import { IconButton } from './Button';
 
 const FOCUSABLE =
@@ -69,11 +70,9 @@ export default function Modal({
 
     previouslyFocused.current = document.activeElement as HTMLElement;
 
-    // Lock scrolling and pad for the scrollbar so the page does not jump.
-    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
-    const { overflow, paddingInlineEnd } = document.body.style;
-    document.body.style.overflow = 'hidden';
-    if (scrollbarWidth > 0) document.body.style.paddingInlineEnd = `${scrollbarWidth}px`;
+    // Lock scrolling through the shared counter so several overlays can be
+    // open at once without the first one to close unlocking the page.
+    const releaseLock = acquireScrollLock();
 
     // Move focus into the dialog on the next frame, once it is painted.
     const focusTimer = window.setTimeout(() => {
@@ -112,8 +111,7 @@ export default function Modal({
     return () => {
       document.removeEventListener('keydown', handleKeyDown, true);
       window.clearTimeout(focusTimer);
-      document.body.style.overflow = overflow;
-      document.body.style.paddingInlineEnd = paddingInlineEnd;
+      releaseLock();
       previouslyFocused.current?.focus?.();
     };
   }, [open, onClose]);
