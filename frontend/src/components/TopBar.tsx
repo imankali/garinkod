@@ -32,7 +32,7 @@ export default function TopBar(_props: { isDark?: boolean; onToggleDark?: () => 
             <Truck size={13} className="text-lime-300" />
             <span className="hidden md:inline">ارسال به سراسر کشور</span>
           </span>
-          <span className="hidden text-[11px] text-emerald-100 md:inline">همراه تأمین، فروش و خدمات کشاورزی</span>
+          <span className="hidden text-fluid-xs text-emerald-100 md:inline">همراه تأمین، فروش و خدمات کشاورزی</span>
         </div>
 
         {/* ======================================== */}

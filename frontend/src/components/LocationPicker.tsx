@@ -127,7 +127,7 @@ export default function LocationPicker({
           ))}
         </select>
         {(provinceError || loadError) && (
-          <p id={`${provinceId}-error`} role="alert" className="mt-1 text-[11px] font-semibold text-rose-600">
+          <p id={`${provinceId}-error`} role="alert" className="mt-1 text-fluid-xs font-semibold text-rose-600">
             {provinceError || loadError}
           </p>
         )}
@@ -162,7 +162,7 @@ export default function LocationPicker({
           ))}
         </select>
         {cityError && (
-          <p id={`${cityId}-error`} role="alert" className="mt-1 text-[11px] font-semibold text-rose-600">
+          <p id={`${cityId}-error`} role="alert" className="mt-1 text-fluid-xs font-semibold text-rose-600">
             {cityError}
           </p>
         )}

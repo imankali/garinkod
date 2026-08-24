@@ -126,7 +126,7 @@ export default function Login() {
 
             {/* Username */}
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-emerald-200">
+              <label htmlFor="login-username" className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-emerald-200">
                 نام کاربری
               </label>
               <div className="relative">
@@ -136,6 +136,7 @@ export default function Login() {
                 <input
                   type="text"
                   name="username"
+                  id="login-username"
                   value={formData.username}
                   onChange={handleChange}
                   required
@@ -151,12 +152,13 @@ export default function Login() {
               <>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-emerald-200">
-                      نام
-                    </label>
+                    <label htmlFor="login-first_name" className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-emerald-200">
+                نام
+              </label>
                     <input
                       type="text"
                       name="first_name"
+                  id="login-first_name"
                       value={formData.first_name}
                       onChange={handleChange}
                       className="w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm transition-colors focus:border-emerald-500 focus:outline-none dark:border-emerald-800 dark:bg-emerald-950 dark:text-white"
@@ -165,12 +167,13 @@ export default function Login() {
                     />
                   </div>
                   <div>
-                    <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-emerald-200">
-                      نام خانوادگی
-                    </label>
+                    <label htmlFor="login-last_name" className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-emerald-200">
+                نام خانوادگی
+              </label>
                     <input
                       type="text"
                       name="last_name"
+                  id="login-last_name"
                       value={formData.last_name}
                       onChange={handleChange}
                       className="w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm transition-colors focus:border-emerald-500 focus:outline-none dark:border-emerald-800 dark:bg-emerald-950 dark:text-white"
@@ -181,9 +184,9 @@ export default function Login() {
                 </div>
 
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-emerald-200">
-                    ایمیل
-                  </label>
+                  <label htmlFor="login-email" className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-emerald-200">
+                ایمیل
+              </label>
                   <div className="relative">
                     <span className="absolute start-3 top-1/2 -translate-y-1/2 text-slate-400">
                       <Mail size={18} />
@@ -191,6 +194,7 @@ export default function Login() {
                     <input
                       type="email"
                       name="email"
+                  id="login-email"
                       value={formData.email}
                       onChange={handleChange}
                       required
@@ -206,7 +210,7 @@ export default function Login() {
 
             {/* Password */}
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-emerald-200">
+              <label htmlFor="login-password" className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-emerald-200">
                 رمز عبور
               </label>
               <div className="relative">
@@ -216,6 +220,7 @@ export default function Login() {
                 <input
                   type={showPassword ? "text" : "password"}
                   name="password"
+                  id="login-password"
                   value={formData.password}
                   onChange={handleChange}
                   required
@@ -238,9 +243,9 @@ export default function Login() {
             {/* Password Confirmation (Register only) */}
             {isRegister && (
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-emerald-200">
-                  تکرار رمز عبور
-                </label>
+                <label htmlFor="login-password2" className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-emerald-200">
+                تکرار رمز عبور
+              </label>
                 <div className="relative">
                   <span className="absolute start-3 top-1/2 -translate-y-1/2 text-slate-400">
                     <Lock size={18} />
@@ -248,6 +253,7 @@ export default function Login() {
                   <input
                     type={showPassword2 ? "text" : "password"}
                     name="password2"
+                  id="login-password2"
                     value={formData.password2}
                     onChange={handleChange}
                     required

@@ -106,7 +106,7 @@ export default function StorefrontPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-5xl px-4 py-16 text-center" role="status" aria-live="polite">
+      <div className="mx-auto max-w-5xl px-[var(--page-gutter)] py-16 text-center" role="status" aria-live="polite">
         <p className="text-sm font-semibold text-slate-500 dark:text-emerald-200">
           در حال بارگذاری غرفه…
         </p>
@@ -116,7 +116,7 @@ export default function StorefrontPage() {
 
   if (loadError || !profile) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-16 text-center">
+      <div className="mx-auto max-w-3xl px-[var(--page-gutter)] py-16 text-center">
         <h1 className="text-xl font-extrabold text-slate-800 dark:text-white">غرفه پیدا نشد</h1>
         <p className="mt-2 text-sm text-slate-500 dark:text-emerald-200">
           {loadError || 'این غرفه در دسترس نیست.'}
@@ -134,7 +134,7 @@ export default function StorefrontPage() {
   const { storefront, listings, posts, stories, highlights, counts } = profile;
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-6">
+    <div className="mx-auto max-w-5xl px-[var(--page-gutter)] py-6">
       {/* Cover */}
       <div className="relative h-36 overflow-hidden rounded-3xl bg-gradient-to-l from-emerald-600 to-lime-500 sm:h-48">
         {storefront.cover_url && (
@@ -206,7 +206,7 @@ export default function StorefrontPage() {
           { label: 'دنبال‌کننده', value: counts.followers },
         ].map((entry) => (
           <div key={entry.label}>
-            <dt className="text-[11px] text-slate-400 dark:text-emerald-300">{entry.label}</dt>
+            <dt className="text-fluid-xs text-slate-400 dark:text-emerald-300">{entry.label}</dt>
             <dd className="text-base font-extrabold text-slate-800 dark:text-white">{entry.value}</dd>
           </div>
         ))}
@@ -234,7 +234,7 @@ export default function StorefrontPage() {
                       <img src={stories[0]?.image_url} alt="" className="h-full w-full object-cover" />
                     </span>
                   </span>
-                  <span className="w-full truncate text-center text-[10px] text-slate-600 dark:text-emerald-100">
+                  <span className="w-full truncate text-center text-fluid-2xs text-slate-600 dark:text-emerald-100">
                     استوری‌ها
                   </span>
                 </button>
@@ -260,7 +260,7 @@ export default function StorefrontPage() {
                   <span className="block h-14 w-14 overflow-hidden rounded-full border-2 border-slate-200 dark:border-emerald-800">
                     <img src={highlight.cover_url} alt="" className="h-full w-full object-cover" />
                   </span>
-                  <span className="w-full truncate text-center text-[10px] text-slate-600 dark:text-emerald-100">
+                  <span className="w-full truncate text-center text-fluid-2xs text-slate-600 dark:text-emerald-100">
                     {highlight.title}
                   </span>
                 </button>
@@ -312,7 +312,7 @@ export default function StorefrontPage() {
                     <p className="mt-1 text-xs text-slate-500 dark:text-emerald-200">
                       {formatPrice(listing.price)} / {listing.unit}
                     </p>
-                    <p className="mt-0.5 text-[11px] text-slate-400">
+                    <p className="mt-0.5 text-fluid-xs text-slate-400">
                       موجودی {listing.quantity_available} {listing.unit}
                       {listing.minimum_order > 1 && ` · حداقل ${listing.minimum_order}`}
                     </p>

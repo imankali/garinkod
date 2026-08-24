@@ -134,7 +134,7 @@ export default function Marketplace() {
   const currentPage = Number(filters.page) || 1;
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-8">
+    <main className="mx-auto max-w-7xl px-[var(--page-gutter)] py-8">
       {/* Hero */}
       <section className="rounded-3xl bg-gradient-to-l from-emerald-800 via-emerald-700 to-lime-600 p-6 text-white md:p-10">
         <div className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
@@ -179,7 +179,7 @@ export default function Marketplace() {
                   <p className="truncate text-xs font-bold text-violet-700 dark:text-violet-200">
                     {story.storefront_name}
                   </p>
-                  <p className="mt-1 line-clamp-2 text-[11px] text-slate-600 dark:text-emerald-100">
+                  <p className="mt-1 line-clamp-2 text-fluid-xs text-slate-600 dark:text-emerald-100">
                     {story.caption}
                   </p>
                 </div>
@@ -247,7 +247,7 @@ export default function Marketplace() {
               <SlidersHorizontal size={15} />
               فیلتر
               {activeCount > 0 && (
-                <span className="rounded-full bg-emerald-600 px-1.5 text-[10px] text-white">{activeCount}</span>
+                <span className="rounded-full bg-emerald-600 px-1.5 text-fluid-2xs text-white">{activeCount}</span>
               )}
             </button>
           </div>
@@ -263,7 +263,7 @@ export default function Marketplace() {
               />
 
               <label className="block">
-                <span className="mb-1 block text-[11px] font-bold text-slate-500 dark:text-emerald-200">
+                <span className="mb-1 block text-fluid-xs font-bold text-slate-500 dark:text-emerald-200">
                   نوع فروشنده
                 </span>
                 <select
@@ -280,7 +280,7 @@ export default function Marketplace() {
               </label>
 
               <label className="block">
-                <span className="mb-1 block text-[11px] font-bold text-slate-500 dark:text-emerald-200">
+                <span className="mb-1 block text-fluid-xs font-bold text-slate-500 dark:text-emerald-200">
                   مرتب‌سازی
                 </span>
                 <select
@@ -297,7 +297,7 @@ export default function Marketplace() {
               </label>
 
               <label className="block">
-                <span className="mb-1 block text-[11px] font-bold text-slate-500 dark:text-emerald-200">
+                <span className="mb-1 block text-fluid-xs font-bold text-slate-500 dark:text-emerald-200">
                   حداقل قیمت (تومان)
                 </span>
                 <input
@@ -311,7 +311,7 @@ export default function Marketplace() {
               </label>
 
               <label className="block">
-                <span className="mb-1 block text-[11px] font-bold text-slate-500 dark:text-emerald-200">
+                <span className="mb-1 block text-fluid-xs font-bold text-slate-500 dark:text-emerald-200">
                   حداکثر قیمت (تومان)
                 </span>
                 <input
@@ -492,7 +492,7 @@ function ListingCard({ listing }: { listing: MarketplaceListing }) {
           </strong>
         </div>
 
-        <p className="mt-1 text-[11px] text-slate-400">
+        <p className="mt-1 text-fluid-xs text-slate-400">
           موجودی {listing.quantity_available} {listing.unit}
           {listing.minimum_order > 1 && ` · حداقل سفارش ${listing.minimum_order} ${listing.unit}`}
         </p>
@@ -525,14 +525,14 @@ function ListingCard({ listing }: { listing: MarketplaceListing }) {
         )}
 
         {error && (
-          <p role="alert" className="mt-2 text-[11px] font-semibold text-rose-600">
+          <p role="alert" className="mt-2 text-fluid-xs font-semibold text-rose-600">
             {error}
           </p>
         )}
 
         <Link
           to={`/support?storefront=${listing.storefront.id}&listing=${listing.id}`}
-          className="mt-3 inline-block text-[11px] font-bold text-slate-400 underline hover:text-amber-700 dark:text-emerald-300"
+          className="mt-3 inline-block text-fluid-xs font-bold text-slate-400 underline hover:text-amber-700 dark:text-emerald-300"
         >
           گزارش مشکل یا شکایت از غرفه
         </Link>
@@ -674,7 +674,7 @@ function StorefrontForm({
           <p
             id="store-name-status"
             role={nameStatus?.available === false || fieldErrors.name ? 'alert' : 'status'}
-            className={`mt-1 text-[11px] font-semibold ${
+            className={`mt-1 text-fluid-xs font-semibold ${
               nameStatus?.available === false || fieldErrors.name
                 ? 'text-rose-600'
                 : nameStatus?.available
@@ -708,7 +708,7 @@ function StorefrontForm({
           <p
             id="store-slug-status"
             role={slugStatus?.available === false ? 'alert' : 'status'}
-            className="mt-1 text-[11px] font-semibold text-slate-400"
+            className="mt-1 text-fluid-xs font-semibold text-slate-400"
           >
             {fieldErrors.slug ||
               (slugStatus?.available === false

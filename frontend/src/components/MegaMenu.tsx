@@ -170,7 +170,7 @@ export default function MegaMenu() {
                     </span>
                     <span className="flex-1 text-start">{cat.name}</span>
                     {cat.product_count > 0 && (
-                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-700 dark:text-lime-300">
+                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-fluid-2xs font-bold text-emerald-700 dark:bg-emerald-700 dark:text-lime-300">
                         {cat.product_count.toLocaleString("fa-IR")}
                       </span>
                     )}

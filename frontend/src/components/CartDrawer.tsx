@@ -209,7 +209,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
               )}
 
               {/* Trust mini strip */}
-              <div className="relative mt-3 flex items-center justify-between text-[10px] text-white/85">
+              <div className="relative mt-3 flex items-center justify-between text-fluid-2xs text-white/85">
                 <span className="flex items-center gap-1">
                   <Truck size={11} /> زمان ارسال پس از هماهنگی
                 </span>
@@ -229,7 +229,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mx-4 mt-3 flex items-start gap-2 rounded-xl bg-orange-50 p-3 text-[11px] text-orange-700 dark:bg-orange-950/40 dark:text-orange-300"
+                className="mx-4 mt-3 flex items-start gap-2 rounded-xl bg-orange-50 p-3 text-fluid-xs text-orange-700 dark:bg-orange-950/40 dark:text-orange-300"
               >
                 <AlertTriangle size={15} className="mt-0.5 shrink-0" />
                 سبد شما شامل سموم کشاورزی است. لطفاً هنگام مصرف از تجهیزات ایمنی استفاده کرده و دستورالعمل مصرف را
@@ -298,7 +298,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                           <p className="truncate text-sm font-semibold text-slate-700 dark:text-white">
                             {item.title}
                           </p>
-                          <div className="mb-2 flex flex-wrap items-center gap-1.5 text-[10px] text-slate-400">
+                          <div className="mb-2 flex flex-wrap items-center gap-1.5 text-fluid-2xs text-slate-400">
                             {item.kind === 'listing' ? (
                               <>
                                 <span className="rounded-full bg-lime-100 px-2 py-0.5 font-bold text-emerald-700 dark:bg-emerald-800 dark:text-lime-200">
@@ -364,7 +364,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                           {(itemErrors[item.id] || !item.is_in_stock) && (
                             <p
                               role="alert"
-                              className="mt-2 flex items-start gap-1 rounded-lg bg-rose-50 px-2 py-1 text-[11px] font-semibold text-rose-600 dark:bg-rose-950/40 dark:text-rose-300"
+                              className="mt-2 flex items-start gap-1 rounded-lg bg-rose-50 px-2 py-1 text-fluid-xs font-semibold text-rose-600 dark:bg-rose-950/40 dark:text-rose-300"
                             >
                               <AlertTriangle size={12} className="mt-0.5 shrink-0" />
                               <span>
@@ -409,7 +409,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                         />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="mb-0.5 flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-lime-300">
+                        <p className="mb-0.5 flex items-center gap-1 text-fluid-2xs font-bold text-emerald-600 dark:text-lime-300">
                           <Gift size={11} /> شاید به این هم نیاز داشته باشید
                         </p>
                         <p className="truncate text-xs font-semibold text-slate-600 dark:text-emerald-50">
@@ -418,7 +418,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                       </div>
                       <button
                         onClick={() => handleAddToCart(suggestion.id)}
-                        className="shrink-0 rounded-lg bg-white px-2.5 py-1.5 text-[10px] font-bold text-emerald-600 shadow ring-1 ring-emerald-200 dark:bg-emerald-900 dark:text-lime-300 dark:ring-emerald-700"
+                        className="shrink-0 rounded-lg bg-white px-2.5 py-1.5 text-fluid-2xs font-bold text-emerald-600 shadow ring-1 ring-emerald-200 dark:bg-emerald-900 dark:text-lime-300 dark:ring-emerald-700"
                       >
                         افزودن
                       </button>
@@ -473,7 +473,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                   </span>
                 </motion.a>
 
-                <p className="mt-3 text-center text-[10px] text-slate-400 dark:text-emerald-400">
+                <p className="mt-3 text-center text-fluid-2xs text-slate-400 dark:text-emerald-400">
                   مبلغ و موجودی نهایی پیش از تأیید سفارش توسط کارشناس بررسی می‌شود.
                 </p>
               </div>

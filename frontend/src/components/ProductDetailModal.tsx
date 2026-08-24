@@ -184,7 +184,7 @@ export default function ProductDetailModal({
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
-                      className={`relative flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 text-[11px] font-bold transition-colors ${
+                      className={`relative flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 text-fluid-xs font-bold transition-colors ${
                         activeTab === tab.id ? "text-white" : "text-slate-500 hover:text-[#0F8A5F]"
                       }`}
                     >
@@ -264,7 +264,7 @@ export default function ProductDetailModal({
                             <p className="mb-1.5 font-bold text-slate-600">محصولات سازگار برای مصرف همراه</p>
                             <div className="flex flex-wrap gap-1.5">
                               {product.compatibleWith.map((c) => (
-                                <span key={c} className="rounded-full bg-white px-2.5 py-1 text-[10px] text-slate-600 ring-1 ring-slate-200">
+                                <span key={c} className="rounded-full bg-white px-2.5 py-1 text-fluid-2xs text-slate-600 ring-1 ring-slate-200">
                                   {c}
                                 </span>
                               ))}

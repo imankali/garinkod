@@ -124,7 +124,7 @@ export default function Checkout() {
 
   if (order) {
     return (
-      <main className="mx-auto max-w-3xl px-4 py-12">
+      <main className="mx-auto max-w-3xl px-[var(--page-gutter)] py-12">
         <section className="rounded-3xl border border-emerald-100 bg-white p-7 text-center shadow-xl shadow-emerald-100/60 dark:border-emerald-800 dark:bg-emerald-950 dark:shadow-none">
           <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-900 dark:text-lime-300">
             <CheckCircle2 size={36} />
@@ -161,7 +161,7 @@ export default function Checkout() {
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-7 md:py-10">
+    <main className="mx-auto max-w-6xl px-[var(--page-gutter)] py-7 md:py-10">
       <Link to="/" className="inline-flex items-center gap-2 text-sm font-bold text-emerald-700 dark:text-lime-300">بازگشت به فروشگاه</Link>
       <div className="mt-5 grid gap-6 lg:grid-cols-[1fr_360px]">
         <form onSubmit={submit} className="space-y-5 rounded-3xl border border-slate-100 bg-white p-5 shadow-sm md:p-7 dark:border-emerald-900 dark:bg-emerald-950">
@@ -202,7 +202,7 @@ export default function Checkout() {
               aria-describedby={fieldErrors.address ? "checkout-address-error" : undefined}
               className={`mt-2 w-full rounded-xl border bg-white px-3 py-2.5 font-normal outline-none transition focus-visible:ring-2 focus-visible:ring-emerald-500 dark:bg-emerald-900 ${fieldErrors.address ? "border-rose-400" : "border-slate-200 dark:border-emerald-700"}`}
             />
-            {fieldErrors.address && <p id="checkout-address-error" role="alert" className="mt-1 text-[11px] font-semibold text-rose-600">{fieldErrors.address}</p>}
+            {fieldErrors.address && <p id="checkout-address-error" role="alert" className="mt-1 text-fluid-xs font-semibold text-rose-600">{fieldErrors.address}</p>}
           </div>
           <label className="block text-sm font-bold text-slate-700 dark:text-emerald-50">
             توضیحات برای کارشناس یا ارسال (اختیاری)
@@ -216,7 +216,7 @@ export default function Checkout() {
               {providers.map((provider) => (
                 <button key={provider.code} type="button" disabled={!provider.enabled} onClick={() => updateField('payment_method', provider.code)} className={`rounded-xl border p-3 text-start text-xs transition ${form.payment_method === provider.code ? 'border-emerald-600 bg-emerald-100 text-emerald-900 dark:bg-emerald-900 dark:text-lime-100' : 'border-amber-200 bg-white/80 dark:border-amber-800 dark:bg-emerald-950'} ${!provider.enabled ? 'cursor-not-allowed opacity-60' : ''}`}>
                   <span className="block font-extrabold">{provider.label}</span>
-                  <span className="mt-1 block text-[10px]">{provider.enabled ? 'فعال' : provider.reason}</span>
+                  <span className="mt-1 block text-fluid-2xs">{provider.enabled ? 'فعال' : provider.reason}</span>
                 </button>
               ))}
             </div>
@@ -237,7 +237,7 @@ export default function Checkout() {
               <input id="checkout-terms_accepted" type="checkbox" checked={form.terms_accepted} onChange={(event) => updateField("terms_accepted", event.target.checked)} aria-invalid={Boolean(fieldErrors.terms_accepted)} className="mt-1 h-4 w-4 accent-emerald-600" />
               <span>صحت اطلاعات تحویل را تأیید می‌کنم و می‌پذیرم سفارش پیش از هماهنگی کارشناس، پرداخت‌شده یا قطعی تلقی نمی‌شود.</span>
             </label>
-            {fieldErrors.terms_accepted && <p role="alert" className="mt-1 text-[11px] font-semibold text-rose-600">{fieldErrors.terms_accepted}</p>}
+            {fieldErrors.terms_accepted && <p role="alert" className="mt-1 text-fluid-xs font-semibold text-rose-600">{fieldErrors.terms_accepted}</p>}
           </div>
 
           {formError && (
@@ -261,7 +261,7 @@ export default function Checkout() {
                   {/* Marketplace lines name their storefront so the buyer knows
                       who is actually shipping each part of the order. */}
                   {item.kind === 'listing' && item.listing?.storefront_name && (
-                    <span className="mt-0.5 block text-[11px] text-emerald-600 dark:text-lime-300">
+                    <span className="mt-0.5 block text-fluid-xs text-emerald-600 dark:text-lime-300">
                       غرفه {item.listing.storefront_name}
                     </span>
                   )}
@@ -275,7 +275,7 @@ export default function Checkout() {
           <SummaryRow label="جمع کالاها" value={formatPrice(subtotal)} />
           <SummaryRow label="هزینه ارسال" value={shippingPrice === 0 ? "رایگان" : formatPrice(shippingPrice)} />
           <div className="mt-3 flex items-center justify-between border-t border-emerald-200 pt-4 text-base font-extrabold text-slate-800 dark:border-emerald-700 dark:text-white"><span>مبلغ قابل پرداخت</span><span className="text-emerald-700 dark:text-lime-300">{formatPrice(total)}</span></div>
-          <div className="mt-5 flex gap-2 rounded-xl bg-white/70 p-3 text-[11px] leading-5 text-slate-500 dark:bg-emerald-950/50 dark:text-emerald-200"><ShieldCheck size={18} className="shrink-0 text-emerald-600" />مبلغ نهایی توسط سرور با قیمت و موجودی لحظه‌ای محاسبه می‌شود.</div>
+          <div className="mt-5 flex gap-2 rounded-xl bg-white/70 p-3 text-fluid-xs leading-5 text-slate-500 dark:bg-emerald-950/50 dark:text-emerald-200"><ShieldCheck size={18} className="shrink-0 text-emerald-600" />مبلغ نهایی توسط سرور با قیمت و موجودی لحظه‌ای محاسبه می‌شود.</div>
         </aside>
       </div>
     </main>
@@ -299,7 +299,7 @@ function Field({ id, label, value, onChange, type = "text", inputMode, required 
         aria-describedby={error ? `${id}-error` : undefined}
         className={`mt-2 w-full rounded-xl border bg-white px-3 py-2.5 font-normal outline-none transition focus-visible:ring-2 focus-visible:ring-emerald-500 dark:bg-emerald-900 ${error ? "border-rose-400" : "border-slate-200 dark:border-emerald-700"}`}
       />
-      {error && <p id={`${id}-error`} role="alert" className="mt-1 text-[11px] font-semibold text-rose-600">{error}</p>}
+      {error && <p id={`${id}-error`} role="alert" className="mt-1 text-fluid-xs font-semibold text-rose-600">{error}</p>}
     </div>
   );
 }

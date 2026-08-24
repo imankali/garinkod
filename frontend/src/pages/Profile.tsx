@@ -226,7 +226,7 @@ function SellerPanel({ storefront, listings, loading, storeForm, setStoreForm, l
                       <div>
                         <p className="text-xs font-extrabold text-rose-800 dark:text-rose-200">دلیل رد آگهی</p>
                         <p className="mt-1 text-xs leading-6 text-rose-700 dark:text-rose-100">{listing.rejection_reason}</p>
-                        <p className="mt-2 text-[11px] text-rose-600 dark:text-rose-300">پس از اصلاح، آگهی دوباره برای بررسی ارسال می‌شود.</p>
+                        <p className="mt-2 text-fluid-xs text-rose-600 dark:text-rose-300">پس از اصلاح، آگهی دوباره برای بررسی ارسال می‌شود.</p>
                       </div>
                     </div>
                   )}

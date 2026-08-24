@@ -64,7 +64,7 @@ export default function WishlistModal({
             </div>
             <button
               onClick={onClose}
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 transition-colors hover:bg-white/30"
+              className="tap-target flex h-9 w-9 items-center justify-center rounded-full bg-white/20 transition-colors hover:bg-white/30"
               aria-label="بستن"
             >
               <X size={18} />

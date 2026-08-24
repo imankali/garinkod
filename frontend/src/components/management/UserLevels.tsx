@@ -162,14 +162,14 @@ export default function UserLevels({ viewerLevel }: { viewerLevel: number }) {
                       {user.username}
                       {isOwner && <ShieldCheck size={14} className="text-amber-500" aria-label="مالک سیستم" />}
                     </strong>
-                    <p className="truncate text-[11px] text-slate-500 dark:text-emerald-200">
+                    <p className="truncate text-fluid-xs text-slate-500 dark:text-emerald-200">
                       {user.full_name || user.email || 'بدون اطلاعات تکمیلی'}
                       {user.groups.length > 0 && ` · ${user.groups.join('، ')}`}
                     </p>
                   </div>
 
                   {isOwner ? (
-                    <span className="rounded-full bg-amber-100 px-3 py-1 text-[11px] font-bold text-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
+                    <span className="rounded-full bg-amber-100 px-3 py-1 text-fluid-xs font-bold text-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
                       مالک سیستم — غیرقابل تغییر
                     </span>
                   ) : (
@@ -196,7 +196,7 @@ export default function UserLevels({ viewerLevel }: { viewerLevel: number }) {
                           </option>
                         ))}
                       </select>
-                      <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600 dark:text-emerald-100">
+                      <label className="flex items-center gap-1.5 text-fluid-xs font-bold text-slate-600 dark:text-emerald-100">
                         <input
                           type="checkbox"
                           checked={user.is_active}

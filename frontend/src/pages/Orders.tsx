@@ -50,7 +50,7 @@ export default function Orders() {
   }
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-9">
+    <main className="mx-auto max-w-5xl px-[var(--page-gutter)] py-9">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div><p className="text-sm font-bold text-emerald-700 dark:text-lime-300">پیگیری شفاف سفارش</p><h1 className="mt-1 text-3xl font-extrabold text-slate-800 dark:text-white">سفارش‌های من</h1></div>
         <Link to="/products" className="rounded-xl border border-emerald-200 px-4 py-2.5 text-sm font-bold text-emerald-700 dark:border-emerald-700 dark:text-lime-300">بازگشت به محصولات</Link>
@@ -59,8 +59,8 @@ export default function Orders() {
       <section className="mt-7 rounded-3xl border border-slate-100 bg-white p-5 shadow-sm dark:border-emerald-900 dark:bg-emerald-950">
         <div className="flex items-center gap-3"><span className="rounded-xl bg-emerald-100 p-2 text-emerald-700 dark:bg-emerald-900 dark:text-lime-300"><PackageSearch size={22} /></span><div><h2 className="font-extrabold text-slate-800 dark:text-white">پیگیری سفارش مهمان</h2><p className="text-xs text-slate-500 dark:text-emerald-200">کد سفارش و همان شماره‌ای که هنگام ثبت وارد کردید را بنویسید.</p></div></div>
         <form onSubmit={lookup} className="mt-5 grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
-          <input required value={code} onChange={(event) => setCode(event.target.value)} placeholder="کد سفارش، مانند GK-..." className="rounded-xl border border-slate-200 px-3 py-3 text-sm outline-none focus:border-emerald-500 dark:border-emerald-700 dark:bg-emerald-900" dir="ltr" />
-          <input required value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="شماره تماس" className="rounded-xl border border-slate-200 px-3 py-3 text-sm outline-none focus:border-emerald-500 dark:border-emerald-700 dark:bg-emerald-900" />
+          <input required id="track-code" aria-label="کد سفارش" value={code} onChange={(event) => setCode(event.target.value)} placeholder="کد سفارش، مانند GK-..." className="rounded-xl border border-slate-200 px-3 py-3 text-sm outline-none focus:border-emerald-500 dark:border-emerald-700 dark:bg-emerald-900" dir="ltr" />
+          <input required id="track-phone" aria-label="شماره تماس ثبت‌شده در سفارش" inputMode="tel" value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="شماره تماس" className="rounded-xl border border-slate-200 px-3 py-3 text-sm outline-none focus:border-emerald-500 dark:border-emerald-700 dark:bg-emerald-900" />
           <button disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white disabled:opacity-50"><RefreshCw size={16} className={loading ? "animate-spin" : ""} />پیگیری</button>
         </form>
       </section>

@@ -80,7 +80,7 @@ export default function CompareModal({ isOpen, items, onClose, onAddToCart }: Co
       label: "ویژگی‌ها",
       render: (p) =>
         p.features && p.features.length > 0 ? (
-          <ul className="space-y-1 text-start text-[10px]">
+          <ul className="space-y-1 text-start text-fluid-2xs">
             {p.features.slice(0, 3).map((feature, idx) => (
               <li key={idx} className="flex items-start gap-1">
                 <CheckCircle2 size={10} className="mt-0.5 shrink-0 text-emerald-500" />
@@ -135,7 +135,7 @@ export default function CompareModal({ isOpen, items, onClose, onAddToCart }: Co
               </div>
               <button
                 onClick={onClose}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 transition-colors hover:bg-white/30"
+                className="tap-target flex h-9 w-9 items-center justify-center rounded-full bg-white/20 transition-colors hover:bg-white/30"
                 aria-label="بستن"
               >
                 <X size={18} />
@@ -211,7 +211,7 @@ export default function CompareModal({ isOpen, items, onClose, onAddToCart }: Co
                           whileTap={{ scale: p.inStock ? 0.95 : 1 }}
                           onClick={() => onAddToCart(p)}
                           disabled={!p.inStock}
-                          className="mx-auto flex items-center gap-1.5 rounded-xl bg-brand-gradient px-3 py-2 text-[11px] font-bold text-white shadow disabled:cursor-not-allowed disabled:opacity-50"
+                          className="mx-auto flex items-center gap-1.5 rounded-xl bg-brand-gradient px-3 py-2 text-fluid-xs font-bold text-white shadow disabled:cursor-not-allowed disabled:opacity-50"
                           aria-label={`افزودن ${p.name} به سبد خرید`}
                         >
                           <ShoppingCart size={13} />

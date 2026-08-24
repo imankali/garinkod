@@ -251,7 +251,7 @@ export default function AgriCalculator({ onAddToCart }: AgriCalculatorProps) {
                       <Leaf size={14} className="shrink-0 text-emerald-500" />
                     )}
                     <span className="flex-1 truncate text-slate-700 dark:text-emerald-50">{item.name}</span>
-                    <span className="shrink-0 text-[10px] text-slate-400">{item.active_ingredient}</span>
+                    <span className="shrink-0 text-fluid-2xs text-slate-400">{item.active_ingredient}</span>
                   </button>
                 </li>
               ))}
@@ -259,7 +259,7 @@ export default function AgriCalculator({ onAddToCart }: AgriCalculatorProps) {
           )}
         </div>
         {errors.input && (
-          <p role="alert" className="mt-1 text-[11px] font-semibold text-rose-600">
+          <p role="alert" className="mt-1 text-fluid-xs font-semibold text-rose-600">
             {errors.input}
           </p>
         )}
@@ -287,7 +287,7 @@ export default function AgriCalculator({ onAddToCart }: AgriCalculatorProps) {
             ))}
           </select>
           {errors.crop && (
-            <p role="alert" className="mt-1 text-[11px] font-semibold text-rose-600">
+            <p role="alert" className="mt-1 text-fluid-xs font-semibold text-rose-600">
               {errors.crop}
             </p>
           )}
@@ -309,7 +309,7 @@ export default function AgriCalculator({ onAddToCart }: AgriCalculatorProps) {
             className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-emerald-800 dark:bg-emerald-950 dark:text-white"
           />
           {errors.area && (
-            <p role="alert" className="mt-1 text-[11px] font-semibold text-rose-600">
+            <p role="alert" className="mt-1 text-fluid-xs font-semibold text-rose-600">
               {errors.area}
             </p>
           )}
@@ -374,11 +374,11 @@ export default function AgriCalculator({ onAddToCart }: AgriCalculatorProps) {
             {result.crop}
             {result.target && ` — ${result.target}`}
           </p>
-          <p className="mt-1 text-[11px] text-slate-400">
+          <p className="mt-1 text-fluid-xs text-slate-400">
             دوز پایه: {result.rate.min} تا {result.rate.max} {result.rate.unit} {result.rate.basis_label}
           </p>
           {result.notes && (
-            <p className="mt-2 rounded-lg bg-slate-50 p-2 text-[11px] text-slate-600 dark:bg-emerald-900/50 dark:text-emerald-100">
+            <p className="mt-2 rounded-lg bg-slate-50 p-2 text-fluid-xs text-slate-600 dark:bg-emerald-900/50 dark:text-emerald-100">
               {result.notes}
             </p>
           )}
@@ -388,7 +388,7 @@ export default function AgriCalculator({ onAddToCart }: AgriCalculatorProps) {
             {result.warnings.map((warning) => (
               <li
                 key={warning}
-                className="flex items-start gap-1.5 rounded-lg bg-amber-50 p-2 text-[11px] font-semibold leading-5 text-amber-800 dark:bg-amber-950/30 dark:text-amber-200"
+                className="flex items-start gap-1.5 rounded-lg bg-amber-50 p-2 text-fluid-xs font-semibold leading-5 text-amber-800 dark:bg-amber-950/30 dark:text-amber-200"
               >
                 <ShieldAlert size={13} className="mt-0.5 shrink-0" />
                 <span>{warning}</span>

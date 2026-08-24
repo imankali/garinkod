@@ -106,6 +106,7 @@ export default function AvatarUploader({ fallback, size = 'lg' }: AvatarUploader
         <input
           ref={inputRef}
           type="file"
+        aria-label="انتخاب تصویر پروفایل"
           accept={ALLOWED_TYPES.join(',')}
           onChange={(event) => handleFile(event.target.files?.[0])}
           className="sr-only"
@@ -115,7 +116,7 @@ export default function AvatarUploader({ fallback, size = 'lg' }: AvatarUploader
       </div>
 
       {error && (
-        <p role="alert" className="mt-1 max-w-[9rem] text-[10px] font-semibold text-rose-200">
+        <p role="alert" className="mt-1 max-w-[9rem] text-fluid-2xs font-semibold text-rose-200">
           {error}
         </p>
       )}

@@ -126,8 +126,8 @@ export default function HighlightManager({ storefrontSlug, stories }: HighlightM
                   <Trash2 size={11} />
                 </button>
               </div>
-              <p className="mt-1 truncate text-[11px] text-slate-600 dark:text-emerald-100">{highlight.title}</p>
-              <p className="text-[10px] text-slate-400">{highlight.items.length} استوری</p>
+              <p className="mt-1 truncate text-fluid-xs text-slate-600 dark:text-emerald-100">{highlight.title}</p>
+              <p className="text-fluid-2xs text-slate-400">{highlight.items.length} استوری</p>
             </li>
           ))}
         </ul>
@@ -182,7 +182,7 @@ export default function HighlightManager({ storefrontSlug, stories }: HighlightM
         )}
 
         {error && (
-          <p role="alert" className="mt-2 text-[11px] font-semibold text-rose-600">
+          <p role="alert" className="mt-2 text-fluid-xs font-semibold text-rose-600">
             {error}
           </p>
         )}

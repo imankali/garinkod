@@ -53,7 +53,7 @@ export default function Management() {
   }
 
   if (isLoading) return <main className="flex min-h-[60vh] items-center justify-center"><div className="text-center text-slate-500"><div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" /> <p className="mt-4">در حال بارگذاری مرکز مدیریت...</p></div></main>;
-  if (isError || !data) return <main className="mx-auto max-w-3xl px-4 py-12"><section className="rounded-3xl border border-rose-200 bg-rose-50 p-7 text-rose-900 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-100"><ShieldAlert size={30} /><h1 className="mt-4 text-2xl font-extrabold">دسترسی مدیریتی ندارید</h1><p className="mt-2 leading-7">این بخش فقط برای کاربران staff فعال است. مالک سایت می‌تواند از Django Admin یا نقش‌های مدیریتی، دسترسی کارمندان را تعیین کند.</p></section></main>;
+  if (isError || !data) return <main className="mx-auto max-w-3xl px-[var(--page-gutter)] py-12"><section className="rounded-3xl border border-rose-200 bg-rose-50 p-7 text-rose-900 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-100"><ShieldAlert size={30} /><h1 className="mt-4 text-2xl font-extrabold">دسترسی مدیریتی ندارید</h1><p className="mt-2 leading-7">این بخش فقط برای کاربران staff فعال است. مالک سایت می‌تواند از Django Admin یا نقش‌های مدیریتی، دسترسی کارمندان را تعیین کند.</p></section></main>;
 
   const viewerLevel = data.viewer_level ?? (data.viewer.is_superuser ? USER_LEVEL.OWNER : USER_LEVEL.MODERATOR);
   const nav = [
@@ -91,7 +91,7 @@ function Overview({ data, onOpenModeration }: { data: ManagementDashboard; onOpe
               <img src={listing.image_url} alt="" loading="lazy" className="h-10 w-10 shrink-0 rounded-lg object-cover" />
               <div className="min-w-0 flex-1">
                 <strong className="block truncate text-sm text-slate-800 dark:text-white">{listing.title}</strong>
-                <span className="text-[11px] text-slate-500 dark:text-emerald-200">آگهی · غرفه {listing.storefront.name}</span>
+                <span className="text-fluid-xs text-slate-500 dark:text-emerald-200">آگهی · غرفه {listing.storefront.name}</span>
               </div>
             </li>
           ))}
@@ -100,7 +100,7 @@ function Overview({ data, onOpenModeration }: { data: ManagementDashboard; onOpe
               <img src={post.image_url} alt="" loading="lazy" className="h-10 w-10 shrink-0 rounded-lg object-cover" />
               <div className="min-w-0 flex-1">
                 <strong className="block truncate text-sm text-slate-800 dark:text-white">{post.caption}</strong>
-                <span className="text-[11px] text-slate-500 dark:text-emerald-200">{post.post_type_label} · غرفه {post.storefront_name}</span>
+                <span className="text-fluid-xs text-slate-500 dark:text-emerald-200">{post.post_type_label} · غرفه {post.storefront_name}</span>
               </div>
             </li>
           ))}

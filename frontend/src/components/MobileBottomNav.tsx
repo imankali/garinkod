@@ -61,7 +61,7 @@ export default function MobileBottomNav({
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
                     exit={{ scale: 0 }}
-                    className="absolute -end-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-orange-500 px-1 text-[10px] font-bold text-white"
+                    className="absolute -end-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-orange-500 px-1 text-fluid-2xs font-bold text-white"
                   >
                     {cartCount > 9 ? '۹+' : cartCount.toLocaleString('fa-IR')}
                   </motion.span>

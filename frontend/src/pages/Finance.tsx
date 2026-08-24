@@ -113,7 +113,7 @@ export default function Finance() {
   const hasFilters = Boolean(statusFilter || typeFilter || dateFrom || dateTo || search);
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-9">
+    <main className="mx-auto max-w-6xl px-[var(--page-gutter)] py-9">
       <section className="rounded-3xl bg-gradient-to-l from-slate-900 via-emerald-900 to-emerald-600 p-6 text-white md:p-8">
         <p className="text-sm font-bold text-lime-200">دفتر مالی فروشنده</p>
         <h1 className="mt-2 text-2xl font-extrabold md:text-3xl">موجودی، کمیسیون و تسویه شفاف</h1>
@@ -167,7 +167,7 @@ export default function Finance() {
             {/* Filters */}
             <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
               <label className="block">
-                <span className="mb-1 block text-[11px] font-bold text-slate-500 dark:text-emerald-200">وضعیت</span>
+                <span className="mb-1 block text-fluid-xs font-bold text-slate-500 dark:text-emerald-200">وضعیت</span>
                 <select
                   value={statusFilter}
                   onChange={(event) => setStatusFilter(event.target.value)}
@@ -180,7 +180,7 @@ export default function Finance() {
                 </select>
               </label>
               <label className="block">
-                <span className="mb-1 block text-[11px] font-bold text-slate-500 dark:text-emerald-200">نوع رویداد</span>
+                <span className="mb-1 block text-fluid-xs font-bold text-slate-500 dark:text-emerald-200">نوع رویداد</span>
                 <select
                   value={typeFilter}
                   onChange={(event) => setTypeFilter(event.target.value)}
@@ -193,7 +193,7 @@ export default function Finance() {
                 </select>
               </label>
               <label className="block">
-                <span className="mb-1 block text-[11px] font-bold text-slate-500 dark:text-emerald-200">از تاریخ</span>
+                <span className="mb-1 block text-fluid-xs font-bold text-slate-500 dark:text-emerald-200">از تاریخ</span>
                 <input
                   type="date"
                   value={dateFrom}
@@ -202,7 +202,7 @@ export default function Finance() {
                 />
               </label>
               <label className="block">
-                <span className="mb-1 block text-[11px] font-bold text-slate-500 dark:text-emerald-200">تا تاریخ</span>
+                <span className="mb-1 block text-fluid-xs font-bold text-slate-500 dark:text-emerald-200">تا تاریخ</span>
                 <input
                   type="date"
                   value={dateTo}
@@ -211,7 +211,7 @@ export default function Finance() {
                 />
               </label>
               <label className="block">
-                <span className="mb-1 block text-[11px] font-bold text-slate-500 dark:text-emerald-200">جستجو</span>
+                <span className="mb-1 block text-fluid-xs font-bold text-slate-500 dark:text-emerald-200">جستجو</span>
                 <input
                   type="search"
                   value={searchInput}
@@ -252,22 +252,22 @@ export default function Finance() {
                           <strong className="text-slate-800 dark:text-white">{entry.entry_type_label}</strong>
                           <code
                             dir="ltr"
-                            className="rounded bg-white px-1.5 py-0.5 text-[10px] font-bold text-slate-500 dark:bg-emerald-950 dark:text-emerald-300"
+                            className="rounded bg-white px-1.5 py-0.5 text-fluid-2xs font-bold text-slate-500 dark:bg-emerald-950 dark:text-emerald-300"
                           >
                             {entry.reference}
                           </code>
                           {entry.order_code && (
-                            <span dir="ltr" className="text-[10px] text-slate-400">سفارش {entry.order_code}</span>
+                            <span dir="ltr" className="text-fluid-2xs text-slate-400">سفارش {entry.order_code}</span>
                           )}
                         </div>
                         <p className="mt-1 text-xs text-slate-500 dark:text-emerald-200">{entry.description}</p>
-                        <p className="mt-1 text-[10px] text-slate-400">
+                        <p className="mt-1 text-fluid-2xs text-slate-400">
                           {new Date(entry.created_at).toLocaleString('fa-IR')}
                           {entry.available_at && ` · قابل تسویه از ${new Date(entry.available_at).toLocaleDateString('fa-IR')}`}
                         </p>
                       </div>
                       <div className="flex shrink-0 items-center gap-3">
-                        <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-slate-600 dark:bg-emerald-950 dark:text-emerald-200">
+                        <span className="rounded-full bg-white px-2.5 py-1 text-fluid-xs font-bold text-slate-600 dark:bg-emerald-950 dark:text-emerald-200">
                           {entry.status_label}
                         </span>
                         <strong className={entry.amount >= 0 ? 'text-emerald-700 dark:text-lime-300' : 'text-rose-600'}>

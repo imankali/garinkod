@@ -123,7 +123,7 @@ export default function FilterSortBar({
             >
               {cat.name}
               {cat.product_count > 0 && (
-                <span className="rounded-full bg-white/30 px-1.5 py-0.5 text-[10px]">
+                <span className="rounded-full bg-white/30 px-1.5 py-0.5 text-fluid-2xs">
                   {cat.product_count.toLocaleString("fa-IR")}
                 </span>
               )}
@@ -159,7 +159,7 @@ export default function FilterSortBar({
             <SlidersHorizontal size={14} />
             فیلترها
             {activeFacets > 0 && (
-              <span className="absolute -end-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-brand-orange text-[9px] font-bold text-white">
+              <span className="absolute -end-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-brand-orange text-fluid-2xs font-bold text-white">
                 {activeFacets}
               </span>
             )}
@@ -284,9 +284,10 @@ export default function FilterSortBar({
                   max={maxPrice}
                   step={50000}
                   value={priceLimit}
+                  aria-label="حداکثر قیمت"
+                  aria-valuetext={`${priceLimit.toLocaleString('fa-IR')} تومان`}
                   onChange={(e) => onPriceLimitChange(Number(e.target.value))}
                   className="h-2 w-full cursor-pointer appearance-none rounded-full bg-emerald-200 accent-[#0F8A5F] dark:bg-emerald-800"
-                  aria-label="حداکثر قیمت"
                 />
               </div>
 

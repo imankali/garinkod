@@ -118,7 +118,7 @@ export default function Storefronts() {
   );
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6">
+    <div className="mx-auto max-w-6xl px-[var(--page-gutter)] py-6">
       <header className="mb-5">
         <h1 className="flex items-center gap-2 text-2xl font-extrabold text-slate-800 dark:text-white">
           <Store size={22} className="text-emerald-600" />
@@ -155,7 +155,7 @@ export default function Storefronts() {
             <SlidersHorizontal size={15} />
             فیلتر
             {activeCount > 0 && (
-              <span className="rounded-full bg-emerald-600 px-1.5 text-[10px] text-white">{activeCount}</span>
+              <span className="rounded-full bg-emerald-600 px-1.5 text-fluid-2xs text-white">{activeCount}</span>
             )}
           </button>
         </div>
@@ -301,7 +301,7 @@ function FilterSelect({
 }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-[11px] font-bold text-slate-500 dark:text-emerald-200">{label}</span>
+      <span className="mb-1 block text-fluid-xs font-bold text-slate-500 dark:text-emerald-200">{label}</span>
       <select
         value={value}
         disabled={disabled}
@@ -340,7 +340,7 @@ export function StorefrontCard({ storefront }: { storefront: Storefront }) {
             {storefront.name}
             {storefront.is_verified && <BadgeCheck size={14} className="shrink-0 text-emerald-500" />}
           </h3>
-          <p className="mt-0.5 truncate text-[11px] text-slate-500 dark:text-emerald-200">
+          <p className="mt-0.5 truncate text-fluid-xs text-slate-500 dark:text-emerald-200">
             {storefront.seller_type_label}
             {storefront.city && (
               <>
@@ -352,7 +352,7 @@ export function StorefrontCard({ storefront }: { storefront: Storefront }) {
         </div>
       </div>
 
-      <dl className="mt-3 flex items-center gap-3 text-[11px] text-slate-500 dark:text-emerald-200">
+      <dl className="mt-3 flex items-center gap-3 text-fluid-xs text-slate-500 dark:text-emerald-200">
         <span className="flex items-center gap-1">
           <Store size={12} /> {storefront.listing_count} آگهی
         </span>

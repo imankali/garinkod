@@ -195,7 +195,7 @@ export default function ModerationQueue() {
       {/* Filters */}
       <div className="mt-4 grid gap-2 sm:grid-cols-3">
         <label className="block">
-          <span className="mb-1 block text-[11px] font-bold text-slate-500 dark:text-emerald-200">نوع محتوا</span>
+          <span className="mb-1 block text-fluid-xs font-bold text-slate-500 dark:text-emerald-200">نوع محتوا</span>
           <select
             value={contentType}
             onChange={(event) => setContentType(event.target.value)}
@@ -209,7 +209,7 @@ export default function ModerationQueue() {
           </select>
         </label>
         <label className="block">
-          <span className="mb-1 block text-[11px] font-bold text-slate-500 dark:text-emerald-200">وضعیت</span>
+          <span className="mb-1 block text-fluid-xs font-bold text-slate-500 dark:text-emerald-200">وضعیت</span>
           <select
             value={status}
             onChange={(event) => setStatus(event.target.value)}
@@ -223,7 +223,7 @@ export default function ModerationQueue() {
           </select>
         </label>
         <label className="block">
-          <span className="mb-1 block text-[11px] font-bold text-slate-500 dark:text-emerald-200">جستجو</span>
+          <span className="mb-1 block text-fluid-xs font-bold text-slate-500 dark:text-emerald-200">جستجو</span>
           <input
             type="search"
             value={searchInput}
@@ -325,18 +325,18 @@ export default function ModerationQueue() {
                   )}
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-700 dark:bg-emerald-800 dark:text-lime-200">
+                      <span className="rounded-full bg-slate-200 px-2 py-0.5 text-fluid-2xs font-bold text-slate-700 dark:bg-emerald-800 dark:text-lime-200">
                         {CONTENT_TYPES.find((entry) => entry.value === row.type)?.label ?? row.type}
                       </span>
                       <strong className="truncate text-sm text-slate-800 dark:text-white">{row.title}</strong>
-                      <span className="text-[10px] text-slate-400">{row.status_label}</span>
+                      <span className="text-fluid-2xs text-slate-400">{row.status_label}</span>
                     </div>
                     {row.storefront && (
-                      <p className="mt-1 text-[11px] text-emerald-700 dark:text-lime-300">غرفه {row.storefront}</p>
+                      <p className="mt-1 text-fluid-xs text-emerald-700 dark:text-lime-300">غرفه {row.storefront}</p>
                     )}
                     <p className="mt-1 line-clamp-2 text-xs text-slate-600 dark:text-emerald-100">{row.excerpt}</p>
                     {row.rejection_reason && (
-                      <p className="mt-2 rounded-lg bg-rose-50 p-2 text-[11px] font-semibold text-rose-700 dark:bg-rose-950/40 dark:text-rose-200">
+                      <p className="mt-2 rounded-lg bg-rose-50 p-2 text-fluid-xs font-semibold text-rose-700 dark:bg-rose-950/40 dark:text-rose-200">
                         دلیل رد: {row.rejection_reason}
                       </p>
                     )}
@@ -348,7 +348,7 @@ export default function ModerationQueue() {
                         type="button"
                         onClick={() => approveOne(row)}
                         disabled={busy}
-                        className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-50"
+                        className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-fluid-xs font-bold text-white disabled:opacity-50"
                       >
                         <CheckCircle2 size={12} /> تأیید
                       </button>
@@ -360,7 +360,7 @@ export default function ModerationQueue() {
                           setReasonError('');
                         }}
                         disabled={busy}
-                        className="flex items-center gap-1 rounded-lg bg-rose-600 px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-50"
+                        className="flex items-center gap-1 rounded-lg bg-rose-600 px-3 py-1.5 text-fluid-xs font-bold text-white disabled:opacity-50"
                       >
                         <XCircle size={12} /> رد
                       </button>
@@ -422,7 +422,7 @@ export default function ModerationQueue() {
               }`}
             />
             {reasonError && (
-              <p id="reject-reason-error" role="alert" className="mt-1 text-[11px] font-semibold text-rose-600">
+              <p id="reject-reason-error" role="alert" className="mt-1 text-fluid-xs font-semibold text-rose-600">
                 {reasonError}
               </p>
             )}

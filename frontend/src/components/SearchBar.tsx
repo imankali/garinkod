@@ -323,7 +323,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
         >
           <SlidersHorizontal size={16} />
           {activeFacetCount > 0 && (
-            <span className="absolute -end-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-brand-orange text-[9px] font-bold text-white">
+            <span className="absolute -end-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-brand-orange text-fluid-2xs font-bold text-white">
               {activeFacetCount}
             </span>
           )}
@@ -372,18 +372,18 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
               >
                 <div className="mb-3 flex items-center justify-between">
                   <p className="text-xs font-bold text-slate-600 dark:text-emerald-100">فیلتر تخصصی جستجو</p>
-                  <button onClick={resetFacets} className="text-[11px] text-rose-500 hover:underline">
+                  <button onClick={resetFacets} className="text-fluid-xs text-rose-500 hover:underline">
                     حذف همه فیلترها
                   </button>
                 </div>
 
                 {/* Quick Filters */}
                 <div className="mb-3">
-                  <p className="mb-1.5 text-[11px] font-semibold text-slate-500 dark:text-emerald-300">فیلترهای سریع</p>
+                  <p className="mb-1.5 text-fluid-xs font-semibold text-slate-500 dark:text-emerald-300">فیلترهای سریع</p>
                   <div className="flex flex-wrap gap-1.5">
                     <button
                       onClick={() => handleQuickFilter('inStock', null)}
-                      className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${
+                      className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-fluid-xs font-semibold transition-colors ${
                         inStockOnly
                           ? "bg-[#0F8A5F] text-white"
                           : "bg-white text-slate-600 ring-1 ring-slate-200 dark:bg-emerald-900 dark:text-emerald-100 dark:ring-emerald-800"
@@ -396,13 +396,13 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
 
                 {/* Categories */}
                 <div>
-                  <p className="mb-1.5 text-[11px] font-semibold text-slate-500 dark:text-emerald-300">دسته‌بندی‌ها</p>
+                  <p className="mb-1.5 text-fluid-xs font-semibold text-slate-500 dark:text-emerald-300">دسته‌بندی‌ها</p>
                   <div className="flex flex-wrap gap-1.5">
                     {categories.slice(0, 6).map((cat) => (
                       <button
                         key={cat.id}
                         onClick={() => handleQuickFilter('category', cat.id)}
-                        className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${
+                        className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-fluid-xs font-semibold transition-colors ${
                           activeCategory === cat.id
                             ? "bg-[#0F8A5F] text-white"
                             : "bg-white text-slate-600 ring-1 ring-slate-200 dark:bg-emerald-900 dark:text-emerald-100 dark:ring-emerald-800"
@@ -492,7 +492,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
                   <p className="mb-1 flex items-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-lime-300">
                     <Sparkles size={12} /> راهنمای جستجو
                   </p>
-                  <ul className="space-y-1 text-[11px] text-slate-600 dark:text-emerald-200">
+                  <ul className="space-y-1 text-fluid-xs text-slate-600 dark:text-emerald-200">
                     <li>• برای جستجوی دقیق، نام کامل محصول را وارد کنید</li>
                     <li>• از فیلترهای پیشرفته برای محدود کردن نتایج استفاده کنید</li>
                     <li>• با کلیک روی 🎤 جستجوی صوتی انجام دهید</li>
@@ -511,7 +511,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
                     {filteredProducts.length} نتیجه یافت شد
                   </p>
                   {activeFacetCount > 0 && (
-                    <button onClick={resetFacets} className="text-[10px] text-rose-500 hover:underline">
+                    <button onClick={resetFacets} className="text-fluid-2xs text-rose-500 hover:underline">
                       حذف فیلترها
                     </button>
                   )}
@@ -545,7 +545,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
                           </span>
                         </span>
                         {!product.inStock && (
-                          <span className="shrink-0 rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-500">
+                          <span className="shrink-0 rounded-full bg-rose-50 px-2 py-0.5 text-fluid-2xs font-bold text-rose-500">
                             ناموجود
                           </span>
                         )}

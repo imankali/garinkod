@@ -136,8 +136,8 @@ const CartButton = memo(function CartButton({
               transition={{ ...SPRING_SOFT, damping: 15 }}
               className={`absolute flex items-center justify-center rounded-full bg-white font-bold text-[#0F8A5F] shadow ring-2 ring-emerald-500/20 ${
                 mobile
-                  ? "-end-2 -top-2.5 h-4 min-w-4 px-0.5 text-[9px]"
-                  : "-end-2 -top-2.5 h-4 min-w-4 px-0.5 text-[9px] sm:-end-2.5 sm:-top-3 sm:h-5 sm:min-w-5 sm:text-[10px]"
+                  ? "-end-2 -top-2.5 h-4 min-w-4 px-0.5 text-fluid-2xs"
+                  : "-end-2 -top-2.5 h-4 min-w-4 px-0.5 text-fluid-2xs sm:-end-2.5 sm:-top-3 sm:h-5 sm:min-w-5 sm:text-fluid-2xs"
               }`}
             >
               <AnimatedCount value={count} />
@@ -523,7 +523,7 @@ export default function Header({
                       animate={{ scale: 1, y: 0 }}
                       exit={{ scale: 0 }}
                       transition={{ ...SPRING_SOFT, damping: 15 }}
-                      className="absolute -end-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-orange px-0.5 text-[9px] font-bold text-white shadow-md sm:h-5 sm:min-w-5 sm:text-[10px]"
+                      className="absolute -end-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-orange px-0.5 text-fluid-2xs font-bold text-white shadow-md sm:h-5 sm:min-w-5 sm:text-fluid-2xs"
                     >
                       <AnimatedCount value={wishlistCount} />
                     </motion.span>

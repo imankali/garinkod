@@ -118,7 +118,7 @@ export default function ConsultationButton() {
               <div className="relative bg-brand-gradient px-5 py-5 text-white">
                 <button
                   onClick={handleCloseModal}
-                  className="absolute end-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-white/20 transition-colors hover:bg-white/30"
+                  className="tap-target absolute end-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-white/20 transition-colors hover:bg-white/30"
                   aria-label="بستن"
                 >
                   <X size={16} />
@@ -211,7 +211,7 @@ export default function ConsultationButton() {
                     <motion.p
                       initial={{ opacity: 0, y: 5 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="mt-2 text-[11px] font-semibold text-amber-700 dark:text-amber-200"
+                      className="mt-2 text-fluid-xs font-semibold text-amber-700 dark:text-amber-200"
                     >
                       برای تکمیل مشاوره، این تصویر را از طریق واتس‌اپ برای کارشناس ارسال کنید.
                     </motion.p>
