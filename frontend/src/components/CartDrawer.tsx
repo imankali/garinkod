@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { useCartStore } from "../store/cartStore";
 import { productsApi } from "../api/services";
-import type { ProductList } from "../types";
+import type { CartItem, ProductList } from "../types";
 import { formatPrice } from "../utils/formatPrice";
 
 // ========================================
@@ -61,7 +61,8 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
   const navigate = useNavigate();
 
   // دریافت توابع و state از cartStore
-  const { cart, fetchCart, addToCart, removeFromCart, updateQuantity } = useCartStore();
+  const { cart, fetchCart, addToCart, removeFromCart, updateQuantity, itemErrors } =
+    useCartStore();
 
   // ========================================
   // لود سبد خرید و محصول پیشنهادی هنگام باز شدن
@@ -112,6 +113,20 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
   // ========================================
   async function handleUpdateQty(itemId: number, newQty: number) {
     await updateQuantity(itemId, newQty);
+  }
+
+  /**
+   * Storefront listings carry a seller-defined minimum order and their own
+   * stock ceiling; catalogue products keep the flat cap of ten. Clamping here
+   * keeps the buttons honest, and the server re-checks either way.
+   */
+  function quantityBounds(item: CartItem) {
+    const min = item.kind === 'listing' ? item.min_order_quantity : 1;
+    const max =
+      item.kind === 'listing'
+        ? item.available_quantity
+        : Math.min(10, item.available_quantity || 10);
+    return { min, max };
   }
 
   async function handleRemove(itemId: number) {
@@ -262,11 +277,15 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                         transition={{ type: "spring", stiffness: 250, damping: 24 }}
                         className="group relative flex items-center gap-3 overflow-hidden rounded-2xl border border-slate-100 bg-gradient-to-br from-white to-slate-50 p-3 shadow-sm dark:border-emerald-800 dark:from-emerald-900 dark:to-emerald-950"
                       >
-                        {/* Product Image */}
+                        {/* Item image: product photo or listing photo */}
                         <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-white shadow-inner">
                           <img
-                            src={item.product.image_url || item.product.image || '/images/hero-farm.jpg'}
-                            alt={item.product.title}
+                            src={
+                              item.kind === 'listing'
+                                ? item.listing?.image_url || '/images/hero-farm.jpg'
+                                : item.product?.image_url || item.product?.image || '/images/hero-farm.jpg'
+                            }
+                            alt={item.title}
                             className="h-full w-full object-cover"
                             onError={(e) => {
                               (e.target as HTMLImageElement).src = '/images/hero-farm.jpg';
@@ -274,13 +293,25 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                           />
                         </div>
 
-                        {/* Product Info */}
+                        {/* Item info */}
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-semibold text-slate-700 dark:text-white">
-                            {item.product.title}
+                            {item.title}
                           </p>
-                          <div className="mb-2 flex items-center gap-1.5 text-[10px] text-slate-400">
-                            <span>{item.product.category}</span>
+                          <div className="mb-2 flex flex-wrap items-center gap-1.5 text-[10px] text-slate-400">
+                            {item.kind === 'listing' ? (
+                              <>
+                                <span className="rounded-full bg-lime-100 px-2 py-0.5 font-bold text-emerald-700 dark:bg-emerald-800 dark:text-lime-200">
+                                  غرفه
+                                </span>
+                                <span className="truncate">{item.listing?.storefront_name}</span>
+                                {item.min_order_quantity > 1 && (
+                                  <span>· حداقل {item.min_order_quantity} {item.listing?.unit}</span>
+                                )}
+                              </>
+                            ) : (
+                              <span>{item.product?.category as string}</span>
+                            )}
                           </div>
 
                           {/* Quantity Controls */}
@@ -288,8 +319,15 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                             <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white shadow-sm dark:border-emerald-700 dark:bg-emerald-900">
                               <motion.button
                                 whileTap={{ scale: 0.85 }}
-                                onClick={() => handleUpdateQty(item.id, item.quantity + 1)}
-                                className="flex h-8 w-8 items-center justify-center rounded-r-lg text-emerald-600 hover:bg-emerald-50 dark:text-lime-300 dark:hover:bg-emerald-800"
+                                disabled={item.quantity >= quantityBounds(item).max}
+                                aria-label={`افزایش تعداد ${item.title}`}
+                                onClick={() =>
+                                  handleUpdateQty(
+                                    item.id,
+                                    Math.min(item.quantity + 1, quantityBounds(item).max),
+                                  )
+                                }
+                                className="flex h-8 w-8 items-center justify-center rounded-r-lg text-emerald-600 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40 dark:text-lime-300 dark:hover:bg-emerald-800"
                               >
                                 <Plus size={14} />
                               </motion.button>
@@ -303,8 +341,15 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                               </motion.span>
                               <motion.button
                                 whileTap={{ scale: 0.85 }}
-                                onClick={() => handleUpdateQty(item.id, Math.max(1, item.quantity - 1))}
-                                className="flex h-8 w-8 items-center justify-center rounded-l-lg text-slate-500 hover:bg-slate-100 dark:text-emerald-400 dark:hover:bg-emerald-800"
+                                disabled={item.quantity <= quantityBounds(item).min}
+                                aria-label={`کاهش تعداد ${item.title}`}
+                                onClick={() =>
+                                  handleUpdateQty(
+                                    item.id,
+                                    Math.max(quantityBounds(item).min, item.quantity - 1),
+                                  )
+                                }
+                                className="flex h-8 w-8 items-center justify-center rounded-l-lg text-slate-500 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 dark:text-emerald-400 dark:hover:bg-emerald-800"
                               >
                                 <Minus size={14} />
                               </motion.button>
@@ -313,6 +358,21 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                               {formatPrice(item.total_price)}
                             </span>
                           </div>
+
+                          {/* Row-level problems stay visible in the cart rather
+                              than vanishing with a toast. */}
+                          {(itemErrors[item.id] || !item.is_in_stock) && (
+                            <p
+                              role="alert"
+                              className="mt-2 flex items-start gap-1 rounded-lg bg-rose-50 px-2 py-1 text-[11px] font-semibold text-rose-600 dark:bg-rose-950/40 dark:text-rose-300"
+                            >
+                              <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+                              <span>
+                                {itemErrors[item.id] ??
+                                  `موجودی کافی نیست؛ حداکثر ${item.available_quantity} عدد قابل سفارش است.`}
+                              </span>
+                            </p>
+                          )}
                         </div>
 
                         {/* Remove Button */}

@@ -3,6 +3,8 @@
 
 import { useEffect, useState, lazy, Suspense } from "react";
 import { BrowserRouter, Navigate, Routes, Route } from "react-router-dom";
+import RequireLevel from "./components/RequireLevel";
+import { USER_LEVEL } from "./types";
 import { Toaster } from "react-hot-toast";
 import { useQuery } from "@tanstack/react-query";
 
@@ -43,6 +45,8 @@ const Finance = lazy(() => import("./pages/Finance"));
 const Studio = lazy(() => import("./pages/Studio"));
 const Rewards = lazy(() => import("./pages/Rewards"));
 const Management = lazy(() => import("./pages/Management"));
+const Storefronts = lazy(() => import("./pages/Storefronts"));
+const StorefrontPage = lazy(() => import("./pages/StorefrontPage"));
 
 // ========================================
 // Stores
@@ -454,9 +458,36 @@ export default function App() {
               <Route path="/support" element={<Support />} />
               <Route path="/affiliate" element={<Affiliate />} />
               <Route path="/finance" element={<Finance />} />
-              <Route path="/studio" element={<Studio />} />
               <Route path="/rewards" element={<Rewards />} />
-              <Route path="/management" element={<Management />} />
+
+              {/* Public storefront directory and profiles */}
+              <Route path="/storefronts" element={<Storefronts />} />
+              <Route path="/storefronts/:slug" element={<StorefrontPage />} />
+
+              {/* Seller studio is for storefront owners (level 2+). */}
+              <Route
+                path="/studio"
+                element={
+                  <RequireLevel level={USER_LEVEL.SELLER}>
+                    <Studio />
+                  </RequireLevel>
+                }
+              />
+
+              {/*
+                The management console lives at /poshtiban and is restricted to
+                level 3 and above; /management is kept as an alias so existing
+                links and bookmarks keep working.
+              */}
+              <Route
+                path="/poshtiban"
+                element={
+                  <RequireLevel level={USER_LEVEL.MODERATOR}>
+                    <Management />
+                  </RequireLevel>
+                }
+              />
+              <Route path="/management" element={<Navigate to="/poshtiban" replace />} />
 
               {/* ======================================== */}
               {/* Crawlable product detail route */}

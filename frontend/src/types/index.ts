@@ -139,11 +139,36 @@ export interface MockProduct {
 // Cart & CartItem (مطابق با CartSerializer)
 // ========================================
 
+/** A listing as it appears inside a cart row (trimmed, no storefront tree). */
+export interface CartListing {
+  id: number;
+  title: string;
+  slug: string;
+  price: number;
+  unit: string;
+  quantity_available: string;
+  min_order_quantity: string;
+  image_url: string;
+  storefront_name: string;
+  storefront_slug: string;
+}
+
+/**
+ * A cart row is either a catalogue product or a storefront listing; `kind`
+ * says which, and exactly one of `product` / `listing` is non-null.
+ */
 export interface CartItem {
   id: number;
-  product: ProductList;
+  kind: 'product' | 'listing';
+  product: ProductList | null;
+  listing: CartListing | null;
+  title: string;
   quantity: number;
+  unit_price: number;
   total_price: number;
+  available_quantity: number;
+  min_order_quantity: number;
+  is_in_stock: boolean;
 }
 
 export interface Cart {
@@ -167,6 +192,17 @@ export interface User {
   last_name: string;
 }
 
+/** Access levels 1-5; see UserAccount.LEVEL_CHOICES on the backend. */
+export const USER_LEVEL = {
+  BUYER: 1,
+  SELLER: 2,
+  MODERATOR: 3,
+  ADMIN: 4,
+  OWNER: 5,
+} as const;
+
+export type UserLevel = (typeof USER_LEVEL)[keyof typeof USER_LEVEL];
+
 export interface UserAccount {
   id: number;
   username: string;
@@ -175,6 +211,11 @@ export interface UserAccount {
   phone: string;
   gender: 'male' | 'female';
   address: string;
+  avatar: string | null;
+  avatar_url: string;
+  level: UserLevel;
+  level_label: string;
+  has_storefront: boolean;
   created: string;
   updated: string;
 }
@@ -224,9 +265,17 @@ export interface ProfileResponse {
 // ========================================
 export interface OrderItem {
   id: number;
+  kind: 'product' | 'listing';
+  kind_label: string;
   product: number | null;
+  listing: number | null;
   product_title: string;
   product_slug: string;
+  storefront: number | null;
+  storefront_name: string;
+  storefront_slug: string;
+  seller_name: string;
+  unit: string;
   unit_price: number;
   quantity: number;
   total_price: number;
@@ -369,18 +418,75 @@ export interface ProcurementRequestPayload {
   description?: string;
 }
 
+export type SellerType = 'farmer' | 'cooperative' | 'merchant' | 'company';
+
 export interface Storefront {
   id: number;
   name: string;
   slug: string;
-  seller_type: 'farmer' | 'cooperative' | 'merchant' | 'company';
+  seller_type: SellerType;
+  seller_type_label: string;
   bio: string;
+  avatar: string | null;
+  avatar_url: string;
+  cover: string | null;
+  cover_url: string;
   province: string;
   city: string;
   is_verified: boolean;
+  is_active: boolean;
   commission_rate: string;
+  rating: string;
+  sales_count: number;
+  followers_count: number;
+  listing_count: number;
+  is_following: boolean;
   owner_name: string;
   created_at: string;
+}
+
+export interface StorefrontHighlightItem {
+  id: number;
+  post: number;
+  position: number;
+  image_url: string;
+  caption: string;
+  created_at: string;
+}
+
+export interface StorefrontHighlight {
+  id: number;
+  title: string;
+  cover: string | null;
+  cover_url: string;
+  position: number;
+  items: StorefrontHighlightItem[];
+  created_at: string;
+}
+
+/** Everything the public storefront page needs, in one response. */
+export interface StorefrontProfile {
+  storefront: Storefront;
+  listings: MarketplaceListing[];
+  posts: StorefrontPost[];
+  stories: StorefrontPost[];
+  highlights: StorefrontHighlight[];
+  counts: {
+    listings: number;
+    posts: number;
+    stories: number;
+    followers: number;
+  };
+}
+
+export interface StorefrontAvailability {
+  name?: { value: string; available: boolean; reason: string };
+  slug?: { value: string; available: boolean; suggestion: string; reason: string };
+}
+
+export interface FollowedStorefront {
+  storefront: Storefront;
+  stories: StorefrontPost[];
 }
 
 export interface MarketplaceListing {
@@ -394,13 +500,71 @@ export interface MarketplaceListing {
   unit: string;
   quantity_available: string;
   min_order_quantity: string;
+  minimum_order: number;
   harvest_date: string | null;
   image: string | null;
   image_url: string;
   status: string;
   status_label: string;
+  is_purchasable: boolean;
+  rejection_reason: string;
+  reviewed_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+// ========================================
+// Geography and agricultural reference data
+// ========================================
+
+export interface Location {
+  id: number;
+  name: string;
+  slug: string;
+  kind: 'province' | 'city';
+  parent: number | null;
+  province_name: string;
+}
+
+export interface AgriInputDose {
+  id: number;
+  crop_name: string;
+  target: string;
+  basis: 'per_hectare' | 'per_1000_liter';
+  basis_label: string;
+  min_rate: string;
+  max_rate: string;
+  rate_unit: string;
+  notes: string;
+}
+
+export interface AgriInput {
+  id: number;
+  name: string;
+  slug: string;
+  kind: 'fertilizer' | 'pesticide';
+  kind_label: string;
+  active_ingredient: string;
+  formulation: string;
+  unit: string;
+  product: number | null;
+  product_slug: string;
+  safety_notes: string;
+  preharvest_interval_days: number | null;
+  doses: AgriInputDose[];
+}
+
+export type AreaUnit = 'hectare' | 'jarib' | 'square_meter' | 'acre';
+
+export interface DoseCalculation {
+  input: { id: number; name: string; kind: string };
+  crop: string;
+  target: string;
+  area: { value: string; unit: AreaUnit; unit_label: string; hectares: string };
+  rate: { min: string; max: string; unit: string; basis: string; basis_label: string };
+  total: { min: string; max: string; unit: string };
+  notes: string;
+  warnings: string[];
 }
 
 export interface Coupon {
@@ -443,6 +607,8 @@ export interface StorefrontPost {
   id: number;
   storefront: number;
   storefront_name: string;
+  storefront_slug: string;
+  storefront_avatar_url: string;
   listing: number | null;
   post_type: 'post' | 'story';
   post_type_label: string;
@@ -486,8 +652,14 @@ export interface ManagementMetric {
 
 export interface ManagementDashboard {
   viewer: { username: string; is_superuser: boolean; groups: string[] };
+  viewer_level: number;
   metrics: ManagementMetric;
   recent_orders: Order[];
+  /** Items awaiting review, surfaced directly on the dashboard. */
+  pending_review: {
+    listings: MarketplaceListing[];
+    posts: StorefrontPost[];
+  };
   alerts: { type: string; count: number | null; label: string }[];
 }
 

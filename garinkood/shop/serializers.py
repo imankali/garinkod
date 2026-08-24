@@ -721,6 +721,8 @@ class WalletSerializer(serializers.ModelSerializer):
 
 class StorefrontPostSerializer(serializers.ModelSerializer):
     storefront_name = serializers.CharField(source='storefront.name', read_only=True)
+    storefront_slug = serializers.CharField(source='storefront.slug', read_only=True)
+    storefront_avatar_url = serializers.CharField(source='storefront.avatar_url', read_only=True)
     image_url = serializers.SerializerMethodField()
     status_label = serializers.CharField(source='get_status_display', read_only=True)
     post_type_label = serializers.CharField(source='get_post_type_display', read_only=True)
@@ -728,11 +730,14 @@ class StorefrontPostSerializer(serializers.ModelSerializer):
     class Meta:
         model = StorefrontPost
         fields = [
-            'id', 'storefront', 'storefront_name', 'listing', 'post_type',
-            'post_type_label', 'caption', 'image', 'image_url', 'status',
-            'status_label', 'expires_at', 'created_at', 'updated_at'
+            'id', 'storefront', 'storefront_name', 'storefront_slug', 'storefront_avatar_url',
+            'listing', 'post_type', 'post_type_label', 'caption', 'image', 'image_url',
+            'status', 'status_label', 'expires_at', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'storefront', 'storefront_name', 'image_url', 'status', 'status_label', 'created_at', 'updated_at']
+        read_only_fields = [
+            'id', 'storefront', 'storefront_name', 'storefront_slug', 'storefront_avatar_url',
+            'image_url', 'status', 'status_label', 'created_at', 'updated_at',
+        ]
 
     def validate_image(self, image):
         if image and image.size > settings.VISUAL_SEARCH_MAX_UPLOAD_BYTES:
