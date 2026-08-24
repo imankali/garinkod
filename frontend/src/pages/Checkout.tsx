@@ -172,10 +172,10 @@ export default function Checkout() {
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field id="checkout-customer_name" label="نام و نام خانوادگی" required value={form.customer_name} error={fieldErrors.customer_name} onChange={(value) => updateField("customer_name", value)} />
-            <Field id="checkout-phone" label="شماره تماس" required inputMode="tel" value={form.phone} error={fieldErrors.phone} onChange={(value) => updateField("phone", value)} />
-            <Field id="checkout-email" label="ایمیل (اختیاری)" type="email" value={form.email || ""} error={fieldErrors.email} onChange={(value) => updateField("email", value)} />
-            <Field id="checkout-postal_code" label="کد پستی (اختیاری)" inputMode="numeric" value={form.postal_code || ""} error={fieldErrors.postal_code} onChange={(value) => updateField("postal_code", value)} />
+            <Field id="checkout-customer_name" autoComplete="name" label="نام و نام خانوادگی" required value={form.customer_name} error={fieldErrors.customer_name} onChange={(value) => updateField("customer_name", value)} />
+            <Field id="checkout-phone" autoComplete="tel" label="شماره تماس" required inputMode="tel" value={form.phone} error={fieldErrors.phone} onChange={(value) => updateField("phone", value)} />
+            <Field id="checkout-email" autoComplete="email" label="ایمیل (اختیاری)" type="email" value={form.email || ""} error={fieldErrors.email} onChange={(value) => updateField("email", value)} />
+            <Field id="checkout-postal_code" autoComplete="postal-code" label="کد پستی (اختیاری)" inputMode="numeric" value={form.postal_code || ""} error={fieldErrors.postal_code} onChange={(value) => updateField("postal_code", value)} />
             <LocationPicker
               idPrefix="checkout"
               required
@@ -194,6 +194,7 @@ export default function Checkout() {
             </label>
             <textarea
               id="checkout-address"
+              autoComplete="street-address"
               required
               value={form.address}
               onChange={(event) => updateField("address", event.target.value)}
@@ -282,7 +283,7 @@ export default function Checkout() {
   );
 }
 
-function Field({ id, label, value, onChange, type = "text", inputMode, required = false, error }: { id: string; label: string; value: string; onChange: (value: string) => void; type?: string; inputMode?: "tel" | "numeric"; required?: boolean; error?: string }) {
+function Field({ id, label, value, onChange, type = "text", inputMode, required = false, error, autoComplete }: { id: string; label: string; value: string; onChange: (value: string) => void; type?: string; inputMode?: "tel" | "numeric"; required?: boolean; error?: string; autoComplete?: string }) {
   return (
     <div>
       <label htmlFor={id} className="block text-sm font-bold text-slate-700 dark:text-emerald-50">
@@ -293,6 +294,7 @@ function Field({ id, label, value, onChange, type = "text", inputMode, required 
         required={required}
         type={type}
         inputMode={inputMode}
+        autoComplete={autoComplete}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         aria-invalid={Boolean(error)}
