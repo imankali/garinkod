@@ -3,6 +3,8 @@
 
 import { useEffect, useState, lazy, Suspense } from "react";
 import { BrowserRouter, Navigate, Routes, Route } from "react-router-dom";
+import RequireLevel from "./components/RequireLevel";
+import { USER_LEVEL } from "./types";
 import { Toaster } from "react-hot-toast";
 import { useQuery } from "@tanstack/react-query";
 
@@ -11,6 +13,7 @@ import { useQuery } from "@tanstack/react-query";
 // ========================================
 import Header from "./components/Header";
 import MobileBottomNav from "./components/MobileBottomNav";
+import SiteFooter from "./components/SiteFooter";
 import CartDrawer from "./components/CartDrawer";
 import ProductCard from "./components/ProductCard";
 import ProductDetailModal from "./components/ProductDetailModal";
@@ -25,6 +28,10 @@ import FlyToCart, { type FlyingItem } from "./components/FlyToCart";
 import ConsultationButton from "./components/ConsultationButton";
 import CropSelector from "./components/CropSelector";
 import AgriCalculator from "./components/AgriCalculator";
+import HomeHero from "./components/home/HomeHero";
+import ServiceShortcuts from "./components/home/ServiceShortcuts";
+import CategoryGrid from "./components/home/CategoryGrid";
+import FeaturedStorefronts from "./components/home/FeaturedStorefronts";
 
 // ========================================
 // Pages (Lazy Loaded)
@@ -43,6 +50,8 @@ const Finance = lazy(() => import("./pages/Finance"));
 const Studio = lazy(() => import("./pages/Studio"));
 const Rewards = lazy(() => import("./pages/Rewards"));
 const Management = lazy(() => import("./pages/Management"));
+const Storefronts = lazy(() => import("./pages/Storefronts"));
+const StorefrontPage = lazy(() => import("./pages/StorefrontPage"));
 
 // ========================================
 // Stores
@@ -362,7 +371,20 @@ export default function App() {
         {/* ✅ pb-24 برای MobileBottomNav در موبایل */}
         {/* ✅ lg:pb-8 برای دسکتاپ */}
         {/* ======================================== */}
-        <main className="pb-24 lg:pb-8">
+        {/*
+          Skip link: the first thing a keyboard or screen-reader user reaches,
+          letting them jump past the header and navigation straight to content.
+        */}
+        <a href="#main-content" className="skip-link">
+          پرش به محتوای اصلی
+        </a>
+
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className="outline-none"
+          style={{ paddingBottom: 'var(--mobile-nav-clearance)' }}
+        >
           <Suspense fallback={<LoadingSpinner />}>
             <Routes>
               {/* ======================================== */}
@@ -373,6 +395,28 @@ export default function App() {
                 element={
                   <>
                     <h1 className="sr-only">گرین کود، فروشگاه تخصصی نهاده‌های کشاورزی</h1>
+
+                    {/*
+                      Shop-window order, chosen deliberately:
+                      1. Hero  — what this site is and where to start.
+                      2. Services — the nine things the platform does beyond
+                         the catalogue, none of which were visible before.
+                      3. Categories — how buyers actually think about produce.
+                      4. Storefronts — the marketplace, our differentiator.
+                      5. Weather/crop/installments — helpful context, but not
+                         the first thing a stranger should meet.
+                      6. Catalogue — the deep browse, with filters.
+                      7. Calculator — a tool for people who already know what
+                         they need.
+                    */}
+                    <HomeHero />
+
+                    <ServiceShortcuts />
+
+                    <CategoryGrid />
+
+                    <FeaturedStorefronts />
+
                     {/* Weather Widget */}
                     <WeatherWidget />
 
@@ -454,9 +498,36 @@ export default function App() {
               <Route path="/support" element={<Support />} />
               <Route path="/affiliate" element={<Affiliate />} />
               <Route path="/finance" element={<Finance />} />
-              <Route path="/studio" element={<Studio />} />
               <Route path="/rewards" element={<Rewards />} />
-              <Route path="/management" element={<Management />} />
+
+              {/* Public storefront directory and profiles */}
+              <Route path="/storefronts" element={<Storefronts />} />
+              <Route path="/storefronts/:slug" element={<StorefrontPage />} />
+
+              {/* Seller studio is for storefront owners (level 2+). */}
+              <Route
+                path="/studio"
+                element={
+                  <RequireLevel level={USER_LEVEL.SELLER}>
+                    <Studio />
+                  </RequireLevel>
+                }
+              />
+
+              {/*
+                The management console lives at /poshtiban and is restricted to
+                level 3 and above; /management is kept as an alias so existing
+                links and bookmarks keep working.
+              */}
+              <Route
+                path="/poshtiban"
+                element={
+                  <RequireLevel level={USER_LEVEL.MODERATOR}>
+                    <Management />
+                  </RequireLevel>
+                }
+              />
+              <Route path="/management" element={<Navigate to="/poshtiban" replace />} />
 
               {/* ======================================== */}
               {/* Crawlable product detail route */}
@@ -499,15 +570,16 @@ export default function App() {
           </Suspense>
         </main>
 
+        {/* Site map footer — the fallback route to every destination. */}
+        <SiteFooter />
+
         {/* ======================================== */}
         {/* Mobile Bottom Nav */}
         {/* ======================================== */}
         <MobileBottomNav
           cartCount={cart?.total_items || 0}
-          wishlistCount={wishlist.length}
           onOpenCart={() => setCartOpen(true)}
           onOpenMenu={() => setMobileOpen(true)}
-          onOpenWishlist={() => setWishlistOpen(true)}
         />
 
         {/* ======================================== */}

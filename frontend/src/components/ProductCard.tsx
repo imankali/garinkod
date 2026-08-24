@@ -55,17 +55,17 @@ export default function ProductCard({
       <div className="absolute inset-x-3 top-3 z-10 flex items-start justify-between">
         <div className="flex flex-col gap-1.5">
           {product.badge && (
-            <span className="rounded-full bg-brand-orange px-2.5 py-1 text-[10px] font-bold text-white shadow-lg">
+            <span className="rounded-full bg-brand-orange px-2.5 py-1 text-fluid-2xs font-bold text-white shadow-lg">
               {product.badge}
             </span>
           )}
           {discountPercent > 0 && (
-            <span className="rounded-full bg-slate-900/85 px-2.5 py-1 text-[10px] font-bold text-lime-300 backdrop-blur">
+            <span className="rounded-full bg-slate-900/85 px-2.5 py-1 text-fluid-2xs font-bold text-lime-300 backdrop-blur">
               {discountPercent.toLocaleString("fa-IR")}٪ تخفیف
             </span>
           )}
           {!product.inStock && (
-            <span className="flex items-center gap-1 rounded-full bg-slate-500/90 px-2.5 py-1 text-[10px] font-bold text-white backdrop-blur">
+            <span className="flex items-center gap-1 rounded-full bg-slate-500/90 px-2.5 py-1 text-fluid-2xs font-bold text-white backdrop-blur">
               <PackageX size={10} /> ناموجود
             </span>
           )}
@@ -129,8 +129,8 @@ export default function ProductCard({
       <div className="flex flex-1 flex-col p-4">
         {/* Category & Brand */}
         <div className="mb-1 flex items-center justify-between">
-          <p className="text-[11px] font-medium text-[#0F8A5F] dark:text-lime-300">{product.category}</p>
-          <p className="text-[10px] text-slate-400">{product.brand}</p>
+          <p className="text-fluid-xs font-medium text-[#0F8A5F] dark:text-lime-300">{product.category}</p>
+          <p className="text-fluid-2xs text-slate-400">{product.brand}</p>
         </div>
 
         {/* Product Name */}
@@ -140,7 +140,7 @@ export default function ProductCard({
               {product.name}
             </a>
           ) : (
-            <button type="button" onClick={() => onQuickView(product)} className="text-right transition-colors hover:text-[#0F8A5F]">
+            <button type="button" onClick={() => onQuickView(product)} className="text-start transition-colors hover:text-[#0F8A5F]">
               {product.name}
             </button>
           )}
@@ -157,7 +157,7 @@ export default function ProductCard({
                 className={i < Math.round(product.rating) ? "" : "text-slate-200"}
               />
             ))}
-            <span className="mr-1 text-xs text-slate-400">
+            <span className="ms-1 text-xs text-slate-400">
               ({product.rating}) · {product.reviews.toLocaleString("fa-IR")} نظر
             </span>
           </div>

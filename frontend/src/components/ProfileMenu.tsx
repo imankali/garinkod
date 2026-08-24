@@ -49,7 +49,7 @@ export default function ProfileMenu() {
   const ref = useRef<HTMLDivElement>(null);
 
   // دریافت اطلاعات کاربر از auth store
-  const { user, isAuthenticated, logout } = useAuthStore();
+  const { user, account, isAuthenticated, logout } = useAuthStore();
 
   // ========================================
   // بستن منو هنگام کلیک بیرون
@@ -108,19 +108,32 @@ export default function ProfileMenu() {
       {/* ======================================== */}
       <button
         onClick={() => setOpen((v) => !v)}
-        className="group flex items-center gap-2 rounded-full border border-transparent p-1 pl-1 pr-1 transition-all hover:border-emerald-200 hover:bg-emerald-50 dark:hover:border-emerald-800 dark:hover:bg-emerald-950"
+        className="group flex items-center gap-2 rounded-full border border-transparent p-1 pe-1 ps-1 transition-all hover:border-emerald-200 hover:bg-emerald-50 dark:hover:border-emerald-800 dark:hover:bg-emerald-950"
         aria-label="منوی پروفایل"
         aria-expanded={open}
       >
-        {/* Avatar */}
-        <span className="relative flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-lime-500 text-sm font-bold text-white shadow-md shadow-emerald-200 transition-transform duration-300 group-hover:scale-105 md:h-10 md:w-10">
-          {initials}
+        {/* Avatar: the uploaded picture when there is one, initials otherwise. */}
+        <span className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-emerald-500 to-lime-500 text-sm font-bold text-white shadow-md shadow-emerald-200 transition-transform duration-300 group-hover:scale-105 md:h-10 md:w-10">
+          {account?.avatar_url ? (
+            <img
+              src={account.avatar_url}
+              alt=""
+              className="h-full w-full object-cover"
+              onError={(event) => {
+                // A deleted or unreachable file falls back to the initials
+                // rather than showing a broken-image icon.
+                event.currentTarget.style.display = 'none';
+              }}
+            />
+          ) : (
+            initials
+          )}
           {/* Online Indicator */}
-          <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-lime-400" />
+          <span className="absolute -bottom-0.5 -start-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-lime-400" />
         </span>
 
         {/* User Info (Desktop) */}
-        <span className="hidden text-right lg:block">
+        <span className="hidden text-start lg:block">
           <span className="block text-xs text-slate-400">خوش آمدید</span>
           <span className="block text-sm font-semibold text-slate-700 dark:text-emerald-50">
             {user?.first_name || user?.username || 'کاربر'}
@@ -138,7 +151,7 @@ export default function ProfileMenu() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.95 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
-            className="absolute left-0 top-[calc(100%+12px)] z-50 w-72 overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-2xl shadow-emerald-900/10 dark:border-emerald-800 dark:bg-emerald-950"
+            className="absolute end-0 top-[calc(100%+12px)] z-50 w-72 overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-2xl shadow-emerald-900/10 dark:border-emerald-800 dark:bg-emerald-950"
           >
             {/* ======================================== */}
             {/* Header - اطلاعات کاربر */}
@@ -161,7 +174,7 @@ export default function ProfileMenu() {
                 >
                   <a
                     href={item.href}
-                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-right transition-colors hover:bg-emerald-50 dark:hover:bg-emerald-900"
+                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-start transition-colors hover:bg-emerald-50 dark:hover:bg-emerald-900"
                   >
                     <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-900 dark:text-lime-300">
                       <item.icon size={16} />
@@ -185,7 +198,7 @@ export default function ProfileMenu() {
             <div className="border-t border-slate-100 p-2 dark:border-emerald-800">
               <button
                 onClick={handleLogout}
-                className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-right text-rose-500 transition-colors hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-start text-rose-500 transition-colors hover:bg-rose-50 dark:hover:bg-rose-950/40"
                 aria-label="خروج از حساب"
               >
                 <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-rose-50 dark:bg-rose-950/40">

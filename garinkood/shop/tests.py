@@ -74,13 +74,17 @@ class ProfileAndSeoTests(TestCase):
         self.client = APIClient()
         self.user = User.objects.create_user(username="farmer", password="safe-password-123")
 
-    def test_profile_can_update_user_without_existing_user_account(self):
+    def test_profile_can_update_user_and_always_exposes_an_account(self):
+        # Every user now has a level-1 profile row from the moment the account
+        # is created, so a name-only update returns the profile rather than
+        # null.
         self.client.force_authenticate(self.user)
         response = self.client.patch("/api/profile/", {"first_name": "علی"}, format="json")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["user"]["first_name"], "علی")
-        self.assertIsNone(response.data["account"])
+        self.assertIsNotNone(response.data["account"])
+        self.assertEqual(response.data["account"]["level"], 1)
 
     def test_robots_and_sitemap_are_available(self):
         robots = self.client.get("/robots.txt")

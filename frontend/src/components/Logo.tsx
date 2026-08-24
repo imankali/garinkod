@@ -55,7 +55,7 @@ export default function Logo({ compact = false }: LogoProps) {
           <motion.span
             animate={{ scale: [1, 1.3, 1] }}
             transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute -left-1 -top-1 h-3 w-3 rounded-full bg-lime-400 shadow-lg shadow-lime-400/50"
+            className="absolute -end-1 -top-1 h-3 w-3 rounded-full bg-lime-400 shadow-lg shadow-lime-400/50"
           />
         </motion.div>
       </div>
@@ -69,7 +69,7 @@ export default function Logo({ compact = false }: LogoProps) {
             <span className="text-gradient-green">گرین</span>
             <span>کود</span>
           </p>
-          <p className="hidden text-[10px] font-medium text-slate-400 md:block">
+          <p className="hidden text-fluid-2xs font-medium text-slate-400 md:block">
             فروشگاه تخصصی نهاده‌های کشاورزی
           </p>
         </div>

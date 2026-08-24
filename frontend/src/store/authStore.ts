@@ -1,8 +1,9 @@
 import { create } from 'zustand';
 import toast from 'react-hot-toast';
 
-import { authApi } from '../api/services';
-import type { User, UserAccount } from '../types';
+import { authApi, avatarApi } from '../api/services';
+import { parseApiError } from '../api/errors';
+import { USER_LEVEL, type User, type UserAccount, type UserLevel } from '../types';
 
 interface AuthState {
   user: User | null;
@@ -34,6 +35,8 @@ interface AuthState {
     address: string;
   }>) => Promise<void>;
   clearAuth: () => void;
+  uploadAvatar: (file: File) => Promise<void>;
+  removeAvatar: () => Promise<void>;
 }
 
 const signedOutState = {
@@ -69,9 +72,11 @@ export const useAuthStore = create<AuthState>((set) => ({
       const response = await authApi.login(username, password);
       set({ user: response.data.user, account: null, isAuthenticated: true, isLoading: false, isSessionChecked: true });
       toast.success('ورود با موفقیت انجام شد');
-    } catch (error: any) {
-      const errorMsg = error.response?.data?.error || 'نام کاربری یا رمز عبور اشتباه است';
-      toast.error(errorMsg);
+    } catch (error) {
+      const parsed = parseApiError(error);
+      // The login endpoint is silent in the interceptor, so the message is
+      // surfaced exactly once here.
+      if (!parsed.handled) toast.error(parsed.message);
       set({ isLoading: false, isSessionChecked: true });
       throw error;
     }
@@ -83,13 +88,12 @@ export const useAuthStore = create<AuthState>((set) => ({
       const response = await authApi.register(data);
       set({ user: response.data.user, account: null, isAuthenticated: true, isLoading: false, isSessionChecked: true });
       toast.success('ثبت‌نام با موفقیت انجام شد');
-    } catch (error: any) {
-      const errors = error.response?.data;
-      if (errors && typeof errors === 'object') {
-        const firstError = Object.values(errors)[0];
-        toast.error(Array.isArray(firstError) ? String(firstError[0]) : String(firstError));
-      } else {
-        toast.error('خطا در ثبت‌نام');
+    } catch (error) {
+      const parsed = parseApiError(error);
+      // Field errors are rendered by the register form itself; only a
+      // form-wide problem needs a toast.
+      if (!parsed.handled && Object.keys(parsed.fields).length === 0) {
+        toast.error(parsed.message);
       }
       set({ isLoading: false, isSessionChecked: true });
       throw error;
@@ -123,13 +127,60 @@ export const useAuthStore = create<AuthState>((set) => ({
       const response = await authApi.updateProfile(data);
       set({ user: response.data.user, account: response.data.account, isAuthenticated: true, isLoading: false, isSessionChecked: true });
       toast.success('پروفایل با موفقیت بروزرسانی شد');
-    } catch (error: any) {
-      const errorMsg = error.response?.data?.error || 'خطا در بروزرسانی پروفایل';
-      toast.error(errorMsg);
+    } catch (error) {
+      const parsed = parseApiError(error);
+      if (!parsed.handled && Object.keys(parsed.fields).length === 0) {
+        toast.error(parsed.message);
+      }
       set({ isLoading: false, isSessionChecked: true });
+      throw error;
+    }
+  },
+
+  uploadAvatar: async (file: File) => {
+    set({ isLoading: true });
+    try {
+      const response = await avatarApi.upload(file);
+      set({ account: response.data, isLoading: false });
+      toast.success('تصویر پروفایل به‌روزرسانی شد');
+    } catch (error) {
+      const parsed = parseApiError(error);
+      if (!parsed.handled) toast.error(parsed.fields.avatar ?? parsed.message);
+      set({ isLoading: false });
+      throw error;
+    }
+  },
+
+  removeAvatar: async () => {
+    set({ isLoading: true });
+    try {
+      const response = await avatarApi.remove();
+      set({ account: response.data, isLoading: false });
+      toast.success('تصویر پروفایل حذف شد');
+    } catch (error) {
+      const parsed = parseApiError(error);
+      if (!parsed.handled) toast.error(parsed.message);
+      set({ isLoading: false });
       throw error;
     }
   },
 
   clearAuth: () => set({ ...signedOutState, isSessionChecked: true }),
 }));
+
+/**
+ * The caller's access level.
+ *
+ * A signed-in user whose profile has not loaded yet is treated as level 1
+ * rather than level 0, so the UI never flashes "no access" for an ordinary
+ * buyer mid-fetch.
+ */
+export function useUserLevel(): UserLevel | 0 {
+  const { isAuthenticated, account } = useAuthStore();
+  if (!isAuthenticated) return 0;
+  return account?.level ?? USER_LEVEL.BUYER;
+}
+
+export function useHasLevel(required: UserLevel): boolean {
+  return useUserLevel() >= required;
+}

@@ -16,9 +16,10 @@ import {
   Truck,
   X,
 } from "lucide-react";
+import { useFocusTrap } from "../hooks/useFocusTrap";
 import { useCartStore } from "../store/cartStore";
 import { productsApi } from "../api/services";
-import type { ProductList } from "../types";
+import type { CartItem, ProductList } from "../types";
 import { formatPrice } from "../utils/formatPrice";
 
 // ========================================
@@ -57,11 +58,15 @@ function convertToSuggestion(apiProduct: ProductList): SuggestedProduct {
 // CartDrawer Component
 // ========================================
 export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
+  // Traps Tab inside the drawer, closes on Escape, locks background scrolling
+  // and returns focus to the cart button when it closes.
+  const drawerRef = useFocusTrap<HTMLElement>(isOpen, { onEscape: onClose });
   const [suggestion, setSuggestion] = useState<SuggestedProduct | null>(null);
   const navigate = useNavigate();
 
   // دریافت توابع و state از cartStore
-  const { cart, fetchCart, addToCart, removeFromCart, updateQuantity } = useCartStore();
+  const { cart, fetchCart, addToCart, removeFromCart, updateQuantity, itemErrors } =
+    useCartStore();
 
   // ========================================
   // لود سبد خرید و محصول پیشنهادی هنگام باز شدن
@@ -114,6 +119,20 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
     await updateQuantity(itemId, newQty);
   }
 
+  /**
+   * Storefront listings carry a seller-defined minimum order and their own
+   * stock ceiling; catalogue products keep the flat cap of ten. Clamping here
+   * keeps the buttons honest, and the server re-checks either way.
+   */
+  function quantityBounds(item: CartItem) {
+    const min = item.kind === 'listing' ? item.min_order_quantity : 1;
+    const max =
+      item.kind === 'listing'
+        ? item.available_quantity
+        : Math.min(10, item.available_quantity || 10);
+    return { min, max };
+  }
+
   async function handleRemove(itemId: number) {
     await removeFromCart(itemId);
   }
@@ -137,11 +156,16 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
 
           {/* Drawer Panel */}
           <motion.aside
+            ref={drawerRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="سبد خرید"
+            tabIndex={-1}
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", damping: 30, stiffness: 280 }}
-            className="fixed inset-y-0 left-0 z-[70] flex w-full max-w-md flex-col bg-white shadow-2xl dark:bg-emerald-950"
+            className="fixed inset-y-0 end-0 z-[70] flex w-full max-w-md flex-col bg-white shadow-2xl outline-none dark:bg-emerald-950"
           >
             {/* ======================================== */}
             {/* Header */}
@@ -187,14 +211,14 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                       initial={{ width: 0 }}
                       animate={{ width: `${shippingProgress}%` }}
                       transition={{ duration: 0.6, ease: "easeOut" }}
-                      className="absolute inset-y-0 right-0 rounded-full bg-gradient-to-l from-lime-300 to-white"
+                      className="absolute inset-y-0 start-0 rounded-full bg-gradient-to-l from-lime-300 to-white"
                     />
                   </div>
                 </div>
               )}
 
               {/* Trust mini strip */}
-              <div className="relative mt-3 flex items-center justify-between text-[10px] text-white/85">
+              <div className="relative mt-3 flex items-center justify-between text-fluid-2xs text-white/85">
                 <span className="flex items-center gap-1">
                   <Truck size={11} /> زمان ارسال پس از هماهنگی
                 </span>
@@ -214,7 +238,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mx-4 mt-3 flex items-start gap-2 rounded-xl bg-orange-50 p-3 text-[11px] text-orange-700 dark:bg-orange-950/40 dark:text-orange-300"
+                className="mx-4 mt-3 flex items-start gap-2 rounded-xl bg-orange-50 p-3 text-fluid-xs text-orange-700 dark:bg-orange-950/40 dark:text-orange-300"
               >
                 <AlertTriangle size={15} className="mt-0.5 shrink-0" />
                 سبد شما شامل سموم کشاورزی است. لطفاً هنگام مصرف از تجهیزات ایمنی استفاده کرده و دستورالعمل مصرف را
@@ -262,11 +286,15 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                         transition={{ type: "spring", stiffness: 250, damping: 24 }}
                         className="group relative flex items-center gap-3 overflow-hidden rounded-2xl border border-slate-100 bg-gradient-to-br from-white to-slate-50 p-3 shadow-sm dark:border-emerald-800 dark:from-emerald-900 dark:to-emerald-950"
                       >
-                        {/* Product Image */}
+                        {/* Item image: product photo or listing photo */}
                         <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-white shadow-inner">
                           <img
-                            src={item.product.image_url || item.product.image || '/images/hero-farm.jpg'}
-                            alt={item.product.title}
+                            src={
+                              item.kind === 'listing'
+                                ? item.listing?.image_url || '/images/hero-farm.jpg'
+                                : item.product?.image_url || item.product?.image || '/images/hero-farm.jpg'
+                            }
+                            alt={item.title}
                             className="h-full w-full object-cover"
                             onError={(e) => {
                               (e.target as HTMLImageElement).src = '/images/hero-farm.jpg';
@@ -274,13 +302,25 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                           />
                         </div>
 
-                        {/* Product Info */}
+                        {/* Item info */}
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-semibold text-slate-700 dark:text-white">
-                            {item.product.title}
+                            {item.title}
                           </p>
-                          <div className="mb-2 flex items-center gap-1.5 text-[10px] text-slate-400">
-                            <span>{item.product.category}</span>
+                          <div className="mb-2 flex flex-wrap items-center gap-1.5 text-fluid-2xs text-slate-400">
+                            {item.kind === 'listing' ? (
+                              <>
+                                <span className="rounded-full bg-lime-100 px-2 py-0.5 font-bold text-emerald-700 dark:bg-emerald-800 dark:text-lime-200">
+                                  غرفه
+                                </span>
+                                <span className="truncate">{item.listing?.storefront_name}</span>
+                                {item.min_order_quantity > 1 && (
+                                  <span>· حداقل {item.min_order_quantity} {item.listing?.unit}</span>
+                                )}
+                              </>
+                            ) : (
+                              <span>{item.product?.category as string}</span>
+                            )}
                           </div>
 
                           {/* Quantity Controls */}
@@ -288,8 +328,15 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                             <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white shadow-sm dark:border-emerald-700 dark:bg-emerald-900">
                               <motion.button
                                 whileTap={{ scale: 0.85 }}
-                                onClick={() => handleUpdateQty(item.id, item.quantity + 1)}
-                                className="flex h-8 w-8 items-center justify-center rounded-r-lg text-emerald-600 hover:bg-emerald-50 dark:text-lime-300 dark:hover:bg-emerald-800"
+                                disabled={item.quantity >= quantityBounds(item).max}
+                                aria-label={`افزایش تعداد ${item.title}`}
+                                onClick={() =>
+                                  handleUpdateQty(
+                                    item.id,
+                                    Math.min(item.quantity + 1, quantityBounds(item).max),
+                                  )
+                                }
+                                className="flex h-8 w-8 items-center justify-center rounded-e-lg text-emerald-600 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40 dark:text-lime-300 dark:hover:bg-emerald-800"
                               >
                                 <Plus size={14} />
                               </motion.button>
@@ -303,8 +350,15 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                               </motion.span>
                               <motion.button
                                 whileTap={{ scale: 0.85 }}
-                                onClick={() => handleUpdateQty(item.id, Math.max(1, item.quantity - 1))}
-                                className="flex h-8 w-8 items-center justify-center rounded-l-lg text-slate-500 hover:bg-slate-100 dark:text-emerald-400 dark:hover:bg-emerald-800"
+                                disabled={item.quantity <= quantityBounds(item).min}
+                                aria-label={`کاهش تعداد ${item.title}`}
+                                onClick={() =>
+                                  handleUpdateQty(
+                                    item.id,
+                                    Math.max(quantityBounds(item).min, item.quantity - 1),
+                                  )
+                                }
+                                className="flex h-8 w-8 items-center justify-center rounded-s-lg text-slate-500 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 dark:text-emerald-400 dark:hover:bg-emerald-800"
                               >
                                 <Minus size={14} />
                               </motion.button>
@@ -313,6 +367,21 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                               {formatPrice(item.total_price)}
                             </span>
                           </div>
+
+                          {/* Row-level problems stay visible in the cart rather
+                              than vanishing with a toast. */}
+                          {(itemErrors[item.id] || !item.is_in_stock) && (
+                            <p
+                              role="alert"
+                              className="mt-2 flex items-start gap-1 rounded-lg bg-rose-50 px-2 py-1 text-fluid-xs font-semibold text-rose-600 dark:bg-rose-950/40 dark:text-rose-300"
+                            >
+                              <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+                              <span>
+                                {itemErrors[item.id] ??
+                                  `موجودی کافی نیست؛ حداکثر ${item.available_quantity} عدد قابل سفارش است.`}
+                              </span>
+                            </p>
+                          )}
                         </div>
 
                         {/* Remove Button */}
@@ -349,7 +418,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                         />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="mb-0.5 flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-lime-300">
+                        <p className="mb-0.5 flex items-center gap-1 text-fluid-2xs font-bold text-emerald-600 dark:text-lime-300">
                           <Gift size={11} /> شاید به این هم نیاز داشته باشید
                         </p>
                         <p className="truncate text-xs font-semibold text-slate-600 dark:text-emerald-50">
@@ -358,7 +427,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                       </div>
                       <button
                         onClick={() => handleAddToCart(suggestion.id)}
-                        className="shrink-0 rounded-lg bg-white px-2.5 py-1.5 text-[10px] font-bold text-emerald-600 shadow ring-1 ring-emerald-200 dark:bg-emerald-900 dark:text-lime-300 dark:ring-emerald-700"
+                        className="shrink-0 rounded-lg bg-white px-2.5 py-1.5 text-fluid-2xs font-bold text-emerald-600 shadow ring-1 ring-emerald-200 dark:bg-emerald-900 dark:text-lime-300 dark:ring-emerald-700"
                       >
                         افزودن
                       </button>
@@ -413,7 +482,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                   </span>
                 </motion.a>
 
-                <p className="mt-3 text-center text-[10px] text-slate-400 dark:text-emerald-400">
+                <p className="mt-3 text-center text-fluid-2xs text-slate-400 dark:text-emerald-400">
                   مبلغ و موجودی نهایی پیش از تأیید سفارش توسط کارشناس بررسی می‌شود.
                 </p>
               </div>

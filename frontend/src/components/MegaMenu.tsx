@@ -144,18 +144,18 @@ export default function MegaMenu() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -12, scale: 0.98 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
-            className="absolute right-0 top-[calc(100%+12px)] z-50 flex w-[640px] overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-2xl shadow-emerald-900/10 dark:border-emerald-800 dark:bg-emerald-950"
+            className="absolute start-0 top-[calc(100%+12px)] z-50 flex w-[640px] overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-2xl shadow-emerald-900/10 dark:border-emerald-800 dark:bg-emerald-950"
           >
             {/* ======================================== */}
             {/* Sidebar - لیست دسته‌بندی‌ها */}
             {/* ======================================== */}
-            <ul className="w-56 border-l border-slate-100 bg-slate-50/60 p-2 dark:border-emerald-800 dark:bg-emerald-900/30">
+            <ul className="w-56 border-e border-slate-100 bg-slate-50/60 p-2 dark:border-emerald-800 dark:bg-emerald-900/30">
               {categories.map((cat) => (
                 <li key={cat.slug}>
                   <button
                     onMouseEnter={() => setActiveSlug(cat.slug)}
                     onClick={() => setActiveSlug(cat.slug)}
-                    className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-right text-sm font-medium transition-colors ${
+                    className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-start text-sm font-medium transition-colors ${
                       activeSlug === cat.slug
                         ? "bg-white text-emerald-700 shadow-sm dark:bg-emerald-800 dark:text-lime-300"
                         : "text-slate-600 hover:bg-white/70 dark:text-emerald-200 dark:hover:bg-emerald-800/50"
@@ -168,9 +168,9 @@ export default function MegaMenu() {
                     >
                       {categoryIcons[cat.slug] || '📦'}
                     </span>
-                    <span className="flex-1 text-right">{cat.name}</span>
+                    <span className="flex-1 text-start">{cat.name}</span>
                     {cat.product_count > 0 && (
-                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-700 dark:text-lime-300">
+                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-fluid-2xs font-bold text-emerald-700 dark:bg-emerald-700 dark:text-lime-300">
                         {cat.product_count.toLocaleString("fa-IR")}
                       </span>
                     )}

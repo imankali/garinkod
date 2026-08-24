@@ -98,7 +98,7 @@ export default function WeatherWidget() {
                   نمونهٔ توصیه اقلیمی
                 </span>
                 <span
-                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-fluid-2xs font-bold ${
                     data.canSpray
                       ? "bg-emerald-100 text-[#0F8A5F] dark:bg-emerald-900 dark:text-lime-300"
                       : "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300"
@@ -142,7 +142,7 @@ export default function WeatherWidget() {
         <div className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-100 pt-3 dark:border-emerald-900/40 sm:grid-cols-4">
           {/* Temperature */}
           <div className="rounded-xl bg-slate-50 p-2.5 dark:bg-emerald-950/50">
-            <span className="block text-[10px] text-slate-400 dark:text-emerald-400">دمای هوا</span>
+            <span className="block text-fluid-2xs text-slate-400 dark:text-emerald-400">دمای هوا</span>
             <span className="text-xs font-bold text-slate-700 dark:text-white">
               {data.temp} ({data.condition})
             </span>
@@ -150,13 +150,13 @@ export default function WeatherWidget() {
 
           {/* Wind */}
           <div className="rounded-xl bg-slate-50 p-2.5 dark:bg-emerald-950/50">
-            <span className="block text-[10px] text-slate-400 dark:text-emerald-400">سرعت باد</span>
+            <span className="block text-fluid-2xs text-slate-400 dark:text-emerald-400">سرعت باد</span>
             <span className="text-xs font-bold text-slate-700 dark:text-white">{data.wind}</span>
           </div>
 
           {/* Humidity */}
           <div className="rounded-xl bg-slate-50 p-2.5 dark:bg-emerald-950/50">
-            <span className="block text-[10px] text-slate-400 dark:text-emerald-400">رطوبت نسبی</span>
+            <span className="block text-fluid-2xs text-slate-400 dark:text-emerald-400">رطوبت نسبی</span>
             <span className="text-xs font-bold text-slate-700 dark:text-white">{data.humidity}</span>
           </div>
 
@@ -169,7 +169,7 @@ export default function WeatherWidget() {
             }`}
           >
             <AlertTriangle size={15} className="shrink-0" />
-            <span className="text-[11px] font-semibold leading-tight">{data.advisory}</span>
+            <span className="text-fluid-xs font-semibold leading-tight">{data.advisory}</span>
           </div>
         </div>
       </div>

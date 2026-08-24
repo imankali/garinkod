@@ -1,6 +1,7 @@
 // frontend/src/components/CompareModal.tsx
 
 import { AnimatePresence, motion } from "framer-motion";
+import { useFocusTrap } from "../hooks/useFocusTrap";
 import { CheckCircle2, ShoppingCart, Star, X, XCircle } from "lucide-react";
 import { formatPrice } from "../utils/formatPrice";
 import type { MockProduct } from "../types";
@@ -30,6 +31,7 @@ const DEFAULT_IMAGE = "/images/hero-farm.jpg";
 // ✅ مودال مقایسه محصولات
 // ========================================
 export default function CompareModal({ isOpen, items, onClose, onAddToCart }: CompareModalProps) {
+  const panelRef = useFocusTrap<HTMLDivElement>(isOpen, { onEscape: onClose });
   // ========================================
   // Comparison Rows Configuration
   // ========================================
@@ -80,7 +82,7 @@ export default function CompareModal({ isOpen, items, onClose, onAddToCart }: Co
       label: "ویژگی‌ها",
       render: (p) =>
         p.features && p.features.length > 0 ? (
-          <ul className="space-y-1 text-right text-[10px]">
+          <ul className="space-y-1 text-start text-fluid-2xs">
             {p.features.slice(0, 3).map((feature, idx) => (
               <li key={idx} className="flex items-start gap-1">
                 <CheckCircle2 size={10} className="mt-0.5 shrink-0 text-emerald-500" />
@@ -119,6 +121,8 @@ export default function CompareModal({ isOpen, items, onClose, onAddToCart }: Co
             exit={{ opacity: 0, scale: 0.92, y: 30 }}
             transition={{ type: "spring", damping: 26, stiffness: 280 }}
             className="fixed inset-x-4 top-1/2 z-[90] mx-auto max-h-[85vh] max-w-4xl -translate-y-1/2 overflow-y-auto rounded-3xl bg-white shadow-2xl dark:bg-emerald-950"
+            ref={panelRef}
+            tabIndex={-1}
             role="dialog"
             aria-modal="true"
             aria-label="مقایسه محصولات"
@@ -135,7 +139,7 @@ export default function CompareModal({ isOpen, items, onClose, onAddToCart }: Co
               </div>
               <button
                 onClick={onClose}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 transition-colors hover:bg-white/30"
+                className="tap-target flex h-9 w-9 items-center justify-center rounded-full bg-white/20 transition-colors hover:bg-white/30"
                 aria-label="بستن"
               >
                 <X size={18} />
@@ -152,7 +156,7 @@ export default function CompareModal({ isOpen, items, onClose, onAddToCart }: Co
                 {/* ======================================== */}
                 <thead>
                   <tr>
-                    <th className="w-32 text-right text-xs text-slate-400 dark:text-emerald-400"></th>
+                    <th className="w-32 text-start text-xs text-slate-400 dark:text-emerald-400"></th>
                     {items.map((p) => (
                       <th key={p.id} className="p-2">
                         <div className="mx-auto mb-2 h-20 w-20 overflow-hidden rounded-xl bg-emerald-50 dark:bg-emerald-900">
@@ -183,13 +187,13 @@ export default function CompareModal({ isOpen, items, onClose, onAddToCart }: Co
                       key={row.label}
                       className="rounded-xl bg-slate-50 dark:bg-emerald-900/50"
                     >
-                      <td className="rounded-r-xl p-3 text-right text-xs font-bold text-slate-500 dark:text-emerald-300">
+                      <td className="rounded-e-xl p-3 text-start text-xs font-bold text-slate-500 dark:text-emerald-300">
                         {row.label}
                       </td>
                       {items.map((p) => (
                         <td
                           key={p.id}
-                          className="p-3 text-xs font-semibold text-slate-700 last:rounded-l-xl dark:text-emerald-50"
+                          className="p-3 text-xs font-semibold text-slate-700 last:rounded-s-xl dark:text-emerald-50"
                         >
                           {row.render(p)}
                         </td>
@@ -201,7 +205,7 @@ export default function CompareModal({ isOpen, items, onClose, onAddToCart }: Co
                   {/* Action Row - Add to Cart Buttons */}
                   {/* ======================================== */}
                   <tr>
-                    <td className="p-2 text-right text-xs font-bold text-slate-500 dark:text-emerald-300">
+                    <td className="p-2 text-start text-xs font-bold text-slate-500 dark:text-emerald-300">
                       خرید
                     </td>
                     {items.map((p) => (
@@ -211,7 +215,7 @@ export default function CompareModal({ isOpen, items, onClose, onAddToCart }: Co
                           whileTap={{ scale: p.inStock ? 0.95 : 1 }}
                           onClick={() => onAddToCart(p)}
                           disabled={!p.inStock}
-                          className="mx-auto flex items-center gap-1.5 rounded-xl bg-brand-gradient px-3 py-2 text-[11px] font-bold text-white shadow disabled:cursor-not-allowed disabled:opacity-50"
+                          className="mx-auto flex items-center gap-1.5 rounded-xl bg-brand-gradient px-3 py-2 text-fluid-xs font-bold text-white shadow disabled:cursor-not-allowed disabled:opacity-50"
                           aria-label={`افزودن ${p.name} به سبد خرید`}
                         >
                           <ShoppingCart size={13} />
