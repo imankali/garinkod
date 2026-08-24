@@ -2,13 +2,14 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   AlertTriangle, BadgeCheck, BarChart3, Building2, ClipboardList, Edit3, Leaf,
-  LogOut, Moon, Package, Plus, Save, Settings2, ShoppingBag,
+  LogOut, Moon, Package, Plus, Save, Settings2, ShoppingBag, Sprout,
   Store, Sun, UserRound, X,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
 import { agricultureApi, ordersApi } from "../api/services";
 import AvatarUploader from "../components/AvatarUploader";
+import FarmPanel from "../components/farm/FarmPanel";
 import LocationPicker from "../components/LocationPicker";
 import { LANGUAGES, useTranslation } from "../i18n";
 import { useAuthStore } from "../store/authStore";
@@ -17,7 +18,7 @@ import type { MarketplaceListing, Order, Storefront } from "../types";
 import { formatPrice } from "../utils/formatPrice";
 import { cn } from "../utils/cn";
 
-type Tab = "overview" | "buyer" | "seller" | "settings";
+type Tab = "overview" | "buyer" | "seller" | "farm" | "settings";
 
 interface ProfileForm {
   first_name: string;
@@ -34,7 +35,10 @@ export default function Profile() {
   const { user, account, isAuthenticated, isLoading, isSessionChecked, logout, fetchProfile, updateProfile } = useAuthStore();
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [tab, setTab] = useState<Tab>(() => new URLSearchParams(window.location.search).get("tab") === "seller" ? "seller" : "overview");
+  const [tab, setTab] = useState<Tab>(() => {
+    const fromUrl = new URLSearchParams(window.location.search).get("tab");
+    return fromUrl === "seller" || fromUrl === "farm" ? fromUrl : "overview";
+  });
   const [profileForm, setProfileForm] = useState<ProfileForm>({ first_name: "", last_name: "", email: "", phone: "", address: "" });
   const [editing, setEditing] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
@@ -160,6 +164,7 @@ export default function Profile() {
     { id: "overview", label: t("account.overview"), icon: BarChart3 },
     { id: "buyer", label: t("account.buyer"), icon: ShoppingBag },
     { id: "seller", label: t("account.seller"), icon: Store },
+    { id: "farm", label: t("account.farm"), icon: Sprout },
     { id: "settings", label: t("account.settings"), icon: Settings2 },
   ];
 
@@ -208,6 +213,7 @@ export default function Profile() {
             {tab === "overview" && <Overview orders={orders} pendingOrders={pendingOrders.length} storefront={storefront} activeListings={activeListings.length} onBuyer={() => setTab("buyer")} onSeller={() => setTab("seller")} t={t} />}
             {tab === "buyer" && <BuyerPanel orders={orders} t={t} />}
             {tab === "seller" && <SellerPanel storefront={storefront} listings={listings} loading={loadingSeller} storeForm={storeForm} setStoreForm={setStoreForm} listingForm={listingForm} setListingForm={setListingForm} creatingStore={creatingStore} creatingListing={creatingListing} onCreateStore={createStore} onCreateListing={createListing} t={t} />}
+            {tab === "farm" && <FarmPanel />}
             {tab === "settings" && <SettingsPanel form={profileForm} setForm={setProfileForm} editing={editing} setEditing={setEditing} saving={savingProfile} onSave={saveProfile} onCancel={() => { syncProfileForm(); setEditing(false); }} t={t} username={user?.username || ""} />}
           </section>
         </div>

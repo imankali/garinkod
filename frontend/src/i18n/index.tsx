@@ -7,7 +7,7 @@ type Dictionary = Record<string, string>;
 const dictionaries: Record<Locale, Dictionary> = {
   fa: {
     "nav.home": "خانه", "nav.products": "محصولات", "nav.services": "خدمات کشاورزی", "nav.marketplace": "بازار کشاورزان", "nav.offers": "تخفیف‌ها", "nav.storefronts": "غرفه‌داران",
-    "nav.cart": "سبد خرید", "nav.wishlist": "علاقه‌مندی‌ها", "nav.more": "بیشتر", "nav.messages": "پیام‌ها", "nav.direct": "دایرکت", "nav.profile": "حساب من", "nav.orders": "سفارش‌ها", "nav.login": "ورود", "nav.logout": "خروج",
+    "nav.cart": "سبد خرید", "nav.wishlist": "علاقه‌مندی‌ها", "nav.more": "بیشتر", "nav.messages": "پیام‌ها", "nav.farmers": "پشتیبانی کشاورزان", "nav.direct": "دایرکت", "nav.profile": "حساب من", "nav.orders": "سفارش‌ها", "nav.login": "ورود", "nav.logout": "خروج",
     "header.searchPlaceholder": "جستجوی کود، سم، بذر و بازار کشاورزان...",
     "header.menu": "منو", "header.openMenu": "باز کردن منوی کامل", "header.closeMenu": "بستن منو",
     "header.themeToLight": "تغییر به حالت روز", "header.themeToDark": "تغییر به حالت شب",
@@ -15,7 +15,7 @@ const dictionaries: Record<Locale, Dictionary> = {
     "language.description": "زبان نمایش سایت را انتخاب کنید؛ همه صفحات بلافاصله به زبان انتخابی نمایش داده می‌شوند.",
     "settings.site": "تنظیمات سایت", "settings.siteDescription": "زبان و حالت نمایش (روز/شب) سایت را از اینجا مدیریت کنید.",
     "settings.theme": "حالت نمایش", "settings.light": "روز", "settings.dark": "شب",
-    "account.title": "حساب کاربری", "account.overview": "نمای کلی", "account.buyer": "خریدهای من", "account.seller": "غرفه و فروش", "account.settings": "اطلاعات و نشانی", "account.signout": "خروج از حساب",
+    "account.title": "حساب کاربری", "account.farm": "زمین‌ها و مشاوره کشاورزی", "account.overview": "نمای کلی", "account.buyer": "خریدهای من", "account.seller": "غرفه و فروش", "account.settings": "اطلاعات و نشانی", "account.signout": "خروج از حساب",
     "account.orders": "سفارش‌ها", "account.noOrders": "هنوز سفارشی ثبت نشده است.", "account.openOrders": "پیگیری سفارش‌ها", "account.store": "غرفه من", "account.createStore": "ساخت غرفه", "account.createListing": "ثبت آگهی محصول", "account.noStore": "هنوز غرفه‌ای ندارید.",
     "account.buyerDescription": "سفارش‌ها، اطلاعات تحویل و پیگیری خریدهای مزرعه را یکجا مدیریت کنید.", "account.sellerDescription": "غرفه، آگهی‌ها و وضعیت بررسی محصولات خود را مدیریت کنید.",
     "account.profileSaved": "اطلاعات حساب ذخیره شد.", "account.storeCreated": "غرفه شما ساخته شد و برای فعالیت آماده است.", "account.listingCreated": "آگهی شما برای بررسی ارسال شد.",
@@ -54,7 +54,7 @@ const dictionaries: Record<Locale, Dictionary> = {
   },
   en: {
     "nav.home": "Home", "nav.products": "Products", "nav.services": "Farm services", "nav.marketplace": "Farmers market", "nav.offers": "Offers", "nav.storefronts": "Sellers",
-    "nav.cart": "Cart", "nav.wishlist": "Wishlist", "nav.more": "More", "nav.messages": "Messages", "nav.direct": "Direct", "nav.profile": "My account", "nav.orders": "Orders", "nav.login": "Sign in", "nav.logout": "Sign out",
+    "nav.cart": "Cart", "nav.wishlist": "Wishlist", "nav.more": "More", "nav.messages": "Messages", "nav.farmers": "Farmer support", "nav.direct": "Direct", "nav.profile": "My account", "nav.orders": "Orders", "nav.login": "Sign in", "nav.logout": "Sign out",
     "header.searchPlaceholder": "Search fertilizers, pesticides, seeds and farm products...",
     "header.menu": "Menu", "header.openMenu": "Open full menu", "header.closeMenu": "Close menu",
     "header.themeToLight": "Switch to light mode", "header.themeToDark": "Switch to dark mode",
@@ -62,7 +62,7 @@ const dictionaries: Record<Locale, Dictionary> = {
     "language.description": "Choose the display language; every page switches instantly.",
     "settings.site": "Site settings", "settings.siteDescription": "Manage the site language and light/dark appearance here.",
     "settings.theme": "Appearance", "settings.light": "Light", "settings.dark": "Dark",
-    "account.title": "Account centre", "account.overview": "Overview", "account.buyer": "My buying", "account.seller": "Store & selling", "account.settings": "Profile & address", "account.signout": "Sign out",
+    "account.title": "Account centre", "account.farm": "My farm & consultations", "account.overview": "Overview", "account.buyer": "My buying", "account.seller": "Store & selling", "account.settings": "Profile & address", "account.signout": "Sign out",
     "account.orders": "Orders", "account.noOrders": "No orders have been placed yet.", "account.openOrders": "Track orders", "account.store": "My storefront", "account.createStore": "Create storefront", "account.createListing": "Add produce listing", "account.noStore": "You do not have a storefront yet.",
     "account.buyerDescription": "Manage orders, delivery details and farm purchases in one place.", "account.sellerDescription": "Manage your storefront, produce listings and review status.",
     "account.profileSaved": "Account details were saved.", "account.storeCreated": "Your storefront has been created.", "account.listingCreated": "Your listing was sent for review.",
@@ -101,7 +101,7 @@ const dictionaries: Record<Locale, Dictionary> = {
   },
   ar: {
     "nav.home": "الرئيسية", "nav.products": "المنتجات", "nav.services": "الخدمات الزراعية", "nav.marketplace": "سوق المزارعين", "nav.offers": "العروض", "nav.storefronts": "الباعة",
-    "nav.cart": "السلة", "nav.wishlist": "المفضلة", "nav.more": "المزيد", "nav.messages": "الرسائل", "nav.direct": "الرسائل المباشرة", "nav.profile": "حسابي", "nav.orders": "الطلبات", "nav.login": "تسجيل الدخول", "nav.logout": "خروج",
+    "nav.cart": "السلة", "nav.wishlist": "المفضلة", "nav.more": "المزيد", "nav.messages": "الرسائل", "nav.farmers": "دعم المزارعين", "nav.direct": "الرسائل المباشرة", "nav.profile": "حسابي", "nav.orders": "الطلبات", "nav.login": "تسجيل الدخول", "nav.logout": "خروج",
     "header.searchPlaceholder": "ابحث عن الأسمدة والمبيدات والبذور ومنتجات المزارع...",
     "header.menu": "القائمة", "header.openMenu": "فتح القائمة الكاملة", "header.closeMenu": "إغلاق القائمة",
     "header.themeToLight": "التبديل إلى الوضع النهاري", "header.themeToDark": "التبديل إلى الوضع الليلي",
@@ -109,7 +109,7 @@ const dictionaries: Record<Locale, Dictionary> = {
     "language.description": "اختر لغة العرض؛ تتحول جميع الصفحات فوراً إلى اللغة المختارة.",
     "settings.site": "إعدادات الموقع", "settings.siteDescription": "إدارة لغة الموقع والمظهر الليلي/النهاري من هنا.",
     "settings.theme": "المظهر", "settings.light": "نهاري", "settings.dark": "ليلي",
-    "account.title": "مركز الحساب", "account.overview": "نظرة عامة", "account.buyer": "مشترياتي", "account.seller": "المتجر والبيع", "account.settings": "الملف والعنوان", "account.signout": "تسجيل الخروج",
+    "account.title": "مركز الحساب", "account.farm": "أراضيي والاستشارات", "account.overview": "نظرة عامة", "account.buyer": "مشترياتي", "account.seller": "المتجر والبيع", "account.settings": "الملف والعنوان", "account.signout": "تسجيل الخروج",
     "account.orders": "الطلبات", "account.noOrders": "لا توجد طلبات حتى الآن.", "account.openOrders": "تتبع الطلبات", "account.store": "متجري", "account.createStore": "إنشاء متجر", "account.createListing": "إضافة إعلان منتج", "account.noStore": "ليس لديك متجر بعد.",
     "account.buyerDescription": "أدر طلباتك وبيانات التسليم ومشتريات المزرعة في مكان واحد.", "account.sellerDescription": "أدر متجرك وإعلانات المنتجات وحالة المراجعة.",
     "account.profileSaved": "تم حفظ بيانات الحساب.", "account.storeCreated": "تم إنشاء متجرك.", "account.listingCreated": "تم إرسال إعلانك للمراجعة.",

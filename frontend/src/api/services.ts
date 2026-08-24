@@ -40,6 +40,11 @@ import type {
   FollowedStorefront,
   StorefrontConversation,
   StorefrontMessage,
+  FarmLand,
+  FarmCalendarEvent,
+  FarmConsultationRequest,
+  ConsultantFarmerSummary,
+  ConsultantFarmerDossier,
   UserAccount,
 } from '../types';
 
@@ -348,6 +353,13 @@ export const storefrontsApi = {
     apiClient.get<Storefront[]>('/marketplace/storefronts/featured/', { params: { limit } }),
   profile: (slug: string) =>
     apiClient.get<StorefrontProfile>(`/marketplace/storefronts/${slug}/profile/`),
+
+  /** جستجو داخل پست‌ها و استوری‌های یک غرفه (مثلاً «اصلاح درخت»). */
+  searchContent: (slug: string, query: string) =>
+    apiClient.get<{ query: string; posts: StorefrontPost[]; stories: StorefrontPost[] }>(
+      `/marketplace/storefronts/${slug}/search-content/`,
+      { params: { q: query } },
+    ),
   follow: (slug: string) =>
     apiClient.post<{ is_following: boolean; followers_count: number }>(
       `/marketplace/storefronts/${slug}/follow/`,
@@ -484,6 +496,83 @@ export const messagesApi = {
       `/marketplace/conversations/${conversationId}/messages/`,
       data,
     ),
+};
+
+// ========================================
+// Farm profile: lands, calendars and consultation
+// ========================================
+export interface FarmLandPayload {
+  name: string;
+  land_type: FarmLand['land_type'];
+  area: string;
+  area_unit?: string;
+  crop_type: string;
+  crop_variety?: string;
+  province?: string;
+  city?: string;
+  soil_type?: string;
+  irrigation_type?: string;
+  planting_date?: string | null;
+  notes?: string;
+}
+
+export interface FarmEventPayload {
+  kind: FarmCalendarEvent['kind'];
+  title: string;
+  date: string;
+  notes?: string;
+  status?: FarmCalendarEvent['status'];
+}
+
+export const farmApi = {
+  /** All of the caller's lands (orchards / croplands / greenhouses). */
+  lands: () => apiClient.get<FarmLand[]>('/farm/lands/'),
+  createLand: (data: FarmLandPayload) => apiClient.post<FarmLand>('/farm/lands/', data),
+  landDetail: (landId: number) =>
+    apiClient.get<{ land: FarmLand; events: FarmCalendarEvent[] }>(`/farm/lands/${landId}/`),
+  updateLand: (landId: number, data: Partial<FarmLandPayload>) =>
+    apiClient.patch<FarmLand>(`/farm/lands/${landId}/`, data),
+  deleteLand: (landId: number) => apiClient.delete<{ message: string }>(`/farm/lands/${landId}/`),
+
+  /** Add an entry to one of the caller's own land calendars. */
+  addEvent: (landId: number, data: FarmEventPayload) =>
+    apiClient.post<FarmCalendarEvent>(`/farm/lands/${landId}/events/`, data),
+  updateEvent: (eventId: number, data: Partial<FarmEventPayload>) =>
+    apiClient.patch<FarmCalendarEvent>(`/farm/events/${eventId}/`, data),
+  deleteEvent: (eventId: number) => apiClient.delete<{ message: string }>(`/farm/events/${eventId}/`),
+
+  /** The caller's whole calendar, optionally filtered. */
+  calendar: (params?: { kind?: FarmCalendarEvent['kind']; from?: string; to?: string }) =>
+    apiClient.get<FarmCalendarEvent[]>('/farm/calendar/', { params }),
+
+  /** The caller's consultation requests, or file a new one for a land. */
+  consultations: () => apiClient.get<FarmConsultationRequest[]>('/farm/consultations/'),
+  createConsultation: (data: { land_id: number; subject: string; message: string }) =>
+    apiClient.post<FarmConsultationRequest>('/farm/consultations/', data),
+};
+
+export const consultingApi = {
+  /** Consultant queue (level 3+): all requests, filterable. */
+  requests: (params?: { status?: string; search?: string }) =>
+    apiClient.get<FarmConsultationRequest[]>('/farm/consulting/requests/', { params }),
+  reply: (consultationId: number, data: { reply: string; status?: string }) =>
+    apiClient.patch<FarmConsultationRequest>(
+      `/farm/consulting/requests/${consultationId}/reply/`, data,
+    ),
+
+  /** Farmer directory with lands and pending counts. */
+  farmers: (params?: { search?: string }) =>
+    apiClient.get<{ count: number; results: ConsultantFarmerSummary[] }>(
+      '/farm/consulting/farmers/', { params },
+    ),
+
+  /** One farmer's full dossier: profile, lands with calendars, requests. */
+  dossier: (userId: number) =>
+    apiClient.get<ConsultantFarmerDossier>(`/farm/consulting/farmers/${userId}/`),
+
+  /** Write a spraying/fertilizing/irrigation entry into any land's calendar. */
+  addEvent: (landId: number, data: FarmEventPayload) =>
+    apiClient.post<FarmCalendarEvent>(`/farm/consulting/lands/${landId}/events/`, data),
 };
 
 export const storefrontPostsApi = {

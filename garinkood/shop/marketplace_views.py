@@ -150,6 +150,34 @@ class StorefrontDirectoryViewSet(viewsets.ReadOnlyModelViewSet):
             },
         })
 
+    @action(detail=True, methods=['get'], url_path='search-content')
+    def search_content(self, request, slug=None):
+        """Search inside one storefront's published posts and live stories.
+
+        Buyers search the page (e.g. «اصلاح درخت») and find the matching
+        post/story article or video regardless of how old it is.
+        """
+        storefront = get_object_or_404(Storefront, slug=slug, is_active=True)
+        query = request.query_params.get('q', '').strip()
+
+        posts = StorefrontPost.objects.filter(
+            storefront=storefront, status='published', post_type='post'
+        )
+        stories = StorefrontPost.objects.filter(
+            storefront=storefront, status='published', post_type='story',
+            expires_at__gt=timezone.now(),
+        )
+        if query:
+            posts = posts.filter(Q(caption__icontains=query) | Q(listing__title__icontains=query))
+            stories = stories.filter(Q(caption__icontains=query))
+
+        context = {'request': request}
+        return Response({
+            'query': query,
+            'posts': StorefrontPostSerializer(posts.order_by('-created_at')[:24], many=True, context=context).data,
+            'stories': StorefrontPostSerializer(stories.order_by('created_at')[:24], many=True, context=context).data,
+        })
+
     @action(
         detail=True, methods=['post', 'delete'],
         permission_classes=[permissions.IsAuthenticated], url_path='follow',

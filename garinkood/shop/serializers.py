@@ -10,7 +10,7 @@ from .models import (
     PaymentAttempt, AffiliateProfile, AffiliateConversion, FinancialLedgerEntry,
     PlatformFeedback, StorefrontComplaint, VisualSearchRequest, Coupon, Wallet,
     WalletTransaction, StorefrontPost, StorefrontConversation, StorefrontMessage,
-    AdminAuditLog
+    FarmLand, FarmCalendarEvent, FarmConsultationRequest, AdminAuditLog
 )
 from .slugs import slugify_fa, unique_storefront_slug
 
@@ -893,6 +893,92 @@ class StorefrontConversationSerializer(serializers.ModelSerializer):
     def get_unread_count(self, obj):
         request = self.context.get('request')
         return obj.unread_count_for(request.user) if request else 0
+
+
+class FarmLandSerializer(serializers.ModelSerializer):
+    land_type_label = serializers.CharField(source='get_land_type_display', read_only=True)
+    soil_type_label = serializers.CharField(source='get_soil_type_display', read_only=True)
+    irrigation_type_label = serializers.CharField(source='get_irrigation_type_display', read_only=True)
+    area_unit_label = serializers.CharField(source='get_area_unit_display', read_only=True)
+    owner_name = serializers.CharField(source='owner.get_full_name', read_only=True)
+    event_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = FarmLand
+        fields = [
+            'id', 'owner', 'owner_name', 'name', 'land_type', 'land_type_label',
+            'area', 'area_unit', 'area_unit_label', 'area_label',
+            'crop_type', 'crop_variety', 'province', 'city',
+            'soil_type', 'soil_type_label', 'irrigation_type', 'irrigation_type_label',
+            'planting_date', 'notes', 'is_active', 'event_count',
+            'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'owner', 'owner_name', 'event_count', 'created_at', 'updated_at']
+
+    def get_event_count(self, obj):
+        return obj.calendar_events.count()
+
+
+class FarmCalendarEventSerializer(serializers.ModelSerializer):
+    kind_label = serializers.CharField(source='get_kind_display', read_only=True)
+    status_label = serializers.CharField(source='get_status_display', read_only=True)
+    land_name = serializers.CharField(source='land.name', read_only=True)
+    created_by_name = serializers.SerializerMethodField()
+    is_consultant_note = serializers.SerializerMethodField()
+
+    class Meta:
+        model = FarmCalendarEvent
+        fields = [
+            'id', 'land', 'land_name', 'kind', 'kind_label', 'title', 'date',
+            'notes', 'status', 'status_label', 'created_by', 'created_by_name',
+            'is_consultant_note', 'created_at', 'updated_at',
+        ]
+        read_only_fields = [
+            'id', 'land', 'land_name', 'created_by', 'created_by_name',
+            'is_consultant_note', 'created_at', 'updated_at',
+        ]
+
+    def get_created_by_name(self, obj):
+        return obj.created_by.get_full_name() or obj.created_by.username
+
+    def get_is_consultant_note(self, obj):
+        return obj.created_by_id != obj.land.owner_id
+
+    def validate_date(self, value):
+        return value
+
+
+class FarmConsultationRequestSerializer(serializers.ModelSerializer):
+    subject_label = serializers.CharField(source='get_subject_display', read_only=True)
+    status_label = serializers.CharField(source='get_status_display', read_only=True)
+    land = FarmLandSerializer(read_only=True)
+    land_id = serializers.PrimaryKeyRelatedField(
+        queryset=FarmLand.objects.all(), source='land', write_only=True
+    )
+    farmer_name = serializers.SerializerMethodField()
+    farmer_username = serializers.CharField(source='farmer.username', read_only=True)
+
+    class Meta:
+        model = FarmConsultationRequest
+        fields = [
+            'id', 'farmer', 'farmer_name', 'farmer_username', 'land', 'land_id',
+            'subject', 'subject_label', 'message', 'reply', 'status', 'status_label',
+            'replied_by', 'created_at', 'updated_at',
+        ]
+        read_only_fields = [
+            'id', 'farmer', 'farmer_name', 'farmer_username', 'land', 'reply',
+            'status', 'status_label', 'replied_by', 'created_at', 'updated_at',
+        ]
+
+    def get_farmer_name(self, obj):
+        return obj.farmer.get_full_name() or obj.farmer.username
+
+    def validate_land_id(self, value):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            if value.owner_id != request.user.id:
+                raise serializers.ValidationError('پرونده انتخابی متعلق به حساب شما نیست.')
+        return value
 
 
 class AdminAuditLogSerializer(serializers.ModelSerializer):

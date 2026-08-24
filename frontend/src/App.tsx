@@ -55,6 +55,7 @@ const Storefronts = lazy(() => import("./pages/Storefronts"));
 const StorefrontPage = lazy(() => import("./pages/StorefrontPage"));
 const Shop = lazy(() => import("./pages/Shop"));
 const Messages = lazy(() => import("./pages/Messages"));
+const Farmers = lazy(() => import("./pages/Farmers"));
 
 // ========================================
 // Stores
@@ -467,6 +468,16 @@ export default function App() {
 
               {/* Direct messages centre (buyers and storefront owners) */}
               <Route path="/messages" element={<Messages />} />
+
+              {/* Consultant workbench: farmer dossiers, calendars and requests */}
+              <Route
+                path="/farmers"
+                element={
+                  <RequireLevel level={USER_LEVEL.MODERATOR}>
+                    <Farmers />
+                  </RequireLevel>
+                }
+              />
 
               {/* Seller studio is for storefront owners (level 2+). */}
               <Route

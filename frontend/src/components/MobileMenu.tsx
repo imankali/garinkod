@@ -9,6 +9,7 @@ import { visibleSections } from '../config/navigation';
 import { useAuthStore, useUserLevel } from '../store/authStore';
 import { useTranslation } from '../i18n';
 import { cn } from '../utils/cn';
+import { acquireScrollLock } from '../utils/scrollLock';
 import { IconButton } from './ui/Button';
 import Logo from './Logo';
 
@@ -62,8 +63,7 @@ export default function MobileMenu({
     if (!open) return undefined;
 
     previouslyFocused.current = document.activeElement as HTMLElement;
-    const { overflow } = document.body.style;
-    document.body.style.overflow = 'hidden';
+    const releaseLock = acquireScrollLock();
 
     const timer = window.setTimeout(() => {
       panelRef.current?.querySelector<HTMLElement>(FOCUSABLE)?.focus();
@@ -93,7 +93,7 @@ export default function MobileMenu({
     return () => {
       document.removeEventListener('keydown', handleKey, true);
       window.clearTimeout(timer);
-      document.body.style.overflow = overflow;
+      releaseLock();
       previouslyFocused.current?.focus?.();
     };
   }, [open, onClose]);

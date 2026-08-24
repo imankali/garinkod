@@ -13,6 +13,7 @@ import {
   MessageCircle,
   Pencil,
   Save,
+  Search,
   Send,
   ShoppingBasket,
   Star,
@@ -26,9 +27,10 @@ import { parseApiError } from '../api/errors';
 import { useAuthStore } from '../store/authStore';
 import { useCartStore } from '../store/cartStore';
 import { useDirectStore } from '../store/directStore';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { useTranslation } from '../i18n';
 import { formatPrice } from '../utils/formatPrice';
-import type { StorefrontProfile } from '../types';
+import type { StorefrontPost, StorefrontProfile } from '../types';
 
 /**
  * The viewer only ever renders an image and a caption, so it takes this
@@ -70,6 +72,12 @@ export default function StorefrontPage() {
   const [viewer, setViewer] = useState<{ posts: ViewableStory[]; index: number } | null>(null);
   const [unread, setUnread] = useState(0);
 
+  // جستجو داخل محتوای غرفه (پست‌ها و استوری‌ها)
+  const [contentQuery, setContentQuery] = useState('');
+  const debouncedContentQuery = useDebouncedValue(contentQuery, 350);
+  const [contentResults, setContentResults] = useState<StorefrontPost[] | null>(null);
+  const [contentBusy, setContentBusy] = useState(false);
+
   const { isAuthenticated } = useAuthStore();
   const addListingToCart = useCartStore((state) => state.addListingToCart);
   const openDirect = useDirectStore((state) => state.openDirect);
@@ -93,6 +101,32 @@ export default function StorefrontPage() {
   }, [load]);
 
   // Owners see a live unread badge for the storefront inbox.
+  // Live content search inside this storefront.
+  useEffect(() => {
+    const query = debouncedContentQuery.trim();
+    if (!query) {
+      setContentResults(null);
+      return undefined;
+    }
+    let cancelled = false;
+    setContentBusy(true);
+    storefrontsApi
+      .searchContent(slug, query)
+      .then((response) => {
+        if (cancelled) return;
+        setContentResults([...response.data.posts, ...response.data.stories]);
+      })
+      .catch(() => {
+        if (!cancelled) setContentResults([]);
+      })
+      .finally(() => {
+        if (!cancelled) setContentBusy(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [debouncedContentQuery, slug]);
+
   useEffect(() => {
     if (!profile?.storefront.is_owner) return;
     let cancelled = false;
@@ -354,6 +388,76 @@ export default function StorefrontPage() {
         </section>
       )}
 
+      {/* جستجو داخل محتوای غرفه: پست، استوری، فیلم و مقاله */}
+      <section className="mt-5" aria-label="جستجو در محتوای غرفه">
+        <div className="relative">
+          <Search
+            size={16}
+            className="pointer-events-none absolute start-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+          />
+          <input
+            type="search"
+            value={contentQuery}
+            onChange={(event) => setContentQuery(event.target.value)}
+            placeholder="جستجو در پست‌ها و استوری‌های این غرفه… (مثلاً اصلاح درخت)"
+            className="w-full rounded-2xl border border-emerald-100 bg-white py-3 ps-10 pe-4 text-sm text-slate-700 shadow-sm outline-none transition focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-emerald-800 dark:bg-emerald-950 dark:text-white"
+            aria-label="جستجو در محتوای غرفه"
+          />
+          {contentQuery && (
+            <button
+              type="button"
+              onClick={() => setContentQuery('')}
+              className="absolute end-3 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-emerald-900"
+              aria-label={t('common.close')}
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+
+        {contentResults !== null && (
+          <div className="mt-3">
+            <p className="mb-2 text-fluid-xs font-bold text-slate-500 dark:text-emerald-200">
+              {contentBusy
+                ? t('common.loading')
+                : contentResults.length > 0
+                  ? `${contentResults.length} نتیجه برای «${debouncedContentQuery.trim()}»`
+                  : 'نتیجه‌ای پیدا نشد؛ عبارت دیگری را امتحان کنید.'}
+            </p>
+            {!contentBusy && contentResults.length > 0 && (
+              <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+                {contentResults.map((post, index) => (
+                  <li key={post.id}>
+                    <button
+                      type="button"
+                      onClick={() => setViewer({ posts: contentResults, index })}
+                      className="group relative block aspect-[4/3] w-full overflow-hidden rounded-xl"
+                    >
+                      <img
+                        src={post.image_url}
+                        alt={post.caption.slice(0, 60)}
+                        loading="lazy"
+                        className="h-full w-full object-cover transition group-hover:scale-105"
+                      />
+                      <span
+                        className={`absolute start-2 top-2 rounded-full px-2 py-0.5 text-fluid-2xs font-bold text-white ${
+                          post.post_type === 'story' ? 'bg-rose-500/90' : 'bg-emerald-600/90'
+                        }`}
+                      >
+                        {post.post_type === 'story' ? t('storefront.tab.stories') : t('storefront.tab.posts')}
+                      </span>
+                      <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-2 text-start text-fluid-2xs font-bold text-white line-clamp-1">
+                        {post.caption}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </section>
+
       {/* Owner composer: publish a post or story from this page */}
       {isOwner && <OwnerComposer onPublished={load} />}
 
@@ -380,7 +484,7 @@ export default function StorefrontPage() {
       </div>
 
       {/* Listings */}
-      {tab === 'listings' && (
+      {tab === 'listings' && contentResults === null && (
         <div role="tabpanel" id="panel-listings" aria-labelledby="tab-listings" className="mt-5">
           {listings.length === 0 ? (
             <EmptyState text="این غرفه هنوز آگهی منتشرشده‌ای ندارد." />
@@ -446,7 +550,7 @@ export default function StorefrontPage() {
       )}
 
       {/* Posts */}
-      {tab === 'posts' && (
+      {tab === 'posts' && contentResults === null && (
         <div role="tabpanel" id="panel-posts" aria-labelledby="tab-posts" className="mt-5">
           {posts.length === 0 ? (
             <EmptyState text="هنوز پستی منتشر نشده است." />
@@ -474,7 +578,7 @@ export default function StorefrontPage() {
       )}
 
       {/* Stories */}
-      {tab === 'stories' && (
+      {tab === 'stories' && contentResults === null && (
         <div role="tabpanel" id="panel-stories" aria-labelledby="tab-stories" className="mt-5">
           {stories.length === 0 ? (
             <EmptyState text="در حال حاضر استوری فعالی وجود ندارد." />

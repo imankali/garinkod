@@ -2,6 +2,8 @@
 
 import { useEffect, useRef } from 'react';
 
+import { acquireScrollLock } from '../utils/scrollLock';
+
 const FOCUSABLE =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
@@ -21,6 +23,9 @@ interface Options {
  * closing a cart drawer returns the user to the cart button rather than to the
  * top of the document.
  *
+ * The scroll lock goes through a shared counter, so several overlays may be
+ * open at once without the first one to close unlocking the page.
+ *
  * Returns a ref to attach to the overlay's root element.
  */
 export function useFocusTrap<T extends HTMLElement>(
@@ -35,17 +40,7 @@ export function useFocusTrap<T extends HTMLElement>(
 
     previouslyFocused.current = document.activeElement as HTMLElement;
 
-    let restoreOverflow = '';
-    let restorePadding = '';
-    if (lockScroll) {
-      // Compensating for the scrollbar keeps the page from shifting sideways
-      // the moment the overlay opens.
-      const scrollbar = window.innerWidth - document.documentElement.clientWidth;
-      restoreOverflow = document.body.style.overflow;
-      restorePadding = document.body.style.paddingInlineEnd;
-      document.body.style.overflow = 'hidden';
-      if (scrollbar > 0) document.body.style.paddingInlineEnd = `${scrollbar}px`;
-    }
+    const release = lockScroll ? acquireScrollLock() : null;
 
     // Wait a frame so the element exists and its entrance animation has begun.
     const timer = window.setTimeout(() => {
@@ -83,10 +78,7 @@ export function useFocusTrap<T extends HTMLElement>(
     return () => {
       document.removeEventListener('keydown', handleKeyDown, true);
       window.clearTimeout(timer);
-      if (lockScroll) {
-        document.body.style.overflow = restoreOverflow;
-        document.body.style.paddingInlineEnd = restorePadding;
-      }
+      release?.();
       previouslyFocused.current?.focus?.();
     };
   }, [active, onEscape, lockScroll]);

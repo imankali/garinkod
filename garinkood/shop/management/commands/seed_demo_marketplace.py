@@ -12,7 +12,7 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
 
-from shop.models import MarketplaceListing, Storefront, StorefrontPost
+from shop.models import MarketplaceListing, Storefront, StorefrontPost, UserAccount
 from shop.slugs import slugify_fa
 
 DEMO_SELLERS = [
@@ -90,6 +90,19 @@ class Command(BaseCommand):
     @transaction.atomic
     def handle(self, *args, **options):
         created_sellers = created_listings = created_posts = 0
+
+        # A demo consultant (level 3) who can open the farmer-support desk.
+        consultant, _ = User.objects.get_or_create(
+            username='moshaver',
+            defaults={'email': 'moshaver@example.com', 'first_name': 'کارشناس', 'last_name': 'گرین کود'},
+        )
+        if not consultant.check_password(self.DEMO_PASSWORD):
+            consultant.set_password(self.DEMO_PASSWORD)
+            consultant.save(update_fields=['password'])
+        consultant_account, _ = UserAccount.objects.get_or_create(user=consultant)
+        if consultant_account.level < UserAccount.LEVEL_MODERATOR:
+            consultant_account.level = UserAccount.LEVEL_MODERATOR
+            consultant_account.save(update_fields=['level'])
 
         for entry in DEMO_SELLERS:
             user, _ = User.objects.get_or_create(

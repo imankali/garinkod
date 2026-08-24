@@ -34,7 +34,6 @@ import Logo from "./Logo";
 import MegaMenu from "./MegaMenu";
 import SearchBar from "./SearchBar";
 import MobileMenu from "./MobileMenu";
-import CartDrawer from "./CartDrawer";
 import { useCartStore } from "../store/cartStore";
 import { messagesApi } from "../api/services";
 import { useTranslation } from "../i18n";
@@ -724,7 +723,8 @@ export default function Header({
         onOpenWishlist={onOpenWishlist}
       />
 
-      <CartDrawer isOpen={cartOpen} onClose={() => onCartOpenChange(false)} />
+      {/* The global CartDrawer lives in App — rendering it here too would mount
+          a second instance whose scroll lock conflicts with the first one. */}
     </>
   );
 }

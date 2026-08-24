@@ -1,6 +1,7 @@
 // frontend/src/components/SearchBar.tsx
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import toast from "react-hot-toast";
@@ -89,12 +90,24 @@ const trendingSearches = [
 // ========================================
 export default function SearchBar({ variant = "desktop", onSelectProduct }: SearchBarProps) {
   const { locale, t } = useTranslation();
+  const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("all");
   const [isFocused, setIsFocused] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [inStockOnly, setInStockOnly] = useState(false);
+
+  /** بدون callback، کلیک روی نتیجه مستقیماً به صفحه محصول می‌رود. */
+  function openProduct(product: MockProduct) {
+    if (onSelectProduct) {
+      onSelectProduct(product);
+      return;
+    }
+    if (product.slug) {
+      navigate(`/products/${product.slug}`);
+    }
+  }
 
   const [recent, setRecent] = useState<string[]>(() => {
     try {
@@ -309,15 +322,15 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
           </button>
         )}
 
-        {/* Advanced Filters Button */}
+        {/* Advanced Filters Button — toggles an inline panel below the bar so it
+            works reliably on touch screens where the floating dropdown can be
+            clipped or hard to reach. */}
         <button
           type="button"
-          onClick={() => {
-            setShowAdvanced((v) => !v);
-            setIsFocused(true);
-          }}
-          className={`relative flex items-center gap-1 border-s border-emerald-100 px-3 text-slate-500 transition-colors hover:text-[#0F8A5F] dark:border-emerald-900 dark:text-emerald-400 ${
-            showAdvanced ? "text-[#0F8A5F] dark:text-lime-300" : ""
+          onClick={() => setShowAdvanced((v) => !v)}
+          aria-expanded={showAdvanced}
+          className={`relative flex min-h-11 items-center gap-1 border-s border-emerald-100 px-3 text-slate-500 transition-colors hover:text-[#0F8A5F] dark:border-emerald-900 dark:text-emerald-400 ${
+            showAdvanced ? "bg-emerald-50 text-[#0F8A5F] dark:bg-emerald-900/60 dark:text-lime-300" : ""
           }`}
           aria-label="فیلترهای پیشرفته"
         >
@@ -342,6 +355,101 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
       </motion.form>
 
       {/* ======================================== */}
+      {/* Advanced Filters Panel — در جریان عادی صفحه (نه dropdown شناور)
+          تا روی موبایل همیشه قابل لمس و دیده شدن باشد */}
+      {/* ======================================== */}
+      <AnimatePresence initial={false}>
+        {showAdvanced && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.22 }}
+            className="overflow-hidden"
+          >
+            <div className="mt-2 rounded-xl border border-emerald-100 bg-emerald-50/60 p-3 shadow-sm dark:border-emerald-800 dark:bg-emerald-900/40">
+              <div className="mb-3 flex items-center justify-between">
+                <p className="text-xs font-bold text-slate-600 dark:text-emerald-100">فیلتر تخصصی جستجو</p>
+                <button
+                  type="button"
+                  onClick={resetFacets}
+                  className="text-fluid-xs font-bold text-rose-500 hover:underline"
+                >
+                  حذف همه فیلترها
+                </button>
+              </div>
+
+              {/* Quick Filters */}
+              <div className="mb-3">
+                <p className="mb-1.5 text-fluid-xs font-semibold text-slate-500 dark:text-emerald-300">فیلترهای سریع</p>
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => handleQuickFilter('inStock', null)}
+                    className={`flex min-h-9 items-center gap-1.5 rounded-full px-3 py-1.5 text-fluid-xs font-semibold transition-colors ${
+                      inStockOnly
+                        ? "bg-[#0F8A5F] text-white"
+                        : "bg-white text-slate-600 ring-1 ring-slate-200 dark:bg-emerald-900 dark:text-emerald-100 dark:ring-emerald-800"
+                    }`}
+                  >
+                    <PackageCheck size={13} /> فقط کالای موجود
+                  </button>
+                </div>
+              </div>
+
+              {/* Categories */}
+              <div>
+                <p className="mb-1.5 text-fluid-xs font-semibold text-slate-500 dark:text-emerald-300">دسته‌بندی‌ها</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {categories.slice(0, 6).map((cat) => (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => handleQuickFilter('category', cat.id)}
+                      className={`flex min-h-9 items-center gap-1.5 rounded-full px-3 py-1.5 text-fluid-xs font-semibold transition-colors ${
+                        activeCategory === cat.id
+                          ? "bg-[#0F8A5F] text-white"
+                          : "bg-white text-slate-600 ring-1 ring-slate-200 dark:bg-emerald-900 dark:text-emerald-100 dark:ring-emerald-800"
+                      }`}
+                    >
+                      <cat.icon size={12} />
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* نتایج زنده فیلترها */}
+              {activeFacetCount > 0 && searchResults && searchResults.length > 0 && (
+                <div className="mt-3 border-t border-emerald-100 pt-3 dark:border-emerald-800">
+                  <p className="mb-2 text-fluid-xs font-semibold text-slate-500 dark:text-emerald-300">
+                    نتایج فیلتر ({filteredProducts.length})
+                  </p>
+                  <ul className="grid gap-1 sm:grid-cols-2">
+                    {filteredProducts.map((product) => (
+                      <li key={product.id}>
+                        <button
+                          type="button"
+                          onClick={() => openProduct(product)}
+                          className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-start text-xs text-slate-600 transition hover:bg-white dark:text-emerald-100 dark:hover:bg-emerald-900"
+                        >
+                          <img src={product.image} alt="" className="h-8 w-8 shrink-0 rounded-lg object-cover" />
+                          <span className="line-clamp-1 flex-1">{product.name}</span>
+                          <span className="shrink-0 font-bold text-emerald-700 dark:text-lime-300">
+                            {product.price.toLocaleString('fa-IR')}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ======================================== */}
       {/* Dropdown Results */}
       {/* ======================================== */}
       <AnimatePresence>
@@ -351,7 +459,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.98 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
-            className="absolute start-0 top-[calc(100%+10px)] z-50 w-full overflow-hidden rounded-2xl border border-emerald-100 bg-white/95 p-3 shadow-2xl shadow-emerald-900/10 backdrop-blur-xl dark:border-emerald-800 dark:bg-emerald-950/95"
+            className="absolute start-0 top-[calc(100%+10px)] z-50 max-h-[70vh] w-full overflow-y-auto rounded-2xl border border-emerald-100 bg-white/95 p-3 shadow-2xl shadow-emerald-900/10 backdrop-blur-xl dark:border-emerald-800 dark:bg-emerald-950/95"
           >
             {/* Voice Search Listening Indicator */}
             {isListening && (
@@ -359,62 +467,6 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
                 <span className="h-2 w-2 animate-ping rounded-full bg-rose-500" />
                 لطفاً نام محصول یا آفت مورد نظر خود را به فارسی بگویید...
               </div>
-            )}
-
-            {/* Advanced Filters Panel */}
-            {showAdvanced && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.22 }}
-                className="mb-3 overflow-hidden rounded-xl border border-emerald-100 bg-emerald-50/40 p-3 dark:border-emerald-800 dark:bg-emerald-900/30"
-              >
-                <div className="mb-3 flex items-center justify-between">
-                  <p className="text-xs font-bold text-slate-600 dark:text-emerald-100">فیلتر تخصصی جستجو</p>
-                  <button onClick={resetFacets} className="text-fluid-xs text-rose-500 hover:underline">
-                    حذف همه فیلترها
-                  </button>
-                </div>
-
-                {/* Quick Filters */}
-                <div className="mb-3">
-                  <p className="mb-1.5 text-fluid-xs font-semibold text-slate-500 dark:text-emerald-300">فیلترهای سریع</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    <button
-                      onClick={() => handleQuickFilter('inStock', null)}
-                      className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-fluid-xs font-semibold transition-colors ${
-                        inStockOnly
-                          ? "bg-[#0F8A5F] text-white"
-                          : "bg-white text-slate-600 ring-1 ring-slate-200 dark:bg-emerald-900 dark:text-emerald-100 dark:ring-emerald-800"
-                      }`}
-                    >
-                      <PackageCheck size={13} /> فقط کالای موجود
-                    </button>
-                  </div>
-                </div>
-
-                {/* Categories */}
-                <div>
-                  <p className="mb-1.5 text-fluid-xs font-semibold text-slate-500 dark:text-emerald-300">دسته‌بندی‌ها</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {categories.slice(0, 6).map((cat) => (
-                      <button
-                        key={cat.id}
-                        onClick={() => handleQuickFilter('category', cat.id)}
-                        className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-fluid-xs font-semibold transition-colors ${
-                          activeCategory === cat.id
-                            ? "bg-[#0F8A5F] text-white"
-                            : "bg-white text-slate-600 ring-1 ring-slate-200 dark:bg-emerald-900 dark:text-emerald-100 dark:ring-emerald-800"
-                        }`}
-                      >
-                        <cat.icon size={12} />
-                        {cat.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </motion.div>
             )}
 
             {/* ======================================== */}
@@ -523,7 +575,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
                     <li key={product.id}>
                       <button
                         onClick={() => {
-                          onSelectProduct?.(product);
+                          openProduct(product);
                           setIsFocused(false);
                         }}
                         className="flex w-full items-center gap-3 rounded-xl p-2 text-start transition-colors hover:bg-emerald-50 dark:hover:bg-emerald-900/50"
