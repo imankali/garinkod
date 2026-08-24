@@ -309,3 +309,6 @@ settings.local.py
 !README.md
 !LICENSE
 !frontend/.env.example
+# Lighthouse CI reports
+frontend/lighthouse-report/
+frontend/.lighthouseci/
