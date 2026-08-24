@@ -13,7 +13,8 @@ from django.test import TestCase, TransactionTestCase, override_settings
 from rest_framework.test import APIClient
 
 from .models import (
-    AgriInput, AgriInputDose, Cart, CartItem, Category, FinancialLedgerEntry, Location,
+    AdminAuditLog, AgriInput, AgriInputDose, Cart, CartItem, Category,
+    FinancialLedgerEntry, Location,
     MarketplaceListing, Order, OrderItem, Product, Storefront, StorefrontFollow,
     StorefrontHighlight, StorefrontPost, UserAccount, Wallet, WalletTransaction,
     account_level,
@@ -1054,3 +1055,168 @@ class ThrottleTests(TestCase):
         response = self.client.get('/api/products/')
 
         self.assertEqual(response.status_code, 200)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class FinanceLedgerTests(TestCase):
+    """The seller-facing ledger: references, filters and CSV export."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.seller, self.storefront = make_seller(commission=10)
+        self.listing = make_listing(self.storefront, price=200_000, quantity=30)
+
+        buyer = APIClient()
+        buyer.post(
+            '/api/cart/add-listing/', {'listing_id': self.listing.id, 'quantity': 4}, format='json'
+        )
+        buyer.post('/api/orders/checkout/', CHECKOUT_PAYLOAD, format='json')
+        self.order = Order.objects.get()
+        self.client.force_authenticate(user=self.seller)
+
+    def test_ledger_entries_expose_a_stable_reference(self):
+        response = self.client.get('/api/marketplace/finance/')
+
+        self.assertEqual(response.status_code, 200)
+        entry = response.data['entries'][0]
+        self.assertTrue(entry['reference'].startswith('GKF-'))
+        self.assertEqual(entry['order_code'], self.order.code)
+
+    def test_ledger_can_be_filtered_by_status(self):
+        response = self.client.get('/api/marketplace/finance/', {'status': 'available'})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['count'], 0)
+
+        # Balances are deliberately computed over the whole ledger, so a filter
+        # that matches nothing must not zero the pending balance.
+        self.assertGreater(response.data['balances']['pending'], 0)
+
+    def test_ledger_can_be_filtered_by_entry_type(self):
+        response = self.client.get('/api/marketplace/finance/', {'entry_type': 'sale'})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(all(row['entry_type'] == 'sale' for row in response.data['entries']))
+
+    def test_ledger_search_matches_the_order_code(self):
+        response = self.client.get('/api/marketplace/finance/', {'search': self.order.code})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertGreaterEqual(response.data['count'], 1)
+
+    def test_ledger_is_paginated(self):
+        response = self.client.get('/api/marketplace/finance/', {'page_size': 1})
+
+        self.assertEqual(len(response.data['entries']), 1)
+        self.assertIn('total_pages', response.data)
+
+    def test_csv_export_returns_a_utf8_file_with_a_bom(self):
+        response = self.client.get('/api/marketplace/finance/export/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('text/csv', response['Content-Type'])
+        self.assertIn('attachment;', response['Content-Disposition'])
+        body = response.content.decode('utf-8')
+        # Excel on Windows needs the BOM to read Persian text correctly.
+        self.assertTrue(body.startswith('\ufeff'))
+        self.assertIn('شناسه تراکنش', body)
+        self.assertIn(self.order.code, body)
+
+    def test_csv_export_is_written_to_the_audit_log(self):
+        self.client.get('/api/marketplace/finance/export/')
+
+        self.assertTrue(AdminAuditLog.objects.filter(action='finance_exported').exists())
+
+    def test_a_seller_cannot_see_another_storefronts_ledger(self):
+        other_user, other = make_seller('rival-seller')
+        client = APIClient()
+        client.force_authenticate(user=other_user)
+
+        response = client.get('/api/marketplace/finance/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['count'], 0)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class StorefrontImageTests(TestCase):
+    """A seller sets their own shop avatar and cover."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.seller, self.storefront = make_seller('image-seller')
+        self.client.force_authenticate(user=self.seller)
+
+    def _image(self, size=(200, 200)):
+        from io import BytesIO
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from PIL import Image
+
+        buffer = BytesIO()
+        Image.new('RGB', size, 'green').save(buffer, format='PNG')
+        buffer.seek(0)
+        return SimpleUploadedFile('shop.png', buffer.read(), content_type='image/png')
+
+    def test_seller_can_upload_a_storefront_avatar(self):
+        response = self.client.patch(
+            '/api/marketplace/storefront/', {'avatar': self._image()}, format='multipart'
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data['avatar_url'])
+
+    def test_undersized_storefront_images_are_rejected(self):
+        response = self.client.patch(
+            '/api/marketplace/storefront/', {'avatar': self._image(size=(20, 20))}, format='multipart'
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('avatar', response.data['fields'])
+
+    def test_non_image_storefront_upload_is_rejected(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        bad = SimpleUploadedFile('x.txt', b'nope', content_type='text/plain')
+        response = self.client.patch(
+            '/api/marketplace/storefront/', {'avatar': bad}, format='multipart'
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class SellerRejectionVisibilityTests(TestCase):
+    """A rejected listing must tell its owner why."""
+
+    def test_seller_sees_the_reason_and_can_resubmit(self):
+        moderator = User.objects.create_superuser(
+            username='mod-vis', password='safe-password-123', email='mv@x.com'
+        )
+        seller, storefront = make_seller('rejected-seller')
+        listing = make_listing(storefront, status='pending_review')
+
+        staff = APIClient()
+        staff.force_authenticate(user=moderator)
+        staff.post(
+            f'/api/management/moderate/listing/{listing.id}/',
+            {'status': 'rejected', 'reason': 'تصویر محصول واضح نیست.'},
+            format='json',
+        )
+
+        seller_client = APIClient()
+        seller_client.force_authenticate(user=seller)
+        mine = seller_client.get('/api/marketplace/listings/mine/')
+        self.assertEqual(mine.data[0]['status'], 'rejected')
+        self.assertEqual(mine.data[0]['rejection_reason'], 'تصویر محصول واضح نیست.')
+
+        # Editing clears the stale reason and returns the listing to the queue.
+        updated = seller_client.patch(
+            f'/api/marketplace/listings/{listing.slug}/',
+            {'description': 'توضیحات کامل‌تر با تصویر جدید'},
+            format='json',
+        )
+        self.assertEqual(updated.status_code, 200)
+        listing.refresh_from_db()
+        self.assertEqual(listing.status, 'pending_review')
+        self.assertEqual(listing.rejection_reason, '')

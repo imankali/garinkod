@@ -401,8 +401,33 @@ export const affiliateApi = {
   join: () => apiClient.post<{ profile: AffiliateProfile; message: string }>('/affiliate/me/'),
 };
 
+export interface LedgerQueryParams {
+  status?: string;
+  entry_type?: string;
+  date_from?: string;
+  date_to?: string;
+  search?: string;
+  page?: number;
+  page_size?: number;
+}
+
 export const financeApi = {
-  storefront: () => apiClient.get<{ storefront: Storefront; balances: Record<string, number>; entries: FinancialLedgerEntry[]; notice: string }>('/marketplace/finance/'),
+  storefront: (params?: LedgerQueryParams) =>
+    apiClient.get<{
+      storefront: Storefront;
+      balances: Record<string, number>;
+      entries: FinancialLedgerEntry[];
+      entry_types: { value: string; label: string }[];
+      statuses: { value: string; label: string }[];
+      count: number;
+      page: number;
+      total_pages: number;
+      notice: string;
+    }>('/marketplace/finance/', { params }),
+
+  /** Download the ledger as CSV; the response is a blob, not JSON. */
+  exportLedger: (params?: Omit<LedgerQueryParams, 'page' | 'page_size'>) =>
+    apiClient.get('/marketplace/finance/export/', { params, responseType: 'blob' }),
 };
 
 export const trustApi = {

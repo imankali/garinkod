@@ -9,6 +9,8 @@
 
 import type { AxiosError } from 'axios';
 
+import { localiseError } from './errorMessages';
+
 export type ApiErrorCode =
   | 'validation_error'
   | 'authentication_required'
@@ -70,7 +72,7 @@ export function parseApiError(error: unknown): ParsedApiError {
 
   if (axiosError?.code === 'ECONNABORTED') {
     return {
-      message: TRANSPORT_MESSAGES.timeout,
+      message: localiseError('timeout', TRANSPORT_MESSAGES.timeout),
       code: 'timeout',
       status: 0,
       fields: {},
@@ -80,7 +82,7 @@ export function parseApiError(error: unknown): ParsedApiError {
 
   if (!axiosError?.response) {
     return {
-      message: TRANSPORT_MESSAGES.network,
+      message: localiseError('network_error', TRANSPORT_MESSAGES.network),
       code: 'network_error',
       status: 0,
       fields: {},
@@ -95,9 +97,12 @@ export function parseApiError(error: unknown): ParsedApiError {
     const envelope = data as Partial<ApiErrorEnvelope>;
 
     if (typeof envelope.error === 'string') {
+      const code = (envelope.code as ApiErrorCode) ?? 'error';
       return {
-        message: envelope.error,
-        code: (envelope.code as ApiErrorCode) ?? 'error',
+        // In Persian the server's own wording is kept (it is more specific);
+        // in another language the code is translated instead.
+        message: localiseError(code, envelope.error),
+        code,
         status: envelope.status ?? status,
         fields: flattenFields(envelope.fields),
         retryAfter: envelope.retry_after,
@@ -113,9 +118,10 @@ export function parseApiError(error: unknown): ParsedApiError {
     delete legacyFields.detail;
 
     const firstFieldMessage = Object.values(legacyFields)[0];
+    const legacyCode: ApiErrorCode = status === 400 ? 'validation_error' : 'error';
     return {
-      message: detail ?? firstFieldMessage ?? TRANSPORT_MESSAGES.unknown,
-      code: status === 400 ? 'validation_error' : 'error',
+      message: localiseError(legacyCode, detail ?? firstFieldMessage ?? TRANSPORT_MESSAGES.unknown),
+      code: legacyCode,
       status,
       fields: legacyFields,
       handled,
@@ -123,7 +129,7 @@ export function parseApiError(error: unknown): ParsedApiError {
   }
 
   return {
-    message: TRANSPORT_MESSAGES.unknown,
+    message: localiseError('error', TRANSPORT_MESSAGES.unknown),
     code: 'error',
     status,
     fields: {},

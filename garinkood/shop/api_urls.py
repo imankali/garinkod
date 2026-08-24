@@ -46,6 +46,7 @@ urlpatterns = [
     path('marketplace/storefront/availability/', marketplace_views.storefront_name_available, name='api_storefront_availability'),
     path('marketplace/following/', marketplace_views.my_following, name='api_my_following'),
     path('marketplace/finance/', api_views.storefront_finance, name='api_storefront_finance'),
+    path('marketplace/finance/export/', api_views.storefront_finance_export, name='api_storefront_finance_export'),
     path('payments/options/', api_views.payment_options_view, name='api_payment_options'),
     path('affiliate/me/', api_views.affiliate_me, name='api_affiliate_me'),
     path('feedback/', api_views.submit_feedback, name='api_feedback'),

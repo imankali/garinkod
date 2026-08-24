@@ -353,6 +353,9 @@ export interface AffiliateConversion {
 
 export interface FinancialLedgerEntry {
   id: number;
+  /** Stable human reference, e.g. GKF-00000123. */
+  reference: string;
+  order_code: string;
   owner_type: string;
   entry_type: string;
   entry_type_label: string;

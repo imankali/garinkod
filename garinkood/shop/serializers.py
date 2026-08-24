@@ -443,6 +443,31 @@ class StorefrontSerializer(serializers.ModelSerializer):
             return False
         return StorefrontFollow.objects.filter(storefront=obj, user=request.user).exists()
 
+    def _validate_storefront_image(self, image, label):
+        """Same MIME/size/dimension rules the user avatar uses."""
+        if not image:
+            return image
+        max_bytes = settings.AVATAR_MAX_UPLOAD_BYTES
+        if image.size > max_bytes:
+            raise serializers.ValidationError(
+                f'حجم {label} باید کمتر از {max_bytes // (1024 * 1024)} مگابایت باشد.'
+            )
+        content_type = getattr(image, 'content_type', '')
+        if content_type and content_type not in settings.AVATAR_ALLOWED_CONTENT_TYPES:
+            raise serializers.ValidationError(f'فرمت {label} باید JPEG، PNG یا WebP باشد.')
+        if getattr(image, 'image', None) is not None:
+            if image.image.width < 64 or image.image.height < 64:
+                raise serializers.ValidationError(f'ابعاد {label} باید حداقل ۶۴×۶۴ پیکسل باشد.')
+            if image.image.width > 4096 or image.image.height > 4096:
+                raise serializers.ValidationError(f'ابعاد {label} نباید بیشتر از ۴۰۹۶ پیکسل باشد.')
+        return image
+
+    def validate_avatar(self, image):
+        return self._validate_storefront_image(image, 'تصویر غرفه')
+
+    def validate_cover(self, image):
+        return self._validate_storefront_image(image, 'کاور غرفه')
+
     def validate_name(self, name):
         """Reject a name already taken by another storefront, case-insensitively."""
         cleaned = ' '.join(name.split())
@@ -629,11 +654,21 @@ class PaymentAttemptSerializer(serializers.ModelSerializer):
 class FinancialLedgerEntrySerializer(serializers.ModelSerializer):
     status_label = serializers.CharField(source='get_status_display', read_only=True)
     entry_type_label = serializers.CharField(source='get_entry_type_display', read_only=True)
+    # A stable, quotable reference the seller can cite in a support ticket.
+    reference = serializers.SerializerMethodField()
+    order_code = serializers.CharField(source='order.code', read_only=True, default='')
 
     class Meta:
         model = FinancialLedgerEntry
-        fields = ['id', 'owner_type', 'entry_type', 'entry_type_label', 'status', 'status_label', 'amount', 'currency', 'description', 'created_at', 'available_at']
+        fields = [
+            'id', 'reference', 'owner_type', 'entry_type', 'entry_type_label',
+            'status', 'status_label', 'amount', 'currency', 'description',
+            'order_code', 'created_at', 'available_at',
+        ]
         read_only_fields = fields
+
+    def get_reference(self, obj):
+        return f'GKF-{obj.id:08d}'
 
 
 class AffiliateProfileSerializer(serializers.ModelSerializer):

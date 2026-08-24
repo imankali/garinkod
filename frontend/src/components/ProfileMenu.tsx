@@ -49,7 +49,7 @@ export default function ProfileMenu() {
   const ref = useRef<HTMLDivElement>(null);
 
   // دریافت اطلاعات کاربر از auth store
-  const { user, isAuthenticated, logout } = useAuthStore();
+  const { user, account, isAuthenticated, logout } = useAuthStore();
 
   // ========================================
   // بستن منو هنگام کلیک بیرون
@@ -112,9 +112,22 @@ export default function ProfileMenu() {
         aria-label="منوی پروفایل"
         aria-expanded={open}
       >
-        {/* Avatar */}
-        <span className="relative flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-lime-500 text-sm font-bold text-white shadow-md shadow-emerald-200 transition-transform duration-300 group-hover:scale-105 md:h-10 md:w-10">
-          {initials}
+        {/* Avatar: the uploaded picture when there is one, initials otherwise. */}
+        <span className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-emerald-500 to-lime-500 text-sm font-bold text-white shadow-md shadow-emerald-200 transition-transform duration-300 group-hover:scale-105 md:h-10 md:w-10">
+          {account?.avatar_url ? (
+            <img
+              src={account.avatar_url}
+              alt=""
+              className="h-full w-full object-cover"
+              onError={(event) => {
+                // A deleted or unreachable file falls back to the initials
+                // rather than showing a broken-image icon.
+                event.currentTarget.style.display = 'none';
+              }}
+            />
+          ) : (
+            initials
+          )}
           {/* Online Indicator */}
           <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-lime-400" />
         </span>

@@ -871,19 +871,28 @@ class MarketplaceListingViewSet(viewsets.ModelViewSet):
 def my_storefront(request):
     storefront = Storefront.objects.filter(user=request.user).first()
     if request.method == 'GET':
-        return Response(StorefrontSerializer(storefront).data if storefront else None)
+        return Response(
+            StorefrontSerializer(storefront, context={'request': request}).data if storefront else None
+        )
 
     if request.method == 'POST':
         if storefront:
             return Response({'error': 'شما قبلاً غرفه ساخته‌اید.'}, status=status.HTTP_400_BAD_REQUEST)
-        serializer = StorefrontSerializer(data=request.data)
+        serializer = StorefrontSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         storefront = serializer.save(user=request.user)
-        return Response(StorefrontSerializer(storefront).data, status=status.HTTP_201_CREATED)
+        return Response(
+            StorefrontSerializer(storefront, context={'request': request}).data,
+            status=status.HTTP_201_CREATED,
+        )
 
     if not storefront:
         return Response({'error': 'ابتدا غرفه خود را بسازید.'}, status=status.HTTP_404_NOT_FOUND)
-    serializer = StorefrontSerializer(storefront, data=request.data, partial=True)
+    # PATCH accepts multipart so the seller can set the shop avatar and cover
+    # in the same request as the textual details.
+    serializer = StorefrontSerializer(
+        storefront, data=request.data, partial=True, context={'request': request}
+    )
     serializer.is_valid(raise_exception=True)
     serializer.save()
     return Response(serializer.data)
@@ -1038,21 +1047,121 @@ def affiliate_me(request):
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def storefront_finance(request):
+    """The seller's ledger, filterable by status, type and date range."""
     storefront = get_object_or_404(Storefront, user=request.user)
-    entries = FinancialLedgerEntry.objects.filter(storefront=storefront)
-    totals = entries.values('status').annotate(total=Sum('amount'))
+    entries = FinancialLedgerEntry.objects.filter(storefront=storefront).select_related('order')
+
+    # Balances are always computed over the *unfiltered* ledger: a filtered
+    # view must not make a seller think their available balance changed.
+    totals = FinancialLedgerEntry.objects.filter(storefront=storefront).values('status').annotate(total=Sum('amount'))
     balances = {row['status']: row['total'] or 0 for row in totals}
+
+    params = request.query_params
+    status_filter = params.get('status', '').strip()
+    if status_filter:
+        entries = entries.filter(status=status_filter)
+    entry_type = params.get('entry_type', '').strip()
+    if entry_type:
+        entries = entries.filter(entry_type=entry_type)
+    date_from = params.get('date_from', '').strip()
+    if date_from:
+        entries = entries.filter(created_at__date__gte=date_from)
+    date_to = params.get('date_to', '').strip()
+    if date_to:
+        entries = entries.filter(created_at__date__lte=date_to)
+    search = params.get('search', '').strip()
+    if search:
+        entries = entries.filter(Q(description__icontains=search) | Q(order__code__icontains=search))
+
+    try:
+        page = max(int(params.get('page', 1)), 1)
+        page_size = min(max(int(params.get('page_size', 25)), 1), 100)
+    except (TypeError, ValueError):
+        return Response({'error': 'پارامترهای صفحه‌بندی نامعتبر است.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    total_count = entries.count()
+    start = (page - 1) * page_size
     return Response({
-        'storefront': StorefrontSerializer(storefront).data,
+        'storefront': StorefrontSerializer(storefront, context={'request': request}).data,
         'balances': {
             'pending': balances.get('pending', 0),
             'available': balances.get('available', 0),
             'held': balances.get('held', 0),
             'paid': balances.get('paid', 0),
         },
-        'entries': FinancialLedgerEntrySerializer(entries[:50], many=True).data,
-        'notice': 'تسویه خودکار پس از راه‌اندازی سفارش امن marketplace و تأیید پرداخت فعال می‌شود.'
+        'count': total_count,
+        'page': page,
+        'page_size': page_size,
+        'total_pages': (total_count + page_size - 1) // page_size or 1,
+        'entry_types': [{'value': value, 'label': label} for value, label in FinancialLedgerEntry.ENTRY_TYPE_CHOICES],
+        'statuses': [{'value': value, 'label': label} for value, label in FinancialLedgerEntry.STATUS_CHOICES],
+        'entries': FinancialLedgerEntrySerializer(entries[start:start + page_size], many=True).data,
+        'notice': 'مبالغ «قابل تسویه» پس از پایان دوره رسیدگی به شکایت قابل برداشت خواهند بود.'
     })
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def storefront_finance_export(request):
+    """Download the seller's ledger as CSV.
+
+    A UTF-8 BOM is written before the rows: without it Excel on Windows opens
+    Persian text as mojibake, which makes the export useless for the audience
+    most likely to need it.
+    """
+    import csv
+    from urllib.parse import quote
+
+    from django.http import HttpResponse
+
+    storefront = get_object_or_404(Storefront, user=request.user)
+    entries = (
+        FinancialLedgerEntry.objects
+        .filter(storefront=storefront)
+        .select_related('order')
+        .order_by('-created_at')
+    )
+    params = request.query_params
+    if params.get('status'):
+        entries = entries.filter(status=params['status'].strip())
+    if params.get('entry_type'):
+        entries = entries.filter(entry_type=params['entry_type'].strip())
+    if params.get('date_from'):
+        entries = entries.filter(created_at__date__gte=params['date_from'].strip())
+    if params.get('date_to'):
+        entries = entries.filter(created_at__date__lte=params['date_to'].strip())
+
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    # A Persian slug in the header would force base64 encoding, which some
+    # browsers save literally. RFC 5987 gives an ASCII fallback plus a UTF-8
+    # version, so every client gets a sensible filename.
+    ascii_name = f'garinkood-ledger-{storefront.id}-{timezone.now():%Y%m%d}.csv'
+    utf8_name = quote(f'گزارش-مالی-{storefront.name}-{timezone.now():%Y%m%d}.csv')
+    response['Content-Disposition'] = (
+        f'attachment; filename="{ascii_name}"; filename*=UTF-8\'\'{utf8_name}'
+    )
+    response.write('\ufeff')
+
+    writer = csv.writer(response)
+    writer.writerow([
+        'شناسه تراکنش', 'تاریخ', 'نوع', 'وضعیت', 'مبلغ (تومان)',
+        'ارز', 'کد سفارش', 'شرح', 'تاریخ قابل تسویه',
+    ])
+    for entry in entries:
+        writer.writerow([
+            f'GKF-{entry.id:08d}',
+            timezone.localtime(entry.created_at).strftime('%Y-%m-%d %H:%M'),
+            entry.get_entry_type_display(),
+            entry.get_status_display(),
+            entry.amount,
+            entry.currency,
+            entry.order.code if entry.order_id else '',
+            entry.description,
+            timezone.localtime(entry.available_at).strftime('%Y-%m-%d') if entry.available_at else '',
+        ])
+
+    _audit(request.user, 'finance_exported', storefront, f'گزارش مالی غرفه {storefront.name} دریافت شد.', {'rows': entries.count()})
+    return response
 
 
 @api_view(['POST'])

@@ -118,6 +118,16 @@ jobs:
           python manage.py seed_agri_inputs
           python manage.py bootstrap_management_roles
           python manage.py seed_demo_marketplace
+          # A level-3 account so the moderation specs have somewhere to sign in.
+          python manage.py shell -c "
+          from django.contrib.auth.models import User
+          from shop.models import UserAccount
+          user, _ = User.objects.get_or_create(username='e2e-moderator', defaults={'is_staff': True})
+          user.set_password('E2eModerator!234'); user.is_staff = True; user.save()
+          account, _ = UserAccount.objects.get_or_create(user=user, defaults={'phone': ''})
+          account.level = UserAccount.LEVEL_MODERATOR; account.save()
+          "
+
 
       - name: Start the API
         working-directory: garinkood
@@ -142,6 +152,9 @@ jobs:
 
       - name: Run end-to-end tests
         run: npx playwright test --project=${{ matrix.project }}
+        env:
+          E2E_MODERATOR_USERNAME: e2e-moderator
+          E2E_MODERATOR_PASSWORD: E2eModerator!234
 
       - name: Upload Playwright report
         if: always()

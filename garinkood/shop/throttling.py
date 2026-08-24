@@ -13,10 +13,38 @@ Two keying strategies are used deliberately:
   IP otherwise, so one signed-in user cannot spend a shared NAT's budget.
 """
 
+import logging
+
 from rest_framework.throttling import SimpleRateThrottle
 
+# Blocked requests are logged so a spike is visible in monitoring rather than
+# only being felt by users. The logger is configured in settings.LOGGING.
+throttle_logger = logging.getLogger('garinkood.throttle')
 
-class IPRateThrottle(SimpleRateThrottle):
+
+class LoggingThrottleMixin:
+    """Emit a warning whenever a request is actually blocked."""
+
+    def allow_request(self, request, view):
+        allowed = super().allow_request(request, view)
+        if not allowed:
+            throttle_logger.warning(
+                'throttled scope=%s ident=%s path=%s method=%s',
+                self.scope,
+                self.get_ident(request),
+                request.path,
+                request.method,
+                extra={
+                    'throttle_scope': self.scope,
+                    'client_ip': self.get_ident(request),
+                    'path': request.path,
+                    'user_id': getattr(request.user, 'id', None),
+                },
+            )
+        return allowed
+
+
+class IPRateThrottle(LoggingThrottleMixin, SimpleRateThrottle):
     """Throttle strictly by client IP, ignoring authentication state."""
 
     scope = 'ip'
@@ -25,7 +53,7 @@ class IPRateThrottle(SimpleRateThrottle):
         return self.cache_format % {'scope': self.scope, 'ident': self.get_ident(request)}
 
 
-class UserOrIPRateThrottle(SimpleRateThrottle):
+class UserOrIPRateThrottle(LoggingThrottleMixin, SimpleRateThrottle):
     """Throttle per authenticated user, falling back to the client IP."""
 
     scope = 'user_or_ip'
