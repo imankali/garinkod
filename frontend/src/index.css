@@ -314,6 +314,67 @@ button, a, input, select, textarea {
   height: 100%;
 }
 
+/*
+ * Mobile overflow safety net.
+ *
+ * A single wide child — a long unbroken code, a `w-max` marquee, a grid whose
+ * minimum track exceeded the screen — used to widen the whole document and
+ * make every page scroll sideways on a phone. Clamping the root and letting
+ * long words break contains that at the source instead of patching each
+ * component after the fact.
+ */
+html,
+body {
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+@media (max-width: 767px) {
+  /* Long identifiers (order codes, emails, referral links) wrap instead of
+     pushing their container past the viewport edge. */
+  p,
+  li,
+  dd,
+  h1,
+  h2,
+  h3,
+  h4 {
+    overflow-wrap: break-word;
+  }
+}
+
+/*
+ * Text inputs are never smaller than 16px on touch screens: iOS Safari zooms
+ * the whole page in when a focused field's text is below that, which leaves
+ * the layout scrolled sideways after the keyboard closes.
+ */
+@media (hover: none) and (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    font-size: max(16px, 1em);
+  }
+}
+
+/*
+ * The messages panel.
+ *
+ * On a phone it fills exactly the gap between the sticky header and the fixed
+ * bottom bar, so the composer lands just above the bar instead of being pushed
+ * off-screen by a fixed vh height. Desktop uses a comfortable fixed height.
+ * These live here rather than in an inline style because an inline height
+ * would also win on desktop, where a different rule is wanted.
+ */
+.chat-shell {
+  height: calc(100dvh - var(--header-height) - var(--mobile-nav-clearance) - 2rem);
+}
+
+@media (min-width: 1024px) {
+  .chat-shell {
+    height: min(70vh, 44rem);
+  }
+}
+
 /* Standard page shell: consistent gutters and bottom clearance everywhere. */
 .page-shell {
   width: 100%;

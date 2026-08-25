@@ -27,6 +27,7 @@ import type {
   Coupon,
   Wallet,
   StorefrontPost,
+  StorefrontPostComment,
   ManagementDashboard,
   ManagementStaffMember,
   ManagementAuditLog,
@@ -40,6 +41,8 @@ import type {
   FollowedStorefront,
   StorefrontConversation,
   StorefrontMessage,
+  MessageChannel,
+  InboxResponse,
   FarmLand,
   FarmCalendarEvent,
   FarmConsultationRequest,
@@ -309,6 +312,10 @@ export const agricultureApi = {
   myListings: () => apiClient.get<MarketplaceListing[]>('/marketplace/listings/mine/'),
   createListing: (data: Partial<MarketplaceListing>) =>
     apiClient.post<MarketplaceListing>('/marketplace/listings/', data),
+  /** Owner edits one of their own آگهی‌ها; the viewset scopes writes to them. */
+  updateListing: (slug: string, data: Partial<MarketplaceListing>) =>
+    apiClient.patch<MarketplaceListing>(`/marketplace/listings/${slug}/`, data),
+  deleteListing: (slug: string) => apiClient.delete(`/marketplace/listings/${slug}/`),
 };
 
 /** فیلترهای سمت سرور برای بازار غرفه‌داران */
@@ -466,11 +473,19 @@ export const rewardsApi = {
 // Direct messages (DM) between buyers and storefronts
 // ========================================
 export const messagesApi = {
-  /** All conversations the caller participates in, with unread counts. */
-  conversations: () =>
-    apiClient.get<{ count: number; results: StorefrontConversation[]; unread_total: number }>(
-      '/marketplace/conversations/',
-    ),
+  /** The caller's whole inbox, optionally narrowed to one channel. */
+  conversations: (channel?: MessageChannel) =>
+    apiClient.get<InboxResponse>('/marketplace/conversations/', {
+      params: channel ? { channel } : undefined,
+    }),
+
+  /** Open (or fetch) the caller's thread with a service desk. */
+  openServiceConversation: (channel: Exclude<MessageChannel, 'storefront'>) =>
+    apiClient.post<StorefrontConversation>(`/marketplace/conversations/service/${channel}/`),
+
+  /** A consultant starts the consulting thread with one farmer. */
+  openFarmerConversation: (userId: number) =>
+    apiClient.post<StorefrontConversation>(`/marketplace/conversations/farmer/${userId}/`),
 
   /** Get or create the caller's private thread with one storefront. */
   openStorefrontConversation: (storefrontSlug: string) =>
@@ -490,12 +505,35 @@ export const messagesApi = {
       { params: { page } },
     ),
 
-  /** Send a text message, optionally attaching a marketplace listing. */
-  send: (conversationId: number, data: { body?: string; listing?: number }) =>
-    apiClient.post<StorefrontMessage>(
-      `/marketplace/conversations/${conversationId}/messages/`,
-      data,
-    ),
+  /** Send a message: text, a listing card, and/or one media attachment. */
+  send: (
+    conversationId: number,
+    data: {
+      body?: string;
+      listing?: number;
+      attachment?: Blob | null;
+      attachmentName?: string;
+      attachmentDuration?: number;
+    },
+  ) => {
+    const url = `/marketplace/conversations/${conversationId}/messages/`;
+    if (!data.attachment) {
+      return apiClient.post<StorefrontMessage>(url, {
+        body: data.body,
+        listing: data.listing,
+      });
+    }
+    // A media message goes as multipart; the request interceptor drops the
+    // JSON content-type so the browser can add the multipart boundary.
+    const formData = new FormData();
+    if (data.body) formData.append('body', data.body);
+    if (data.listing) formData.append('listing', String(data.listing));
+    formData.append('attachment', data.attachment, data.attachmentName || 'attachment');
+    if (data.attachmentDuration !== undefined) {
+      formData.append('attachment_duration', String(Math.round(data.attachmentDuration)));
+    }
+    return apiClient.post<StorefrontMessage>(url, formData);
+  },
 };
 
 // ========================================
@@ -576,17 +614,55 @@ export const consultingApi = {
 };
 
 export const storefrontPostsApi = {
-  list: (params?: { post_type?: 'post' | 'story' }) =>
+  list: (params?: { post_type?: 'post' | 'story'; storefront?: number; page?: number }) =>
     apiClient.get<PaginatedResponse<StorefrontPost>>('/marketplace/posts/', { params }),
   mine: () => apiClient.get<StorefrontPost[]>('/marketplace/posts/mine/'),
-  create: (data: { post_type: 'post' | 'story'; caption: string; listing?: number; image?: File | null }) => {
+
+  create: (data: {
+    post_type: 'post' | 'story';
+    caption: string;
+    listing?: number;
+    image?: File | null;
+  }) => {
     const formData = new FormData();
     formData.append('post_type', data.post_type);
     formData.append('caption', data.caption);
     if (data.listing) formData.append('listing', String(data.listing));
     if (data.image) formData.append('image', data.image);
-    return apiClient.post<StorefrontPost>('/marketplace/posts/', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+    return apiClient.post<StorefrontPost>('/marketplace/posts/', formData);
   },
+
+  /** Owner edits their own post; the revision re-enters moderation. */
+  update: (id: number, data: { caption?: string; listing?: number | null; image?: File | null }) => {
+    const formData = new FormData();
+    if (data.caption !== undefined) formData.append('caption', data.caption);
+    if (data.listing !== undefined && data.listing !== null) {
+      formData.append('listing', String(data.listing));
+    }
+    if (data.image) formData.append('image', data.image);
+    return apiClient.patch<StorefrontPost>(`/marketplace/posts/${id}/`, formData);
+  },
+
+  remove: (id: number) => apiClient.delete(`/marketplace/posts/${id}/`),
+
+  // --- Instagram-style social actions ---
+  like: (id: number) =>
+    apiClient.post<{ is_liked: boolean; like_count: number }>(`/marketplace/posts/${id}/like/`),
+  unlike: (id: number) =>
+    apiClient.delete<{ is_liked: boolean; like_count: number }>(`/marketplace/posts/${id}/like/`),
+  /** Mark a story as watched so its ring turns grey. */
+  markSeen: (id: number) => apiClient.post<{ is_seen: boolean }>(`/marketplace/posts/${id}/seen/`),
+
+  comments: (id: number) =>
+    apiClient.get<{ count: number; results: StorefrontPostComment[] }>(
+      `/marketplace/posts/${id}/comments/`,
+    ),
+  addComment: (id: number, body: string, parent?: number) =>
+    apiClient.post<StorefrontPostComment>(`/marketplace/posts/${id}/comments/`, { body, parent }),
+  updateComment: (commentId: number, body: string) =>
+    apiClient.patch<StorefrontPostComment>(`/marketplace/post-comments/${commentId}/`, { body }),
+  deleteComment: (commentId: number) =>
+    apiClient.delete(`/marketplace/post-comments/${commentId}/`),
 };
 
 export const managementApi = {

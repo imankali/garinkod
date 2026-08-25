@@ -5,8 +5,8 @@ from secrets import token_urlsafe
 from threading import Lock
 
 from django.conf import settings
-from django.db.models import Count, F, Prefetch, Q, Sum
-from rest_framework import viewsets, permissions, status
+from django.db.models import Count, Exists, F, OuterRef, Prefetch, Q, Sum
+from rest_framework import mixins, viewsets, permissions, status
 from rest_framework.decorators import action, api_view, permission_classes, throttle_classes
 from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
@@ -17,6 +17,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.pagination import PageNumberPagination
 
 from .filters import ProductFilter
@@ -27,6 +28,7 @@ from .models import (
     PlatformFeedback, StorefrontComplaint, VisualSearchRequest, Coupon, Wallet,
     WalletTransaction, StorefrontPost, AdminAuditLog, Location, AgriInput,
     AgriInputDose, StorefrontFollow, StorefrontHighlight, StorefrontHighlightItem,
+    StorefrontPostComment, StorefrontPostLike, StorefrontStoryView,
     UserAccount, account_level
 )
 from .serializers import (
@@ -38,12 +40,14 @@ from .serializers import (
     AffiliateConversionSerializer, FinancialLedgerEntrySerializer, PlatformFeedbackSerializer,
     StorefrontComplaintSerializer, VisualSearchRequestSerializer, CouponSerializer,
     WalletSerializer, StorefrontPostSerializer, AdminAuditLogSerializer,
-    LocationSerializer, AgriInputSerializer, StorefrontHighlightSerializer
+    LocationSerializer, AgriInputSerializer, StorefrontHighlightSerializer,
+    StorefrontPostCommentSerializer
 )
 from .management_roles import ROLE_PERMISSIONS
 from .payments import get_provider, provider_options
 from .rewards import mark_order_paid_and_reward
 from .settlements import record_marketplace_sale, reverse_marketplace_sale, restore_listing_quantities
+from .notifications import notify_comment_reply
 from .permissions import IsModerator, IsAdminLevel, IsOwnerLevel
 from .slugs import slugify_fa, unique_storefront_slug, unique_listing_slug
 from .throttling import (
@@ -1266,27 +1270,101 @@ def my_wallet(request):
 
 
 class StorefrontPostViewSet(viewsets.ModelViewSet):
+    """Storefront posts and stories, with Instagram-style social actions.
+
+    Owners may edit and delete their own posts; everyone else gets the public,
+    published feed. Likes, comments and story views live on nested routes so a
+    single post payload can carry its own counters.
+    """
+
     serializer_class = StorefrontPostSerializer
     filter_backends = [OrderingFilter]
     ordering_fields = ['created_at']
     ordering = ['-created_at']
 
-    def get_queryset(self):
-        base = StorefrontPost.objects.select_related('storefront', 'listing')
-        if self.action in {'list', 'retrieve'}:
-            now = timezone.now()
-            return base.filter(status='published').filter(
-                Q(post_type='post') |
-                Q(post_type='story', expires_at__gt=now)
+    def _annotate(self, queryset):
+        """Attach the social counters in the same query as the rows.
+
+        Without this each card in a feed would trigger its own COUNT for likes
+        and comments plus two existence probes — the classic N+1 that makes a
+        20-post page issue 80 queries.
+        """
+        user = self.request.user
+        queryset = queryset.annotate(
+            likes_total=Count('likes', distinct=True),
+            comments_total=Count(
+                'comments', filter=Q(comments__is_hidden=False), distinct=True
+            ),
+        )
+        if user.is_authenticated:
+            queryset = queryset.annotate(
+                liked_by_me=Exists(
+                    StorefrontPostLike.objects.filter(post=OuterRef('pk'), user=user)
+                ),
+                seen_by_me=Exists(
+                    StorefrontStoryView.objects.filter(post=OuterRef('pk'), user=user)
+                ),
             )
+        return queryset
+
+    def _apply_feed_filters(self, queryset):
+        """Narrow the feed by the parameters the clients actually send.
+
+        The stories strip and the posts feed are two separate sections of the
+        same page, so both request the same endpoint with ?post_type=. Without
+        this the strip and the feed were handed identical mixed payloads.
+        """
+        params = self.request.query_params
+        post_type = params.get('post_type', '').strip()
+        if post_type in {'post', 'story'}:
+            queryset = queryset.filter(post_type=post_type)
+        storefront = params.get('storefront', '').strip()
+        if storefront:
+            # Accept either the numeric id or the slug: the profile page has
+            # the slug in the URL, list callers usually have the id.
+            if storefront.isdigit():
+                queryset = queryset.filter(storefront_id=int(storefront))
+            else:
+                queryset = queryset.filter(storefront__slug=storefront)
+        return queryset
+
+    def get_queryset(self):
+        base = StorefrontPost.objects.select_related('storefront', 'storefront__user', 'listing')
+        if self.action in {'list', 'retrieve', 'comments', 'like', 'seen'}:
+            now = timezone.now()
+            # Expired stories are gone for everyone, owner included: a story is
+            # ephemeral by definition and resurfacing it would be a bug, not a
+            # privilege.
+            live = base.filter(Q(post_type='post') | Q(post_type='story', expires_at__gt=now))
+            public = live.filter(status='published')
+            # The owner also sees their own pending/rejected items in place,
+            # so a post under review does not silently vanish from their page.
+            if self.request.user.is_authenticated:
+                public = live.filter(
+                    Q(pk__in=public.values('pk')) | Q(storefront__user=self.request.user)
+                )
+            return self._annotate(self._apply_feed_filters(public))
         if self.request.user.is_authenticated:
-            return base.filter(storefront__user=self.request.user)
+            return self._annotate(base.filter(storefront__user=self.request.user))
         return base.none()
 
     def get_permissions(self):
+        # Actions declare their own permissions (``comments`` is readable by
+        # anyone). Overriding them here unconditionally made an anonymous
+        # visitor's attempt to read a comment thread return 401, which the
+        # frontend interceptor turns into a redirect to the login page.
+        if getattr(self, 'action', None) and hasattr(self, self.action):
+            handler = getattr(self, self.action)
+            declared = getattr(handler, 'kwargs', {}).get('permission_classes')
+            if declared:
+                return [permission() for permission in declared]
         if self.action in {'list', 'retrieve'}:
             return [permissions.AllowAny()]
         return [permissions.IsAuthenticated()]
+
+    def _assert_owner(self, post):
+        if post.storefront.user_id != self.request.user.id:
+            raise PermissionDenied('این پست متعلق به غرفه شما نیست.')
 
     def perform_create(self, serializer):
         storefront = get_object_or_404(Storefront, user=self.request.user)
@@ -1296,9 +1374,124 @@ class StorefrontPostViewSet(viewsets.ModelViewSet):
             expires_at = timezone.now() + timedelta(hours=24)
         serializer.save(storefront=storefront, status='pending_review', expires_at=expires_at)
 
+    def perform_update(self, serializer):
+        """An owner may revise a post; the revision goes back for review.
+
+        Re-queuing matters: without it an approved post could be edited into
+        content that was never moderated.
+        """
+        self._assert_owner(serializer.instance)
+        serializer.save(status='pending_review')
+
+    def perform_destroy(self, instance):
+        self._assert_owner(instance)
+        instance.delete()
+
     @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated])
     def mine(self, request):
         return Response(self.get_serializer(self.get_queryset(), many=True).data)
+
+    @action(detail=True, methods=['post', 'delete'], permission_classes=[permissions.IsAuthenticated])
+    def like(self, request, pk=None):
+        """Like (POST) or unlike (DELETE) a post — both are idempotent."""
+        post = self.get_object()
+        if request.method == 'POST':
+            StorefrontPostLike.objects.get_or_create(post=post, user=request.user)
+        else:
+            StorefrontPostLike.objects.filter(post=post, user=request.user).delete()
+        return Response({
+            'is_liked': request.method == 'POST',
+            'like_count': post.likes.count(),
+        })
+
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def seen(self, request, pk=None):
+        """Mark a story as viewed, which greys out its ring for this user."""
+        post = self.get_object()
+        StorefrontStoryView.objects.get_or_create(post=post, user=request.user)
+        return Response({'is_seen': True})
+
+    @action(
+        detail=True, methods=['get', 'post'],
+        permission_classes=[permissions.IsAuthenticatedOrReadOnly],
+    )
+    def comments(self, request, pk=None):
+        """List a post's comment thread, or add a comment / reply to it."""
+        post = self.get_object()
+
+        if request.method == 'GET':
+            roots = (
+                post.comments.filter(parent__isnull=True, is_hidden=False)
+                .select_related('user', 'user__account', 'post__storefront')
+                .prefetch_related(
+                    Prefetch(
+                        'replies',
+                        queryset=StorefrontPostComment.objects.filter(is_hidden=False)
+                        .select_related('user', 'user__account', 'post__storefront')
+                        .order_by('created_at'),
+                    )
+                )
+                .order_by('created_at')
+            )
+            return Response({
+                'count': post.comments.filter(is_hidden=False).count(),
+                'results': StorefrontPostCommentSerializer(
+                    roots, many=True, context={'request': request}
+                ).data,
+            })
+
+        serializer = StorefrontPostCommentSerializer(
+            data=request.data, context={'request': request}
+        )
+        serializer.is_valid(raise_exception=True)
+
+        parent = None
+        parent_id = request.data.get('parent')
+        if parent_id:
+            parent = get_object_or_404(StorefrontPostComment, pk=parent_id, post=post)
+
+        comment = serializer.save(post=post, user=request.user, parent=parent)
+
+        # Replying to someone notifies them in the unified inbox, so a reply is
+        # never something the author has to come back and hunt for.
+        if parent is not None and parent.user_id != request.user.id:
+            notify_comment_reply(comment)
+
+        return Response(
+            StorefrontPostCommentSerializer(comment, context={'request': request}).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class StorefrontPostCommentViewSet(
+    mixins.UpdateModelMixin, mixins.DestroyModelMixin, viewsets.GenericViewSet
+):
+    """Editing and removing a single comment.
+
+    The author may edit or delete their own comment; the owner of the post may
+    remove (but not rewrite) anything on their page — moderation without
+    putting words in someone else's mouth.
+    """
+
+    serializer_class = StorefrontPostCommentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return StorefrontPostComment.objects.select_related(
+            'user', 'user__account', 'post', 'post__storefront'
+        )
+
+    def perform_update(self, serializer):
+        if serializer.instance.user_id != self.request.user.id:
+            raise PermissionDenied('فقط نویسنده می‌تواند دیدگاه را ویرایش کند.')
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        is_author = instance.user_id == self.request.user.id
+        is_post_owner = instance.post.storefront.user_id == self.request.user.id
+        if not (is_author or is_post_owner):
+            raise PermissionDenied('اجازه حذف این دیدگاه را ندارید.')
+        instance.delete()
 
 
 # ========================================

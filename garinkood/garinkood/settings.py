@@ -312,3 +312,31 @@ AVATAR_ALLOWED_CONTENT_TYPES = config(
     default="image/jpeg,image/png,image/webp",
     cast=Csv(),
 )
+
+# Chat attachments (voice notes, photos and short clips). Limits are enforced
+# in shop.attachments before the file is written to storage; the generous video
+# ceiling still has to stay under the reverse proxy's own body-size limit.
+MESSAGE_ATTACHMENT_MAX_BYTES = {
+    "image": config("MESSAGE_IMAGE_MAX_BYTES", default=5 * 1024 * 1024, cast=int),
+    "audio": config("MESSAGE_AUDIO_MAX_BYTES", default=10 * 1024 * 1024, cast=int),
+    "video": config("MESSAGE_VIDEO_MAX_BYTES", default=25 * 1024 * 1024, cast=int),
+}
+MESSAGE_ATTACHMENT_CONTENT_TYPES = {
+    "image": config(
+        "MESSAGE_IMAGE_CONTENT_TYPES",
+        default="image/jpeg,image/png,image/webp,image/gif",
+        cast=Csv(),
+    ),
+    "audio": config(
+        "MESSAGE_AUDIO_CONTENT_TYPES",
+        # webm/ogg are what MediaRecorder produces in Chrome and Firefox;
+        # mp4/m4a covers Safari on iOS.
+        default="audio/webm,audio/ogg,audio/mpeg,audio/mp4,audio/aac,audio/wav",
+        cast=Csv(),
+    ),
+    "video": config(
+        "MESSAGE_VIDEO_CONTENT_TYPES",
+        default="video/mp4,video/webm,video/quicktime",
+        cast=Csv(),
+    ),
+}

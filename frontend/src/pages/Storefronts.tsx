@@ -43,19 +43,44 @@ const ORDERINGS = [
 
 const PAGE_SIZE = 12;
 
-type Section = 'stores' | 'bestsellers' | 'discounted';
-
-const SECTIONS: { key: Section; icon: typeof Store; labelKey: string }[] = [
-  { key: 'stores', icon: Store, labelKey: 'storefronts.tab.stores' },
-  { key: 'bestsellers', icon: TrendingUp, labelKey: 'storefronts.tab.bestSellers' },
-  { key: 'discounted', icon: Sparkles, labelKey: 'storefronts.tab.discounted' },
+/**
+ * The curated product rows, each rendered as its own titled section with its
+ * own five listings. They were tabs before, so reaching the discounted
+ * products meant hiding the best sellers; stacking them shows everything in
+ * one scroll.
+ */
+const LISTING_SECTIONS: {
+  id: string;
+  icon: typeof Store;
+  labelKey: string;
+  ordering: string;
+  onlyDiscounted?: boolean;
+  tone: string;
+}[] = [
+  {
+    id: 'bestsellers',
+    icon: TrendingUp,
+    labelKey: 'storefronts.tab.bestSellers',
+    ordering: '-sales_count',
+    tone: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-lime-300',
+  },
+  {
+    id: 'discounted',
+    icon: Sparkles,
+    labelKey: 'storefronts.tab.discounted',
+    ordering: '-discount_percent',
+    onlyDiscounted: true,
+    tone: 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-200',
+  },
 ];
+
+/** Each curated row shows five listings. */
+const SECTION_SIZE = 5;
 
 /** The full, filterable directory of storefronts, plus the sellers' best-selling
  *  and most-discounted products. */
 export default function Storefronts() {
   const { t } = useTranslation();
-  const [section, setSection] = useState<Section>('stores');
   const { filters, setFilter, setFilters, resetFilters, activeCount } = useUrlFilters(DEFAULT_FILTERS);
   const [searchInput, setSearchInput] = useState(filters.search);
   const debouncedSearch = useDebouncedValue(searchInput, 350);
@@ -142,40 +167,33 @@ export default function Storefronts() {
           {t('storefronts.subtitle')}
         </p>
 
-        {/* Section tabs */}
-        <div role="tablist" aria-label={t('storefronts.title')} className="no-scrollbar mt-4 flex gap-2 overflow-x-auto pb-1">
-          {SECTIONS.map(({ key, icon: Icon, labelKey }) => (
-            <button
-              key={key}
-              role="tab"
-              aria-selected={section === key}
-              onClick={() => setSection(key)}
-              className={cn(
-                'flex shrink-0 items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-bold transition',
-                section === key
-                  ? 'border-emerald-600 bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
-                  : 'border-emerald-100 bg-white text-slate-600 hover:border-emerald-300 hover:text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-100 dark:hover:border-emerald-600',
-              )}
-            >
-              <Icon size={16} aria-hidden="true" />
-              {t(labelKey)}
-            </button>
-          ))}
-        </div>
       </header>
 
-      {section !== 'stores' && (
-        <ListingSection
-          key={section}
-          ordering={section === 'bestsellers' ? '-sales_count' : '-discount_percent'}
-          onlyDiscounted={section === 'discounted'}
-        />
-      )}
+      {/* Curated listing rows, one section each. */}
+      <div className="mb-8 space-y-8">
+        {LISTING_SECTIONS.map((item) => (
+          <ListingSection
+            key={item.id}
+            id={item.id}
+            icon={item.icon}
+            title={t(item.labelKey)}
+            tone={item.tone}
+            ordering={item.ordering}
+            onlyDiscounted={item.onlyDiscounted}
+          />
+        ))}
+      </div>
 
-      {/* Search + filter toggle */}
-      {section === 'stores' && (
-      <>
-      <div className="sticky top-0 z-10 -mx-4 mb-4 bg-white/95 px-4 py-3 backdrop-blur dark:bg-emerald-950/95">
+      {/* The full storefront directory, with search and filters. */}
+      <h2 className="mb-3 text-fluid-lg font-extrabold text-slate-800 dark:text-white">
+        {t('storefronts.tab.stores')}
+      </h2>
+      {/* Sticks below the header, not under it — top-0 put this bar behind the
+          sticky header on every scroll. */}
+      <div
+        className="sticky z-20 -mx-[var(--page-gutter)] mb-4 bg-white/95 px-[var(--page-gutter)] py-3 backdrop-blur dark:bg-emerald-950/95"
+        style={{ top: 'var(--header-height)' }}
+      >
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Search
@@ -327,43 +345,49 @@ export default function Storefronts() {
           )}
         </>
       )}
-      </>
-      )}
     </div>
   );
 }
 
 /**
- * The sellers' best-selling / most-discounted listings, fetched live from the
- * marketplace API with the matching ordering.
+ * One curated row of seller listings: a heading plus its own five products.
+ *
+ * A row that comes back empty removes itself — a heading over nothing reads
+ * as a broken page rather than as "no results".
  */
-function ListingSection({ ordering, onlyDiscounted }: { ordering: string; onlyDiscounted?: boolean }) {
+function ListingSection({
+  id,
+  icon: Icon,
+  title,
+  tone,
+  ordering,
+  onlyDiscounted,
+}: {
+  id: string;
+  icon: typeof Store;
+  title: string;
+  tone: string;
+  ordering: string;
+  onlyDiscounted?: boolean;
+}) {
   const { t } = useTranslation();
   const [listings, setListings] = useState<MarketplaceListing[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    setError('');
     agricultureApi
-      .listMarketplace({
-        ordering,
-        page: 1,
-        page_size: 24,
-        in_stock: '1',
-        ...(onlyDiscounted ? { max_price: undefined } : {}),
-      })
+      .listMarketplace({ ordering, page: 1, page_size: 24, in_stock: '1' })
       .then((response) => {
         if (cancelled) return;
-        const rows = (response.data.results || []).filter(
-          (listing) => !onlyDiscounted || listing.discount_percent > 0,
-        );
+        const rows = (response.data.results || [])
+          .filter((listing) => !onlyDiscounted || listing.discount_percent > 0)
+          .slice(0, SECTION_SIZE);
         setListings(rows);
       })
       .catch(() => {
-        if (!cancelled) setError(t('shop.noProducts'));
+        if (!cancelled) setListings([]);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -371,32 +395,42 @@ function ListingSection({ ordering, onlyDiscounted }: { ordering: string; onlyDi
     return () => {
       cancelled = true;
     };
-  }, [ordering, onlyDiscounted, t]);
+  }, [ordering, onlyDiscounted]);
 
-  if (loading) {
-    return (
-      <p role="status" aria-live="polite" className="py-12 text-center text-sm text-slate-500">
-        {t('common.loading')}
-      </p>
-    );
-  }
-
-  if (error || listings.length === 0) {
-    return (
-      <p className="rounded-2xl border border-dashed border-slate-200 py-12 text-center text-sm text-slate-400 dark:border-emerald-800">
-        {error || t('shop.noProducts')}
-      </p>
-    );
-  }
+  if (!loading && listings.length === 0) return null;
 
   return (
-    <ul className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
-      {listings.map((listing, index) => (
-        <li key={listing.id}>
-          <MarketplaceListingCard listing={listing} index={index} />
-        </li>
-      ))}
-    </ul>
+    <section aria-labelledby={`storefront-section-${id}`}>
+      <h2
+        id={`storefront-section-${id}`}
+        className="mb-3 flex items-center gap-2 text-fluid-lg font-extrabold text-slate-800 dark:text-white"
+      >
+        <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-xl', tone)}>
+          <Icon size={17} aria-hidden="true" />
+        </span>
+        {title}
+      </h2>
+
+      {loading ? (
+        <ul className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-5">
+          {Array.from({ length: SECTION_SIZE }).map((_, index) => (
+            <li
+              key={index}
+              className="h-64 animate-pulse rounded-2xl bg-emerald-100/60 dark:bg-emerald-900/40"
+              aria-label={t('common.loading')}
+            />
+          ))}
+        </ul>
+      ) : (
+        <ul className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-5">
+          {listings.map((listing, index) => (
+            <li key={listing.id}>
+              <MarketplaceListingCard listing={listing} index={index} />
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 

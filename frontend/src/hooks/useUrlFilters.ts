@@ -65,9 +65,25 @@ export function useUrlFilters<T extends Record<string, string>>(defaults: T) {
     [setSearchParams, defaults],
   );
 
+  /**
+   * Clear every filter this hook owns.
+   *
+   * Only the declared keys are removed: wiping the whole query string also
+   * dropped unrelated parameters (the open tab, a referral code, a deep link
+   * target), which made "clear all filters" silently reset the rest of the
+   * page too — the surprising behaviour this now avoids.
+   */
   const resetFilters = useCallback(() => {
-    setSearchParams(new URLSearchParams(), { replace: true });
-  }, [setSearchParams]);
+    setSearchParams(
+      (previous) => {
+        const next = new URLSearchParams(previous);
+        Object.keys(defaults).forEach((key) => next.delete(key));
+        next.delete('page');
+        return next;
+      },
+      { replace: true },
+    );
+  }, [setSearchParams, defaults]);
 
   /** Only the non-default entries, ready to pass straight to the API. */
   const activeFilters = useMemo(() => {

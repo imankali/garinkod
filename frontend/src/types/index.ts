@@ -539,26 +539,49 @@ export interface AttachedListing {
   storefront_slug: string;
 }
 
+/** Where a thread comes from — shown as a badge so provenance is never lost. */
+export type MessageChannel = 'storefront' | 'support' | 'consulting' | 'comment';
+
+export type MessageAttachmentType = 'image' | 'video' | 'audio';
+
 export interface StorefrontMessage {
   id: number;
   conversation: number;
   sender: number;
   sender_name: string;
+  sender_avatar_url: string;
   is_mine: boolean;
   body: string;
   listing: AttachedListing | null;
+  attachment: string | null;
+  attachment_url: string;
+  attachment_type: MessageAttachmentType | '';
+  attachment_duration: number | null;
   is_read: boolean;
   created_at: string;
 }
 
 export interface StorefrontConversation {
   id: number;
-  storefront: Storefront;
+  channel: MessageChannel;
+  channel_label: string;
+  subject: string;
+  /** Only storefront threads have one. */
+  storefront: Storefront | null;
   counterpart_name: string;
+  counterpart_avatar_url: string;
   last_message: StorefrontMessage | null;
   unread_count: number;
   created_at: string;
   updated_at: string;
+}
+
+export interface InboxResponse {
+  count: number;
+  results: StorefrontConversation[];
+  unread_total: number;
+  unread_by_channel: Partial<Record<MessageChannel, number>>;
+  channels: { value: MessageChannel; label: string }[];
 }
 
 // ========================================
@@ -751,6 +774,7 @@ export interface StorefrontPost {
   storefront_name: string;
   storefront_slug: string;
   storefront_avatar_url: string;
+  storefront_is_verified: boolean;
   listing: number | null;
   post_type: 'post' | 'story';
   post_type_label: string;
@@ -762,6 +786,27 @@ export interface StorefrontPost {
   expires_at: string | null;
   created_at: string;
   updated_at: string;
+  // Instagram-style social state.
+  like_count: number;
+  comment_count: number;
+  is_liked: boolean;
+  /** Whether the viewer has already watched this story. */
+  is_seen: boolean;
+  is_owner: boolean;
+}
+
+export interface StorefrontPostComment {
+  id: number;
+  post: number;
+  parent: number | null;
+  body: string;
+  author_name: string;
+  author_avatar_url: string;
+  is_mine: boolean;
+  /** The comment author, or the owner of the post it sits on. */
+  can_moderate: boolean;
+  replies: StorefrontPostComment[];
+  created_at: string;
 }
 
 // ========================================

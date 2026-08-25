@@ -25,13 +25,12 @@ import {
   UserRound,
   X,
 } from "lucide-react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
-import { PRIMARY_ITEMS, SELLER_ITEMS, STAFF_ITEMS, visibleItems, type NavItem } from "../config/navigation";
-import { useAuthStore, useUserLevel } from "../store/authStore";
+import { useAuthStore } from "../store/authStore";
 import TopBar from "./TopBar";
 import Logo from "./Logo";
-import MegaMenu from "./MegaMenu";
+import DesktopNav from "./DesktopNav";
 import SearchBar from "./SearchBar";
 import MobileMenu from "./MobileMenu";
 import { useCartStore } from "../store/cartStore";
@@ -43,13 +42,6 @@ import { useTranslation } from "../i18n";
 // ========================================
 const SPRING = { type: "spring", damping: 28, stiffness: 320, mass: 0.6 } as const;
 const SPRING_SOFT = { type: "spring", damping: 22, stiffness: 260 } as const;
-
-/** Nav labels come from the dictionaries when available. */
-function navLabel(t: (key: string) => string, item: NavItem): string {
-  const key = `nav.${item.id}`;
-  const translated = t(key);
-  return translated === key ? item.label : translated;
-}
 
 // ========================================
 // ✅ Animated Number - انیمیشن flip برای تغییر عدد
@@ -101,8 +93,8 @@ const CartButton = memo(function CartButton({
       transition={SPRING}
       className={`group relative flex items-center gap-1.5 overflow-hidden rounded-xl bg-brand-gradient-accent text-white shadow-md shadow-emerald-200 transition-shadow duration-300 hover:shadow-xl hover:shadow-emerald-300/50 dark:shadow-emerald-950/50 ${
         mobile
-          ? "h-9 w-9 justify-center px-0"
-          : "h-9 px-2.5 sm:h-10 sm:gap-2 sm:px-3 md:px-4"
+          ? "h-11 w-11 justify-center px-0"
+          : "h-11 px-3 sm:gap-2 md:px-4"
       }`}
       aria-label={`سبد خرید${count > 0 ? ` - ${count} کالا` : ""}`}
       aria-expanded={isOpen}
@@ -203,108 +195,12 @@ const IconButton = memo(function IconButton({
       }
       whileTap={{ scale: 0.9 }}
       transition={SPRING}
-      className={`relative flex h-9 w-9 items-center justify-center rounded-xl transition-colors duration-200 sm:h-10 sm:w-10 ${className}`}
+      className={`relative flex h-11 w-11 items-center justify-center rounded-xl transition-colors duration-200 ${className}`}
       title={label}
       aria-label={label}
     >
       {children}
     </motion.button>
-  );
-});
-
-// ========================================
-// ✅ Nav Link با underline هوشمند (layoutId)
-// ========================================
-const DesktopNav = memo(function DesktopNav() {
-  const [hoveredHref, setHoveredHref] = useState<string | null>(null);
-  // The router's location, not window.location: reading the global directly
-  // meant the active link never updated during client-side navigation.
-  const { pathname } = useLocation();
-  const { isAuthenticated } = useAuthStore();
-  const level = useUserLevel();
-  const { t } = useTranslation();
-
-  // Primary destinations plus whatever this viewer is entitled to see, so a
-  // seller or moderator reaches their console without hunting for it.
-  const contextualItems = visibleItems(
-    [...SELLER_ITEMS, ...STAFF_ITEMS],
-    { level, isAuthenticated },
-  ).filter((item) => item.minLevel);
-
-  return (
-    <nav
-      className="hidden border-t border-emerald-50 bg-gradient-to-l from-emerald-50/40 via-white to-[#F7F3E8] dark:border-emerald-900/50 dark:from-emerald-950/40 dark:via-[#052e22] dark:to-emerald-950/30 lg:block"
-      aria-label="ناوبری اصلی"
-    >
-      <ul
-        className="mx-auto flex max-w-7xl flex-wrap items-center gap-1 px-4"
-        onMouseLeave={() => setHoveredHref(null)}
-      >
-        {PRIMARY_ITEMS.map((item) => {
-          const base = item.to.split("?")[0]!;
-          const isActive = base === "/" ? pathname === "/" : pathname.startsWith(base);
-          const showUnderline = hoveredHref === item.to || (!hoveredHref && isActive);
-
-          return (
-            <li key={item.id} className="relative">
-              <Link
-                to={item.to}
-                onMouseEnter={() => setHoveredHref(item.to)}
-                onFocus={() => setHoveredHref(item.to)}
-                className={`relative flex min-h-11 items-center px-3.5 text-fluid-sm font-medium transition-colors duration-200 ${
-                  isActive
-                    ? "text-[#0F8A5F] dark:text-lime-300"
-                    : "text-slate-600 hover:text-[#0F8A5F] dark:text-emerald-100 dark:hover:text-lime-300"
-                }`}
-                aria-current={isActive ? "page" : undefined}
-              >
-                {navLabel(t, item)}
-                {showUnderline && (
-                  <motion.span
-                    layoutId="nav-underline"
-                    transition={SPRING}
-                    className="absolute inset-x-3 bottom-1.5 h-0.5 rounded-full bg-brand-gradient-accent"
-                  />
-                )}
-              </Link>
-            </li>
-          );
-        })}
-
-        {/* Role-specific shortcuts, visually separated from the shop links. */}
-        {contextualItems.length > 0 && (
-          <li aria-hidden="true" className="mx-1 h-5 w-px bg-emerald-200 dark:bg-emerald-800" />
-        )}
-        {contextualItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = pathname.startsWith(item.to);
-          return (
-            <li key={item.id}>
-              <Link
-                to={item.to}
-                aria-current={isActive ? "page" : undefined}
-                className={`flex min-h-11 items-center gap-1.5 rounded-lg px-3 text-fluid-xs font-bold transition-colors ${
-                  isActive
-                    ? "bg-emerald-600 text-white"
-                    : "text-emerald-700 hover:bg-emerald-100 dark:text-lime-300 dark:hover:bg-emerald-900"
-                }`}
-              >
-                <Icon size={14} aria-hidden="true" />
-                {navLabel(t, item)}
-              </Link>
-            </li>
-          );
-        })}
-
-        <li className="ms-auto hidden items-center gap-1.5 py-1 text-fluid-2xs font-semibold text-[#0F8A5F] dark:text-lime-300 xl:flex">
-          <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-          </span>
-          کارشناسان آنلاین: پاسخگویی ۲ ساعته
-        </li>
-      </ul>
-    </nav>
   );
 });
 
@@ -410,7 +306,7 @@ function MoreMenu({ isDark, onToggleDark }: { isDark: boolean; onToggleDark: () 
                 onToggleDark();
                 setOpen(false);
               }}
-              className="flex w-full items-center gap-3 px-4 py-3 text-start text-sm font-bold text-slate-700 transition-colors hover:bg-emerald-50 dark:text-emerald-100 dark:hover:bg-emerald-900/60"
+              className="flex min-h-12 w-full items-center gap-3 px-4 text-start text-sm font-bold text-slate-700 transition-colors hover:bg-emerald-50 dark:text-emerald-100 dark:hover:bg-emerald-900/60"
             >
               <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 text-amber-600 dark:bg-amber-950/50 dark:text-amber-300">
                 {isDark ? <Sun size={17} /> : <Moon size={17} />}
@@ -482,7 +378,7 @@ function MoreMenu({ isDark, onToggleDark }: { isDark: boolean; onToggleDark: () 
                   type="button"
                   role="menuitem"
                   onClick={signOut}
-                  className="flex w-full items-center gap-3 border-t border-slate-100 px-4 py-3 text-start text-sm font-bold text-rose-600 transition-colors hover:bg-rose-50 dark:border-emerald-900 dark:text-rose-300 dark:hover:bg-rose-950/40"
+                  className="flex min-h-12 w-full items-center gap-3 border-t border-slate-100 px-4 text-start text-sm font-bold text-rose-600 transition-colors hover:bg-rose-50 dark:border-emerald-900 dark:text-rose-300 dark:hover:bg-rose-950/40"
                 >
                   <LogOut size={16} />
                   {t("nav.logout")}
@@ -541,6 +437,33 @@ export default function Header({
 
   const { scrollY } = useScroll();
   const cartCount = useCartStore((state) => state.cart?.total_items || 0);
+  const headerRef = useRef<HTMLElement>(null);
+
+  // ========================================
+  // ✅ ارتفاع واقعی هدر را در --header-height منتشر می‌کنیم.
+  //    هدر sticky است و ارتفاعش با اسکرول و اندازه صفحه تغییر می‌کند؛ بدون این
+  //    مقدار، نوارهای sticky داخل صفحه و پرش به لنگرها زیر هدر پنهان می‌شدند.
+  // ========================================
+  useEffect(() => {
+    const element = headerRef.current;
+    if (!element) return undefined;
+
+    const publish = () => {
+      document.documentElement.style.setProperty(
+        "--header-height",
+        `${Math.round(element.getBoundingClientRect().height)}px`,
+      );
+    };
+    publish();
+
+    const observer = new ResizeObserver(publish);
+    observer.observe(element);
+    window.addEventListener("resize", publish);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", publish);
+    };
+  }, []);
 
   // ✨ نوار پیشرفت اسکرول
   const { scrollYProgress } = useScroll();
@@ -576,7 +499,7 @@ export default function Header({
 
   return (
     <>
-      <header className="sticky top-0 z-50">
+      <header ref={headerRef} className="sticky top-0 z-50">
         <TopBar isDark={isDark} onToggleDark={onToggleDark} />
 
         <div
@@ -584,8 +507,8 @@ export default function Header({
             scrolled ? "shadow-lg shadow-emerald-900/8" : ""
           }`}
         >
-          {/* Background Glow */}
-          <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          {/* Background Glow — clipped so its blurred box never widens the page. */}
+          <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
             <motion.div
               animate={
                 prefersReducedMotion
@@ -601,8 +524,8 @@ export default function Header({
           {/* Main Row: منو (راست) | لوگو (وسط) | سبد (چپ) */}
           {/* ======================================== */}
           <div
-            className={`relative mx-auto flex max-w-7xl items-center gap-2 px-2.5 transition-[padding] duration-300 sm:gap-3 sm:px-4 md:gap-4 lg:gap-6 ${
-              scrolled ? "py-2 sm:py-2.5" : "py-2.5 sm:py-3 md:py-4"
+            className={`relative mx-auto flex max-w-7xl items-center gap-2 px-[var(--page-gutter)] transition-[padding] duration-300 sm:gap-3 md:gap-4 ${
+              scrolled ? "py-2 sm:py-2.5" : "py-2.5 sm:py-3 md:py-3.5"
             }`}
           >
             {/* ✅ Menu Toggle - آیکون morph بین Menu و X */}
@@ -611,7 +534,7 @@ export default function Header({
               whileHover={prefersReducedMotion ? undefined : { scale: 1.05 }}
               whileTap={{ scale: 0.92 }}
               transition={SPRING}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-[#0F8A5F] transition-colors hover:bg-emerald-100 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300 sm:h-10 sm:w-10 lg:hidden"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-[#0F8A5F] transition-colors hover:bg-emerald-100 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300 lg:hidden"
               aria-label={mobileOpen ? t("header.closeMenu") : t("header.openMenu")}
               aria-expanded={mobileOpen}
               aria-controls="mobile-menu"
@@ -630,23 +553,21 @@ export default function Header({
               </AnimatePresence>
             </motion.button>
 
-            {/* Logo */}
-            <div className="flex flex-1 justify-center sm:justify-start">
+            {/* Logo — never shrinks the search field on desktop. */}
+            <div className="flex flex-1 justify-center sm:justify-start md:flex-none">
               <Logo compact={scrolled} />
             </div>
 
-            {/* Search (Desktop) — بیشترین عرض برای فیلد جستجو */}
-            <div className="hidden min-w-0 flex-1 md:block">
+            {/* Search (Desktop) — پهن‌ترین عنصر ردیف هدر.
+                z-index بالاتر از بقیه هدر تا نتایج جستجو روی همه چیز بیفتد. */}
+            <div className="relative z-40 hidden min-w-0 flex-1 md:block">
               <SearchBar />
             </div>
 
             {/* Desktop Actions: تنها علاقه‌مندی و سبد بیرون می‌مانند؛
-                حالت شب، پیام‌ها و حساب کاربری داخل منوی «بیشتر» قرار گرفته‌اند. */}
-            <div className="ms-auto hidden items-center gap-1 sm:flex sm:gap-1.5 md:gap-2 lg:gap-3">
-              <div className="hidden lg:block">
-                <MegaMenu />
-              </div>
-
+                حالت شب، پیام‌ها و حساب کاربری داخل منوی «بیشتر» قرار گرفته‌اند.
+                گزینه «دسته‌بندی‌ها» حذف شد — دسته‌بندی‌ها در صفحه محصولات هستند. */}
+            <div className="ms-auto hidden shrink-0 items-center gap-1 sm:flex sm:gap-1.5 md:gap-2">
               {/* Wishlist */}
               <IconButton
                 onClick={onOpenWishlist}
@@ -698,7 +619,7 @@ export default function Header({
           </div>
 
           {/* ✅ Mobile Search - همیشه در دسترس، حتی هنگام اسکرول */}
-          <div className="border-t border-emerald-50 px-2.5 py-2 dark:border-emerald-900/50 sm:px-4 sm:py-2.5 md:hidden">
+          <div className="relative z-40 border-t border-emerald-50 px-[var(--page-gutter)] py-2 dark:border-emerald-900/50 sm:py-2.5 md:hidden">
             <SearchBar variant="mobile" />
           </div>
 

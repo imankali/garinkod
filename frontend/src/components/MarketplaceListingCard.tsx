@@ -77,7 +77,7 @@ export default function MarketplaceListingCard({ listing, index = 0 }: { listing
       <div className="flex flex-1 flex-col p-3.5">
         <Link
           to={`/storefronts/${listing.storefront.slug}`}
-          className="line-clamp-2 text-sm font-extrabold text-slate-800 transition-colors hover:text-emerald-700 dark:text-white dark:hover:text-lime-300"
+          className="line-clamp-2 min-h-11 py-1 text-fluid-sm font-extrabold text-slate-800 transition-colors hover:text-emerald-700 dark:text-white dark:hover:text-lime-300"
         >
           {listing.title}
         </Link>

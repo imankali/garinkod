@@ -3,7 +3,7 @@ from django.utils import timezone
 from django.contrib.auth.models import User
 from django.urls import reverse
 from django.conf import settings
-from django.db.models import Sum, F
+from django.db.models import Q, Sum, F
 from django.db.models.functions import Lower
 
 
@@ -1185,32 +1185,188 @@ class StorefrontPost(models.Model):
         return self.image.url if self.image else '/images/hero-farm.jpg'
 
 
-class StorefrontConversation(models.Model):
-    """A private thread between one buyer and one storefront.
+class StorefrontPostLike(models.Model):
+    """One "like" on a storefront post.
 
-    There is exactly one conversation per (storefront, customer) pair, so a
-    buyer asking about several products keeps one continuous history, and the
-    owner sees one entry per customer rather than one per question.
+    A row per (post, user) with a unique constraint is what makes the like
+    idempotent: tapping twice cannot inflate the count, and the current user's
+    own state is a cheap existence check rather than a stored flag that could
+    drift from the tally.
     """
 
-    storefront = models.ForeignKey(Storefront, on_delete=models.CASCADE, related_name='conversations')
-    customer = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='storefront_conversations'
+    post = models.ForeignKey(StorefrontPost, on_delete=models.CASCADE, related_name='likes')
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='liked_storefront_posts'
     )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'پسند پست غرفه'
+        verbose_name_plural = 'پسندهای پست غرفه'
+        constraints = [
+            models.UniqueConstraint(fields=['post', 'user'], name='unique_storefront_post_like'),
+        ]
+
+    def __str__(self):
+        return f'{self.user} ♥ {self.post_id}'
+
+
+class StorefrontPostComment(models.Model):
+    """A comment on a storefront post, optionally replying to another comment.
+
+    Replies are one level deep by design: `parent` is normalised to the root
+    comment in `save()`, so a thread stays a flat list of answers under a top
+    comment instead of an unbounded nesting chain no phone screen can show.
+    """
+
+    post = models.ForeignKey(StorefrontPost, on_delete=models.CASCADE, related_name='comments')
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='storefront_post_comments'
+    )
+    parent = models.ForeignKey(
+        'self', null=True, blank=True, on_delete=models.CASCADE, related_name='replies'
+    )
+    body = models.TextField(max_length=1000)
+    is_hidden = models.BooleanField(default=False, db_index=True, verbose_name='پنهان شده')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        verbose_name = 'گفتگوی غرفه'
-        verbose_name_plural = 'گفتگوهای غرفه'
+        ordering = ('created_at',)
+        verbose_name = 'نظر پست غرفه'
+        verbose_name_plural = 'نظرات پست غرفه'
+        indexes = [models.Index(fields=['post', 'created_at'])]
+
+    def save(self, *args, **kwargs):
+        # Flatten deeper nesting: a reply to a reply belongs to the same root.
+        if self.parent is not None and self.parent.parent_id is not None:
+            self.parent = self.parent.parent
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.user}: {self.body[:40]}'
+
+
+class StorefrontStoryView(models.Model):
+    """Records that a viewer has seen a story.
+
+    This is what drives the Instagram-style ring: unseen stories get the
+    coloured ring, seen ones the grey one. Keeping it server-side (rather than
+    in localStorage) means the state follows the user across devices.
+    """
+
+    post = models.ForeignKey(StorefrontPost, on_delete=models.CASCADE, related_name='views')
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='seen_stories'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'بازدید استوری'
+        verbose_name_plural = 'بازدیدهای استوری'
         constraints = [
+            models.UniqueConstraint(fields=['post', 'user'], name='unique_story_view'),
+        ]
+
+    def __str__(self):
+        return f'{self.user} 👁 {self.post_id}'
+
+
+class StorefrontConversation(models.Model):
+    """One thread in the unified inbox.
+
+    Originally this was only "buyer ↔ storefront", and it still is for the
+    ``storefront`` channel. It now also carries the other places the platform
+    talks to a user — support, agricultural consulting and comment replies —
+    because a person wants *one* inbox, not four places to check for a reply.
+
+    ``channel`` is what the UI labels each thread with ("پشتیبانی", "غرفه",
+    …) so the reader can always tell where a message came from. ``storefront``
+    is therefore nullable: only storefront threads have one.
+    """
+
+    CHANNEL_STOREFRONT = 'storefront'
+    CHANNEL_SUPPORT = 'support'
+    CHANNEL_CONSULTING = 'consulting'
+    CHANNEL_COMMENT = 'comment'
+
+    CHANNEL_CHOICES = (
+        (CHANNEL_STOREFRONT, 'غرفه'),
+        (CHANNEL_SUPPORT, 'پشتیبانی'),
+        (CHANNEL_CONSULTING, 'پشتیبانی کشاورزان'),
+        (CHANNEL_COMMENT, 'پاسخ به دیدگاه'),
+    )
+
+    channel = models.CharField(
+        max_length=20, choices=CHANNEL_CHOICES, default=CHANNEL_STOREFRONT, db_index=True,
+        verbose_name='کانال',
+    )
+    storefront = models.ForeignKey(
+        Storefront, null=True, blank=True, on_delete=models.CASCADE, related_name='conversations'
+    )
+    customer = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='storefront_conversations'
+    )
+    # Staff side of a support/consulting thread. Left null while unassigned so
+    # any authorised operator can pick the thread up.
+    agent = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='handled_conversations', verbose_name='کارشناس',
+    )
+    subject = models.CharField(max_length=150, blank=True, verbose_name='موضوع')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'گفتگو'
+        verbose_name_plural = 'گفتگوها'
+        constraints = [
+            # Still exactly one storefront thread per (storefront, customer).
+            # Scoped to the storefront channel so the other channels — which
+            # have no storefront — are not all collapsed into a single row.
             models.UniqueConstraint(
-                fields=['storefront', 'customer'], name='unique_storefront_customer_conversation'
+                fields=['storefront', 'customer'],
+                condition=Q(channel='storefront'),
+                name='unique_storefront_customer_conversation',
+            ),
+            models.UniqueConstraint(
+                fields=['customer', 'channel'],
+                condition=Q(channel__in=['support', 'consulting']),
+                name='unique_customer_service_conversation',
+            ),
+            models.CheckConstraint(
+                condition=Q(channel='storefront', storefront__isnull=False)
+                | (~Q(channel='storefront') & Q(storefront__isnull=True)),
+                name='storefront_channel_requires_storefront',
             ),
         ]
 
     def __str__(self):
-        return f'{self.storefront.name} ↔ {self.customer.username}'
+        counterpart = self.storefront.name if self.storefront else self.get_channel_display()
+        return f'{counterpart} ↔ {self.customer.username}'
+
+    @property
+    def channel_label(self) -> str:
+        return self.get_channel_display()
+
+    def is_participant(self, user) -> bool:
+        """Whether `user` may read and write in this thread.
+
+        Storefront threads are private to the two parties. Support and
+        consulting threads are additionally open to staff, which is what lets
+        any operator answer without a hand-off step.
+        """
+        if not user or not user.is_authenticated:
+            return False
+        if user.id == self.customer_id:
+            return True
+        if self.storefront_id and user.id == self.storefront.user_id:
+            return True
+        if self.channel in {self.CHANNEL_SUPPORT, self.CHANNEL_COMMENT}:
+            return bool(user.is_superuser or user.has_perm('shop.view_platformfeedback'))
+        if self.channel == self.CHANNEL_CONSULTING:
+            return bool(user.is_superuser or user.has_perm('shop.view_farmconsultationrequest'))
+        return False
 
     def unread_count_for(self, user) -> int:
         """Messages the given participant has not read yet."""
@@ -1222,12 +1378,32 @@ class StorefrontConversation(models.Model):
         return self.messages.order_by('-created_at').first()
 
 
+def message_attachment_path(instance, filename):
+    """Group attachments by kind and month so the media tree stays navigable."""
+    return f'messages/{instance.attachment_type or "file"}/%Y/%m/{filename}'.replace(
+        '%Y/%m', timezone.now().strftime('%Y/%m')
+    )
+
+
 class StorefrontMessage(models.Model):
-    """One message in a storefront conversation.
+    """One message in a conversation.
 
     ``listing`` attaches a marketplace product the buyer is asking about, so
     the owner sees exactly which offering the question refers to.
+
+    ``attachment`` carries a voice note, photo or short video. The kind is
+    stored explicitly rather than sniffed from the extension at render time,
+    so the client always knows which player to mount.
     """
+
+    ATTACHMENT_IMAGE = 'image'
+    ATTACHMENT_VIDEO = 'video'
+    ATTACHMENT_AUDIO = 'audio'
+    ATTACHMENT_CHOICES = (
+        (ATTACHMENT_IMAGE, 'تصویر'),
+        (ATTACHMENT_VIDEO, 'ویدیو'),
+        (ATTACHMENT_AUDIO, 'صدا'),
+    )
 
     conversation = models.ForeignKey(
         StorefrontConversation, on_delete=models.CASCADE, related_name='messages'
@@ -1240,19 +1416,34 @@ class StorefrontMessage(models.Model):
         MarketplaceListing, null=True, blank=True, on_delete=models.SET_NULL,
         related_name='direct_messages',
     )
+    attachment = models.FileField(
+        upload_to=message_attachment_path, blank=True, null=True, verbose_name='پیوست'
+    )
+    attachment_type = models.CharField(
+        max_length=10, choices=ATTACHMENT_CHOICES, blank=True, verbose_name='نوع پیوست'
+    )
+    # Voice notes render a waveform of known length instead of a player that
+    # only reveals its duration after the file has downloaded.
+    attachment_duration = models.PositiveIntegerField(
+        null=True, blank=True, verbose_name='مدت (ثانیه)'
+    )
     is_read = models.BooleanField(default=False, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ('created_at',)
-        verbose_name = 'پیام غرفه'
-        verbose_name_plural = 'پیام‌های غرفه'
+        verbose_name = 'پیام'
+        verbose_name_plural = 'پیام‌ها'
         indexes = [
             models.Index(fields=['conversation', '-created_at']),
         ]
 
     def __str__(self):
         return f'{self.sender.username}: {self.body[:40]}'
+
+    @property
+    def attachment_url(self) -> str:
+        return self.attachment.url if self.attachment else ''
 
 
 # --- Farm profile: lands, calendars and consultation ---

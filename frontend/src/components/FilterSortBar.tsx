@@ -49,8 +49,19 @@ export default function FilterSortBar({
   inStockOnly,
   onInStockChange,
 }: FilterSortBarProps) {
-  const [showFilters, setShowFilters] = useState(false);
-  const [showSortDropdown, setShowSortDropdown] = useState(false);
+  /**
+   * Only one of the two panels is ever open.
+   *
+   * They were independent booleans, so the floating sort dropdown could open
+   * on top of the expanded filter panel and the two sets of options visually
+   * merged. A single value makes them mutually exclusive, and tapping the
+   * same button twice closes it.
+   */
+  const [panel, setPanel] = useState<"none" | "filters" | "sort">("none");
+  const showFilters = panel === "filters";
+  const showSortDropdown = panel === "sort";
+  const togglePanel = (next: "filters" | "sort") =>
+    setPanel((current) => (current === next ? "none" : next));
 
   // محاسبه تعداد فیلترهای فعال
   const activeFacets = [inStockOnly, priceLimit < maxPrice].filter(Boolean).length;
@@ -73,9 +84,18 @@ export default function FilterSortBar({
   // ========================================
   // Handle Sort Selection
   // ========================================
+  /**
+   * Reset only the facets — it must not close or open any panel, otherwise
+   * clearing filters visibly re-opens other menus.
+   */
+  function clearFacets() {
+    onInStockChange(false);
+    onPriceLimitChange(maxPrice);
+  }
+
   function handleSortSelect(sortId: SortOption) {
     onSortChange(sortId);
-    setShowSortDropdown(false);
+    setPanel("none");
   }
 
   // ========================================
@@ -95,7 +115,7 @@ export default function FilterSortBar({
         <motion.button
           whileTap={{ scale: 0.95 }}
           onClick={() => onCategoryChange("all")}
-          className={`shrink-0 rounded-full px-4 py-2 text-xs font-semibold transition-all ${
+          className={`flex min-h-11 shrink-0 items-center rounded-full px-4 text-xs font-semibold transition-all ${
             activeCategory === "all"
               ? "bg-brand-gradient-accent text-white shadow-md"
               : "bg-white text-slate-500 ring-1 ring-slate-200 hover:ring-emerald-300"
@@ -115,7 +135,7 @@ export default function FilterSortBar({
               key={cat.slug}
               whileTap={{ scale: 0.95 }}
               onClick={() => onCategoryChange(cat.slug)}
-              className={`flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold transition-all ${
+              className={`flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-4 text-xs font-semibold transition-all ${
                 activeCategory === cat.slug
                   ? "bg-brand-gradient-accent text-white shadow-md"
                   : "bg-white text-slate-500 ring-1 ring-slate-200 hover:ring-emerald-300"
@@ -148,8 +168,8 @@ export default function FilterSortBar({
           {/* Filters Button */}
           <motion.button
             whileTap={{ scale: 0.95 }}
-            onClick={() => setShowFilters((v) => !v)}
-            className={`relative flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold transition-colors ${
+            onClick={() => togglePanel("filters")}
+            className={`relative flex min-h-11 items-center gap-1.5 rounded-xl px-3.5 text-xs font-semibold transition-colors ${
               showFilters
                 ? "bg-[#0F8A5F] text-white"
                 : "bg-emerald-50 text-[#0F8A5F] hover:bg-emerald-100 dark:bg-emerald-900 dark:text-lime-300"
@@ -172,8 +192,8 @@ export default function FilterSortBar({
             {/* Sort Trigger Button (با آیکون فلش) */}
             <motion.button
               whileTap={{ scale: 0.95 }}
-              onClick={() => setShowSortDropdown(!showSortDropdown)}
-              className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100 dark:bg-emerald-900 dark:text-emerald-100 dark:hover:bg-emerald-800"
+              onClick={() => togglePanel("sort")}
+              className="flex min-h-11 w-full items-center justify-between gap-2 rounded-xl bg-slate-50 px-3 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100 dark:bg-emerald-900 dark:text-emerald-100 dark:hover:bg-emerald-800 sm:w-auto sm:justify-start"
               aria-label="مرتب‌سازی"
               aria-expanded={showSortDropdown}
             >
@@ -207,7 +227,7 @@ export default function FilterSortBar({
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    onClick={() => setShowSortDropdown(false)}
+                    onClick={() => setPanel("none")}
                     className="fixed inset-0 z-40"
                   />
 
@@ -259,15 +279,26 @@ export default function FilterSortBar({
           >
             <div className="mt-3 space-y-4 rounded-2xl border border-emerald-100 bg-emerald-50/50 p-4 dark:border-emerald-800 dark:bg-emerald-900/30">
               {/* Header */}
-              <div className="flex items-center justify-between text-xs font-bold text-slate-600 dark:text-emerald-200">
+              <div className="flex items-center justify-between gap-2 text-xs font-bold text-slate-600 dark:text-emerald-200">
                 <span>فیلتر پیشرفته محصولات</span>
+                <div className="flex items-center gap-1">
+                  {activeFacets > 0 && (
+                    <button
+                      type="button"
+                      onClick={clearFacets}
+                      className="flex min-h-9 items-center rounded-lg px-2 text-fluid-xs font-bold text-rose-500 hover:bg-white hover:underline dark:hover:bg-emerald-950"
+                    >
+                      حذف همه فیلترها
+                    </button>
+                  )}
                 <button
-                  onClick={() => setShowFilters(false)}
-                  className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-slate-400 hover:text-rose-500 dark:bg-emerald-950"
+                  onClick={() => setPanel("none")}
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-400 hover:text-rose-500 dark:bg-emerald-950"
                   aria-label="بستن فیلترها"
                 >
-                  <X size={12} />
+                  <X size={14} />
                 </button>
+                </div>
               </div>
 
               {/* Price Range */}
@@ -294,7 +325,7 @@ export default function FilterSortBar({
               {/* In Stock Only */}
               <button
                 onClick={() => onInStockChange(!inStockOnly)}
-                className={`flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-semibold transition-colors ${
+                className={`flex min-h-11 items-center gap-1.5 rounded-full px-3.5 text-xs font-semibold transition-colors ${
                   inStockOnly
                     ? "bg-[#0F8A5F] text-white"
                     : "bg-white text-slate-600 ring-1 ring-slate-200 dark:bg-emerald-900 dark:text-emerald-300 dark:ring-emerald-700"

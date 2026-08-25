@@ -124,7 +124,7 @@ export default function WeatherWidget() {
             <select
               value={province}
               onChange={(e) => setProvince(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-800 focus:border-[#0F8A5F] focus:outline-none dark:border-emerald-800 dark:bg-emerald-950 dark:text-white"
+              className="min-h-11 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-800 focus:border-[#0F8A5F] focus:outline-none dark:border-emerald-800 dark:bg-emerald-950 dark:text-white"
               aria-label="انتخاب استان"
             >
               <option value="fars">فارس (شیراز و مرودشت)</option>

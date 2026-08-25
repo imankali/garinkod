@@ -93,10 +93,24 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("all");
-  const [isFocused, setIsFocused] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [showAdvanced, setShowAdvanced] = useState(false);
   const [inStockOnly, setInStockOnly] = useState(false);
+
+  /**
+   * Only one panel is ever open.
+   *
+   * The suggestions dropdown and the advanced-filter panel used to be two
+   * independent booleans, so both could be open at once and the floating
+   * dropdown rendered straight on top of the filter chips — the "options
+   * stacked into each other" problem. A single value makes them mutually
+   * exclusive by construction: opening one closes the other.
+   */
+  const [panel, setPanel] = useState<"none" | "suggestions" | "filters">("none");
+  const isFocused = panel === "suggestions";
+  const showAdvanced = panel === "filters";
+  const openSuggestions = () => setPanel("suggestions");
+  /** دکمه فیلتر: بار اول باز، بار دوم بسته. */
+  const toggleFilters = () => setPanel((current) => (current === "filters" ? "none" : "filters"));
 
   /** بدون callback، کلیک روی نتیجه مستقیماً به صفحه محصول می‌رود. */
   function openProduct(product: MockProduct) {
@@ -162,11 +176,18 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setIsFocused(false);
+        setPanel("none");
       }
     }
+    function handleKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setPanel("none");
+    }
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKey);
+    };
   }, []);
 
   // ========================================
@@ -187,9 +208,16 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
     if (query.trim() && !recent.includes(query.trim())) {
       setRecent((prev) => [query.trim(), ...prev].slice(0, 8));
     }
-    setIsFocused(true);
+    openSuggestions();
   }
 
+  /**
+   * Clear the facets without changing which panel is on screen.
+   *
+   * Previously this also re-opened the suggestions dropdown, so "clear all
+   * filters" popped other panels open — the behaviour reported as filters
+   * re-opening themselves. Clearing now only clears.
+   */
   function resetFacets() {
     setInStockOnly(false);
     setActiveCategory("all");
@@ -219,7 +247,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
       return;
     }
     setIsListening(true);
-    setIsFocused(true);
+    openSuggestions();
 
     if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
       try {
@@ -255,14 +283,21 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
         setActiveCategory(value);
         break;
     }
-    setIsFocused(true);
+    // Stay in whichever panel the tap came from instead of forcing the
+    // suggestions dropdown open on top of the filter chips.
   }
 
   // ========================================
   // Render
   // ========================================
   return (
-    <motion.div ref={containerRef} className={`relative w-full ${variant === "desktop" ? "max-w-2xl" : ""}`} layout>
+    <motion.div
+      ref={containerRef}
+      // فیلد جستجو روی دسکتاپ عمداً بدون سقف عرض است تا تمام فضای آزاد
+      // ردیف هدر را بگیرد؛ قبلاً max-w-2xl آن را نصف عرض ممکن نگه می‌داشت.
+      className={`relative w-full ${variant === "desktop" ? "max-w-none" : ""}`}
+      layout
+    >
       <motion.form
         onSubmit={handleSubmit}
         className={`group flex items-stretch rounded-2xl border-2 bg-white shadow-sm transition-colors duration-300 dark:bg-emerald-950 ${
@@ -276,9 +311,9 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          onFocus={() => setIsFocused(true)}
+          onFocus={openSuggestions}
           placeholder={isListening ? "در حال شنیدن صدای شما..." : t("header.searchPlaceholder")}
-          className="w-full flex-1 bg-transparent px-4 py-2.5 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none dark:text-white dark:placeholder:text-emerald-400 md:py-3 md:text-base"
+          className="min-w-0 flex-1 bg-transparent px-4 py-2.5 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none dark:text-white dark:placeholder:text-emerald-400 md:py-3.5 md:text-base"
           aria-label="جستجوی محصولات"
         />
 
@@ -289,7 +324,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
           type="button"
           onClick={() => imageSearchRef.current?.click()}
           title="جستجو با تصویر"
-          className="flex items-center px-2 text-slate-400 transition-colors hover:text-[#0F8A5F] dark:text-emerald-400 dark:hover:text-lime-300"
+          className="flex min-h-11 min-w-11 items-center justify-center text-slate-400 transition-colors hover:text-[#0F8A5F] dark:text-emerald-400 dark:hover:text-lime-300"
           aria-label="جستجو با تصویر"
         >
           <ImagePlus size={18} />
@@ -300,7 +335,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
           type="button"
           onClick={toggleVoiceSearch}
           title="جستجوی صوتی به زبان فارسی"
-          className={`relative flex items-center px-2.5 transition-colors ${
+          className={`relative flex min-h-11 min-w-11 items-center justify-center transition-colors ${
             isListening
               ? "text-rose-500"
               : "text-slate-400 hover:text-[#0F8A5F] dark:text-emerald-400 dark:hover:text-lime-300"
@@ -317,7 +352,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
 
         {/* Clear Button */}
         {query && (
-          <button type="button" onClick={() => setQuery("")} className="flex items-center px-1 text-slate-400 hover:text-slate-600" aria-label="پاک کردن جستجو">
+          <button type="button" onClick={() => setQuery("")} className="flex min-h-11 min-w-9 items-center justify-center text-slate-400 hover:text-slate-600" aria-label="پاک کردن جستجو">
             <X size={16} />
           </button>
         )}
@@ -327,7 +362,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
             clipped or hard to reach. */}
         <button
           type="button"
-          onClick={() => setShowAdvanced((v) => !v)}
+          onClick={toggleFilters}
           aria-expanded={showAdvanced}
           className={`relative flex min-h-11 items-center gap-1 border-s border-emerald-100 px-3 text-slate-500 transition-colors hover:text-[#0F8A5F] dark:border-emerald-900 dark:text-emerald-400 ${
             showAdvanced ? "bg-emerald-50 text-[#0F8A5F] dark:bg-emerald-900/60 dark:text-lime-300" : ""
@@ -355,19 +390,20 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
       </motion.form>
 
       {/* ======================================== */}
-      {/* Advanced Filters Panel — در جریان عادی صفحه (نه dropdown شناور)
-          تا روی موبایل همیشه قابل لمس و دیده شدن باشد */}
+      {/* Advanced Filters Panel
+          یک پنل شناور دقیقاً زیر نوار جستجو — چون هدر sticky است، پنل درون
+          جریان صفحه ارتفاع هدر را تغییر می‌داد و کل صفحه می‌پرید. */}
       {/* ======================================== */}
       <AnimatePresence initial={false}>
         {showAdvanced && (
           <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.22 }}
-            className="overflow-hidden"
+            initial={{ opacity: 0, y: -8, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.98 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
+            className="absolute start-0 top-[calc(100%+10px)] z-50 max-h-[70vh] w-full overflow-y-auto overscroll-contain rounded-2xl shadow-2xl shadow-emerald-900/10"
           >
-            <div className="mt-2 rounded-xl border border-emerald-100 bg-emerald-50/60 p-3 shadow-sm dark:border-emerald-800 dark:bg-emerald-900/40">
+            <div className="rounded-2xl border border-emerald-100 bg-white/95 p-3 backdrop-blur-xl dark:border-emerald-800 dark:bg-emerald-950/95">
               <div className="mb-3 flex items-center justify-between">
                 <p className="text-xs font-bold text-slate-600 dark:text-emerald-100">فیلتر تخصصی جستجو</p>
                 <button
@@ -506,10 +542,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
                     {categories.map((cat) => (
                       <button
                         key={cat.id}
-                        onClick={() => {
-                          setActiveCategory(cat.id);
-                          setIsFocused(true);
-                        }}
+                        onClick={() => setActiveCategory(cat.id)}
                         className="flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-emerald-100 hover:text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-200"
                       >
                         <cat.icon size={12} />
@@ -576,7 +609,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
                       <button
                         onClick={() => {
                           openProduct(product);
-                          setIsFocused(false);
+                          setPanel("none");
                         }}
                         className="flex w-full items-center gap-3 rounded-xl p-2 text-start transition-colors hover:bg-emerald-50 dark:hover:bg-emerald-900/50"
                       >

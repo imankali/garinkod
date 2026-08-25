@@ -10,6 +10,7 @@ router.register(r'comments', api_views.CommentViewSet, basename='comment')
 router.register(r'cart', api_views.CartViewSet, basename='cart')
 router.register(r'marketplace/listings', api_views.MarketplaceListingViewSet, basename='marketplace-listing')
 router.register(r'marketplace/posts', api_views.StorefrontPostViewSet, basename='marketplace-post')
+router.register(r'marketplace/post-comments', api_views.StorefrontPostCommentViewSet, basename='marketplace-post-comment')
 router.register(r'marketplace/storefronts', marketplace_views.StorefrontDirectoryViewSet, basename='storefront-directory')
 router.register(r'marketplace/highlights', marketplace_views.StorefrontHighlightViewSet, basename='storefront-highlight')
 
@@ -57,6 +58,18 @@ urlpatterns = [
         'marketplace/storefronts/<str:slug>/conversation/',
         marketplace_views.storefront_conversation,
         name='api_storefront_conversation',
+    ),
+    # The unified inbox: support, consulting and comment-reply threads all
+    # resolve through the same conversation/message endpoints as storefront chat.
+    path(
+        'marketplace/conversations/service/<str:channel>/',
+        marketplace_views.service_conversation,
+        name='api_service_conversation',
+    ),
+    path(
+        'marketplace/conversations/farmer/<int:user_id>/',
+        marketplace_views.start_farmer_conversation,
+        name='api_start_farmer_conversation',
     ),
 
     # Farm profile: lands, calendars and consultation

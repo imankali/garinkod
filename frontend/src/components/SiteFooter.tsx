@@ -40,13 +40,13 @@ export default function SiteFooter() {
             <ul className="mt-5 space-y-2 text-fluid-xs text-slate-500 dark:text-emerald-200">
               <li className="flex items-center gap-2">
                 <Phone size={14} aria-hidden="true" className="shrink-0 text-emerald-600" />
-                <a href="tel:+982100000000" dir="ltr" className="hover:underline">
+                <a href="tel:+982100000000" dir="ltr" className="flex min-h-11 items-center hover:underline">
                   ۰۲۱-۰۰۰۰۰۰۰۰
                 </a>
               </li>
               <li className="flex items-center gap-2">
                 <Mail size={14} aria-hidden="true" className="shrink-0 text-emerald-600" />
-                <a href="mailto:info@garinkood.ir" dir="ltr" className="hover:underline">
+                <a href="mailto:info@garinkood.ir" dir="ltr" className="flex min-h-11 items-center hover:underline">
                   info@garinkood.ir
                 </a>
               </li>
@@ -69,7 +69,7 @@ export default function SiteFooter() {
                     <li key={item.id}>
                       <Link
                         to={item.to}
-                        className="-mx-2 flex min-h-9 items-center rounded-lg px-2 text-fluid-xs text-slate-500 transition-colors hover:bg-emerald-50 hover:text-emerald-700 dark:text-emerald-200 dark:hover:bg-emerald-900 dark:hover:text-lime-300"
+                        className="-mx-2 flex min-h-11 items-center rounded-lg px-2 text-fluid-xs text-slate-500 transition-colors hover:bg-emerald-50 hover:text-emerald-700 dark:text-emerald-200 dark:hover:bg-emerald-900 dark:hover:text-lime-300"
                       >
                         {(() => {
                           const key = `nav.${item.id}`;

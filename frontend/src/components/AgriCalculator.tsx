@@ -200,7 +200,7 @@ export default function AgriCalculator({ onAddToCart }: AgriCalculatorProps) {
               type="button"
               onClick={() => setKind(option.value)}
               aria-pressed={kind === option.value}
-              className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${
+              className={`min-h-11 rounded-xl px-3.5 text-xs font-bold transition ${
                 kind === option.value
                   ? 'bg-emerald-600 text-white'
                   : 'border border-slate-200 text-slate-600 dark:border-emerald-800 dark:text-emerald-100'
@@ -239,7 +239,7 @@ export default function AgriCalculator({ onAddToCart }: AgriCalculatorProps) {
                     type="button"
                     onClick={() => setSelected(item)}
                     aria-pressed={selected?.id === item.id}
-                    className={`flex w-full items-center gap-2 border-b border-slate-50 px-3 py-2 text-start text-xs transition last:border-0 dark:border-emerald-900 ${
+                    className={`flex min-h-11 w-full items-center gap-2 border-b border-slate-50 px-3 text-start text-xs transition last:border-0 dark:border-emerald-900 ${
                       selected?.id === item.id
                         ? 'bg-emerald-50 font-bold text-emerald-800 dark:bg-emerald-900 dark:text-lime-200'
                         : 'hover:bg-slate-50 dark:hover:bg-emerald-900/50'
@@ -403,7 +403,7 @@ export default function AgriCalculator({ onAddToCart }: AgriCalculatorProps) {
                 selected &&
                 onAddToCart(toMockProduct(linkedProduct, selected), Math.ceil(Number(result.total.min)))
               }
-              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white hover:bg-emerald-700"
+              className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 text-xs font-bold text-white hover:bg-emerald-700"
             >
               <ShoppingCart size={14} />
               افزودن {linkedProduct.title} به سبد خرید

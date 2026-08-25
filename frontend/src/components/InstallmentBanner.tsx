@@ -22,7 +22,7 @@ export default function InstallmentBanner() {
           </div>
           <div className="mt-6 flex items-center justify-between border-t border-slate-100 pt-4 dark:border-emerald-900/40">
             <span className="flex items-center gap-1.5 text-xs font-bold text-[#0F8A5F] dark:text-lime-300"><Landmark size={14} /> هنوز پیشنهاد مالی قطعی صادر نشده است</span>
-            <a href={`tel:${PHONE_NUMBER}`} className="rounded-xl bg-[#0F8A5F] px-4 py-2 text-xs font-bold text-white shadow-md transition-colors hover:bg-[#064E3B]">گفت‌وگو با کارشناس</a>
+            <a href={`tel:${PHONE_NUMBER}`} className="inline-flex min-h-11 items-center rounded-xl bg-[#0F8A5F] px-4 text-xs font-bold text-white shadow-md transition-colors hover:bg-[#064E3B]">گفت‌وگو با کارشناس</a>
           </div>
         </article>
 
@@ -36,7 +36,7 @@ export default function InstallmentBanner() {
           </div>
           <div className="mt-6 flex items-center justify-between border-t border-slate-100 pt-4 dark:border-emerald-900/40">
             <span className="flex items-center gap-1.5 text-xs font-bold text-amber-700 dark:text-amber-300"><Handshake size={14} /> درخواست و قرارداد شفاف</span>
-            <a href="/services" className="rounded-xl bg-amber-600 px-4 py-2 text-xs font-bold text-white shadow-md transition-colors hover:bg-amber-700">ثبت درخواست عمده</a>
+            <a href="/services" className="inline-flex min-h-11 items-center rounded-xl bg-amber-600 px-4 text-xs font-bold text-white shadow-md transition-colors hover:bg-amber-700">ثبت درخواست عمده</a>
           </div>
         </article>
       </div>
