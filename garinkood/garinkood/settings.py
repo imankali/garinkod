@@ -28,6 +28,9 @@ INSTALLED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
+    # Keep the project command ahead of staticfiles so shop's runserver
+    # convenience command overrides Django's built-in command.
+    "shop.apps.ShopConfig",
     "django.contrib.staticfiles",
     "rest_framework",
     "rest_framework.authtoken",
@@ -35,7 +38,6 @@ INSTALLED_APPS = [
     "django_filters",
     "django.contrib.humanize",
     "django.contrib.postgres",
-    "shop.apps.ShopConfig",
 ]
 
 MIDDLEWARE = [

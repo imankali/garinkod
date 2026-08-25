@@ -291,6 +291,8 @@ temp/
 # Local development configs
 config.local.py
 settings.local.py
+.garinkood-*.stamp
+frontend/.garinkood-*.stamp
 
 # Backup files
 *.orig

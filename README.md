@@ -138,123 +138,91 @@
 
 ---
 
-## 🚀 شروع سریع
+## 🚀 شروع سریع — فقط با دستور `runserver`
 
-این راهنما اجرای محلی با SQLite را توضیح می‌دهد. پروژه از یک Backend و یک Frontend تشکیل شده است؛ بنابراین باید دو ترمینال باز داشته باشید.
+پس از نصب **Python 3.11 یا 3.12** و **Node.js 18 یا بالاتر**، در اولین اجرا فقط یک دستور لازم است. این دستور برای توسعهٔ محلی به‌صورت خودکار کارهای زیر را انجام می‌دهد:
 
-### ۱. دریافت پروژه و ساخت محیط Python
+1. ساخت محیط مجازی Python در `.venv` در صورت نبودن آن؛
+2. ساخت `garinkood/.env` از روی `.env.example` در صورت نبودن آن؛
+3. نصب یا بررسی وابستگی‌های Backend از `requirements.txt`؛
+4. نصب یا بررسی وابستگی‌های Frontend با `npm ci`؛
+5. اجرای migrationهای دیتابیس؛
+6. بارگذاری استان‌ها، شهرها، نهاده‌ها و سطح دسترسی‌ها؛
+7. ایجاد دادهٔ نمونهٔ بازار در حالت توسعه؛
+8. اجرای هم‌زمان Django و Vite.
 
-#### Linux و macOS
+> این میان‌بُر، خود Python، Node.js، PostgreSQL یا Redis را نصب نمی‌کند؛ این برنامه‌ها باید روی سیستم وجود داشته باشند. در حالت پیش‌فرض توسعه، PostgreSQL و Redis لازم نیستند و SQLite استفاده می‌شود.
 
-```bash
-git clone https://github.com/imankali/garinkod.git
-cd garinkod
-
-python3.11 -m venv .venv
-source .venv/bin/activate
-
-python -m pip install --upgrade pip
-python -m pip install -r garinkood/requirements-dev.txt
-
-# ساخت تنظیمات محلی؛ این فایل DB_ENGINE=sqlite را فعال می‌کند
-cp garinkood/.env.example garinkood/.env
-```
-
-اگر پروژه را قبلاً دریافت کرده‌اید، بخش `git clone` را دوباره اجرا نکنید.
-
-#### Windows PowerShell
-
-```powershell
-git clone https://github.com/imankali/garinkod.git
-cd garinkod
-
-py -3.11 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-
-python -m pip install --upgrade pip
-python -m pip install -r .\garinkood\requirements-dev.txt
-
-# ساخت تنظیمات محلی
-Copy-Item .\garinkood\.env.example .\garinkood\.env
-```
-
-اگر PowerShell اجازهٔ فعال‌سازی محیط را نداد، فقط برای همان ترمینال اجرا کنید:
-
-```powershell
-Set-ExecutionPolicy -Scope Process Bypass
-```
-
-### ۲. راه‌اندازی Backend (Django)
-
-```bash
-cd garinkood
-
-# بررسی تنظیمات
-python manage.py check
-
-# ساخت دیتابیس SQLite و اجرای تمام migrationها
-python manage.py migrate
-
-# داده‌های مرجع لازم برای فرم‌ها و محاسبه‌گر
-python manage.py seed_locations          # ۳۱ استان و ۵۷۶ شهر
-python manage.py seed_agri_inputs        # ۱۲ نهاده و ۵۳ دوز مصرف
-python manage.py bootstrap_management_roles
-
-# اختیاری: دادهٔ نمونهٔ بازار برای توسعهٔ محلی
-python manage.py seed_demo_marketplace
-
-# ساخت کاربر مدیر پنل ادمین
-python manage.py createsuperuser
-
-# اجرای API
-python manage.py runserver 0.0.0.0:8000
-```
-
-در Windows نیز همین دستورات `manage.py` را پس از فعال‌سازی `.venv` اجرا کنید.
-
-### ۳. راه‌اندازی Frontend (React + Vite)
-
-یک ترمینال جدید باز کنید. محیط Python ترمینال قبلی را نبندید؛ Backend باید همچنان در حال اجرا باشد.
+### اجرای پروژه از ریشهٔ مخزن
 
 #### Linux و macOS
 
 ```bash
-cd /path/to/garinkod/frontend
-npm ci
-cp .env.example .env
-npm run dev
+python3.11 garinkood/manage.py runserver
+```
+
+اگر دستور Python سیستم شما `python` است:
+
+```bash
+python garinkood/manage.py runserver
 ```
 
 #### Windows PowerShell
 
 ```powershell
-cd C:\path\to\garinkod\frontend
-npm ci
-Copy-Item .env.example .env
-npm run dev
+py -3.11 .\garinkood\manage.py runserver
 ```
 
-Vite درخواست‌های `/api`، `/media` و `/static` را به Backend روی `http://127.0.0.1:8000` proxy می‌کند. اگر پورت Backend را تغییر می‌دهید، باید `frontend/vite.config.ts` را نیز تغییر دهید.
+یا اگر داخل پوشهٔ Backend هستید:
 
-### ۴. آدرس‌های دسترسی
+```powershell
+cd .\garinkood
+python manage.py runserver
+```
+
+در اولین اجرا ممکن است نصب بسته‌ها چند دقیقه طول بکشد. بعد از آن، هر بار با اجرای همین دستور، وابستگی‌ها و دیتابیس بررسی شده و هر دو سرور اجرا می‌شوند. با `Ctrl+C` اجرای Backend و Frontend متوقف می‌شود.
+
+### گزینه‌های اختیاری
+
+```bash
+# فقط Backend، بدون اجرای Frontend
+python garinkood/manage.py runserver --no-frontend
+
+# اجرای سرور Frontend روی یک پورت دیگر
+python garinkood/manage.py runserver --frontend-port 5174
+
+# اجرا بدون ایجاد غرفه‌ها و حساب‌های نمونه
+python garinkood/manage.py runserver --no-demo-data
+```
+
+برای غیرفعال‌کردن کامل نصب خودکار و استفاده از رفتار عادی Django:
+
+```bash
+GARINKOOD_AUTO_SETUP=0 python garinkood/manage.py runserver
+```
+
+در Windows PowerShell:
+
+```powershell
+$env:GARINKOOD_AUTO_SETUP="0"
+python .\garinkood\manage.py runserver
+```
+
+### آدرس‌های دسترسی
 
 - 🌐 **Frontend:** [http://localhost:5173](http://localhost:5173)
 - 🔙 **Backend API:** [http://localhost:8000/api/](http://localhost:8000/api/)
 - 👨‍💼 **پنل مدیریت:** [http://localhost:8000/admin/](http://localhost:8000/admin/)
-- 🏠 ریشهٔ Backend به آدرس Frontend که در `FRONTEND_URL` تنظیم شده redirect می‌شود.
 
-### ۵. ایجاد محصول برای فروشگاه
+### ساخت حساب مدیر و محصول
 
-دستور `seed_demo_marketplace` غرفه‌ها و آگهی‌های بازار را ایجاد می‌کند، اما برای کاتالوگ اصلی باید از پنل `/admin/` یک Category و Product بسازید.
-
-همچنین `create_test_product.py` یک محصول آزمایشی می‌سازد، ولی فقط کاربری با نام `admin` را پیدا می‌کند:
+ساخت superuser به‌دلیل نیاز به رمز محرمانه همچنان یک‌بار به‌صورت تعاملی انجام می‌شود:
 
 ```bash
-# بعد از ساخت superuser با username=admin، از پوشهٔ garinkood اجرا کنید
-python manage.py shell < ../create_test_product.py
+python garinkood/manage.py createsuperuser
 ```
 
-رمز حساب‌های ساخته‌شده توسط `seed_demo_marketplace` برابر `demo-12345` است و فقط برای توسعهٔ محلی است؛ هرگز آن را در Production استفاده نکنید.
+دادهٔ نمونهٔ بازار به‌صورت خودکار در حالت `DEBUG=True` ساخته می‌شود، اما کاتالوگ اصلی محصولات را باید از پنل `/admin/` ایجاد کنید. فایل `create_test_product.py` نیز برای ساخت یک محصول آزمایشی وجود دارد و کاربری با نام `admin` می‌خواهد.
 
 ---
 
