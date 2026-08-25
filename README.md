@@ -115,76 +115,253 @@
 
 ## 📦 پیش‌نیازها
 
-قبل از شروع، مطمئن شوید که این‌ها نصب شده‌اند:
+برای اجرای نسخهٔ توسعهٔ پروژه، این موارد را نصب کنید:
 
-- ✅ **Python 3.11+** - [دانلود](https://www.python.org/downloads/)
-- ✅ **Node.js 18+** - [دانلود](https://nodejs.org/)
-- ✅ **PostgreSQL 16+** - [دانلود](https://www.postgresql.org/download/)
-- ✅ **Git** - [دانلود](https://git-scm.com/)
+- ✅ **Python 3.11 یا 3.12** — پروژه Python 3.11+ را اعلام کرده و CI فعلی با Python 3.11 و 3.12 بررسی می‌شود.
+- ✅ **Node.js 18+** — نسخهٔ پیشنهادی Node.js 22 به‌همراه npm 10 است.
+- ✅ **Git** — در صورتی که پروژه را با clone دریافت می‌کنید.
+- ✅ **یک مرورگر به‌روز** — Chrome، Firefox، Edge یا Safari.
+- ✅ اتصال اینترنت برای نصب وابستگی‌ها و دریافت فونت Vazirmatn از CDN.
+- ✅ آزاد بودن پورت‌های `8000` و `5173`.
+
+> برای اجرای محلی با SQLite، نصب PostgreSQL لازم نیست. PostgreSQL فقط برای محیط Production یا تست با دیتابیس واقعی لازم است.
+>
+> پوشهٔ `venv/` موجود در بعضی نسخه‌های مخزن، یک محیط مجازی قدیمی و مخصوص Windows است و قابل انتقال بین کامپیوترها نیست. همیشه یک محیط مجازی جدید با نام `.venv` بسازید.
+
+### وابستگی‌های Backend
+
+وابستگی‌های اجرای Django در `garinkood/requirements.txt` و ابزارهای توسعه و تست در `garinkood/requirements-dev.txt` قرار دارند. برای توسعهٔ کامل، فایل دوم را نصب کنید؛ این فایل، فایل اول را نیز نصب می‌کند.
+
+### وابستگی‌های Frontend
+
+تمام وابستگی‌های React، TypeScript، Vite، Tailwind، Playwright و ابزارهای کیفیت کد در `frontend/package.json` و `frontend/package-lock.json` قرار دارند. نصب استاندارد با `npm ci` انجام می‌شود.
 
 ---
 
 ## 🚀 شروع سریع
 
-### ۱. کلون کردن پروژه
+این راهنما اجرای محلی با SQLite را توضیح می‌دهد. پروژه از یک Backend و یک Frontend تشکیل شده است؛ بنابراین باید دو ترمینال باز داشته باشید.
+
+### ۱. دریافت پروژه و ساخت محیط Python
+
+#### Linux و macOS
 
 ```bash
-git clone https://github.com/your-username/garinkood.git
+git clone https://github.com/imankali/garinkod.git
+cd garinkod
+
+python3.11 -m venv .venv
+source .venv/bin/activate
+
+python -m pip install --upgrade pip
+python -m pip install -r garinkood/requirements-dev.txt
+
+# ساخت تنظیمات محلی؛ این فایل DB_ENGINE=sqlite را فعال می‌کند
+cp garinkood/.env.example garinkood/.env
+```
+
+اگر پروژه را قبلاً دریافت کرده‌اید، بخش `git clone` را دوباره اجرا نکنید.
+
+#### Windows PowerShell
+
+```powershell
+git clone https://github.com/imankali/garinkod.git
+cd garinkod
+
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+
+python -m pip install --upgrade pip
+python -m pip install -r .\garinkood\requirements-dev.txt
+
+# ساخت تنظیمات محلی
+Copy-Item .\garinkood\.env.example .\garinkood\.env
+```
+
+اگر PowerShell اجازهٔ فعال‌سازی محیط را نداد، فقط برای همان ترمینال اجرا کنید:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+```
+
+### ۲. راه‌اندازی Backend (Django)
+
+```bash
 cd garinkood
-۲. راه‌اندازی Backend (Django)
-# ساخت virtual environment
-python -m venv venv
 
-# فعال‌سازی virtual environment
-# Windows:
-venv\Scripts\activate
-# Linux/Mac:
-source venv/bin/activate
+# بررسی تنظیمات
+python manage.py check
 
-# نصب dependencies
-pip install -r requirements.txt
-
-# ساخت فایل .env
-cd garinkood
-copy .env.example .env  # Windows
-# cp .env.example .env  # Linux/Mac
-
-# ویرایش .env و وارد کردن اطلاعات دیتابیس
-
-# اعمال migrations
+# ساخت دیتابیس SQLite و اجرای تمام migrationها
 python manage.py migrate
 
-# بارگذاری داده‌های مرجع (لازم برای فرم آدرس و محاسبه‌گر)
-python manage.py seed_locations         # ۳۱ استان و ۵۷۶ شهر ایران
-python manage.py seed_agri_inputs       # ۱۲ کود/سم و ۵۳ دوز ثبت‌شده
+# داده‌های مرجع لازم برای فرم‌ها و محاسبه‌گر
+python manage.py seed_locations          # ۳۱ استان و ۵۷۶ شهر
+python manage.py seed_agri_inputs        # ۱۲ نهاده و ۵۳ دوز مصرف
 python manage.py bootstrap_management_roles
 
-# داده نمونه بازار (اختیاری — فقط برای توسعه)
+# اختیاری: دادهٔ نمونهٔ بازار برای توسعهٔ محلی
 python manage.py seed_demo_marketplace
 
-# ساخت superuser (ادمین — به‌صورت خودکار سطح ۵ می‌گیرد)
+# ساخت کاربر مدیر پنل ادمین
 python manage.py createsuperuser
 
-# اجرای سرور Django
+# اجرای API
 python manage.py runserver 0.0.0.0:8000
-۳. راه‌اندازی Frontend (React)
-# در یک terminal جدید
-cd frontend
+```
 
-# نصب dependencies
-npm install
+در Windows نیز همین دستورات `manage.py` را پس از فعال‌سازی `.venv` اجرا کنید.
 
-# کپی فایل .env
-copy .env.example .env  # Windows
-# cp .env.example .env  # Linux/Mac
+### ۳. راه‌اندازی Frontend (React + Vite)
 
-# اجرای سرور Vite
+یک ترمینال جدید باز کنید. محیط Python ترمینال قبلی را نبندید؛ Backend باید همچنان در حال اجرا باشد.
+
+#### Linux و macOS
+
+```bash
+cd /path/to/garinkod/frontend
+npm ci
+cp .env.example .env
 npm run dev
-۴. دسترسی به پروژه
-🌐 فرانت‌اند: http://localhost:5173
-🔙 بک‌اند API: http://localhost:8000/api/
-👨‍💼 پنل ادمین: http://localhost:8000/admin/
-📁 ساختار پروژه
+```
+
+#### Windows PowerShell
+
+```powershell
+cd C:\path\to\garinkod\frontend
+npm ci
+Copy-Item .env.example .env
+npm run dev
+```
+
+Vite درخواست‌های `/api`، `/media` و `/static` را به Backend روی `http://127.0.0.1:8000` proxy می‌کند. اگر پورت Backend را تغییر می‌دهید، باید `frontend/vite.config.ts` را نیز تغییر دهید.
+
+### ۴. آدرس‌های دسترسی
+
+- 🌐 **Frontend:** [http://localhost:5173](http://localhost:5173)
+- 🔙 **Backend API:** [http://localhost:8000/api/](http://localhost:8000/api/)
+- 👨‍💼 **پنل مدیریت:** [http://localhost:8000/admin/](http://localhost:8000/admin/)
+- 🏠 ریشهٔ Backend به آدرس Frontend که در `FRONTEND_URL` تنظیم شده redirect می‌شود.
+
+### ۵. ایجاد محصول برای فروشگاه
+
+دستور `seed_demo_marketplace` غرفه‌ها و آگهی‌های بازار را ایجاد می‌کند، اما برای کاتالوگ اصلی باید از پنل `/admin/` یک Category و Product بسازید.
+
+همچنین `create_test_product.py` یک محصول آزمایشی می‌سازد، ولی فقط کاربری با نام `admin` را پیدا می‌کند:
+
+```bash
+# بعد از ساخت superuser با username=admin، از پوشهٔ garinkood اجرا کنید
+python manage.py shell < ../create_test_product.py
+```
+
+رمز حساب‌های ساخته‌شده توسط `seed_demo_marketplace` برابر `demo-12345` است و فقط برای توسعهٔ محلی است؛ هرگز آن را در Production استفاده نکنید.
+
+---
+
+## ⚙️ تنظیمات محیطی
+
+### Backend — فایل `garinkood/.env`
+
+فایل `garinkood/.env.example` را به `garinkood/.env` کپی کنید. تنظیمات پیش‌فرض برای توسعه:
+
+```env
+DEBUG=True
+SECRET_KEY=replace-with-a-long-random-development-secret
+
+DB_ENGINE=sqlite
+DB_NAME=db.sqlite3
+SQLITE_TIMEOUT=30
+
+ALLOWED_HOSTS=localhost,127.0.0.1,testserver
+SITE_URL=http://localhost:5173
+FRONTEND_URL=http://localhost:5173
+```
+
+> ساختن `.env` ضروری است. اگر این فایل وجود نداشته باشد، `settings.py` به‌صورت پیش‌فرض PostgreSQL را انتخاب می‌کند و برای `DB_NAME`، `DB_USER` و `DB_PASSWORD` مقدار می‌خواهد.
+
+### Frontend — فایل `frontend/.env`
+
+```env
+VITE_PHONE_NUMBER=02112345678
+VITE_WHATSAPP_NUMBER=989123456789
+VITE_APP_NAME=گرین کود
+VITE_APP_DESCRIPTION=فروشگاه تخصصی نهاده‌های کشاورزی
+
+VITE_ENABLE_WEATHER_WIDGET=true
+VITE_ENABLE_INSTALLMENT_CALCULATOR=true
+VITE_ENABLE_CROP_SELECTOR=true
+VITE_ENABLE_AGRI_CALCULATOR=true
+VITE_DEV_MODE=true
+```
+
+API در کد فعلی با آدرس نسبی `/api` استفاده می‌شود. متغیر `VITE_API_BASE_URL` که در فایل نمونه توضیح داده شده، در حال حاضر آدرس API را تغییر نمی‌دهد.
+
+---
+
+## 🗄️ PostgreSQL، Redis و سرویس‌های اختیاری
+
+### PostgreSQL
+
+برای اجرای محلی SQLite کافی است. برای Production یا اجرای تست روی PostgreSQL 16، سرویس PostgreSQL را نصب کنید، یک Database و User بسازید و در `.env` قرار دهید:
+
+```env
+DB_ENGINE=postgresql
+DB_NAME=garinkood
+DB_USER=garinkood
+DB_PASSWORD=یک-رمز-قوی
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_CONN_MAX_AGE=60
+```
+
+در این حالت وابستگی `psycopg2-binary` از requirements نصب می‌شود.
+
+### Redis
+
+در توسعهٔ تک‌پردازه لازم نیست. برای محیط چند Worker، یک Redis مشترک برای Cache و Rate Limit تنظیم کنید:
+
+```env
+CACHE_URL=redis://127.0.0.1:6379/1
+```
+
+در صورت فعال‌کردن `CACHE_URL`، بستهٔ Python زیر را نیز نصب کنید:
+
+```bash
+python -m pip install redis
+```
+
+### سرویس‌هایی که فعلاً نیاز نیستند
+
+برای اجرای فعلی پروژه به کلید زرین‌پال، Stripe، PayPal، API هواشناسی، GPU، Docker، Celery یا سرویس هوش مصنوعی نیاز نیست. پرداخت واقعی هنوز فعال نیست، ویجت هواشناسی دادهٔ نمایشی دارد و جستجوی تصویری هنوز به موتور بینایی ماشین متصل نشده است.
+
+---
+
+## 🏭 Build و اجرای Production
+
+### Frontend
+
+```bash
+cd frontend
+npm run build
+```
+
+خروجی در `frontend/dist/` ایجاد می‌شود و باید توسط Nginx، Caddy یا وب‌سرور مشابه سرو شود. وب‌سرور باید برای مسیرهای React به `index.html` fallback داشته باشد.
+
+### Backend
+
+```bash
+cd garinkood
+python manage.py collectstatic --noinput
+gunicorn garinkood.wsgi:application --bind 0.0.0.0:8000
+```
+
+در Production علاوه بر PostgreSQL، باید HTTPS، دامنه، `DEBUG=False`، `SECRET_KEY` واقعی، `ALLOWED_HOSTS`، `CORS_ALLOWED_ORIGINS` و `CSRF_TRUSTED_ORIGINS` تنظیم شوند. پوشهٔ `garinkood/products/` نیز باید برای نگهداری تصاویر آپلودی پایدار باشد.
+
+---
+
+## 📁 ساختار پروژه
+
+```text
 mysite/
 │
 ├── 📁 frontend/                              # 🎨 پروژه React (فرانت‌اند)
@@ -238,10 +415,13 @@ mysite/
 │   ├── 📄 .env                               # ✅ Environment variables
 │   └── 📄 manage.py
 │
-├── 📁 venv/                                  # 🐍 محیط مجازی Python
+├── 📁 .venv/                                 # 🐍 محیط مجازی Python (محلی و غیرقابل commit)
 ├── 📄 .gitignore
 └── 📄 README.md
-🔌 API Endpoints
+```
+
+## 🔌 API Endpoints
+
 📦 Products
 Method
 Endpoint
@@ -316,55 +496,92 @@ POST
 GET
 /api/comments/by_product/?product=slug
 نظرات یک محصول
-🧪 تست
-Backend Tests
-cd garinkood
+## 🧪 تست و کنترل کیفیت
+
+### Backend
+
+از پوشهٔ `garinkood`:
+
+```bash
+python manage.py check
+python manage.py makemigrations --check --dry-run
 python manage.py test shop
-Frontend Type Check
-cd frontend
+```
+
+### Frontend
+
+از پوشهٔ `frontend`:
+
+```bash
 npm run type-check
-Frontend Lint
-cd frontend
 npm run lint
-🏗️ Build برای Production
-Frontend
-cd frontend
 npm run build
-خروجی در پوشه frontend/dist/ قرار می‌گیرد.
-Backend
-cd garinkood
-python manage.py collectstatic
-فایل‌های static در پوشه staticfiles/ جمع‌آوری می‌شوند.
-🌍 Environment Variables
-Backend (garinkood/.env)
-SECRET_KEY=your-secret-key-here
-DEBUG=True
+```
+
+### تست مرورگر با Playwright
+
+برای اجرای تست‌های E2E، Backend را اجرا کنید، Frontend را Build کنید و مرورگرهای Playwright را نصب کنید:
+
+```bash
+cd frontend
+npm ci
+npx playwright install              # Linux: در صورت نیاز --with-deps
+npm run build
+npm run test:e2e
+```
+
+تست‌های مرورگر به Chromium، Firefox، WebKit و وابستگی‌های سیستمی مرورگر نیاز دارند. تست‌های بخش مدیریت در صورت تنظیم `E2E_MODERATOR_USERNAME` و `E2E_MODERATOR_PASSWORD` اجرا می‌شوند.
+
+---
+
+## 🌍 متغیرهای Production
+
+حداقل تنظیمات PostgreSQL در Production:
+
+```env
+DEBUG=False
+SECRET_KEY=یک-کلید-طولانی-و-تصادفی-منحصر‌به‌فرد
+
+DB_ENGINE=postgresql
 DB_NAME=garinkood
-DB_USER=postgres
-DB_PASSWORD=your-password
-DB_HOST=localhost
+DB_USER=garinkood
+DB_PASSWORD=رمز-دیتابیس
+DB_HOST=127.0.0.1
 DB_PORT=5432
-Frontend (frontend/.env)
-VITE_PHONE_NUMBER=02112345678
-VITE_WHATSAPP_NUMBER=989123456789
-VITE_APP_NAME=گرین کود
-🤝 مشارکت
+
+ALLOWED_HOSTS=your-domain.com,www.your-domain.com
+SITE_URL=https://your-domain.com
+FRONTEND_URL=https://your-domain.com
+CORS_ALLOWED_ORIGINS=https://your-domain.com
+CSRF_TRUSTED_ORIGINS=https://your-domain.com
+```
+
+کلیدهای پرداخت را تا زمان پیاده‌سازی و تست کامل درگاه، فعال نکنید. اطلاعات محرمانه را در Git یا فایل `.env.example` قرار ندهید.
+
+---
+
+## 🤝 مشارکت
+
 مشارکت شما باعث خوشحالی ماست! 🎉
 Fork پروژه را بگیرید
 Branch جدید بسازید (git checkout -b feature/AmazingFeature)
 Commit کنید (git commit -m 'Add some AmazingFeature')
 Push کنید (git push origin feature/AmazingFeature)
 Pull Request باز کنید
-📝 لایسنس
+## 📝 لایسنس
+
 این پروژه تحت لایسنس MIT منتشر شده است - جزئیات را در فایل LICENSE ببینید.
-👥 تیم توسعه
+## 👥 تیم توسعه
+
 توسعه‌دهنده اصلی - [imannosrati]
 طراح UI/UX - [imannosrati]
-📞 تماس
+## 📞 تماس
+
 🌐 وبسایت: garinkood.ir
 📧 ایمیل: info@garinkood.ir
 📱 تلفن: ۰۲۱-۱۲۳۴۵۶۷۸
-🙏 قدردانی
+## 🙏 قدردانی
+
 🎨 Tailwind CSS
 ⚛️ React
 🐍 Django
@@ -375,4 +592,3 @@ Pull Request باز کنید
 ساخته شده با ❤️ برای کشاورزان ایران
 ⭐ اگر این پروژه برایتان مفید بود، لطفاً یک ستاره بدهید!
 </div>
-```
