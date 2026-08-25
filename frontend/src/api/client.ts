@@ -19,6 +19,22 @@ const apiClient: AxiosInstance = axios.create({
   },
 });
 
+/**
+ * Let the browser set the Content-Type for FormData bodies.
+ *
+ * The instance-level `application/json` default was being applied to multipart
+ * uploads too, so the browser never added the `boundary=…` parameter and
+ * Django tried to JSON-parse the binary body — which is why saving a storefront
+ * cover (or any other file) silently failed with a parse error. Deleting the
+ * header here makes axios fall back to the correct multipart value.
+ */
+apiClient.interceptors.request.use((config) => {
+  if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+    delete config.headers['Content-Type'];
+  }
+  return config;
+});
+
 // Browser authentication is cookie-based. The HttpOnly token is never exposed
 // to JavaScript; service integrations can still use Authorization headers.
 

@@ -12,11 +12,13 @@ import {
   MapPin,
   MessageCircle,
   Pencil,
+  Plus,
   Save,
   Search,
   Send,
   ShoppingBasket,
   Star,
+  Trash2,
   UserPlus,
   X,
 } from 'lucide-react';
@@ -30,7 +32,9 @@ import { useDirectStore } from '../store/directStore';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { useTranslation } from '../i18n';
 import { formatPrice } from '../utils/formatPrice';
-import type { StorefrontPost, StorefrontProfile } from '../types';
+import { cn } from '../utils/cn';
+import ListingComposer from '../components/storefront/ListingComposer';
+import type { MarketplaceListing, StorefrontPost, StorefrontProfile } from '../types';
 
 /**
  * The viewer only ever renders an image and a caption, so it takes this
@@ -71,6 +75,12 @@ export default function StorefrontPage() {
   const [followBusy, setFollowBusy] = useState(false);
   const [viewer, setViewer] = useState<{ posts: ViewableStory[]; index: number } | null>(null);
   const [unread, setUnread] = useState(0);
+  // Owner CRUD: which آگهی the composer is editing (null = creating a new one).
+  const [listingEditor, setListingEditor] = useState<
+    { open: false } | { open: true; listing: MarketplaceListing | null }
+  >({ open: false });
+  // Which post/story the owner is editing the caption of.
+  const [postEditor, setPostEditor] = useState<StorefrontPost | null>(null);
 
   // جستجو داخل محتوای غرفه (پست‌ها و استوری‌ها)
   const [contentQuery, setContentQuery] = useState('');
@@ -190,6 +200,36 @@ export default function StorefrontPage() {
     });
   }
 
+  /**
+   * Delete a post or story.
+   *
+   * Publishing was one-way before: a mistaken caption or an out-of-date story
+   * stayed on the غرفه forever. The confirm is deliberate — deletion is not
+   * reversible and the content may be linked from elsewhere.
+   */
+  async function deletePost(post: StorefrontPost) {
+    const kind = post.post_type === 'story' ? 'استوری' : 'پست';
+    if (!window.confirm(`این ${kind} برای همیشه حذف شود؟`)) return;
+    try {
+      await storefrontPostsApi.remove(post.id);
+      toast.success(`${kind} حذف شد.`);
+      await load();
+    } catch (error) {
+      toast.error(parseApiError(error).message);
+    }
+  }
+
+  async function deleteListing(listing: MarketplaceListing) {
+    if (!window.confirm(`آگهی «${listing.title}» حذف شود؟`)) return;
+    try {
+      await agricultureApi.deleteListing(listing.slug);
+      toast.success('آگهی حذف شد.');
+      await load();
+    } catch (error) {
+      toast.error(parseApiError(error).message);
+    }
+  }
+
   if (loading) {
     return (
       <div className="mx-auto max-w-5xl px-[var(--page-gutter)] py-16 text-center" role="status" aria-live="polite">
@@ -229,8 +269,13 @@ export default function StorefrontPage() {
         )}
       </div>
 
-      {/* Identity */}
-      <header className="-mt-12 flex flex-col items-center gap-3 px-4 sm:-mt-14 sm:flex-row sm:items-end sm:gap-5">
+      {/*
+        Identity. `relative z-10` is load-bearing: the header is pulled up over
+        the cover with a negative margin, and without its own stacking context
+        the cover (which paints later in DOM order within the same layer) drew
+        on top of the avatar and clipped it.
+      */}
+      <header className="relative z-10 -mt-12 flex flex-col items-center gap-3 px-4 sm:-mt-14 sm:flex-row sm:items-end sm:gap-5">
         <div className="h-24 w-24 shrink-0 overflow-hidden rounded-full border-4 border-white bg-emerald-100 shadow-lg dark:border-emerald-950 sm:h-28 sm:w-28">
           {storefront.avatar_url ? (
             <img
@@ -486,8 +531,30 @@ export default function StorefrontPage() {
       {/* Listings */}
       {tab === 'listings' && contentResults === null && (
         <div role="tabpanel" id="panel-listings" aria-labelledby="tab-listings" className="mt-5">
+          {/* آگهی‌گذاری داخل غرفه خود فروشنده انجام می‌شود، نه در حساب من. */}
+          {isOwner && (
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4 dark:border-emerald-900 dark:bg-emerald-900/20">
+              <div>
+                <h2 className="text-sm font-extrabold text-slate-800 dark:text-white">
+                  {t('account.createListing')}
+                </h2>
+                <p className="mt-1 text-xs text-slate-500 dark:text-emerald-200">
+                  آگهی‌های شما — از جمله در انتظار بررسی و ردشده — همین‌جا مدیریت می‌شوند.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setListingEditor({ open: true, listing: null })}
+                className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-4 text-xs font-bold text-white transition hover:bg-emerald-700"
+              >
+                <Plus size={14} />
+                {t('account.createListing')}
+              </button>
+            </div>
+          )}
+
           {listings.length === 0 ? (
-            <EmptyState text="این غرفه هنوز آگهی منتشرشده‌ای ندارد." />
+            <EmptyState text={isOwner ? 'هنوز آگهی‌ای ثبت نکرده‌اید؛ اولین آگهی را از دکمه بالا اضافه کنید.' : 'این غرفه هنوز آگهی منتشرشده‌ای ندارد.'} />
           ) : (
             <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {listings.map((listing) => (
@@ -500,6 +567,20 @@ export default function StorefrontPage() {
                     {listing.discount_percent > 0 && (
                       <span className="absolute start-2 top-2 rounded-full bg-brand-orange px-2 py-0.5 text-fluid-2xs font-bold text-white">
                         {listing.discount_percent.toLocaleString('fa-IR')}{t('shop.discount')}
+                      </span>
+                    )}
+                    {/* Only the owner sees moderation state; buyers only ever
+                        get published آگهی‌ها from the API. */}
+                    {isOwner && listing.status !== 'published' && (
+                      <span
+                        className={cn(
+                          'absolute end-2 top-2 rounded-full px-2 py-0.5 text-fluid-2xs font-bold',
+                          listing.status === 'rejected'
+                            ? 'bg-rose-600 text-white'
+                            : 'bg-amber-500 text-white',
+                        )}
+                      >
+                        {listing.status_label}
                       </span>
                     )}
                   </div>
@@ -520,7 +601,35 @@ export default function StorefrontPage() {
                       موجودی {listing.quantity_available} {listing.unit}
                       {listing.minimum_order > 1 && ` · حداقل ${listing.minimum_order}`}
                     </p>
+                    {isOwner && listing.status === 'rejected' && listing.rejection_reason && (
+                      <p role="alert" className="mt-2 rounded-xl bg-rose-50 p-2 text-fluid-2xs leading-5 text-rose-700 dark:bg-rose-950/40 dark:text-rose-200">
+                        <strong className="block">دلیل رد آگهی</strong>
+                        {listing.rejection_reason}
+                      </p>
+                    )}
+
                     <div className="mt-2 flex gap-2">
+                      {isOwner ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setListingEditor({ open: true, listing })}
+                            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-emerald-300 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-50 dark:border-emerald-700 dark:text-lime-300 dark:hover:bg-emerald-900/50"
+                          >
+                            <Pencil size={13} />
+                            {t('common.edit')}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void deleteListing(listing)}
+                            className="flex w-10 items-center justify-center rounded-xl border border-rose-200 text-rose-600 transition hover:bg-rose-50 dark:border-rose-900 dark:text-rose-300 dark:hover:bg-rose-950/40"
+                            aria-label={`حذف آگهی ${listing.title}`}
+                          >
+                            <Trash2 size={14} aria-hidden="true" />
+                          </button>
+                        </>
+                      ) : (
+                        <>
                       <button
                         type="button"
                         disabled={!listing.is_purchasable}
@@ -529,7 +638,7 @@ export default function StorefrontPage() {
                       >
                         {listing.is_purchasable ? t('shop.buy') : 'ناموجود'}
                       </button>
-                      {!isOwner && (
+                      {(
                         <button
                           type="button"
                           title={t('storefront.sendToDirectHint')}
@@ -539,6 +648,8 @@ export default function StorefrontPage() {
                         >
                           <Send size={14} aria-hidden="true" />
                         </button>
+                      )}
+                        </>
                       )}
                     </div>
                   </div>
@@ -557,7 +668,7 @@ export default function StorefrontPage() {
           ) : (
             <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               {posts.map((post, index) => (
-                <li key={post.id}>
+                <li key={post.id} className="relative">
                   <button
                     type="button"
                     onClick={() => setViewer({ posts, index })}
@@ -569,7 +680,19 @@ export default function StorefrontPage() {
                       loading="lazy"
                       className="h-full w-full object-cover transition group-hover:scale-105"
                     />
+                    {isOwner && post.status !== 'published' && (
+                      <span className="absolute start-1.5 top-1.5 rounded-full bg-amber-500 px-2 py-0.5 text-fluid-2xs font-bold text-white">
+                        {post.status_label}
+                      </span>
+                    )}
                   </button>
+                  {isOwner && (
+                    <OwnerContentActions
+                      onEdit={() => setPostEditor(post)}
+                      onDelete={() => void deletePost(post)}
+                      label={post.caption.slice(0, 30) || 'پست'}
+                    />
+                  )}
                 </li>
               ))}
             </ul>
@@ -585,7 +708,7 @@ export default function StorefrontPage() {
           ) : (
             <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4">
               {stories.map((story, index) => (
-                <li key={story.id}>
+                <li key={story.id} className="relative">
                   <button
                     type="button"
                     onClick={() => setViewer({ posts: stories, index })}
@@ -598,11 +721,31 @@ export default function StorefrontPage() {
                       className="h-full w-full object-cover"
                     />
                   </button>
+                  {isOwner && (
+                    <OwnerContentActions
+                      onEdit={() => setPostEditor(story)}
+                      onDelete={() => void deletePost(story)}
+                      label={story.caption.slice(0, 30) || 'استوری'}
+                    />
+                  )}
                 </li>
               ))}
             </ul>
           )}
         </div>
+      )}
+
+      {/* Owner dialogs: آگهی composer/editor and post caption editor. */}
+      {isOwner && (
+        <>
+          <ListingComposer
+            open={listingEditor.open}
+            listing={listingEditor.open ? listingEditor.listing : null}
+            onClose={() => setListingEditor({ open: false })}
+            onSaved={load}
+          />
+          <PostEditor post={postEditor} onClose={() => setPostEditor(null)} onSaved={load} />
+        </>
       )}
 
       <AnimatePresence>
@@ -942,6 +1085,161 @@ function OwnerComposer({ onPublished }: { onPublished: () => void | Promise<void
         )}
       </AnimatePresence>
     </section>
+  );
+}
+
+/**
+ * Edit/delete overlay on an owner's post or story tile.
+ *
+ * Kept off the tile's own button so the tap targets never overlap: tapping the
+ * image still opens the viewer, the corner controls manage the content.
+ */
+function OwnerContentActions({
+  onEdit,
+  onDelete,
+  label,
+}: {
+  onEdit: () => void;
+  onDelete: () => void;
+  label: string;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="absolute end-1.5 top-1.5 flex gap-1">
+      <button
+        type="button"
+        onClick={onEdit}
+        aria-label={`${t('common.edit')} ${label}`}
+        className="flex h-8 w-8 items-center justify-center rounded-lg bg-black/55 text-white backdrop-blur-sm transition hover:bg-black/75"
+      >
+        <Pencil size={13} aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        onClick={onDelete}
+        aria-label={`حذف ${label}`}
+        className="flex h-8 w-8 items-center justify-center rounded-lg bg-black/55 text-rose-200 backdrop-blur-sm transition hover:bg-rose-600 hover:text-white"
+      >
+        <Trash2 size={13} aria-hidden="true" />
+      </button>
+    </div>
+  );
+}
+
+/** Owner edits a published post/story: caption text and optionally the image. */
+function PostEditor({
+  post,
+  onClose,
+  onSaved,
+}: {
+  post: StorefrontPost | null;
+  onClose: () => void;
+  onSaved: () => void | Promise<void>;
+}) {
+  const { t } = useTranslation();
+  const [caption, setCaption] = useState('');
+  const [image, setImage] = useState<File | null>(null);
+  const [saving, setSaving] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (post) {
+      setCaption(post.caption);
+      setImage(null);
+    }
+  }, [post]);
+
+  async function save(event: FormEvent) {
+    event.preventDefault();
+    if (!post || !caption.trim()) return;
+    setSaving(true);
+    try {
+      await storefrontPostsApi.update(post.id, { caption: caption.trim(), image });
+      toast.success('محتوا به‌روزرسانی شد.');
+      onClose();
+      await onSaved();
+    } catch (error) {
+      toast.error(parseApiError(error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <AnimatePresence>
+      {post && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[80] flex items-end justify-center bg-emerald-950/40 p-3 backdrop-blur-sm sm:items-center"
+          role="dialog"
+          aria-modal="true"
+          aria-label={post.post_type === 'story' ? 'ویرایش استوری' : 'ویرایش پست'}
+        >
+          <motion.form
+            initial={{ y: 40, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 40, opacity: 0 }}
+            onSubmit={save}
+            className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-3xl border border-emerald-100 bg-white p-5 shadow-2xl dark:border-emerald-800 dark:bg-emerald-950"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-lg font-extrabold text-slate-800 dark:text-white">
+                {post.post_type === 'story' ? 'ویرایش استوری' : 'ویرایش پست'}
+              </h2>
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-emerald-900"
+                aria-label={t('common.close')}
+              >
+                <X size={17} />
+              </button>
+            </div>
+
+            <img src={post.image_url} alt="" className="mt-4 h-40 w-full rounded-xl object-cover" />
+
+            <label className="mt-4 block text-sm font-bold text-slate-700 dark:text-emerald-50">
+              متن
+              <textarea
+                value={caption}
+                onChange={(event) => setCaption(event.target.value)}
+                maxLength={2200}
+                rows={3}
+                required
+                className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-normal outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-emerald-700 dark:bg-emerald-900"
+              />
+            </label>
+
+            <button
+              type="button"
+              onClick={() => fileInput.current?.click()}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-emerald-300 px-3 py-3 text-xs font-bold text-emerald-700 hover:bg-emerald-50 dark:border-emerald-700 dark:text-lime-300 dark:hover:bg-emerald-900/50"
+            >
+              <ImageIcon size={15} />
+              {image ? image.name.slice(0, 28) : 'جایگزینی تصویر (اختیاری)'}
+            </button>
+            <input
+              ref={fileInput}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={(event) => setImage(event.target.files?.[0] ?? null)}
+            />
+
+            <button
+              type="submit"
+              disabled={saving}
+              className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+            >
+              <Save size={15} />
+              {saving ? t('common.loading') : t('common.save')}
+            </button>
+          </motion.form>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 

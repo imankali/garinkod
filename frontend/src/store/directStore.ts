@@ -6,13 +6,18 @@
 
 import { create } from 'zustand';
 
-import type { AttachedListing } from '../types';
+import type { AttachedListing, MessageChannel } from '../types';
 
 interface OpenDirectOptions {
   /** Open an existing conversation's thread. */
   conversationId?: number | null;
   /** Open (or create) the thread with a storefront. */
   storefrontSlug?: string | null;
+  /**
+   * Open (or create) the caller's thread with a service desk — this is how
+   * the floating help button lands in support instead of a dead-end form.
+   */
+  serviceChannel?: Exclude<MessageChannel, 'storefront'> | null;
   /** A listing to attach to the next message (send-product-to-DM). */
   listing?: AttachedListing | null;
 }
@@ -21,6 +26,7 @@ interface DirectState {
   open: boolean;
   conversationId: number | null;
   storefrontSlug: string | null;
+  serviceChannel: Exclude<MessageChannel, 'storefront'> | null;
   attachedListing: AttachedListing | null;
   /** The drawer can start on the conversation list instead of a thread. */
   view: 'list' | 'thread';
@@ -39,6 +45,7 @@ export const useDirectStore = create<DirectState>((set) => ({
   open: false,
   conversationId: null,
   storefrontSlug: null,
+  serviceChannel: null,
   attachedListing: null,
   view: 'list',
   unreadTotal: 0,
@@ -48,8 +55,12 @@ export const useDirectStore = create<DirectState>((set) => ({
       open: true,
       conversationId: options.conversationId ?? null,
       storefrontSlug: options.storefrontSlug ?? null,
+      serviceChannel: options.serviceChannel ?? null,
       attachedListing: options.listing ?? null,
-      view: options.conversationId || options.storefrontSlug ? 'thread' : 'list',
+      view:
+        options.conversationId || options.storefrontSlug || options.serviceChannel
+          ? 'thread'
+          : 'list',
     }),
 
   closeDirect: () =>
@@ -57,6 +68,7 @@ export const useDirectStore = create<DirectState>((set) => ({
       open: false,
       conversationId: null,
       storefrontSlug: null,
+      serviceChannel: null,
       attachedListing: null,
     }),
 
@@ -64,11 +76,13 @@ export const useDirectStore = create<DirectState>((set) => ({
     set({
       conversationId: null,
       storefrontSlug: null,
+      serviceChannel: null,
       attachedListing: null,
       view: 'list',
     }),
 
-  setConversationId: (id) => set({ conversationId: id, storefrontSlug: null }),
+  setConversationId: (id) =>
+    set({ conversationId: id, storefrontSlug: null, serviceChannel: null }),
 
   attachListing: (listing) => set({ attachedListing: listing }),
 

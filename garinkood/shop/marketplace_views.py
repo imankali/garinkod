@@ -7,8 +7,10 @@ profile per storefront, its posts and stories, highlights that outlive the
 
 from datetime import timedelta
 
+from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
-from django.db.models import Count, Prefetch, Q
+from django.db.models import Count, Exists, OuterRef, Prefetch, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import permissions, status, viewsets
@@ -19,15 +21,20 @@ from rest_framework.response import Response
 from .models import (
     MarketplaceListing, Storefront, StorefrontConversation, StorefrontFollow,
     StorefrontHighlight, StorefrontHighlightItem, StorefrontMessage, StorefrontPost,
+    StorefrontPostComment, StorefrontPostLike, StorefrontStoryView,
 )
+from .attachments import validate_message_attachment
+from .notifications import get_or_create_service_thread
 from .permissions import IsStorefrontOwnerOrReadOnly
 from .serializers import (
     MarketplaceListingSerializer, StorefrontConversationSerializer,
     StorefrontHighlightSerializer, StorefrontMessageSerializer,
-    StorefrontPostSerializer, StorefrontSerializer,
+    StorefrontPostCommentSerializer, StorefrontPostSerializer, StorefrontSerializer,
 )
 from .slugs import slugify_fa
 from .throttling import SearchRateThrottle
+
+User = get_user_model()
 
 
 class StorefrontPagination(PageNumberPagination):
@@ -121,16 +128,27 @@ class StorefrontDirectoryViewSet(viewsets.ReadOnlyModelViewSet):
         storefront = get_object_or_404(
             Storefront.objects.select_related('user'), slug=slug, is_active=True
         )
-        listings = MarketplaceListing.objects.filter(
-            storefront=storefront, status='published'
-        ).order_by('-created_at')
-        posts = StorefrontPost.objects.filter(
-            storefront=storefront, status='published', post_type='post'
-        ).order_by('-created_at')
+        # The owner manages their آگهی‌ها, پست‌ها and استوری‌ها from this very
+        # page, so they must see the pending and rejected ones too — filtering
+        # those out would leave a rejected listing invisible and uneditable.
+        is_owner = request.user.is_authenticated and storefront.user_id == request.user.id
+
+        listings = MarketplaceListing.objects.filter(storefront=storefront)
+        if not is_owner:
+            listings = listings.filter(status='published')
+        listings = listings.order_by('-created_at')
+
+        posts = StorefrontPost.objects.filter(storefront=storefront, post_type='post')
+        if not is_owner:
+            posts = posts.filter(status='published')
+        posts = posts.order_by('-created_at')
+
         stories = StorefrontPost.objects.filter(
-            storefront=storefront, status='published', post_type='story',
-            expires_at__gt=timezone.now(),
-        ).order_by('created_at')
+            storefront=storefront, post_type='story', expires_at__gt=timezone.now(),
+        )
+        if not is_owner:
+            stories = stories.filter(status='published')
+        stories = stories.order_by('created_at')
         highlights = StorefrontHighlight.objects.filter(
             storefront=storefront
         ).prefetch_related(Prefetch('items', queryset=StorefrontHighlightItem.objects.select_related('post')))
@@ -357,14 +375,34 @@ class MessagePagination(PageNumberPagination):
 
 
 def _participant_conversations(user):
-    """Every conversation the user can see, newest activity first."""
+    """Every conversation the user can see, newest activity first.
+
+    This is the unified inbox: their storefront threads (as buyer or owner),
+    their support and consulting threads, comment-reply notifications — and,
+    for staff, the service threads they are authorised to answer.
+    """
+    visible = Q(customer=user) | Q(storefront__user=user)
+
+    # Staff see the queues they are permitted to work, which is what lets any
+    # operator pick up a thread instead of it being stuck on one assignee.
+    if user.is_superuser or user.has_perm('shop.view_platformfeedback'):
+        visible |= Q(channel__in=[
+            StorefrontConversation.CHANNEL_SUPPORT,
+            StorefrontConversation.CHANNEL_COMMENT,
+        ])
+    if user.is_superuser or user.has_perm('shop.view_farmconsultationrequest'):
+        visible |= Q(channel=StorefrontConversation.CHANNEL_CONSULTING)
+
     return (
         StorefrontConversation.objects
-        .filter(Q(storefront__user=user) | Q(customer=user))
-        .select_related('storefront', 'storefront__user', 'customer')
+        .filter(visible)
+        .select_related('storefront', 'storefront__user', 'customer', 'customer__account')
         .prefetch_related(Prefetch(
             'messages',
-            queryset=StorefrontMessage.objects.order_by('-created_at').select_related('sender', 'listing', 'listing__storefront'),
+            queryset=StorefrontMessage.objects.order_by('-created_at').select_related(
+                'sender', 'sender__account', 'listing', 'listing__storefront',
+                'conversation', 'conversation__storefront',
+            ),
         ))
         .order_by('-updated_at')
         .distinct()
@@ -374,13 +412,91 @@ def _participant_conversations(user):
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def my_conversations(request):
-    """All direct conversations the caller participates in — as a buyer or as a
-    storefront owner — with unread counts for the messages section."""
+    """The caller's whole inbox, across every channel.
+
+    An optional ``channel`` query parameter narrows it to one source, which is
+    what the inbox filter chips ("پشتیبانی", "غرفه‌ها", …) use.
+    """
     context = {'request': request}
     conversations = _participant_conversations(request.user)
-    data = StorefrontConversationSerializer(conversations, many=True, context=context).data
-    unread_total = sum(conv.unread_count_for(request.user) for conv in conversations)
-    return Response({'count': len(data), 'results': data, 'unread_total': unread_total})
+
+    channel = (request.query_params.get('channel') or '').strip()
+    valid_channels = {value for value, _label in StorefrontConversation.CHANNEL_CHOICES}
+    filtered = (
+        conversations.filter(channel=channel) if channel in valid_channels else conversations
+    )
+
+    data = StorefrontConversationSerializer(filtered, many=True, context=context).data
+
+    # Unread is reported per channel as well, so the UI can badge each filter
+    # chip without issuing one request per channel.
+    unread_by_channel: dict[str, int] = {}
+    unread_total = 0
+    for conversation in conversations:
+        count = conversation.unread_count_for(request.user)
+        if not count:
+            continue
+        unread_total += count
+        unread_by_channel[conversation.channel] = (
+            unread_by_channel.get(conversation.channel, 0) + count
+        )
+
+    return Response({
+        'count': len(data),
+        'results': data,
+        'unread_total': unread_total,
+        'unread_by_channel': unread_by_channel,
+        'channels': [
+            {'value': value, 'label': label}
+            for value, label in StorefrontConversation.CHANNEL_CHOICES
+        ],
+    })
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([permissions.IsAuthenticated])
+def service_conversation(request, channel):
+    """Open (or fetch) the caller's thread with a service desk.
+
+    This is what turns the floating "مشاوره رایگان" button into a real
+    messenger: it resolves to the user's single support/consulting thread
+    instead of a form that goes nowhere the user can follow up on.
+    """
+    allowed = {
+        StorefrontConversation.CHANNEL_SUPPORT,
+        StorefrontConversation.CHANNEL_CONSULTING,
+        StorefrontConversation.CHANNEL_COMMENT,
+    }
+    if channel not in allowed:
+        return Response({'error': 'کانال پیام نامعتبر است.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    conversation = get_or_create_service_thread(request.user, channel)
+    return Response(
+        StorefrontConversationSerializer(conversation, context={'request': request}).data,
+        status=status.HTTP_201_CREATED if request.method == 'POST' else status.HTTP_200_OK,
+    )
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def start_farmer_conversation(request, user_id):
+    """A consultant opens the consulting thread with one farmer.
+
+    Consultants work from the farmer dossier screen, so they need to start the
+    conversation rather than wait for the farmer to write first.
+    """
+    if not (request.user.is_superuser or request.user.has_perm('shop.view_farmconsultationrequest')):
+        return Response(
+            {'error': 'دسترسی گفتگو با کشاورزان را ندارید.'}, status=status.HTTP_403_FORBIDDEN
+        )
+    farmer = get_object_or_404(User, pk=user_id)
+    conversation = get_or_create_service_thread(
+        farmer, StorefrontConversation.CHANNEL_CONSULTING, agent=request.user
+    )
+    return Response(
+        StorefrontConversationSerializer(conversation, context={'request': request}).data,
+        status=status.HTTP_201_CREATED,
+    )
 
 
 @api_view(['GET', 'POST'])
@@ -433,15 +549,18 @@ def conversation_messages(request, conversation_id):
     unread badge clears as soon as the owner opens the conversation.
     """
     conversation = get_object_or_404(
-        StorefrontConversation.objects.select_related('storefront', 'customer'),
+        StorefrontConversation.objects.select_related(
+            'storefront', 'storefront__user', 'customer', 'customer__account'
+        ),
         pk=conversation_id,
     )
-    if request.user.id != conversation.customer_id and request.user.id != conversation.storefront.user_id:
+    if not conversation.is_participant(request.user):
         return Response({'error': 'شما عضو این گفتگو نیستید.'}, status=status.HTTP_403_FORBIDDEN)
 
     if request.method == 'GET':
         messages = conversation.messages.select_related(
-            'sender', 'listing', 'listing__storefront'
+            'sender', 'sender__account', 'listing', 'listing__storefront',
+            'conversation', 'conversation__storefront',
         ).order_by('created_at')
         # Fetching a thread means the viewer has seen it.
         StorefrontMessage.objects.filter(conversation=conversation, is_read=False).exclude(
@@ -468,17 +587,45 @@ def conversation_messages(request, conversation_id):
                 {'error': 'محصول انتخابی متعلق به این غرفه نیست.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-    if not body and listing is None:
+
+    attachment = request.FILES.get('attachment')
+    attachment_type = ''
+    attachment_duration = None
+    if attachment is not None:
+        try:
+            attachment_type = validate_message_attachment(attachment)
+        except ValidationError as error:
+            return Response({'error': error.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+        raw_duration = request.data.get('attachment_duration')
+        if raw_duration not in (None, ''):
+            try:
+                attachment_duration = max(0, min(int(float(raw_duration)), 60 * 60))
+            except (TypeError, ValueError):
+                attachment_duration = None
+
+    if not body and listing is None and attachment is None:
         return Response(
-            {'error': 'متن پیام یا محصول پیوست الزامی است.'},
+            {'error': 'متن پیام، پیوست یا محصول الزامی است.'},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
     message = StorefrontMessage.objects.create(
         conversation=conversation, sender=request.user,
         body=body[:2000], listing=listing,
+        attachment=attachment, attachment_type=attachment_type,
+        attachment_duration=attachment_duration,
     )
-    conversation.save(update_fields=['updated_at'])
+    # A staff reply claims an unassigned service thread, so the farmer sees a
+    # consistent counterpart and other operators know it is being handled.
+    if (
+        conversation.channel != StorefrontConversation.CHANNEL_STOREFRONT
+        and conversation.agent_id is None
+        and request.user.id != conversation.customer_id
+    ):
+        conversation.agent = request.user
+        conversation.save(update_fields=['agent', 'updated_at'])
+    else:
+        conversation.save(update_fields=['updated_at'])
     context = {'request': request}
     return Response(
         StorefrontMessageSerializer(message, context=context).data,

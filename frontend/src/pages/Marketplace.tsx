@@ -23,6 +23,8 @@ import { useCartStore } from '../store/cartStore';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { useUrlFilters } from '../hooks/useUrlFilters';
 import LocationPicker from '../components/LocationPicker';
+import PostCard from '../components/social/PostCard';
+import StoriesRow from '../components/social/StoriesRow';
 import { StorefrontCard } from './Storefronts';
 import type {
   MarketplaceListing,
@@ -80,6 +82,7 @@ export default function Marketplace() {
   const [listError, setListError] = useState('');
 
   const [stories, setStories] = useState<StorefrontPost[]>([]);
+  const [posts, setPosts] = useState<StorefrontPost[]>([]);
   const [featured, setFeatured] = useState<Storefront[]>([]);
 
   useEffect(() => {
@@ -124,6 +127,10 @@ export default function Marketplace() {
       .list({ post_type: 'story' })
       .then((response) => setStories(response.data.results))
       .catch(() => setStories([]));
+    storefrontPostsApi
+      .list({ post_type: 'post' })
+      .then((response) => setPosts(response.data.results))
+      .catch(() => setPosts([]));
     storefrontsApi
       .featured(5)
       .then((response) => setFeatured(response.data))
@@ -159,35 +166,8 @@ export default function Marketplace() {
         </div>
       </section>
 
-      {/* Live stories */}
-      {stories.length > 0 && (
-        <section className="mt-6" aria-label="استوری غرفه‌ها">
-          <div className="flex gap-3 overflow-x-auto pb-2">
-            {stories.map((story) => (
-              <Link
-                key={story.id}
-                to={`/storefronts/${story.storefront_slug}`}
-                className="w-40 shrink-0 overflow-hidden rounded-2xl border border-violet-200 bg-white dark:border-violet-900 dark:bg-emerald-950"
-              >
-                <img
-                  src={story.image_url}
-                  alt=""
-                  loading="lazy"
-                  className="h-32 w-full object-cover"
-                />
-                <div className="p-3">
-                  <p className="truncate text-xs font-bold text-violet-700 dark:text-violet-200">
-                    {story.storefront_name}
-                  </p>
-                  <p className="mt-1 line-clamp-2 text-fluid-xs text-slate-600 dark:text-emerald-100">
-                    {story.caption}
-                  </p>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
+      {/* Stories: their own strip of circles, above the posts feed. */}
+      <StoriesRow stories={stories} />
 
       {showStoreForm && (
         <StorefrontForm
@@ -212,6 +192,22 @@ export default function Marketplace() {
             {featured.map((storefront) => (
               <li key={storefront.id}>
                 <StorefrontCard storefront={storefront} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {/* Posts feed: a section of its own, below the stories strip. */}
+      {posts.length > 0 && (
+        <section className="mt-8" aria-label="پست‌های غرفه‌داران">
+          <h2 className="mb-3 text-lg font-extrabold text-slate-800 dark:text-white">
+            پست‌های غرفه‌داران
+          </h2>
+          <ul className="mx-auto grid max-w-xl gap-5">
+            {posts.map((post) => (
+              <li key={post.id}>
+                <PostCard post={post} />
               </li>
             ))}
           </ul>

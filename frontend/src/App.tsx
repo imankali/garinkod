@@ -25,7 +25,7 @@ import WeatherWidget from "./components/WeatherWidget";
 import InstallmentBanner from "./components/InstallmentBanner";
 import ScrollProgressBar from "./components/ScrollProgressBar";
 import FlyToCart, { type FlyingItem } from "./components/FlyToCart";
-import ConsultationButton from "./components/ConsultationButton";
+import GlobalMessengerButton from "./components/GlobalMessengerButton";
 import CropSelector from "./components/CropSelector";
 import AgriCalculator from "./components/AgriCalculator";
 import HomeHero from "./components/home/HomeHero";
@@ -613,7 +613,7 @@ export default function App() {
         {/* ======================================== */}
         {/* Consultation Button */}
         {/* ======================================== */}
-        <ConsultationButton />
+        <GlobalMessengerButton />
       </div>
     </BrowserRouter>
   );

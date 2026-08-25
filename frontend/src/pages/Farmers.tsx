@@ -8,14 +8,16 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ArrowRight, CalendarPlus, Inbox, MapPin, MessageCircleQuestion, Search, Send, Sprout, Users,
+  ArrowRight, CalendarPlus, Inbox, MapPin, MessageCircleQuestion, MessagesSquare, Search, Send,
+  Sprout, Users,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-import { consultingApi } from '../api/services';
+import { consultingApi, messagesApi } from '../api/services';
 import { parseApiError } from '../api/errors';
 import { useTranslation } from '../i18n';
 import { cn } from '../utils/cn';
+import { useDirectStore } from '../store/directStore';
 import type {
   ConsultantFarmerDossier, ConsultantFarmerSummary, FarmCalendarEvent,
   FarmConsultationRequest, FarmEventKind, FarmLand,
@@ -242,9 +244,10 @@ function RequestWorkspace({
           <ArrowRight size={15} />
         </button>
         <MessageCircleQuestion size={16} className="text-emerald-600 dark:text-lime-300" />
-        <h2 className="truncate text-sm font-extrabold text-slate-800 dark:text-white">
+        <h2 className="min-w-0 flex-1 truncate text-sm font-extrabold text-slate-800 dark:text-white">
           {request.subject_label} — {request.farmer_name}
         </h2>
+        <ChatWithFarmerButton farmerId={request.farmer} farmerName={request.farmer_name} />
       </header>
 
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
@@ -411,7 +414,14 @@ function FarmersDirectory() {
           ) : (
             <ul className="space-y-2">
               {farmers.map((farmer) => (
-                <li key={farmer.id}>
+                <li key={farmer.id} className="relative">
+                  <span className="absolute end-3 top-3 z-10">
+                    <ChatWithFarmerButton
+                      farmerId={farmer.id}
+                      farmerName={farmer.full_name}
+                      variant="ghost"
+                    />
+                  </span>
                   <button
                     type="button"
                     onClick={() => setActiveId(farmer.id)}
@@ -422,7 +432,7 @@ function FarmersDirectory() {
                         : 'border-transparent hover:bg-emerald-50/60 dark:hover:bg-emerald-900/30',
                     )}
                   >
-                    <p className="truncate text-xs font-extrabold text-slate-800 dark:text-white">
+                    <p className="truncate pe-32 text-xs font-extrabold text-slate-800 dark:text-white">
                       {farmer.full_name}
                     </p>
                     <p className="mt-0.5 truncate text-fluid-xs text-slate-400" dir="ltr">
@@ -479,11 +489,14 @@ function DossierView({ dossier }: { dossier: ConsultantFarmerDossier }) {
               <p className="text-fluid-xs text-slate-400" dir="ltr">@{farmer.username}</p>
             </div>
           </div>
-          {pending > 0 && (
-            <span className="rounded-full bg-amber-100 px-3 py-1 text-fluid-xs font-bold text-amber-700 dark:bg-amber-950 dark:text-amber-200">
-              {pending} درخواست در انتظار
-            </span>
-          )}
+          <div className="flex flex-wrap items-center gap-2">
+            {pending > 0 && (
+              <span className="rounded-full bg-amber-100 px-3 py-1 text-fluid-xs font-bold text-amber-700 dark:bg-amber-950 dark:text-amber-200">
+                {pending} درخواست در انتظار
+              </span>
+            )}
+            <ChatWithFarmerButton farmerId={farmer.id} farmerName={farmer.full_name} />
+          </div>
         </div>
         <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-fluid-xs text-slate-500 dark:text-emerald-200 sm:grid-cols-4">
           <span><strong className="text-slate-700 dark:text-white">تلفن:</strong> <bdi>{farmer.phone || '—'}</bdi></span>
@@ -589,5 +602,60 @@ function LandDossierCard({ land }: { land: FarmLand & { events: FarmCalendarEven
         </ul>
       )}
     </section>
+  );
+}
+
+// ============================================================
+// Chat with the farmer
+// ============================================================
+/**
+ * Opens (or resumes) the consulting thread with one farmer and drops the
+ * consultant straight into it.
+ *
+ * Support used to be one-way: a consultant could type a single canned reply
+ * onto a request and nothing more. Real cases need back-and-forth — and
+ * photos of the affected plant — so the dossier now links into the same
+ * messenger the farmer already uses.
+ */
+function ChatWithFarmerButton({
+  farmerId,
+  farmerName,
+  variant = 'solid',
+}: {
+  farmerId: number;
+  farmerName: string;
+  variant?: 'solid' | 'ghost';
+}) {
+  const openDirect = useDirectStore((state) => state.openDirect);
+  const [busy, setBusy] = useState(false);
+
+  async function startChat() {
+    setBusy(true);
+    try {
+      const response = await messagesApi.openFarmerConversation(farmerId);
+      openDirect({ conversationId: response.data.id });
+    } catch (error) {
+      toast.error(parseApiError(error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => void startChat()}
+      disabled={busy}
+      className={cn(
+        'flex min-h-9 shrink-0 items-center gap-1.5 rounded-xl px-3 text-fluid-xs font-bold transition disabled:opacity-60',
+        variant === 'solid'
+          ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+          : 'border border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-700 dark:text-lime-300 dark:hover:bg-emerald-900',
+      )}
+      aria-label={`گفتگو با ${farmerName}`}
+    >
+      <MessagesSquare size={14} aria-hidden="true" />
+      گفتگو با کشاورز
+    </button>
   );
 }

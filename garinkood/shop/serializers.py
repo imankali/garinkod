@@ -10,6 +10,7 @@ from .models import (
     PaymentAttempt, AffiliateProfile, AffiliateConversion, FinancialLedgerEntry,
     PlatformFeedback, StorefrontComplaint, VisualSearchRequest, Coupon, Wallet,
     WalletTransaction, StorefrontPost, StorefrontConversation, StorefrontMessage,
+    StorefrontPostLike, StorefrontPostComment, StorefrontStoryView,
     FarmLand, FarmCalendarEvent, FarmConsultationRequest, AdminAuditLog
 )
 from .slugs import slugify_fa, unique_storefront_slug
@@ -788,24 +789,89 @@ class WalletSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class StorefrontPostCommentSerializer(serializers.ModelSerializer):
+    """One comment, with its replies nested exactly one level deep."""
+
+    author_name = serializers.SerializerMethodField()
+    author_avatar_url = serializers.SerializerMethodField()
+    is_mine = serializers.SerializerMethodField()
+    can_moderate = serializers.SerializerMethodField()
+    replies = serializers.SerializerMethodField()
+
+    class Meta:
+        model = StorefrontPostComment
+        fields = [
+            'id', 'post', 'parent', 'body', 'author_name', 'author_avatar_url',
+            'is_mine', 'can_moderate', 'replies', 'created_at',
+        ]
+        read_only_fields = [
+            'id', 'post', 'author_name', 'author_avatar_url', 'is_mine',
+            'can_moderate', 'replies', 'created_at',
+        ]
+
+    def get_author_name(self, obj):
+        return obj.user.get_full_name() or obj.user.username
+
+    def get_author_avatar_url(self, obj):
+        account = getattr(obj.user, 'account', None)
+        return account.avatar_url if account else ''
+
+    def get_is_mine(self, obj):
+        request = self.context.get('request')
+        return bool(request and request.user.is_authenticated and obj.user_id == request.user.id)
+
+    def get_can_moderate(self, obj):
+        """The post's owner may remove comments on their own post."""
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return False
+        if obj.user_id == request.user.id:
+            return True
+        return obj.post.storefront.user_id == request.user.id
+
+    def get_replies(self, obj):
+        # Only root comments carry replies; nesting stops at one level.
+        if obj.parent_id is not None:
+            return []
+        replies = [reply for reply in obj.replies.all() if not reply.is_hidden]
+        return StorefrontPostCommentSerializer(replies, many=True, context=self.context).data
+
+    def validate_body(self, body):
+        cleaned = body.strip()
+        if not cleaned:
+            raise serializers.ValidationError('متن دیدگاه را بنویسید.')
+        return cleaned
+
+
 class StorefrontPostSerializer(serializers.ModelSerializer):
     storefront_name = serializers.CharField(source='storefront.name', read_only=True)
     storefront_slug = serializers.CharField(source='storefront.slug', read_only=True)
     storefront_avatar_url = serializers.CharField(source='storefront.avatar_url', read_only=True)
+    storefront_is_verified = serializers.BooleanField(source='storefront.is_verified', read_only=True)
     image_url = serializers.SerializerMethodField()
     status_label = serializers.CharField(source='get_status_display', read_only=True)
     post_type_label = serializers.CharField(source='get_post_type_display', read_only=True)
+    # Instagram-style social state.
+    like_count = serializers.SerializerMethodField()
+    comment_count = serializers.SerializerMethodField()
+    is_liked = serializers.SerializerMethodField()
+    is_seen = serializers.SerializerMethodField()
+    is_owner = serializers.SerializerMethodField()
 
     class Meta:
         model = StorefrontPost
         fields = [
             'id', 'storefront', 'storefront_name', 'storefront_slug', 'storefront_avatar_url',
+            'storefront_is_verified',
             'listing', 'post_type', 'post_type_label', 'caption', 'image', 'image_url',
-            'status', 'status_label', 'expires_at', 'created_at', 'updated_at'
+            'status', 'status_label', 'expires_at', 'created_at', 'updated_at',
+            'like_count', 'comment_count', 'is_liked', 'is_seen', 'is_owner',
         ]
         read_only_fields = [
             'id', 'storefront', 'storefront_name', 'storefront_slug', 'storefront_avatar_url',
-            'image_url', 'status', 'status_label', 'created_at', 'updated_at',
+            'storefront_is_verified', 'image_url', 'status', 'status_label',
+            'created_at', 'updated_at',
+            'like_count', 'comment_count', 'is_liked', 'is_seen', 'is_owner',
         ]
 
     def validate_image(self, image):
@@ -816,22 +882,89 @@ class StorefrontPostSerializer(serializers.ModelSerializer):
     def get_image_url(self, obj):
         return obj.image_url
 
+    # The list views annotate these; the fallbacks keep a single-object
+    # serialisation (detail, create response) correct without them.
+    def get_like_count(self, obj):
+        annotated = getattr(obj, 'likes_total', None)
+        return annotated if annotated is not None else obj.likes.count()
+
+    def get_comment_count(self, obj):
+        annotated = getattr(obj, 'comments_total', None)
+        return annotated if annotated is not None else obj.comments.filter(is_hidden=False).count()
+
+    def _user(self):
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        return user if (user and user.is_authenticated) else None
+
+    def get_is_liked(self, obj):
+        annotated = getattr(obj, 'liked_by_me', None)
+        if annotated is not None:
+            return bool(annotated)
+        user = self._user()
+        return bool(user and obj.likes.filter(user=user).exists())
+
+    def get_is_seen(self, obj):
+        annotated = getattr(obj, 'seen_by_me', None)
+        if annotated is not None:
+            return bool(annotated)
+        user = self._user()
+        return bool(user and obj.views.filter(user=user).exists())
+
+    def get_is_owner(self, obj):
+        user = self._user()
+        return bool(user and obj.storefront.user_id == user.id)
+
 
 class StorefrontMessageSerializer(serializers.ModelSerializer):
     sender_name = serializers.SerializerMethodField()
+    sender_avatar_url = serializers.SerializerMethodField()
     is_mine = serializers.SerializerMethodField()
     listing = serializers.SerializerMethodField()
+    attachment_url = serializers.SerializerMethodField()
 
     class Meta:
         model = StorefrontMessage
         fields = [
-            'id', 'conversation', 'sender', 'sender_name', 'is_mine', 'body',
-            'listing', 'is_read', 'created_at',
+            'id', 'conversation', 'sender', 'sender_name', 'sender_avatar_url', 'is_mine', 'body',
+            'listing', 'attachment', 'attachment_url', 'attachment_type', 'attachment_duration',
+            'is_read', 'created_at',
         ]
-        read_only_fields = ['id', 'conversation', 'sender', 'sender_name', 'is_mine', 'is_read', 'created_at']
+        read_only_fields = [
+            'id', 'conversation', 'sender', 'sender_name', 'sender_avatar_url', 'is_mine',
+            'attachment_url', 'is_read', 'created_at',
+        ]
 
     def get_sender_name(self, obj):
+        """Who is speaking — by role, not by username, for service channels.
+
+        In a support or consulting thread the operator answers on behalf of the
+        platform. Showing a staff member's personal username there would leak
+        an identity the reader did not ask for and make replies from different
+        operators look like different people.
+        """
+        conversation = obj.conversation
+        if obj.sender_id != conversation.customer_id:
+            if conversation.channel == StorefrontConversation.CHANNEL_STOREFRONT:
+                if conversation.storefront_id:
+                    return conversation.storefront.name
+            else:
+                return conversation.get_channel_display()
         return obj.sender.get_full_name() or obj.sender.username
+
+    def get_sender_avatar_url(self, obj):
+        conversation = obj.conversation
+        if (
+            obj.sender_id != conversation.customer_id
+            and conversation.channel == StorefrontConversation.CHANNEL_STOREFRONT
+            and conversation.storefront_id
+        ):
+            return conversation.storefront.avatar_url
+        account = getattr(obj.sender, 'account', None)
+        return account.avatar_url if account else ''
+
+    def get_attachment_url(self, obj):
+        return obj.attachment_url
 
     def get_is_mine(self, obj):
         request = self.context.get('request')
@@ -863,26 +996,53 @@ class StorefrontMessageSerializer(serializers.ModelSerializer):
 class StorefrontConversationSerializer(serializers.ModelSerializer):
     storefront = serializers.SerializerMethodField()
     counterpart_name = serializers.SerializerMethodField()
+    counterpart_avatar_url = serializers.SerializerMethodField()
+    channel_label = serializers.CharField(source='get_channel_display', read_only=True)
     last_message = serializers.SerializerMethodField()
     unread_count = serializers.SerializerMethodField()
 
     class Meta:
         model = StorefrontConversation
         fields = [
-            'id', 'storefront', 'counterpart_name', 'last_message', 'unread_count',
+            'id', 'channel', 'channel_label', 'subject', 'storefront',
+            'counterpart_name', 'counterpart_avatar_url', 'last_message', 'unread_count',
             'created_at', 'updated_at',
         ]
         read_only_fields = fields
 
     def get_storefront(self, obj):
+        # Only storefront threads have one; the others report null so the
+        # client renders a channel badge instead of a shop card.
+        if not obj.storefront_id:
+            return None
         return StorefrontSerializer(obj.storefront, context=self.context).data
 
     def get_counterpart_name(self, obj):
+        """The name of whoever is on the *other* side, from the caller's view."""
         request = self.context.get('request')
         user = request.user if request else None
-        if user and obj.storefront.user_id == user.id:
+        if obj.channel != StorefrontConversation.CHANNEL_STOREFRONT:
+            # Staff see the farmer/customer; the customer sees the department.
+            if user and user.id != obj.customer_id:
+                return obj.customer.get_full_name() or obj.customer.username
+            return obj.get_channel_display()
+        if user and obj.storefront_id and obj.storefront.user_id == user.id:
             return obj.customer.get_full_name() or obj.customer.username
-        return obj.storefront.name
+        return obj.storefront.name if obj.storefront_id else obj.get_channel_display()
+
+    def get_counterpart_avatar_url(self, obj):
+        request = self.context.get('request')
+        user = request.user if request else None
+        viewer_is_customer = bool(user and user.id == obj.customer_id)
+        if obj.channel == StorefrontConversation.CHANNEL_STOREFRONT and obj.storefront_id:
+            if viewer_is_customer:
+                return obj.storefront.avatar_url
+            account = getattr(obj.customer, 'account', None)
+            return account.avatar_url if account else ''
+        if not viewer_is_customer:
+            account = getattr(obj.customer, 'account', None)
+            return account.avatar_url if account else ''
+        return ''
 
     def get_last_message(self, obj):
         # The queryset prefetches messages newest-first, so the first cached

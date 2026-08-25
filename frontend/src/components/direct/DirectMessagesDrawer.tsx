@@ -7,15 +7,17 @@
 // Opening with a `storefrontSlug` creates/loads that storefront's thread, which
 // is how "گفتگو با غرفه‌دار" and "ارسال به دایرکت" reach the same chat.
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowRight, MessageCircle, X } from 'lucide-react';
+import { MessageCircle, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 import { messagesApi } from '../../api/services';
 import { useDirectStore } from '../../store/directStore';
 import { useTranslation } from '../../i18n';
-import type { StorefrontConversation } from '../../types';
+import type { MessageChannel, StorefrontConversation } from '../../types';
+import { cn } from '../../utils/cn';
+import ConversationRow from './ConversationRow';
 import DirectThread from './DirectThread';
 
 const LIST_POLL_MS = 6000;
@@ -27,6 +29,7 @@ export default function DirectMessagesDrawer() {
     view,
     conversationId,
     storefrontSlug,
+    serviceChannel,
     setConversationId,
     openList,
     setUnreadTotal,
@@ -34,6 +37,9 @@ export default function DirectMessagesDrawer() {
   } = useDirectStore();
 
   const [conversations, setConversations] = useState<StorefrontConversation[]>([]);
+  const [channels, setChannels] = useState<{ value: MessageChannel; label: string }[]>([]);
+  const [unreadByChannel, setUnreadByChannel] = useState<Partial<Record<MessageChannel, number>>>({});
+  const [filter, setFilter] = useState<'all' | MessageChannel>('all');
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -41,11 +47,21 @@ export default function DirectMessagesDrawer() {
     try {
       const response = await messagesApi.conversations();
       setConversations(response.data.results || []);
+      setChannels(response.data.channels || []);
+      setUnreadByChannel(response.data.unread_by_channel || {});
       setUnreadTotal(response.data.unread_total || 0);
     } catch {
       // Signed-out viewers simply get an empty list.
     }
   }, [setUnreadTotal]);
+
+  const visibleConversations = useMemo(
+    () =>
+      filter === 'all'
+        ? conversations
+        : conversations.filter((conversation) => conversation.channel === filter),
+    [conversations, filter],
+  );
 
   // Opening with a storefront slug resolves (or creates) that thread.
   useEffect(() => {
@@ -79,11 +95,48 @@ export default function DirectMessagesDrawer() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, storefrontSlug, conversationId]);
 
+  // The floating messenger opens a service desk (پشتیبانی / مشاوره) the same
+  // way a storefront slug opens a shop thread: resolve it to a real
+  // conversation id, then hand off to the normal thread view.
+  useEffect(() => {
+    if (!open || !serviceChannel || conversationId) return;
+    let cancelled = false;
+    setBusy(true);
+    messagesApi
+      .openServiceConversation(serviceChannel)
+      .then((response) => {
+        if (!cancelled && response.data?.id) {
+          setConversationId(response.data.id);
+          void loadList();
+        }
+      })
+      .catch(() => {
+        if (!cancelled) toast.error(t('access.loginRequired'));
+      })
+      .finally(() => {
+        if (!cancelled) setBusy(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, serviceChannel, conversationId]);
+
   useEffect(() => {
     if (!open) setLoading(false);
   }, [open]);
 
-  const showThread = view === 'thread' || Boolean(conversationId) || Boolean(storefrontSlug);
+  // Reset the channel filter each time the drawer is dismissed, so the next
+  // open always starts on the full inbox.
+  useEffect(() => {
+    if (!open) setFilter('all');
+  }, [open]);
+
+  const showThread =
+    view === 'thread' ||
+    Boolean(conversationId) ||
+    Boolean(storefrontSlug) ||
+    Boolean(serviceChannel);
 
   return (
     <AnimatePresence>
@@ -135,10 +188,32 @@ export default function DirectMessagesDrawer() {
                   </button>
                 </header>
 
+                {/* One chip per notification source, so "where did this come
+                    from?" is answerable before opening anything. */}
+                {channels.length > 0 && (
+                  <div className="no-scrollbar flex shrink-0 gap-1.5 overflow-x-auto border-b border-emerald-100 px-3 py-2.5 dark:border-emerald-800">
+                    <ChannelChip
+                      label={t('common.all')}
+                      active={filter === 'all'}
+                      count={Object.values(unreadByChannel).reduce((sum, n) => sum + (n || 0), 0)}
+                      onClick={() => setFilter('all')}
+                    />
+                    {channels.map((channel) => (
+                      <ChannelChip
+                        key={channel.value}
+                        label={channel.label}
+                        active={filter === channel.value}
+                        count={unreadByChannel[channel.value] || 0}
+                        onClick={() => setFilter(channel.value)}
+                      />
+                    ))}
+                  </div>
+                )}
+
                 <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3">
                   {loading || busy ? (
                     <p className="py-10 text-center text-xs text-slate-400">{t('common.loading')}</p>
-                  ) : conversations.length === 0 ? (
+                  ) : visibleConversations.length === 0 ? (
                     <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
                       <MessageCircle size={32} className="text-emerald-300" />
                       <p className="max-w-60 text-xs leading-6 text-slate-500 dark:text-emerald-200">
@@ -146,39 +221,15 @@ export default function DirectMessagesDrawer() {
                       </p>
                     </div>
                   ) : (
-                    <ul className="space-y-2">
-                      {conversations.map((conversation) => (
+                    <ul className="space-y-1.5">
+                      {visibleConversations.map((conversation) => (
                         <li key={conversation.id}>
-                          <button
-                            type="button"
-                            onClick={() => setConversationId(conversation.id)}
-                            className="flex min-h-[4.5rem] w-full items-center gap-3 rounded-2xl border border-emerald-100 bg-white p-3 text-start shadow-sm transition hover:border-emerald-300 dark:border-emerald-800 dark:bg-emerald-950/60 dark:hover:border-emerald-600"
-                          >
-                            <img
-                              src={conversation.storefront.avatar_url || '/images/hero-farm.jpg'}
-                              alt={conversation.storefront.name}
-                              className="h-12 w-12 shrink-0 rounded-xl object-cover"
-                              loading="lazy"
-                            />
-                            <span className="min-w-0 flex-1">
-                              <span className="flex items-center justify-between gap-2">
-                                <span className="truncate text-sm font-bold text-slate-800 dark:text-white">
-                                  {conversation.storefront.name}
-                                </span>
-                                {conversation.unread_count > 0 && (
-                                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-600 px-1.5 text-fluid-2xs font-bold text-white">
-                                    {conversation.unread_count.toLocaleString('fa-IR')}
-                                  </span>
-                                )}
-                              </span>
-                              <span className="mt-0.5 block truncate text-xs text-slate-500 dark:text-emerald-200">
-                                {conversation.last_message?.body ||
-                                  conversation.last_message?.listing?.title ||
-                                  t('direct.startHint')}
-                              </span>
-                            </span>
-                            <ArrowRight size={15} className="shrink-0 -scale-x-100 text-slate-300" />
-                          </button>
+                          <ConversationRow
+                            conversation={conversation}
+                            fallbackPreview={t('direct.startHint')}
+                            onSelect={() => setConversationId(conversation.id)}
+                            showChevron
+                          />
                         </li>
                       ))}
                     </ul>
@@ -190,5 +241,44 @@ export default function DirectMessagesDrawer() {
         </>
       )}
     </AnimatePresence>
+  );
+}
+
+/** A channel filter chip inside the drawer's inbox header. */
+function ChannelChip({
+  label,
+  active,
+  count,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  count: number;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        'flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border px-3 text-fluid-2xs font-bold transition',
+        active
+          ? 'border-emerald-600 bg-emerald-600 text-white'
+          : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-300 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200',
+      )}
+    >
+      {label}
+      {count > 0 && (
+        <span
+          className={cn(
+            'flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-fluid-2xs',
+            active ? 'bg-white/25 text-white' : 'bg-emerald-600 text-white',
+          )}
+        >
+          {count.toLocaleString('fa-IR')}
+        </span>
+      )}
+    </button>
   );
 }
