@@ -28,3 +28,6 @@ whitenoise[brotli]==6.12.0
 
 # WSGI production server
 gunicorn==23.0.0
+
+# Redis client for shared caching and rate-limiting
+redis==5.2.1

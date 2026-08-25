@@ -17,6 +17,7 @@ import { useThemeStore } from "../store/themeStore";
 import type { MarketplaceListing, Order, Storefront } from "../types";
 import { formatPrice } from "../utils/formatPrice";
 import { cn } from "../utils/cn";
+import { normalizePhoneNumber } from "../utils/normalizeDigits";
 
 type Tab = "overview" | "buyer" | "seller" | "farm" | "settings";
 
@@ -408,8 +409,8 @@ function SettingsPanel({ form, setForm, editing, setEditing, saving, onSave, onC
         <form onSubmit={onSave} className="mt-6 grid gap-4 sm:grid-cols-2">
           <InfoField label={t("profile.firstName")} value={form.first_name} editing={editing} onChange={(value) => setForm({ ...form, first_name: value })} />
           <InfoField label={t("profile.lastName")} value={form.last_name} editing={editing} onChange={(value) => setForm({ ...form, last_name: value })} />
-          <InfoField label={t("profile.email")} value={form.email} editing={editing} type="email" onChange={(value) => setForm({ ...form, email: value })} />
-          <InfoField label={t("profile.phone")} value={form.phone} editing={editing} onChange={(value) => setForm({ ...form, phone: value })} />
+          <InfoField label={t("profile.email")} value={form.email} editing={editing} type="email" onChange={(value) => setForm({ ...form, email: value.trim() })} />
+          <InfoField label={t("profile.phone")} value={form.phone} editing={editing} onChange={(value) => setForm({ ...form, phone: normalizePhoneNumber(value) })} />
           <InfoField label={t("profile.address")} value={form.address} editing={editing} multiline onChange={(value) => setForm({ ...form, address: value })} />
           <div className="rounded-2xl bg-slate-50 p-4 text-sm dark:bg-emerald-900/40">
             <p className="text-xs text-slate-500 dark:text-emerald-200">{t("profile.username")}</p>

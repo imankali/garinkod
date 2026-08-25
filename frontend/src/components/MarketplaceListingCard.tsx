@@ -59,6 +59,8 @@ export default function MarketplaceListingCard({ listing, index = 0 }: { listing
         <img
           src={listing.image_url || '/images/hero-farm.jpg'}
           alt={listing.title}
+          width={320}
+          height={240}
           loading="lazy"
           className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
         />

@@ -387,6 +387,39 @@ export interface StorefrontComplaintPayload {
   description: string;
 }
 
+export interface VisualDiagnosis {
+  status: string;
+  key: string;
+  title: string;
+  category: string;
+  confidence_score: number;
+  confidence_percent: number;
+  symptoms: string[];
+  treatment_advice: string;
+  image_meta?: {
+    width: number;
+    height: number;
+    dominant_hue: string;
+  };
+  suggested_inputs?: Array<{
+    id: number;
+    name: string;
+    kind: string;
+    active_ingredient?: string;
+    safety_notes?: string;
+    preharvest_interval_days?: number;
+  }>;
+  suggested_products?: Array<{
+    id: number;
+    title: string;
+    slug: string;
+    price: number;
+    image_url?: string;
+    in_stock: boolean;
+  }>;
+  disclaimer: string;
+}
+
 export interface VisualSearchResponse {
   request: {
     id: number;
@@ -396,6 +429,7 @@ export interface VisualSearchResponse {
     result_payload: Record<string, unknown>;
     created_at: string;
   };
+  diagnosis?: VisualDiagnosis;
   message: string;
 }
 

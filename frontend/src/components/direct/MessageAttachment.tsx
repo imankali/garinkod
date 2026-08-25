@@ -4,8 +4,8 @@
 // (`attachment_type`) rather than being guessed from the file extension, so
 // the right player is mounted on the first render.
 
-import { useEffect, useRef, useState } from 'react';
-import { Pause, Play } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Pause, Play, Volume2 } from 'lucide-react';
 
 import type { StorefrontMessage } from '../../types';
 import { cn } from '../../utils/cn';
@@ -65,13 +65,11 @@ export default function MessageAttachment({
   return null;
 }
 
+const SPEEDS = [1, 1.5, 2] as const;
+
 /**
- * A compact voice-note player.
- *
- * The native <audio> control is inconsistent across browsers and far too wide
- * for a chat bubble, so this is a play/pause button plus a progress bar — and
- * it shows the recorded length immediately, from the duration the sender
- * supplied, instead of waiting for metadata to download.
+ * A modern, interactive voice-note player with waveform simulation,
+ * scrubbing, duration tracking, and playback speed toggle.
  */
 function VoiceNote({
   src,
@@ -83,9 +81,11 @@ function VoiceNote({
   isMine: boolean;
 }) {
   const audioRef = useRef<HTMLAudioElement>(null);
+  const progressBarRef = useRef<HTMLDivElement>(null);
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [total, setTotal] = useState(duration ?? 0);
+  const [speedIndex, setSpeedIndex] = useState(0);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -93,7 +93,9 @@ function VoiceNote({
 
     const onTime = () => setProgress(audio.currentTime);
     const onMeta = () => {
-      if (Number.isFinite(audio.duration)) setTotal(audio.duration);
+      if (Number.isFinite(audio.duration) && audio.duration > 0) {
+        setTotal(audio.duration);
+      }
     };
     const onEnd = () => {
       setPlaying(false);
@@ -110,7 +112,7 @@ function VoiceNote({
     };
   }, []);
 
-  function toggle() {
+  const togglePlay = useCallback(() => {
     const audio = audioRef.current;
     if (!audio) return;
     if (playing) {
@@ -120,44 +122,124 @@ function VoiceNote({
       void audio.play();
       setPlaying(true);
     }
-  }
+  }, [playing]);
+
+  const cycleSpeed = useCallback(() => {
+    const nextIndex = (speedIndex + 1) % SPEEDS.length;
+    setSpeedIndex(nextIndex);
+    const nextSpeed: number = SPEEDS[nextIndex] ?? 1;
+    if (audioRef.current) {
+      audioRef.current.playbackRate = nextSpeed;
+    }
+  }, [speedIndex]);
+
+  const handleSeek = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      const audio = audioRef.current;
+      const bar = progressBarRef.current;
+      if (!audio || !bar || total <= 0) return;
+
+      const rect = bar.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const clampedPercent = Math.max(0, Math.min(1, clickX / rect.width));
+      const newTime = clampedPercent * total;
+      audio.currentTime = newTime;
+      setProgress(newTime);
+    },
+    [total],
+  );
 
   const percent = total > 0 ? Math.min((progress / total) * 100, 100) : 0;
+  const currentSpeed = SPEEDS[speedIndex];
+
+  // Pseudo-waveform bar heights (20 bars)
+  const WAVE_BARS = [35, 60, 45, 80, 55, 90, 70, 100, 65, 85, 40, 75, 90, 60, 45, 80, 50, 70, 40, 30];
 
   return (
-    <div className="mt-1.5 flex min-w-48 items-center gap-2.5">
+    <div
+      className={cn(
+        'mt-2 flex min-w-56 max-w-xs flex-col rounded-2xl p-2.5 shadow-sm transition-all sm:min-w-64',
+        isMine
+          ? 'bg-emerald-700/80 text-white'
+          : 'bg-slate-50 text-slate-800 dark:bg-emerald-950/80 dark:text-emerald-100',
+      )}
+    >
       <audio ref={audioRef} src={src} preload="metadata" />
-      <button
-        type="button"
-        onClick={toggle}
-        aria-label={playing ? 'توقف پیام صوتی' : 'پخش پیام صوتی'}
-        className={cn(
-          'flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition',
-          isMine ? 'bg-white/25 text-white hover:bg-white/35' : 'bg-emerald-600 text-white hover:bg-emerald-700',
-        )}
-      >
-        {playing ? <Pause size={15} /> : <Play size={15} className="translate-x-px" />}
-      </button>
 
-      <div className="min-w-0 flex-1">
+      <div className="flex items-center gap-2.5">
+        {/* Play/Pause Button */}
+        <button
+          type="button"
+          onClick={togglePlay}
+          aria-label={playing ? 'توقف پیام صوتی' : 'پخش پیام صوتی'}
+          className={cn(
+            'flex h-10 w-10 shrink-0 items-center justify-center rounded-full shadow-sm transition transform hover:scale-105 active:scale-95',
+            isMine
+              ? 'bg-white text-emerald-800 hover:bg-emerald-50'
+              : 'bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-400',
+          )}
+        >
+          {playing ? <Pause size={17} /> : <Play size={17} className="translate-x-px" />}
+        </button>
+
+        {/* Waveform scrubber */}
         <div
-          className={cn(
-            'h-1.5 w-full overflow-hidden rounded-full',
-            isMine ? 'bg-white/30' : 'bg-emerald-200 dark:bg-emerald-800',
-          )}
+          ref={progressBarRef}
+          onClick={handleSeek}
+          className="relative flex h-8 flex-1 cursor-pointer items-center gap-[2px] px-1"
+          role="progressbar"
+          aria-valuenow={percent}
+          aria-valuemin={0}
+          aria-valuemax={100}
         >
-          <div
-            className={cn('h-full rounded-full transition-[width]', isMine ? 'bg-white' : 'bg-emerald-600')}
-            style={{ width: `${percent}%` }}
-          />
+          {WAVE_BARS.map((heightPercent, idx) => {
+            const barPercent = (idx / WAVE_BARS.length) * 100;
+            const isFilled = barPercent <= percent;
+
+            return (
+              <span
+                key={idx}
+                style={{ height: `${heightPercent}%` }}
+                className={cn(
+                  'w-1 rounded-full transition-all duration-150',
+                  isMine
+                    ? isFilled
+                      ? 'bg-white'
+                      : 'bg-white/35'
+                    : isFilled
+                      ? 'bg-emerald-600 dark:bg-lime-400'
+                      : 'bg-slate-200 dark:bg-emerald-800',
+                  playing && isFilled && 'animate-pulse',
+                )}
+              />
+            );
+          })}
         </div>
-        <span
+
+        {/* Speed toggle */}
+        <button
+          type="button"
+          onClick={cycleSpeed}
+          title="سرعت پخش"
           className={cn(
-            'mt-1 block text-fluid-2xs tabular-nums',
-            isMine ? 'text-white/80' : 'text-slate-500 dark:text-emerald-300',
+            'flex h-7 px-1.5 items-center justify-center rounded-lg text-fluid-2xs font-bold transition',
+            isMine
+              ? 'bg-white/20 text-white hover:bg-white/30'
+              : 'bg-slate-200 text-slate-700 hover:bg-slate-300 dark:bg-emerald-900 dark:text-emerald-200',
           )}
         >
-          {formatDuration(playing || progress > 0 ? progress : total)}
+          {currentSpeed}x
+        </button>
+      </div>
+
+      {/* Time display footer */}
+      <div className="mt-1.5 flex items-center justify-between px-1 text-fluid-2xs tabular-nums">
+        <span className={cn('font-semibold', isMine ? 'text-white/90' : 'text-slate-600 dark:text-emerald-300')}>
+          {formatDuration(progress)} / {formatDuration(total)}
+        </span>
+        <span className={cn('flex items-center gap-1', isMine ? 'text-white/70' : 'text-slate-400 dark:text-emerald-400/70')}>
+          <Volume2 size={11} aria-hidden="true" />
+          صدا
         </span>
       </div>
     </div>

@@ -363,3 +363,67 @@ class ManagementDashboardTests(TestCase):
         self.client.force_authenticate(regular)
         response = self.client.get('/api/management/dashboard/')
         self.assertEqual(response.status_code, 403)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class PestVisionAndVisualSearchTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(username='farmer-tester', password='safe-password-123')
+
+    def test_visual_search_runs_diagnosis_pipeline(self):
+        import io
+        from PIL import Image
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        img = Image.new('RGB', (100, 100), color=(40, 180, 50))
+        buffer = io.BytesIO()
+        img.save(buffer, format='JPEG')
+        buffer.seek(0)
+
+        uploaded = SimpleUploadedFile('test_leaf.jpg', buffer.getvalue(), content_type='image/jpeg')
+        self.client.force_authenticate(self.user)
+        response = self.client.post(
+            '/api/visual-search/',
+            {'image': uploaded, 'target': 'pest'},
+            format='multipart',
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertIn('diagnosis', response.data)
+        diagnosis = response.data['diagnosis']
+        self.assertEqual(diagnosis['status'], 'completed')
+        self.assertIn('confidence_score', diagnosis)
+        self.assertIn('symptoms', diagnosis)
+        self.assertIn('treatment_advice', diagnosis)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class ConversationStreamTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(username='buyer-chat', password='safe-password-123')
+        self.seller = User.objects.create_user(username='seller-chat', password='safe-password-123')
+        self.storefront = Storefront.objects.create(
+            user=self.seller, name='غرفه چت', slug='chat-store', is_verified=True,
+        )
+
+    def test_conversation_events_stream_connects(self):
+        from .models import StorefrontConversation, StorefrontMessage
+
+        conversation = StorefrontConversation.objects.create(
+            storefront=self.storefront,
+            customer=self.user,
+            channel=StorefrontConversation.CHANNEL_STOREFRONT,
+        )
+        StorefrontMessage.objects.create(
+            conversation=conversation,
+            sender=self.seller,
+            body='سلام، در خدمتیم',
+        )
+
+        self.client.force_authenticate(self.user)
+        response = self.client.get(f'/api/marketplace/conversations/{conversation.id}/stream/?last_id=0')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'text/event-stream')
+

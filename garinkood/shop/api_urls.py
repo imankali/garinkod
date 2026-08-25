@@ -55,6 +55,11 @@ urlpatterns = [
         name='api_conversation_messages',
     ),
     path(
+        'marketplace/conversations/<int:conversation_id>/stream/',
+        marketplace_views.conversation_events,
+        name='api_conversation_stream',
+    ),
+    path(
         'marketplace/storefronts/<str:slug>/conversation/',
         marketplace_views.storefront_conversation,
         name='api_storefront_conversation',

@@ -7,12 +7,14 @@ import { useQuery } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import {
   Search, X, Clock, SlidersHorizontal,
-  PackageCheck, Mic, Sparkles, Tag, Flame, ImagePlus
+  PackageCheck, Mic, Sparkles, Tag, Flame, ImagePlus,
+  CheckCircle2, AlertCircle, Leaf, Loader2
 } from "lucide-react";
 import { categories } from "../data/shopData";
 import { productsApi, trustApi } from "../api/services";
 import { useTranslation } from "../i18n";
-import type { ProductList, MockProduct } from "../types";
+import { formatPrice } from "../utils/formatPrice";
+import type { ProductList, MockProduct, VisualDiagnosis } from "../types";
 
 // ========================================
 // Types
@@ -223,6 +225,10 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
     setActiveCategory("all");
   }
 
+  const [analyzingImage, setAnalyzingImage] = useState(false);
+  const [diagnosisResult, setDiagnosisResult] = useState<VisualDiagnosis | null>(null);
+  const [uploadedPreview, setUploadedPreview] = useState<string | null>(null);
+
   async function handleImageSearch(event: React.ChangeEvent<HTMLInputElement>) {
     const image = event.target.files?.[0];
     if (!image) return;
@@ -231,12 +237,21 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
       event.target.value = '';
       return;
     }
+    setAnalyzingImage(true);
+    const previewUrl = URL.createObjectURL(image);
+    setUploadedPreview(previewUrl);
     try {
-      const response = await trustApi.visualSearch(image, 'product');
-      toast(response.data.message);
+      const response = await trustApi.visualSearch(image, 'pest');
+      if (response.data.diagnosis) {
+        setDiagnosisResult(response.data.diagnosis);
+        toast.success(response.data.message);
+      } else {
+        toast(response.data.message);
+      }
     } catch {
       // The API client displays the failure message.
     } finally {
+      setAnalyzingImage(false);
       event.target.value = '';
     }
   }
@@ -323,11 +338,12 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
         <button
           type="button"
           onClick={() => imageSearchRef.current?.click()}
-          title="جستجو با تصویر"
-          className="flex min-h-11 min-w-11 items-center justify-center text-slate-400 transition-colors hover:text-[#0F8A5F] dark:text-emerald-400 dark:hover:text-lime-300"
-          aria-label="جستجو با تصویر"
+          disabled={analyzingImage}
+          title="تشخیص هوشمند آفت، بیماری و محصول با تصویر"
+          className="flex min-h-11 min-w-11 items-center justify-center text-slate-400 transition-colors hover:text-[#0F8A5F] dark:text-emerald-400 dark:hover:text-lime-300 disabled:opacity-50"
+          aria-label="تشخیص هوشمند آفت، بیماری و محصول با تصویر"
         >
-          <ImagePlus size={18} />
+          {analyzingImage ? <Loader2 size={18} className="animate-spin text-emerald-600" /> : <ImagePlus size={18} />}
         </button>
 
         {/* Voice Search Button */}
@@ -657,6 +673,149 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
                 )}
               </div>
             )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Visual Diagnosis Result Modal */}
+      <AnimatePresence>
+        {diagnosisResult && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            role="dialog"
+            aria-modal="true"
+            aria-label="نتیجه تشخیص هوشمند آفت و بیماری"
+            className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-3xl border border-emerald-100 bg-white p-5 shadow-2xl dark:border-emerald-900 dark:bg-emerald-950 sm:p-6"
+            >
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-emerald-900">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-lime-300">
+                    <Leaf size={18} />
+                  </span>
+                  <div>
+                    <h3 className="text-fluid-base font-extrabold text-slate-800 dark:text-white">
+                      تشخیص هوشمند گیاه‌پزشکی
+                    </h3>
+                    <p className="text-fluid-2xs text-slate-500 dark:text-emerald-300">
+                      تحلیل تصویر مزرعه و برگ
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDiagnosisResult(null);
+                    setUploadedPreview(null);
+                  }}
+                  className="rounded-full bg-slate-100 p-2 text-slate-500 hover:bg-slate-200 dark:bg-emerald-900 dark:text-white"
+                  aria-label="بستن"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Uploaded Preview & Diagnosis Heading */}
+              <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center">
+                {uploadedPreview && (
+                  <img
+                    src={uploadedPreview}
+                    alt="تصویر ارسالی"
+                    width={100}
+                    height={100}
+                    className="h-24 w-24 shrink-0 rounded-2xl object-cover ring-2 ring-emerald-500/30"
+                  />
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-fluid-2xs font-bold text-emerald-800 dark:bg-emerald-900 dark:text-lime-200">
+                      {diagnosisResult.category === 'healthy' ? 'گیاه سالم' : 'عارضه / آفت'}
+                    </span>
+                    <span className="text-fluid-2xs font-semibold text-slate-400">
+                      دقت ارزیابی: {diagnosisResult.confidence_percent.toLocaleString('fa-IR')}٪
+                    </span>
+                  </div>
+                  <h4 className="mt-1 text-fluid-lg font-extrabold text-slate-800 dark:text-white">
+                    {diagnosisResult.title}
+                  </h4>
+                </div>
+              </div>
+
+              {/* Symptoms */}
+              {diagnosisResult.symptoms.length > 0 && (
+                <div className="mt-4 rounded-2xl bg-amber-50/70 p-3.5 dark:bg-amber-950/30">
+                  <p className="flex items-center gap-1.5 text-fluid-xs font-bold text-amber-900 dark:text-amber-200">
+                    <AlertCircle size={14} />
+                    نشانه‌ها و علائم شناسایی‌شده:
+                  </p>
+                  <ul className="mt-2 list-disc space-y-1 pe-4 text-fluid-2xs leading-5 text-amber-800 dark:text-amber-300">
+                    {diagnosisResult.symptoms.map((symptom, idx) => (
+                      <li key={idx}>{symptom}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Recommendations */}
+              <div className="mt-3 rounded-2xl bg-emerald-50/70 p-3.5 dark:bg-emerald-900/40">
+                <p className="flex items-center gap-1.5 text-fluid-xs font-bold text-emerald-900 dark:text-lime-200">
+                  <CheckCircle2 size={14} />
+                  توصیه کارشناسی و درمان:
+                </p>
+                <p className="mt-1 text-fluid-2xs leading-6 text-emerald-800 dark:text-emerald-100">
+                  {diagnosisResult.treatment_advice}
+                </p>
+              </div>
+
+              {/* Matched Products in Catalogue */}
+              {diagnosisResult.suggested_products && diagnosisResult.suggested_products.length > 0 && (
+                <div className="mt-4">
+                  <p className="text-fluid-xs font-bold text-slate-700 dark:text-emerald-100">
+                    نهاده‌ها و محصولات پیشنهادی در فروشگاه:
+                  </p>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    {diagnosisResult.suggested_products.map((p) => (
+                      <a
+                        key={p.id}
+                        href={`/products/${p.slug}`}
+                        onClick={() => {
+                          setDiagnosisResult(null);
+                          setUploadedPreview(null);
+                        }}
+                        className="flex items-center gap-2.5 rounded-xl border border-slate-100 bg-white p-2.5 shadow-sm transition hover:border-emerald-300 dark:border-emerald-800 dark:bg-emerald-900/60"
+                      >
+                        <img
+                          src={p.image_url || '/images/hero-farm.jpg'}
+                          alt={p.title}
+                          width={48}
+                          height={48}
+                          className="h-12 w-12 shrink-0 rounded-lg object-cover"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-fluid-xs font-bold text-slate-800 dark:text-white">
+                            {p.title}
+                          </p>
+                          <p className="text-fluid-2xs font-extrabold text-emerald-700 dark:text-lime-300">
+                            {formatPrice(p.price)}
+                          </p>
+                        </div>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <p className="mt-4 text-center text-fluid-2xs text-slate-400 dark:text-emerald-300/70">
+                {diagnosisResult.disclaimer}
+              </p>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
