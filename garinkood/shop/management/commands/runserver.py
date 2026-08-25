@@ -1,9 +1,8 @@
 """Self-bootstrapping local development server.
 
-This command extends Django's static-files runserver so the single command
-``python manage.py runserver`` can prepare the local database and launch the
-Vite frontend as well as Django. It is a development convenience, not a
-replacement for a production process manager.
+This command is intentionally available only with ``DEBUG=True``. Django's
+built-in runserver and Vite's development server are not production servers;
+production uses the explicit Gunicorn entrypoint under ``scripts/``.
 """
 
 from __future__ import annotations
@@ -210,6 +209,13 @@ class Command(StaticRunserverCommand):
                 pass
 
     def handle(self, *args, **options):
+        if not settings.DEBUG or settings.GARINKOOD_ENV in {"production", "prod"}:
+            raise CommandError(
+                "برای محیط Production از Django runserver استفاده نکنید. "
+                "DEBUG=False یا GARINKOOD_ENV=production است؛ ابتدا provisioning "
+                "را انجام دهید و سپس scripts/start-production.sh را اجرا کنید."
+            )
+
         auto_setup = self._auto_setup_enabled()
         use_reloader = options.get("use_reloader", True)
         reloader_child = os.environ.get("RUN_MAIN") == "true"

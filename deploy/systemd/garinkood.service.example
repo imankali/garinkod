@@ -1,0 +1,20 @@
+[Unit]
+Description=GarinKood production API
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=garinkood
+Group=garinkood
+WorkingDirectory=/srv/garinkood
+EnvironmentFile=/srv/garinkood/garinkood/.env
+ExecStart=/srv/garinkood/scripts/start-production.sh
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

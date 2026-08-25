@@ -1,0 +1,5 @@
+# Production-only additions. The base runtime is installed transitively below.
+-r requirements.txt
+
+# Shared Redis cache/rate-limit backend for multi-worker Gunicorn deployments.
+redis==5.2.1

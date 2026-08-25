@@ -1,14 +1,12 @@
 #!/usr/bin/env python
 """Django's command-line utility for administrative tasks.
 
-The ``runserver`` command is intentionally self-bootstrapping for local
-development: it creates a project virtual environment when needed, installs the
-pinned backend requirements and creates the local ``.env`` file before Django
-is imported. The matching management command also prepares the database and
-starts the Vite frontend.
+The optional self-setup behaviour is deliberately limited to local development
+(``DEBUG=True``). A production deployment must provision its environment
+explicitly and must never install packages or copy development secrets while a
+service is starting.
 
-Set ``GARINKOOD_AUTO_SETUP=0`` to disable this convenience and use the normal
-Django management-command behaviour.
+Set ``GARINKOOD_AUTO_SETUP=0`` to disable the local-development convenience.
 """
 
 from __future__ import annotations
@@ -28,6 +26,8 @@ ENV_FILE = MANAGE_DIR / ".env"
 ENV_EXAMPLE_FILE = MANAGE_DIR / ".env.example"
 REQUIREMENTS_FILE = MANAGE_DIR / "requirements.txt"
 REQUIREMENTS_STAMP = REPOSITORY_DIR / ".garinkood-python-requirements.stamp"
+TRUE_VALUES = {"1", "true", "yes", "on"}
+FALSE_VALUES = {"0", "false", "no", "off"}
 
 
 def _is_runserver_command() -> bool:
@@ -37,16 +37,43 @@ def _is_runserver_command() -> bool:
 
 
 def _auto_setup_enabled() -> bool:
-    return os.environ.get("GARINKOOD_AUTO_SETUP", "1").strip().lower() not in {
-        "0",
-        "false",
-        "no",
-        "off",
-    }
+    return os.environ.get("GARINKOOD_AUTO_SETUP", "1").strip().lower() not in FALSE_VALUES
+
+
+def _env_file_value(name: str) -> str | None:
+    """Read a simple value from .env without importing third-party packages."""
+
+    if name in os.environ:
+        return os.environ[name]
+    if not ENV_FILE.exists():
+        return None
+
+    for raw_line in ENV_FILE.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        if key.strip() != name:
+            continue
+        return value.strip().strip('"').strip("'")
+    return None
+
+
+def _is_local_development() -> bool:
+    """Only allow automatic mutation when the configured mode is development."""
+
+    environment = (_env_file_value("GARINKOOD_ENV") or "").strip().lower()
+    if environment and environment not in {"development", "dev", "local"}:
+        return False
+
+    debug = _env_file_value("DEBUG")
+    # A missing .env is treated as a first local run. It will be replaced with
+    # the checked-in local template immediately before Django starts.
+    return debug is None or debug.strip().lower() in TRUE_VALUES
 
 
 def _ensure_local_env() -> None:
-    """Create a safe local environment file without overwriting user config."""
+    """Create a local environment file without overwriting user config."""
 
     if ENV_FILE.exists():
         return
@@ -64,12 +91,7 @@ def _venv_python(venv_dir: Path) -> Path:
 
 
 def _reexecute_in_project_venv(python_path: Path) -> None:
-    """Replace this process with the project interpreter.
-
-    Installing packages into the system Python is both unreliable and often
-    impossible without administrator privileges. Re-executing keeps all local
-    dependencies inside ``.venv`` while preserving the original arguments.
-    """
+    """Replace this process with the project interpreter."""
 
     env = os.environ.copy()
     env["GARINKOOD_BOOTSTRAP_REEXEC"] = "1"
@@ -107,7 +129,7 @@ def _requirements_digest() -> str:
 
 
 def _missing_runtime_modules() -> list[str]:
-    """Check imports before Django starts, so missing packages can be fixed."""
+    """Check imports before Django starts, so local missing packages can be fixed."""
 
     modules = {
         "django": "django",
@@ -123,7 +145,7 @@ def _missing_runtime_modules() -> list[str]:
 
 
 def _ensure_python_requirements() -> None:
-    """Install pinned runtime packages only when they are missing or changed."""
+    """Install pinned runtime packages only for local development."""
 
     digest = _requirements_digest()
     stamp = REQUIREMENTS_STAMP.read_text(encoding="utf-8").strip() if REQUIREMENTS_STAMP.exists() else ""
@@ -150,7 +172,7 @@ def _ensure_python_requirements() -> None:
 
 
 def main() -> None:
-    """Run administrative tasks, bootstrapping runserver when requested."""
+    """Run administrative tasks, with auto-setup only in local development."""
 
     runserver = _is_runserver_command()
     if runserver:
@@ -158,7 +180,7 @@ def main() -> None:
         # ``cd garinkood && python manage.py runserver`` and
         # ``python garinkood/manage.py runserver`` work identically.
         os.chdir(MANAGE_DIR)
-        if _auto_setup_enabled():
+        if _auto_setup_enabled() and _is_local_development():
             _ensure_local_env()
             _ensure_project_venv()
             _ensure_python_requirements()
@@ -168,9 +190,8 @@ def main() -> None:
         from django.core.management import execute_from_command_line
     except ImportError as exc:
         raise ImportError(
-            "Couldn't import Django. Run `python manage.py runserver` to let "
-            "GarinKood install the local dependencies, or install "
-            "garinkood/requirements.txt manually."
+            "Couldn't import Django. Install garinkood/requirements.txt in the "
+            "provisioned environment before starting the application."
         ) from exc
     execute_from_command_line(sys.argv)
 

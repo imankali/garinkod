@@ -8,8 +8,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Never use the development defaults in a deployed environment.  The checked-in
 # .env.example documents every value that has to be set for production.
+GARINKOOD_ENV = config("GARINKOOD_ENV", default="development").strip().lower()
 SECRET_KEY = config("SECRET_KEY", default="django-insecure-local-development-only")
 DEBUG = config("DEBUG", default=False, cast=bool)
+if GARINKOOD_ENV in {"production", "prod"} and DEBUG:
+    raise ValueError("GARINKOOD_ENV=production requires DEBUG=False.")
 SITE_URL = config("SITE_URL", default="https://garinkood.ir").rstrip("/")
 FRONTEND_URL = config("FRONTEND_URL", default=SITE_URL).rstrip("/")
 ALLOWED_HOSTS = config(

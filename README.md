@@ -13,7 +13,7 @@
 **فروشگاه تخصصی نهاده‌های کشاورزی**  
 *سموم، کودها، بذور، ادوات و تجهیزات کشاورزی*
 
-[🚀 شروع سریع](#-شروع-سریع) • [📚 مستندات](#-مستندات) • [🎨 ویژگی‌ها](#-ویژگی‌ها)
+[🚀 راه‌اندازی Production](#-راهاندازی-production) • [🧪 اجرای محلی](#-اجرای-محلی-توسعه) • [🎨 ویژگی‌ها](#-ویژگی‌ها)
 
 </div>
 
@@ -113,116 +113,149 @@
 
 ---
 
-## 📦 پیش‌نیازها
+## 📦 پیش‌نیازهای Production
 
-برای اجرای نسخهٔ توسعهٔ پروژه، این موارد را نصب کنید:
+برای اجرای واقعی پروژه روی VPS یا سرور Linux، این موارد باید از قبل نصب و آماده باشند:
 
-- ✅ **Python 3.11 یا 3.12** — پروژه Python 3.11+ را اعلام کرده و CI فعلی با Python 3.11 و 3.12 بررسی می‌شود.
-- ✅ **Node.js 18+** — نسخهٔ پیشنهادی Node.js 22 به‌همراه npm 10 است.
-- ✅ **Git** — در صورتی که پروژه را با clone دریافت می‌کنید.
-- ✅ **یک مرورگر به‌روز** — Chrome، Firefox، Edge یا Safari.
-- ✅ اتصال اینترنت برای نصب وابستگی‌ها و دریافت فونت Vazirmatn از CDN.
-- ✅ آزاد بودن پورت‌های `8000` و `5173`.
+- ✅ **Python 3.11 یا 3.12**
+- ✅ **Node.js 18+ و npm 9+** — فقط برای Build کردن Frontend
+- ✅ **PostgreSQL 16+** — دیتابیس Production
+- ✅ **Redis** — برای Cache و Rate Limit در اجرای چند Worker
+- ✅ **Nginx یا Caddy** — برای سرو Frontend، Proxy کردن API و TLS
+- ✅ **دامنه و گواهی HTTPS**
+- ✅ فضای دائمی برای `garinkood/products/` جهت تصاویر آپلودی
 
-> برای اجرای محلی با SQLite، نصب PostgreSQL لازم نیست. PostgreSQL فقط برای محیط Production یا تست با دیتابیس واقعی لازم است.
->
-> پوشهٔ `venv/` موجود در بعضی نسخه‌های مخزن، یک محیط مجازی قدیمی و مخصوص Windows است و قابل انتقال بین کامپیوترها نیست. همیشه یک محیط مجازی جدید با نام `.venv` بسازید.
+برای اجرای محلی توسعه، PostgreSQL و Redis ضروری نیستند و SQLite کافی است.
 
-### وابستگی‌های Backend
+> پوشهٔ `venv/` موجود در بعضی نسخه‌های مخزن، یک محیط مجازی قدیمی و مخصوص Windows است و قابل انتقال نیست. در سرور Production همیشه `.venv` را روی همان سرور بسازید.
 
-وابستگی‌های اجرای Django در `garinkood/requirements.txt` و ابزارهای توسعه و تست در `garinkood/requirements-dev.txt` قرار دارند. برای توسعهٔ کامل، فایل دوم را نصب کنید؛ این فایل، فایل اول را نیز نصب می‌کند.
+### وابستگی‌های پروژه
 
-### وابستگی‌های Frontend
-
-تمام وابستگی‌های React، TypeScript، Vite، Tailwind، Playwright و ابزارهای کیفیت کد در `frontend/package.json` و `frontend/package-lock.json` قرار دارند. نصب استاندارد با `npm ci` انجام می‌شود.
+- وابستگی‌های پایهٔ Python در `garinkood/requirements.txt` قرار دارند.
+- وابستگی‌های Production، شامل `redis-py`، در `garinkood/requirements-production.txt` قرار دارند.
+- وابستگی‌های توسعه و تست در `garinkood/requirements-dev.txt` قرار دارند.
+- وابستگی‌های React در `frontend/package.json` و `frontend/package-lock.json` قرار دارند.
 
 ---
 
-## 🚀 شروع سریع — فقط با دستور `runserver`
+## 🚀 راه‌اندازی Production
 
-پس از نصب **Python 3.11 یا 3.12** و **Node.js 18 یا بالاتر**، در اولین اجرا فقط یک دستور لازم است. این دستور برای توسعهٔ محلی به‌صورت خودکار کارهای زیر را انجام می‌دهد:
+### نکتهٔ مهم دربارهٔ `runserver`
 
-1. ساخت محیط مجازی Python در `.venv` در صورت نبودن آن؛
-2. ساخت `garinkood/.env` از روی `.env.example` در صورت نبودن آن؛
-3. نصب یا بررسی وابستگی‌های Backend از `requirements.txt`؛
-4. نصب یا بررسی وابستگی‌های Frontend با `npm ci`؛
-5. اجرای migrationهای دیتابیس؛
-6. بارگذاری استان‌ها، شهرها، نهاده‌ها و سطح دسترسی‌ها؛
-7. ایجاد دادهٔ نمونهٔ بازار در حالت توسعه؛
-8. اجرای هم‌زمان Django و Vite.
+`python manage.py runserver` و `npm run dev` سرور توسعه هستند و برای دریافت ترافیک واقعی، HTTPS، چند Worker و مدیریت خطا طراحی نشده‌اند. در حالت `DEBUG=False`، دستور `runserver` عمداً متوقف می‌شود تا به‌صورت تصادفی در Production استفاده نشود.
 
-> این میان‌بُر، خود Python، Node.js، PostgreSQL یا Redis را نصب نمی‌کند؛ این برنامه‌ها باید روی سیستم وجود داشته باشند. در حالت پیش‌فرض توسعه، PostgreSQL و Redis لازم نیستند و SQLite استفاده می‌شود.
+در Production، Frontend باید Build و توسط Nginx/Caddy سرو شود و Backend با Gunicorn اجرا شود.
 
-### اجرای پروژه از ریشهٔ مخزن
+### ۱. ساخت تنظیمات Production
 
-#### Linux و macOS
+فایل زیر را روی سرور بسازید:
 
 ```bash
-python3.11 garinkood/manage.py runserver
+cp garinkood/.env.example garinkood/.env
 ```
 
-اگر دستور Python سیستم شما `python` است:
+سپس `garinkood/.env` را با مقادیر واقعی و محرمانه ویرایش کنید:
+
+```env
+GARINKOOD_ENV=production
+DEBUG=False
+SECRET_KEY=یک-کلید-طولانی-تصادفی-و-منحصر‌به‌فرد
+
+DB_ENGINE=postgresql
+DB_NAME=garinkood
+DB_USER=garinkood
+DB_PASSWORD=رمز-قوی-دیتابیس
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_CONN_MAX_AGE=60
+
+CACHE_URL=redis://127.0.0.1:6379/1
+
+ALLOWED_HOSTS=your-domain.com,www.your-domain.com
+SITE_URL=https://your-domain.com
+FRONTEND_URL=https://your-domain.com
+CORS_ALLOWED_ORIGINS=https://your-domain.com,https://www.your-domain.com
+CSRF_TRUSTED_ORIGINS=https://your-domain.com,https://www.your-domain.com
+SECURE_SSL_REDIRECT=True
+```
+
+فایل `.env` واقعی را در Git قرار ندهید و از `SECRET_KEY` توسعه استفاده نکنید. دسترسی آن را نیز محدود کنید:
+
+```bash
+chmod 600 garinkood/.env
+```
+
+### ۲. Deploy کنترل‌شده
+
+این مرحله فقط هنگام نصب اولیه یا انتشار نسخهٔ جدید اجرا می‌شود؛ نه در هر Restart سرویس:
+
+```bash
+./scripts/deploy-production.sh
+```
+
+این اسکریپت، به‌ترتیب، `.venv` و `requirements-production.txt` را نصب می‌کند، `npm ci` و `npm run build` را اجرا می‌کند، تنظیمات Production را بررسی می‌کند و سپس migration، داده‌های مرجع و `collectstatic` را اجرا می‌کند. `redis-py` برای استفاده از Cache مشترک در محیط Production به‌صورت نسخه‌دار نصب می‌شود. دادهٔ دمو در این مسیر اجرا نمی‌شود.
+
+اگر می‌خواهید تمام انتشار و اجرای موقت Gunicorn با یک فرمان انجام شود:
+
+```bash
+./scripts/deploy-production.sh --start
+```
+
+برای سرویس دائمی، بهتر است Deploy را جدا از Runtime انجام دهید و systemd فقط `scripts/start-production.sh` را اجرا کند:
+
+```bash
+./scripts/start-production.sh
+```
+
+برای نصب نمونهٔ systemd، بعد از اصلاح مسیرها و کاربر در فایل نمونه:
+
+```bash
+sudo cp deploy/systemd/garinkood.service.example /etc/systemd/system/garinkood.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now garinkood
+```
+
+اسکریپت Runtime هیچ package نصب نمی‌کند، فایل `.env` نمی‌سازد، migration/collectstatic انجام نمی‌دهد و seed دمو اجرا نمی‌کند؛ فقط preflight امنیتی را اجرا و Gunicorn را روی `127.0.0.1:8000` اجرا می‌کند. پس از هر Deploy، سرویس را با `sudo systemctl restart garinkood` دوباره اجرا کنید.
+
+### ۳. تنظیم Nginx
+
+نمونهٔ تنظیمات Reverse Proxy در فایل زیر قرار دارد:
+
+```text
+deploy/nginx/garinkood.conf.example
+```
+
+قبل از فعال‌سازی، دامنه و مسیر `/srv/garinkood` را تغییر دهید. Nginx باید:
+
+- `frontend/dist/` را سرو کند؛
+- مسیرهای `/api/` و `/admin/` را به Gunicorn روی `127.0.0.1:8000` Proxy کند؛
+- مسیرهای `/media/` و `/static/` را سرو کند؛
+- برای React Router به `/index.html` fallback داشته باشد؛
+- HTTPS را فعال کند.
+
+---
+
+## 🧪 اجرای محلی توسعه
+
+برای توسعهٔ محلی، قابلیت میان‌بُر قبلی همچنان وجود دارد و فقط با `DEBUG=True` فعال می‌شود:
 
 ```bash
 python garinkood/manage.py runserver
 ```
 
-#### Windows PowerShell
+در این حالت وابستگی‌های محلی، SQLite، migrationها، داده‌های نمونه و Vite به‌صورت خودکار آماده می‌شوند. این میان‌بُر را برای Production استفاده نکنید.
 
-```powershell
-py -3.11 .\garinkood\manage.py runserver
-```
+آدرس‌های محلی:
 
-یا اگر داخل پوشهٔ Backend هستید:
+- Frontend: `http://localhost:5173`
+- API: `http://localhost:8000/api/`
+- پنل مدیریت: `http://localhost:8000/admin/`
 
-```powershell
-cd .\garinkood
-python manage.py runserver
-```
-
-در اولین اجرا ممکن است نصب بسته‌ها چند دقیقه طول بکشد. بعد از آن، هر بار با اجرای همین دستور، وابستگی‌ها و دیتابیس بررسی شده و هر دو سرور اجرا می‌شوند. با `Ctrl+C` اجرای Backend و Frontend متوقف می‌شود.
-
-### گزینه‌های اختیاری
-
-```bash
-# فقط Backend، بدون اجرای Frontend
-python garinkood/manage.py runserver --no-frontend
-
-# اجرای سرور Frontend روی یک پورت دیگر
-python garinkood/manage.py runserver --frontend-port 5174
-
-# اجرا بدون ایجاد غرفه‌ها و حساب‌های نمونه
-python garinkood/manage.py runserver --no-demo-data
-```
-
-برای غیرفعال‌کردن کامل نصب خودکار و استفاده از رفتار عادی Django:
-
-```bash
-GARINKOOD_AUTO_SETUP=0 python garinkood/manage.py runserver
-```
-
-در Windows PowerShell:
-
-```powershell
-$env:GARINKOOD_AUTO_SETUP="0"
-python .\garinkood\manage.py runserver
-```
-
-### آدرس‌های دسترسی
-
-- 🌐 **Frontend:** [http://localhost:5173](http://localhost:5173)
-- 🔙 **Backend API:** [http://localhost:8000/api/](http://localhost:8000/api/)
-- 👨‍💼 **پنل مدیریت:** [http://localhost:8000/admin/](http://localhost:8000/admin/)
-
-### ساخت حساب مدیر و محصول
-
-ساخت superuser به‌دلیل نیاز به رمز محرمانه همچنان یک‌بار به‌صورت تعاملی انجام می‌شود:
+برای ساخت حساب مدیر، یک‌بار این دستور را در محیط توسعه اجرا کنید:
 
 ```bash
 python garinkood/manage.py createsuperuser
 ```
-
-دادهٔ نمونهٔ بازار به‌صورت خودکار در حالت `DEBUG=True` ساخته می‌شود، اما کاتالوگ اصلی محصولات را باید از پنل `/admin/` ایجاد کنید. فایل `create_test_product.py` نیز برای ساخت یک محصول آزمایشی وجود دارد و کاربری با نام `admin` می‌خواهد.
 
 ---
 
@@ -230,9 +263,10 @@ python garinkood/manage.py createsuperuser
 
 ### Backend — فایل `garinkood/.env`
 
-فایل `garinkood/.env.example` را به `garinkood/.env` کپی کنید. تنظیمات پیش‌فرض برای توسعه:
+برای تنظیم دستی، فایل `garinkood/.env.example` را به `garinkood/.env` کپی کنید. میان‌بُر `runserver` در اولین اجرای محلی، همین فایل توسعه را در صورت نبودن می‌سازد. تنظیمات پیش‌فرض برای توسعه:
 
 ```env
+GARINKOOD_ENV=development
 DEBUG=True
 SECRET_KEY=replace-with-a-long-random-development-secret
 
@@ -245,7 +279,7 @@ SITE_URL=http://localhost:5173
 FRONTEND_URL=http://localhost:5173
 ```
 
-> ساختن `.env` ضروری است. اگر این فایل وجود نداشته باشد، `settings.py` به‌صورت پیش‌فرض PostgreSQL را انتخاب می‌کند و برای `DB_NAME`، `DB_USER` و `DB_PASSWORD` مقدار می‌خواهد.
+> اگر این فایل وجود نداشته باشد و از یک فرمان غیر از shortcut توسعه استفاده کنید، `settings.py` به‌صورت پیش‌فرض PostgreSQL را انتخاب می‌کند و برای `DB_NAME`، `DB_USER` و `DB_PASSWORD` مقدار می‌خواهد. سرویس Production همیشه باید `.env` واقعی و بررسی‌شده داشته باشد.
 
 ### Frontend — فایل `frontend/.env`
 
@@ -263,67 +297,6 @@ VITE_DEV_MODE=true
 ```
 
 API در کد فعلی با آدرس نسبی `/api` استفاده می‌شود. متغیر `VITE_API_BASE_URL` که در فایل نمونه توضیح داده شده، در حال حاضر آدرس API را تغییر نمی‌دهد.
-
----
-
-## 🗄️ PostgreSQL، Redis و سرویس‌های اختیاری
-
-### PostgreSQL
-
-برای اجرای محلی SQLite کافی است. برای Production یا اجرای تست روی PostgreSQL 16، سرویس PostgreSQL را نصب کنید، یک Database و User بسازید و در `.env` قرار دهید:
-
-```env
-DB_ENGINE=postgresql
-DB_NAME=garinkood
-DB_USER=garinkood
-DB_PASSWORD=یک-رمز-قوی
-DB_HOST=127.0.0.1
-DB_PORT=5432
-DB_CONN_MAX_AGE=60
-```
-
-در این حالت وابستگی `psycopg2-binary` از requirements نصب می‌شود.
-
-### Redis
-
-در توسعهٔ تک‌پردازه لازم نیست. برای محیط چند Worker، یک Redis مشترک برای Cache و Rate Limit تنظیم کنید:
-
-```env
-CACHE_URL=redis://127.0.0.1:6379/1
-```
-
-در صورت فعال‌کردن `CACHE_URL`، بستهٔ Python زیر را نیز نصب کنید:
-
-```bash
-python -m pip install redis
-```
-
-### سرویس‌هایی که فعلاً نیاز نیستند
-
-برای اجرای فعلی پروژه به کلید زرین‌پال، Stripe، PayPal، API هواشناسی، GPU، Docker، Celery یا سرویس هوش مصنوعی نیاز نیست. پرداخت واقعی هنوز فعال نیست، ویجت هواشناسی دادهٔ نمایشی دارد و جستجوی تصویری هنوز به موتور بینایی ماشین متصل نشده است.
-
----
-
-## 🏭 Build و اجرای Production
-
-### Frontend
-
-```bash
-cd frontend
-npm run build
-```
-
-خروجی در `frontend/dist/` ایجاد می‌شود و باید توسط Nginx، Caddy یا وب‌سرور مشابه سرو شود. وب‌سرور باید برای مسیرهای React به `index.html` fallback داشته باشد.
-
-### Backend
-
-```bash
-cd garinkood
-python manage.py collectstatic --noinput
-gunicorn garinkood.wsgi:application --bind 0.0.0.0:8000
-```
-
-در Production علاوه بر PostgreSQL، باید HTTPS، دامنه، `DEBUG=False`، `SECRET_KEY` واقعی، `ALLOWED_HOSTS`، `CORS_ALLOWED_ORIGINS` و `CSRF_TRUSTED_ORIGINS` تنظیم شوند. پوشهٔ `garinkood/products/` نیز باید برای نگهداری تصاویر آپلودی پایدار باشد.
 
 ---
 
@@ -502,29 +475,16 @@ npm run test:e2e
 
 ---
 
-## 🌍 متغیرهای Production
+## 🔐 چک‌لیست ایمنی Production
 
-حداقل تنظیمات PostgreSQL در Production:
-
-```env
-DEBUG=False
-SECRET_KEY=یک-کلید-طولانی-و-تصادفی-منحصر‌به‌فرد
-
-DB_ENGINE=postgresql
-DB_NAME=garinkood
-DB_USER=garinkood
-DB_PASSWORD=رمز-دیتابیس
-DB_HOST=127.0.0.1
-DB_PORT=5432
-
-ALLOWED_HOSTS=your-domain.com,www.your-domain.com
-SITE_URL=https://your-domain.com
-FRONTEND_URL=https://your-domain.com
-CORS_ALLOWED_ORIGINS=https://your-domain.com
-CSRF_TRUSTED_ORIGINS=https://your-domain.com
-```
-
-کلیدهای پرداخت را تا زمان پیاده‌سازی و تست کامل درگاه، فعال نکنید. اطلاعات محرمانه را در Git یا فایل `.env.example` قرار ندهید.
+- `DEBUG=False` و `GARINKOOD_ENV=production` تنظیم شده باشد.
+- `SECRET_KEY`، رمز PostgreSQL و کلیدهای سرویس‌ها واقعی، طولانی و خارج از Git باشند.
+- `ALLOWED_HOSTS`، `CORS_ALLOWED_ORIGINS` و `CSRF_TRUSTED_ORIGINS` فقط دامنه‌های واقعی را شامل شوند.
+- HTTPS، redirect امن و کوکی‌های secure فعال باشند.
+- `python manage.py runserver` و `npm run dev` هرگز به‌عنوان سرویس Production اجرا نشوند.
+- `seed_demo_marketplace` فقط برای توسعه است و اسکریپت Production آن را اجرا نمی‌کند.
+- از PostgreSQL و پوشهٔ دائمی تصاویر Backup بگیرید.
+- پس از هر تغییر وابستگی، `scripts/provision-production.sh` را اجرا کنید؛ Restart سرویس فقط `scripts/start-production.sh` را اجرا کند.
 
 ---
 
