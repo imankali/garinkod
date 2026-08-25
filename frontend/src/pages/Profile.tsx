@@ -169,26 +169,30 @@ export default function Profile() {
   ];
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-emerald-50 via-[#f8faf6] to-white px-4 py-7 dark:from-emerald-950 dark:via-[#062d21] dark:to-emerald-950">
+    <main className="min-h-screen overflow-x-hidden bg-gradient-to-b from-emerald-50 via-[#f8faf6] to-white px-[var(--page-gutter)] py-6 dark:from-emerald-950 dark:via-[#062d21] dark:to-emerald-950 md:py-8">
       <div className="mx-auto max-w-7xl">
-        <section className="overflow-hidden rounded-3xl bg-gradient-to-l from-emerald-800 via-emerald-700 to-lime-600 p-6 text-white shadow-xl shadow-emerald-900/15 md:p-8">
-          <div className="flex flex-col justify-between gap-6 md:flex-row md:items-center">
-            <div className="flex items-center gap-4">
+        <section className="overflow-hidden rounded-3xl bg-gradient-to-l from-emerald-800 via-emerald-700 to-lime-600 p-5 text-white shadow-xl shadow-emerald-900/15 sm:p-6 md:p-8">
+          <div className="flex flex-col justify-between gap-5 md:flex-row md:items-center">
+            <div className="flex min-w-0 items-center gap-4 sm:gap-5">
               <AvatarUploader fallback={fullName.charAt(0)} />
-              <div><p className="text-sm text-lime-200">{t("account.title")}</p><h1 className="mt-1 text-2xl font-extrabold md:text-3xl">{fullName}</h1><p className="mt-1 text-sm text-emerald-100">{user?.email || user?.username}</p></div>
+              <div className="min-w-0 flex-1">
+                <p className="text-fluid-xs text-lime-200">{t("account.title")}</p>
+                <h1 className="mt-1 truncate text-fluid-xl font-extrabold">{fullName}</h1>
+                <p className="mt-1 truncate text-fluid-xs text-emerald-100">{user?.email || user?.username}</p>
+              </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <span className="rounded-full bg-white/15 px-3 py-1.5 text-xs font-bold"><UserRound size={14} className="me-1 inline" />{account?.level_label || t("role.buyer")}</span>
-              {storefront && <span className="rounded-full bg-lime-300/20 px-3 py-1.5 text-xs font-bold text-lime-100"><Store size={14} className="me-1 inline" />{t("role.seller")}</span>}
-              <button onClick={signOut} className="rounded-full bg-white/15 px-3 py-1.5 text-xs font-bold transition hover:bg-white/25"><LogOut size={14} className="me-1 inline" />{t("account.signout")}</button>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="flex min-h-9 items-center rounded-full bg-white/15 px-3 text-fluid-xs font-bold"><UserRound size={14} className="me-1 inline" />{account?.level_label || t("role.buyer")}</span>
+              {storefront && <span className="flex min-h-9 items-center rounded-full bg-lime-300/20 px-3 text-fluid-xs font-bold text-lime-100"><Store size={14} className="me-1 inline" />{t("role.seller")}</span>}
+              <button onClick={signOut} className="flex min-h-11 items-center rounded-full bg-white/15 px-4 text-fluid-xs font-bold transition hover:bg-white/25"><LogOut size={14} className="me-1 inline" />{t("account.signout")}</button>
             </div>
           </div>
         </section>
 
-        <div className="mt-6 grid gap-6 lg:grid-cols-[240px_1fr]">
-          <aside className="h-fit rounded-3xl border border-emerald-100 bg-white p-3 shadow-sm dark:border-emerald-900 dark:bg-emerald-950 lg:sticky lg:top-5">
+        <div className="mt-5 grid min-w-0 gap-5 md:mt-6 md:gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
+          <aside className="h-fit min-w-0 rounded-3xl border border-emerald-100 bg-white p-2.5 shadow-sm dark:border-emerald-900 dark:bg-emerald-950 sm:p-3 lg:sticky lg:top-[calc(var(--header-height)+1rem)]">
             <nav
-              className="no-scrollbar -mx-1 flex snap-x gap-2 overflow-x-auto px-1 lg:flex-col lg:overflow-visible"
+              className="no-scrollbar flex snap-x gap-2 overflow-x-auto lg:flex-col lg:overflow-visible"
               aria-label="Account sections"
             >
               {navItems.map(({ id, label, icon: Icon }) => (
@@ -196,7 +200,7 @@ export default function Profile() {
                   key={id}
                   onClick={() => setTab(id)}
                   aria-current={tab === id ? "page" : undefined}
-                  className={`flex min-h-12 shrink-0 snap-start items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold transition lg:w-full ${tab === id ? "bg-emerald-600 text-white shadow-md" : "text-slate-600 hover:bg-emerald-50 dark:text-emerald-100 dark:hover:bg-emerald-900/50"}`}
+                  className={`flex min-h-12 shrink-0 snap-start items-center gap-2.5 whitespace-nowrap rounded-2xl px-3.5 text-fluid-sm font-bold transition sm:gap-3 sm:px-4 lg:w-full ${tab === id ? "bg-emerald-600 text-white shadow-md" : "text-slate-600 hover:bg-emerald-50 dark:text-emerald-100 dark:hover:bg-emerald-900/50"}`}
                 >
                   <Icon size={18} />
                   {label}
@@ -209,7 +213,7 @@ export default function Profile() {
             </div>
           </aside>
 
-          <section>
+          <section className="min-w-0">
             {tab === "overview" && <Overview orders={orders} pendingOrders={pendingOrders.length} storefront={storefront} activeListings={activeListings.length} onBuyer={() => setTab("buyer")} onSeller={() => setTab("seller")} t={t} />}
             {tab === "buyer" && <BuyerPanel orders={orders} t={t} />}
             {tab === "seller" && <SellerPanel storefront={storefront} listings={listings} loading={loadingSeller} storeForm={storeForm} setStoreForm={setStoreForm} listingForm={listingForm} setListingForm={setListingForm} creatingStore={creatingStore} creatingListing={creatingListing} onCreateStore={createStore} onCreateListing={createListing} t={t} />}
@@ -223,7 +227,7 @@ export default function Profile() {
 }
 
 function Overview({ orders, pendingOrders, storefront, activeListings, onBuyer, onSeller, t }: { orders: Order[]; pendingOrders: number; storefront: Storefront | null; activeListings: number; onBuyer: () => void; onSeller: () => void; t: (key: string) => string }) {
-  return <div className="space-y-6"><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Stat icon={ClipboardList} label={t("account.orders")} value={orders.length.toLocaleString("fa-IR")} /><Stat icon={Package} label="سفارش‌های جاری" value={pendingOrders.toLocaleString("fa-IR")} /><Stat icon={Store} label={t("account.store")} value={storefront ? "فعال" : "—"} /><Stat icon={Building2} label="آگهی منتشرشده" value={activeListings.toLocaleString("fa-IR")} /></div><div className="grid gap-6 lg:grid-cols-2"><Panel title={t("account.buyer")} text={t("account.buyerDescription")} icon={ShoppingBag} action={t("account.openOrders")} onClick={onBuyer} /><Panel title={t("account.seller")} text={t("account.sellerDescription")} icon={Store} action={storefront ? t("account.store") : t("account.createStore")} onClick={onSeller} /></div><section className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm dark:border-emerald-900 dark:bg-emerald-950"><div className="flex items-center justify-between"><h2 className="text-lg font-extrabold text-slate-800 dark:text-white">آخرین سفارش‌ها</h2><Link to="/orders" className="text-sm font-bold text-emerald-700 dark:text-lime-300">{t("common.viewAll")}</Link></div>{orders.length ? <div className="mt-4 divide-y divide-slate-100 dark:divide-emerald-900">{orders.slice(0, 3).map((order) => <div key={order.id} className="flex flex-wrap items-center justify-between gap-3 py-4 text-sm"><div><strong className="text-slate-800 dark:text-white" dir="ltr">{order.code}</strong><p className="mt-1 text-xs text-slate-500">{new Date(order.created_at).toLocaleDateString("fa-IR")}</p></div><span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800 dark:bg-amber-950 dark:text-amber-100">{order.status_label}</span><strong className="text-emerald-700 dark:text-lime-300">{formatPrice(order.total_price)}</strong></div>)}</div> : <Empty text={t("account.noOrders")} />}</section></div>;
+  return <div className="space-y-6"><div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4"><Stat icon={ClipboardList} label={t("account.orders")} value={orders.length.toLocaleString("fa-IR")} /><Stat icon={Package} label="سفارش‌های جاری" value={pendingOrders.toLocaleString("fa-IR")} /><Stat icon={Store} label={t("account.store")} value={storefront ? "فعال" : "—"} /><Stat icon={Building2} label="آگهی منتشرشده" value={activeListings.toLocaleString("fa-IR")} /></div><div className="grid gap-6 lg:grid-cols-2"><Panel title={t("account.buyer")} text={t("account.buyerDescription")} icon={ShoppingBag} action={t("account.openOrders")} onClick={onBuyer} /><Panel title={t("account.seller")} text={t("account.sellerDescription")} icon={Store} action={storefront ? t("account.store") : t("account.createStore")} onClick={onSeller} /></div><section className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm dark:border-emerald-900 dark:bg-emerald-950"><div className="flex items-center justify-between"><h2 className="text-lg font-extrabold text-slate-800 dark:text-white">آخرین سفارش‌ها</h2><Link to="/orders" className="inline-flex min-h-11 items-center text-fluid-sm font-bold text-emerald-700 dark:text-lime-300">{t("common.viewAll")}</Link></div>{orders.length ? <div className="mt-4 divide-y divide-slate-100 dark:divide-emerald-900">{orders.slice(0, 3).map((order) => <div key={order.id} className="flex flex-wrap items-center justify-between gap-3 py-4 text-sm"><div><strong className="text-slate-800 dark:text-white" dir="ltr">{order.code}</strong><p className="mt-1 text-xs text-slate-500">{new Date(order.created_at).toLocaleDateString("fa-IR")}</p></div><span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800 dark:bg-amber-950 dark:text-amber-100">{order.status_label}</span><strong className="text-emerald-700 dark:text-lime-300">{formatPrice(order.total_price)}</strong></div>)}</div> : <Empty text={t("account.noOrders")} />}</section></div>;
 }
 
 function BuyerPanel({ orders, t }: { orders: Order[]; t: (key: string) => string }) {
@@ -389,8 +393,8 @@ function SiteSettingsSection({ t }: { t: (key: string) => string }) {
   );
 }
 
-function Stat({ icon: Icon, label, value }: { icon: typeof BarChart3; label: string; value: string }) { return <div className="rounded-3xl border border-emerald-100 bg-white p-5 shadow-sm dark:border-emerald-900 dark:bg-emerald-950"><Icon size={20} className="text-emerald-600 dark:text-lime-300" /><p className="mt-4 text-2xl font-extrabold text-slate-800 dark:text-white">{value}</p><p className="mt-1 text-xs text-slate-500 dark:text-emerald-200">{label}</p></div>; }
-function Panel({ title, text, icon: Icon, action, onClick }: { title: string; text: string; icon: typeof Store; action: string; onClick: () => void }) { return <article className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm dark:border-emerald-900 dark:bg-emerald-950"><Icon className="text-emerald-600 dark:text-lime-300" /><h2 className="mt-4 text-xl font-extrabold text-slate-800 dark:text-white">{title}</h2><p className="mt-2 min-h-12 text-sm leading-6 text-slate-500 dark:text-emerald-200">{text}</p><button onClick={onClick} className="mt-5 text-sm font-bold text-emerald-700 dark:text-lime-300">{action}</button></article>; }
+function Stat({ icon: Icon, label, value }: { icon: typeof BarChart3; label: string; value: string }) { return <div className="rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm dark:border-emerald-900 dark:bg-emerald-950 sm:rounded-3xl sm:p-5"><Icon size={18} className="text-emerald-600 dark:text-lime-300" /><p className="mt-3 text-fluid-xl font-extrabold text-slate-800 dark:text-white">{value}</p><p className="mt-1 text-fluid-2xs leading-5 text-slate-500 dark:text-emerald-200">{label}</p></div>; }
+function Panel({ title, text, icon: Icon, action, onClick }: { title: string; text: string; icon: typeof Store; action: string; onClick: () => void }) { return <article className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm dark:border-emerald-900 dark:bg-emerald-950"><Icon className="text-emerald-600 dark:text-lime-300" /><h2 className="mt-4 text-xl font-extrabold text-slate-800 dark:text-white">{title}</h2><p className="mt-2 min-h-12 text-sm leading-6 text-slate-500 dark:text-emerald-200">{text}</p><button onClick={onClick} className="mt-4 inline-flex min-h-11 items-center text-fluid-sm font-bold text-emerald-700 dark:text-lime-300">{action}</button></article>; }
 function Empty({ text }: { text: string }) { return <div className="mt-5 rounded-2xl bg-slate-50 p-5 text-sm text-slate-500 dark:bg-emerald-900/40 dark:text-emerald-200">{text}</div>; }
 function TextField({ label, value, onChange, type = "text", required = true }: { label: string; value: string; onChange: (value: string) => void; type?: string; required?: boolean }) { return <label className="block text-sm font-bold text-slate-700 dark:text-emerald-50">{label}<input required={required} type={type} min={type === "number" ? 0 : undefined} value={value} onChange={(event) => onChange(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2.5 font-normal outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-emerald-700 dark:bg-emerald-900" /></label>; }
 function SelectField({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: [string, string][] }) { return <label className="block text-sm font-bold text-slate-700 dark:text-emerald-50">{label}<select value={value} onChange={(event) => onChange(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2.5 font-normal dark:border-emerald-700 dark:bg-emerald-900">{options.map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></label>; }

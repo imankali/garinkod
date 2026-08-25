@@ -68,16 +68,32 @@ export default function Messages() {
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-[var(--page-gutter)] py-6 md:py-8">
-      <h1 className="text-xl font-extrabold text-slate-800 dark:text-white md:text-2xl">
-        {t('direct.title')}
-      </h1>
-      <p className="mt-1 text-sm text-slate-500 dark:text-emerald-200">{t('direct.startHint')}</p>
+    <main className="mx-auto max-w-6xl px-[var(--page-gutter)] py-5 md:py-8">
+      {/*
+        The heading is hidden on a phone once a thread is open: the chat needs
+        every available pixel, and the thread already names the storefront.
+      */}
+      <div className={activeId ? 'hidden lg:block' : ''}>
+        <h1 className="text-fluid-xl font-extrabold text-slate-800 dark:text-white">
+          {t('direct.title')}
+        </h1>
+        <p className="mt-1 text-fluid-sm text-slate-500 dark:text-emerald-200">
+          {t('direct.startHint')}
+        </p>
+      </div>
 
-      <div className="mt-5 grid h-[70vh] min-h-[26rem] overflow-hidden rounded-3xl border border-emerald-100 bg-white shadow-sm dark:border-emerald-800 dark:bg-emerald-950 lg:grid-cols-[320px_1fr]">
+      {/*
+        Height: on a phone the panel fills the space between the sticky header
+        and the fixed bottom bar, so the composer sits just above the bar
+        instead of being pushed off-screen by a fixed 70vh. Desktop keeps a
+        comfortable fixed height.
+      */}
+      <div
+        className="chat-shell mt-4 grid min-h-[24rem] overflow-hidden rounded-3xl border border-emerald-100 bg-white shadow-sm dark:border-emerald-800 dark:bg-emerald-950 lg:mt-5 lg:grid-cols-[320px_minmax(0,1fr)]"
+      >
         {/* Conversation list */}
-        <aside className={`${activeId ? 'hidden' : ''} flex h-full flex-col overflow-hidden lg:flex`}>
-          <div className="min-h-0 flex-1 overflow-y-auto p-3">
+        <aside className={`${activeId ? 'hidden' : ''} flex h-full min-h-0 flex-col overflow-hidden lg:flex`}>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3">
             {conversations.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
                 <MessageCircle size={32} className="text-emerald-300" />
@@ -92,7 +108,7 @@ export default function Messages() {
                     <button
                       type="button"
                       onClick={() => setActiveId(conversation.id)}
-                      className={`flex w-full items-center gap-3 rounded-2xl border p-3 text-start transition ${
+                      className={`flex min-h-[4.25rem] w-full items-center gap-3 rounded-2xl border p-3 text-start transition ${
                         activeId === conversation.id
                           ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/50'
                           : 'border-transparent hover:bg-emerald-50/60 dark:hover:bg-emerald-900/30'
@@ -130,7 +146,7 @@ export default function Messages() {
         </aside>
 
         {/* Thread */}
-        <section className={`${activeId ? '' : 'hidden lg:block'} flex h-full min-h-0 flex-col border-s border-emerald-100 dark:border-emerald-800`}>
+        <section className={`${activeId ? 'flex' : 'hidden lg:flex'} h-full min-h-0 min-w-0 flex-col border-emerald-100 dark:border-emerald-800 lg:border-s`}>
           {activeId ? (
             <DirectThread conversationId={activeId} onBack={() => setActiveId(null)} />
           ) : (

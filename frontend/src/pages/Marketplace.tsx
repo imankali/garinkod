@@ -204,7 +204,7 @@ export default function Marketplace() {
         <section className="mt-8">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-lg font-extrabold text-slate-800 dark:text-white">غرفه‌های پیشنهادی</h2>
-            <Link to="/storefronts" className="text-xs font-bold text-emerald-700 underline dark:text-lime-300">
+            <Link to="/storefronts" className="inline-flex min-h-11 items-center text-fluid-xs font-bold text-emerald-700 underline dark:text-lime-300">
               مشاهده همه غرفه‌داران
             </Link>
           </div>
@@ -222,7 +222,11 @@ export default function Marketplace() {
       <section className="mt-8">
         <h2 className="text-xl font-extrabold text-slate-800 dark:text-white">آگهی‌های بازار</h2>
 
-        <div className="sticky top-0 z-10 mt-3 bg-white/95 py-2 backdrop-blur dark:bg-emerald-950/95">
+        {/* Sticks below the header, not under it. */}
+        <div
+          className="sticky z-20 -mx-[var(--page-gutter)] mt-3 bg-white/95 px-[var(--page-gutter)] py-2 backdrop-blur dark:bg-emerald-950/95"
+          style={{ top: 'var(--header-height)' }}
+        >
           <div className="flex gap-2">
             <div className="relative flex-1">
               <Search
@@ -483,7 +487,7 @@ function ListingCard({ listing }: { listing: MarketplaceListing }) {
         <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-sm dark:border-emerald-900">
           <Link
             to={`/storefronts/${listing.storefront.slug}`}
-            className="truncate font-semibold text-slate-600 underline-offset-2 hover:underline dark:text-emerald-100"
+            className="inline-flex min-h-11 items-center truncate font-semibold text-slate-600 underline-offset-2 hover:underline dark:text-emerald-100"
           >
             {listing.storefront.name}
           </Link>
@@ -532,7 +536,7 @@ function ListingCard({ listing }: { listing: MarketplaceListing }) {
 
         <Link
           to={`/support?storefront=${listing.storefront.id}&listing=${listing.id}`}
-          className="mt-3 inline-block text-fluid-xs font-bold text-slate-400 underline hover:text-amber-700 dark:text-emerald-300"
+          className="mt-2 inline-flex min-h-11 items-center text-fluid-xs font-bold text-slate-400 underline hover:text-amber-700 dark:text-emerald-300"
         >
           گزارش مشکل یا شکایت از غرفه
         </Link>

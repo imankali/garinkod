@@ -103,7 +103,10 @@ export default function DirectMessagesDrawer() {
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-            className="fixed inset-y-0 end-0 z-[60] flex w-[min(26rem,100vw)] flex-col border-s border-emerald-100 bg-emerald-50/95 backdrop-blur-xl dark:border-emerald-800 dark:bg-emerald-950"
+            // 100dvh (not the drawer's implicit 100vh) keeps the composer
+            // above the mobile browser's collapsing address bar.
+            style={{ height: '100dvh' }}
+            className="fixed inset-y-0 end-0 z-[60] flex w-[min(26rem,100vw)] flex-col border-s border-emerald-100 bg-white dark:border-emerald-800 dark:bg-emerald-950"
             role="dialog"
             aria-modal="true"
             aria-label={t('direct.title')}
@@ -125,14 +128,14 @@ export default function DirectMessagesDrawer() {
                   <button
                     type="button"
                     onClick={closeDirect}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-emerald-100 dark:text-emerald-200 dark:hover:bg-emerald-900"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-slate-500 hover:bg-emerald-100 dark:text-emerald-200 dark:hover:bg-emerald-900"
                     aria-label={t('common.close')}
                   >
                     <X size={17} />
                   </button>
                 </header>
 
-                <div className="min-h-0 flex-1 overflow-y-auto p-3">
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3">
                   {loading || busy ? (
                     <p className="py-10 text-center text-xs text-slate-400">{t('common.loading')}</p>
                   ) : conversations.length === 0 ? (
@@ -149,7 +152,7 @@ export default function DirectMessagesDrawer() {
                           <button
                             type="button"
                             onClick={() => setConversationId(conversation.id)}
-                            className="flex w-full items-center gap-3 rounded-2xl border border-emerald-100 bg-white p-3 text-start shadow-sm transition hover:border-emerald-300 dark:border-emerald-800 dark:bg-emerald-950 dark:hover:border-emerald-600"
+                            className="flex min-h-[4.5rem] w-full items-center gap-3 rounded-2xl border border-emerald-100 bg-white p-3 text-start shadow-sm transition hover:border-emerald-300 dark:border-emerald-800 dark:bg-emerald-950/60 dark:hover:border-emerald-600"
                           >
                             <img
                               src={conversation.storefront.avatar_url || '/images/hero-farm.jpg'}

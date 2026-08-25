@@ -232,7 +232,7 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute end-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-emerald-300"
+                  className="absolute end-1.5 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-emerald-300"
                   aria-label={showPassword ? "مخفی کردن رمز عبور" : "نمایش رمز عبور"}
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -265,7 +265,7 @@ export default function Login() {
                   <button
                     type="button"
                     onClick={() => setShowPassword2(!showPassword2)}
-                    className="absolute end-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-emerald-300"
+                    className="absolute end-1.5 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-emerald-300"
                     aria-label={showPassword2 ? "مخفی کردن رمز عبور" : "نمایش رمز عبور"}
                   >
                     {showPassword2 ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -310,7 +310,7 @@ export default function Login() {
                   password2: '',
                 });
               }}
-              className="font-bold text-emerald-600 hover:text-emerald-700 dark:text-lime-400 dark:hover:text-lime-300"
+              className="inline-flex min-h-11 items-center px-1 font-bold text-emerald-600 hover:text-emerald-700 dark:text-lime-400 dark:hover:text-lime-300"
             >
               {isRegister ? 'ورود' : 'ثبت‌نام'}
             </button>

@@ -209,7 +209,7 @@ export default function StorefrontPage() {
         </p>
         <Link
           to="/storefronts"
-          className="mt-5 inline-block rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white"
+          className="mt-5 inline-flex min-h-11 items-center rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white"
         >
           مشاهده همه غرفه‌ها
         </Link>

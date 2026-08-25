@@ -76,12 +76,12 @@ export default function ProductCard({
           onClick={() => onToggleWishlist(product)}
           whileHover={{ scale: 1.15 }}
           whileTap={{ scale: 0.85 }}
-          className={`flex h-8 w-8 items-center justify-center rounded-full shadow-md backdrop-blur transition-colors ${
+          className={`flex h-11 w-11 items-center justify-center rounded-full shadow-md backdrop-blur transition-colors ${
             isWishlisted ? "bg-rose-500 text-white" : "bg-white/90 text-slate-400 hover:text-rose-500"
           }`}
           aria-label={isWishlisted ? "حذف از علاقه‌مندی‌ها" : "افزودن به علاقه‌مندی‌ها"}
         >
-          <Heart size={14} fill={isWishlisted ? "currentColor" : "none"} />
+          <Heart size={16} fill={isWishlisted ? "currentColor" : "none"} />
         </motion.button>
       </div>
 
@@ -113,10 +113,11 @@ export default function ProductCard({
           />
         </a>
 
-        {/* Quick View Overlay */}
+        {/* Quick View Overlay — pointer/hover devices only. */}
         <motion.button
           onClick={() => onQuickView(product)}
-          className="absolute inset-x-3 bottom-3 flex translate-y-2 items-center justify-center gap-1.5 rounded-xl bg-white/95 py-2 text-xs font-bold text-slate-700 opacity-0 shadow-lg backdrop-blur transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100"
+          tabIndex={-1}
+          className="pointer-events-none absolute inset-x-3 bottom-3 hidden translate-y-2 items-center justify-center gap-1.5 rounded-xl bg-white/95 py-2.5 text-xs font-bold text-slate-700 opacity-0 shadow-lg backdrop-blur transition-all duration-300 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:translate-y-0 group-focus-within:opacity-100 [@media(hover:hover)]:flex"
           aria-label="نمای سریع محصول"
         >
           <Eye size={14} /> نمای سریع
@@ -134,13 +135,22 @@ export default function ProductCard({
         </div>
 
         {/* Product Name */}
-        <h3 className="mb-2 line-clamp-2 flex-1 text-sm font-semibold text-slate-700 dark:text-emerald-50" title={product.name}>
+        <h3 className="mb-2 flex-1 text-fluid-sm font-semibold text-slate-700 dark:text-emerald-50" title={product.name}>
           {productUrl ? (
-            <a href={productUrl} className="transition-colors hover:text-[#0F8A5F]">
+            <a
+              href={productUrl}
+              // The stretched link makes the whole card tappable, which is the
+              // real target on a phone rather than the two-line title itself.
+              className="line-clamp-2 min-h-11 py-1.5 leading-6 transition-colors before:absolute before:inset-0 before:z-[1] before:content-[''] hover:text-[#0F8A5F]"
+            >
               {product.name}
             </a>
           ) : (
-            <button type="button" onClick={() => onQuickView(product)} className="text-start transition-colors hover:text-[#0F8A5F]">
+            <button
+              type="button"
+              onClick={() => onQuickView(product)}
+              className="line-clamp-2 min-h-11 py-1.5 text-start leading-6 transition-colors hover:text-[#0F8A5F]"
+            >
               {product.name}
             </button>
           )}
@@ -174,17 +184,28 @@ export default function ProductCard({
         {/* ======================================== */}
         {/* Actions: Add to Cart & Compare */}
         {/* ======================================== */}
-        <div className="flex items-center gap-2">
+        <div className="relative z-[2] flex items-center gap-2">
           {/* Add to Cart Button */}
           <motion.button
             onClick={(e) => onAddToCart(product, e)}
             disabled={!product.inStock}
             whileHover={product.inStock ? { scale: 1.03 } : {}}
             whileTap={product.inStock ? { scale: 0.97 } : {}}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-brand-gradient-accent py-2.5 text-xs font-bold text-white shadow-md transition-shadow hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex min-h-11 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl bg-brand-gradient-accent px-2 text-fluid-xs font-bold text-white shadow-md transition-shadow hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-40"
           >
-            <ShoppingCart size={14} />
-            {product.inStock ? "افزودن به سبد خرید" : "اطلاع از موجودی"}
+            <ShoppingCart size={14} aria-hidden="true" className="shrink-0" />
+            {/* The short label keeps the button on one line in narrow grid
+                columns (two-up on a phone, five-up on desktop); the full
+                wording stays available to screen readers. */}
+            <span className="truncate 2xl:hidden">
+              {product.inStock ? "افزودن" : "اطلاع"}
+            </span>
+            <span className="hidden truncate 2xl:inline">
+              {product.inStock ? "افزودن به سبد" : "اطلاع از موجودی"}
+            </span>
+            <span className="sr-only 2xl:hidden">
+              {product.inStock ? "افزودن به سبد خرید" : "اطلاع از موجودی"}
+            </span>
           </motion.button>
 
           {/* Compare Button */}
@@ -194,7 +215,7 @@ export default function ProductCard({
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
             title={isComparing ? "حذف از مقایسه" : "افزودن به مقایسه"}
-            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border transition-colors disabled:cursor-not-allowed disabled:opacity-30 ${
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-colors disabled:cursor-not-allowed disabled:opacity-30 ${
               isComparing
                 ? "border-[#0F8A5F] bg-emerald-50 text-[#0F8A5F]"
                 : "border-slate-200 text-slate-400 hover:text-[#0F8A5F]"

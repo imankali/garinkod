@@ -81,7 +81,7 @@ function Overview({ data, onOpenModeration }: { data: ManagementDashboard; onOpe
       <section className="rounded-3xl border border-amber-200 bg-amber-50 p-6 dark:border-amber-800 dark:bg-amber-950/20">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-extrabold text-amber-900 dark:text-amber-100">در انتظار بررسی شما</h2>
-          <button type="button" onClick={onOpenModeration} className="rounded-xl bg-amber-600 px-4 py-2 text-xs font-bold text-white">
+          <button type="button" onClick={onOpenModeration} className="inline-flex min-h-11 items-center rounded-xl bg-amber-600 px-4 text-xs font-bold text-white">
             رفتن به صف بررسی
           </button>
         </div>

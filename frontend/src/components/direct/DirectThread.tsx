@@ -94,19 +94,19 @@ export default function DirectThread({
   return (
     <div className="flex h-full min-h-0 flex-col">
       {/* Thread header */}
-      <header className="flex items-center gap-2 border-b border-emerald-100 px-4 py-3 dark:border-emerald-800">
+      <header className="flex shrink-0 items-center gap-2 border-b border-emerald-100 bg-white px-3 py-2.5 dark:border-emerald-800 dark:bg-emerald-950 sm:px-4 sm:py-3">
         {onBack && (
           <button
             type="button"
             onClick={onBack}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-emerald-50 dark:text-emerald-200 dark:hover:bg-emerald-900 lg:hidden"
+            className="-ms-1.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-slate-500 hover:bg-emerald-50 dark:text-emerald-200 dark:hover:bg-emerald-900 lg:hidden"
             aria-label={t('common.back')}
           >
             <ArrowRight size={17} />
           </button>
         )}
         {storefrontSlug ? (
-          <Link to={`/storefronts/${storefrontSlug}`} className="min-w-0 flex-1">
+          <Link to={`/storefronts/${storefrontSlug}`} className="flex min-h-11 min-w-0 flex-1 flex-col justify-center">
             <span className="block truncate text-sm font-extrabold text-slate-800 hover:text-emerald-700 dark:text-white dark:hover:text-lime-300">
               {storefrontName}
             </span>
@@ -122,7 +122,10 @@ export default function DirectThread({
       </header>
 
       {/* Messages */}
-      <div ref={scrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
+      <div
+        ref={scrollRef}
+        className="min-h-0 flex-1 space-y-2.5 overflow-y-auto overscroll-contain bg-emerald-50/40 px-3 py-4 dark:bg-emerald-950/60 sm:px-4"
+      >
         {loading ? (
           <p className="py-8 text-center text-xs text-slate-400">{t('common.loading')}</p>
         ) : messages.length === 0 ? (
@@ -140,19 +143,38 @@ export default function DirectThread({
               animate={{ opacity: 1, y: 0 }}
               className={`flex ${message.is_mine ? 'justify-end' : 'justify-start'}`}
             >
-              <div className={`max-w-[85%] ${message.is_mine ? 'order-1' : ''}`}>
+              {/*
+                Bubbles cap at 88% of a phone's width and the corner "tail"
+                uses logical properties, so in RTL it points at the correct
+                speaker instead of at the opposite side of the screen.
+              */}
+              <div className="max-w-[88%] sm:max-w-[75%]">
                 <div
-                  className={`rounded-2xl px-3.5 py-2.5 text-sm leading-6 shadow-sm ${
+                  className={`w-fit rounded-2xl px-3.5 py-2.5 text-fluid-sm leading-6 shadow-sm ${
                     message.is_mine
-                      ? 'rounded-bl-md bg-emerald-600 text-white'
-                      : 'rounded-br-md bg-white text-slate-700 dark:bg-emerald-900 dark:text-emerald-50'
-                  }`}
+                      ? 'rounded-ee-md bg-emerald-600 text-white'
+                      : 'rounded-es-md bg-white text-slate-700 dark:bg-emerald-900 dark:text-emerald-50'
+                  } ${message.is_mine ? 'ms-auto' : ''}`}
                 >
-                  {message.body && <p className="whitespace-pre-wrap break-words">{message.body}</p>}
+                  {message.body && (
+                    <p className="whitespace-pre-wrap break-words hyphens-auto">{message.body}</p>
+                  )}
                   {message.listing && <AttachedProductCard listing={message.listing} />}
                 </div>
-                <p className="mt-1 px-1 text-fluid-2xs text-slate-400">
-                  {message.is_mine ? t('direct.you') : message.sender_name}
+                <p
+                  className={`mt-1 flex gap-1.5 px-1 text-fluid-2xs text-slate-400 dark:text-emerald-300/70 ${
+                    message.is_mine ? 'justify-end' : 'justify-start'
+                  }`}
+                >
+                  <span>{message.is_mine ? t('direct.you') : message.sender_name}</span>
+                  {message.created_at && (
+                    <time dateTime={message.created_at}>
+                      {new Date(message.created_at).toLocaleTimeString('fa-IR', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </time>
+                  )}
                 </p>
               </div>
             </motion.article>
@@ -161,7 +183,11 @@ export default function DirectThread({
       </div>
 
       {/* Composer */}
-      <form onSubmit={send} className="border-t border-emerald-100 p-3 dark:border-emerald-800">
+      <form
+        onSubmit={send}
+        className="shrink-0 border-t border-emerald-100 bg-white p-2.5 dark:border-emerald-800 dark:bg-emerald-950 sm:p-3"
+        style={{ paddingBottom: 'max(0.625rem, env(safe-area-inset-bottom, 0px))' }}
+      >
         {attachedListing && (
           <div className="mb-2 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-2 dark:border-emerald-700 dark:bg-emerald-900/40">
             <AttachedProductCard listing={attachedListing} compact />
@@ -188,7 +214,8 @@ export default function DirectThread({
             }}
             rows={1}
             placeholder={t('direct.placeholder')}
-            className="min-h-11 max-h-32 flex-1 resize-none rounded-2xl border border-emerald-200 bg-white px-4 py-2.5 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-emerald-700 dark:bg-emerald-900 dark:text-white"
+            // 16px keeps iOS Safari from zooming the whole page on focus.
+            className="max-h-32 min-h-11 min-w-0 flex-1 resize-none rounded-2xl border border-emerald-200 bg-white px-4 py-2.5 text-base leading-6 outline-none transition focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-emerald-700 dark:bg-emerald-900 dark:text-white sm:text-fluid-sm"
             aria-label={t('direct.placeholder')}
           />
           <button

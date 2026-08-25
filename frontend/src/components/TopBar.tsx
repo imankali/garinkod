@@ -38,7 +38,9 @@ export default function TopBar(_props: { isDark?: boolean; onToggleDark?: () => 
         {/* ======================================== */}
         {/* بخش وسط - پیام‌های چرخشی (Marquee) */}
         {/* ======================================== */}
-        <div className="relative flex-1 overflow-hidden no-scrollbar">
+        {/* min-w-0 lets the flex child actually shrink, so the w-max marquee
+            inside is clipped instead of stretching the whole bar. */}
+        <div className="no-scrollbar relative min-w-0 flex-1 overflow-hidden" aria-hidden="true">
           <div className="flex w-max animate-marquee gap-16 whitespace-nowrap">
             {[...messages, ...messages].map((msg, idx) => (
               <span key={idx} className="opacity-90">
@@ -55,7 +57,7 @@ export default function TopBar(_props: { isDark?: boolean; onToggleDark?: () => 
           {/* شماره تلفن */}
           <a
             href={`tel:${PHONE_NUMBER}`}
-            className="hidden items-center gap-1 hover:text-lime-300 md:flex"
+            className="hidden min-h-11 items-center gap-1 hover:text-lime-300 md:flex"
             aria-label={`تماس با شماره ${PHONE_NUMBER}`}
           >
             <Phone size={13} />

@@ -1,6 +1,7 @@
 // frontend/src/components/ConsultationButton.tsx
 
 import { useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { Camera, MessageCircle, Phone, Sparkles, Upload, X } from "lucide-react";
 import toast from "react-hot-toast";
@@ -16,10 +17,24 @@ const SUPPORTED_FILE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/jp
 // ========================================
 // ConsultationButton Component
 // ========================================
+/**
+ * Routes where the floating button is suppressed.
+ *
+ * On the messaging screens it sat directly on top of the message composer,
+ * hiding the control the page exists for — and offering a second, redundant
+ * way to start a conversation.
+ */
+const HIDDEN_ON = ["/messages", "/checkout"];
+
 export default function ConsultationButton() {
   const [open, setOpen] = useState(false);
   const [uploadedName, setUploadedName] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const { pathname } = useLocation();
+
+  if (HIDDEN_ON.some((route) => pathname === route || pathname.startsWith(`${route}/`))) {
+    return null;
+  }
 
   // ========================================
   // Handle File Selection
@@ -67,7 +82,10 @@ export default function ConsultationButton() {
         whileHover={{ scale: 1.06 }}
         whileTap={{ scale: 0.94 }}
         onClick={() => setOpen(true)}
-        className="fixed bottom-24 end-4 z-40 flex items-center gap-2 rounded-full bg-brand-gradient px-4 py-3 text-white shadow-xl shadow-emerald-900/30 lg:bottom-6 lg:end-6 dark:shadow-none"
+        // Sits clear of the fixed mobile bar (and the iOS home indicator)
+        // rather than overlapping it, and keeps a full 44px hit area.
+        style={{ bottom: 'calc(var(--mobile-nav-clearance) + 0.5rem)' }}
+        className="fixed end-4 z-40 flex min-h-12 items-center gap-2 rounded-full bg-brand-gradient px-4 text-white shadow-xl shadow-emerald-900/30 lg:!bottom-6 lg:end-6 dark:shadow-none"
         aria-label="باز کردن مشاوره رایگان"
       >
         <motion.span
