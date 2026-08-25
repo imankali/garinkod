@@ -3,12 +3,17 @@
 import { FormEvent, useEffect, useState } from 'react';
 import {
   AlertTriangle,
+  Check,
+  CheckCircle2,
   ClipboardList,
+  Package,
+  PackageCheck,
   PackageSearch,
   RefreshCw,
   ShoppingBag,
   Store,
   Truck,
+  XCircle,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -18,6 +23,7 @@ import { useAuthStore } from '../store/authStore';
 import Button from '../components/ui/Button';
 import type { Order } from '../types';
 import { formatPrice } from '../utils/formatPrice';
+import { toEnglishDigits, normalizePhoneNumber } from '../utils/normalizeDigits';
 
 /** Colour per order status, so state is readable at a glance. */
 const STATUS_TONE: Record<string, string> = {
@@ -35,6 +41,94 @@ const PAYMENT_TONE: Record<string, string> = {
   pending: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-100',
   refunded: 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-200',
 };
+
+const ORDER_STEPS = [
+  { key: 'awaiting_review', label: 'ثبت سفارش', icon: ClipboardList },
+  { key: 'confirmed', label: 'تأیید سفارش', icon: CheckCircle2 },
+  { key: 'preparing', label: 'آماده‌سازی', icon: Package },
+  { key: 'shipped', label: 'ارسال', icon: Truck },
+  { key: 'delivered', label: 'تحویل', icon: PackageCheck },
+];
+
+function getStepIndex(status: string): number {
+  switch (status) {
+    case 'awaiting_review':
+      return 0;
+    case 'confirmed':
+      return 1;
+    case 'preparing':
+      return 2;
+    case 'shipped':
+      return 3;
+    case 'delivered':
+      return 4;
+    default:
+      return -1;
+  }
+}
+
+function OrderTimelineStepper({ status }: { status: string }) {
+  if (status === 'cancelled') {
+    return (
+      <div className="my-3 flex items-center gap-2 rounded-2xl bg-rose-50 p-3.5 text-xs font-bold text-rose-700 dark:bg-rose-950/40 dark:text-rose-200">
+        <XCircle size={18} className="shrink-0 text-rose-600 dark:text-rose-400" />
+        <span>این سفارش لغو شده است و موجودی کالا به انبار بازگردانده شده است.</span>
+      </div>
+    );
+  }
+
+  const currentIndex = getStepIndex(status);
+
+  return (
+    <div className="my-4 rounded-2xl bg-slate-50/80 p-3.5 dark:bg-emerald-900/30">
+      <div className="relative flex items-center justify-between">
+        {/* Progress bar background */}
+        <div className="absolute inset-x-4 top-4 h-1 -translate-y-1/2 bg-slate-200 dark:bg-emerald-800" />
+        {/* Active progress fill */}
+        <div
+          className="absolute start-4 top-4 h-1 -translate-y-1/2 bg-emerald-600 transition-all duration-500 dark:bg-lime-400"
+          style={{
+            width: currentIndex >= 0 ? `${(currentIndex / (ORDER_STEPS.length - 1)) * 90}%` : '0%',
+          }}
+        />
+
+        {ORDER_STEPS.map((step, idx) => {
+          const isDone = idx < currentIndex;
+          const isCurrent = idx === currentIndex;
+          const Icon = step.icon;
+
+          return (
+            <div key={step.key} className="relative z-10 flex flex-col items-center">
+              <div
+                className={`flex h-8 w-8 items-center justify-center rounded-full border-2 text-xs font-bold transition-all duration-300 ${
+                  isDone
+                    ? 'border-emerald-600 bg-emerald-600 text-white shadow-sm'
+                    : isCurrent
+                      ? 'border-emerald-600 bg-white text-emerald-700 ring-4 ring-emerald-100 dark:border-lime-400 dark:bg-emerald-950 dark:text-lime-300 dark:ring-emerald-900'
+                      : 'border-slate-200 bg-white text-slate-400 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                }`}
+                title={step.label}
+              >
+                {isDone ? <Check size={14} /> : <Icon size={14} />}
+              </div>
+              <span
+                className={`mt-1.5 text-center text-[11px] font-bold sm:text-xs ${
+                  isCurrent
+                    ? 'text-emerald-700 dark:text-lime-300'
+                    : isDone
+                      ? 'text-slate-700 dark:text-white'
+                      : 'text-slate-400 dark:text-emerald-400/60'
+                }`}
+              >
+                {step.label}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 export default function Orders() {
   const { isAuthenticated } = useAuthStore();
@@ -140,7 +234,7 @@ export default function Orders() {
               required
               dir="ltr"
               value={code}
-              onChange={(event) => setCode(event.target.value)}
+              onChange={(event) => setCode(toEnglishDigits(event.target.value).toUpperCase().trim())}
               placeholder="GK-..."
               aria-invalid={Boolean(errors.code)}
               aria-describedby={errors.code ? 'track-code-error' : undefined}
@@ -164,7 +258,7 @@ export default function Orders() {
               required
               inputMode="tel"
               value={phone}
-              onChange={(event) => setPhone(event.target.value)}
+              onChange={(event) => setPhone(normalizePhoneNumber(event.target.value))}
               placeholder="۰۹۱۲..."
               aria-invalid={Boolean(errors.phone)}
               aria-describedby={errors.phone ? 'track-phone-error' : undefined}
@@ -269,6 +363,9 @@ function OrderCard({
           </span>
         </div>
       </div>
+
+      {/* Visual Order Progress Stepper */}
+      <OrderTimelineStepper status={order.status} />
 
       {/* Items. On phones each row stacks so nothing is truncated. */}
       <ul className="mt-4 divide-y divide-slate-100 border-y border-slate-100 dark:divide-emerald-900 dark:border-emerald-900">

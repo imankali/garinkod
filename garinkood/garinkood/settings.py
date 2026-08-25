@@ -103,9 +103,9 @@ else:
 
 # Throttling counters live in the cache. The in-memory backend is per-process
 # and therefore only correct for a single-worker development server; any
-# multi-worker deployment must set CACHE_URL to a shared Redis/Memcached so the
+# multi-worker deployment must set CACHE_URL (or REDIS_URL) to a shared Redis so the
 # limits are enforced globally rather than per worker.
-CACHE_URL = config("CACHE_URL", default="")
+CACHE_URL = config("CACHE_URL", default=config("REDIS_URL", default=""))
 if CACHE_URL:
     CACHES = {
         "default": {

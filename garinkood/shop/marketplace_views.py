@@ -6,11 +6,14 @@ profile per storefront, its posts and stories, highlights that outlive the
 """
 
 from datetime import timedelta
+import json
+import time
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import Count, Exists, OuterRef, Prefetch, Q
+from django.http import StreamingHttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import permissions, status, viewsets
@@ -631,3 +634,41 @@ def conversation_messages(request, conversation_id):
         StorefrontMessageSerializer(message, context=context).data,
         status=status.HTTP_201_CREATED,
     )
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def conversation_events(request, conversation_id):
+    """Server-Sent Events (SSE) stream for live conversation updates."""
+    conversation = get_object_or_404(
+        _participant_conversations(request.user), pk=conversation_id
+    )
+    raw_last = request.query_params.get('last_id', '0')
+    last_id = int(raw_last) if raw_last and raw_last.isdigit() else 0
+
+    def event_stream():
+        nonlocal last_id
+        yield f"event: connected\ndata: {json.dumps({'status': 'connected', 'conversation_id': conversation.id})}\n\n"
+        start_time = time.time()
+        timeout = 25
+
+        while time.time() - start_time < timeout:
+            new_msgs = StorefrontMessage.objects.filter(
+                conversation=conversation, id__gt=last_id
+            ).select_related('sender', 'listing').order_by('id')
+
+            if new_msgs.exists():
+                serializer = StorefrontMessageSerializer(
+                    new_msgs, many=True, context={'request': request}
+                )
+                last_id = max(m.id for m in new_msgs)
+                yield f"event: message\ndata: {json.dumps({'results': serializer.data, 'last_id': last_id})}\n\n"
+
+            yield f": ping {int(time.time())}\n\n"
+            time.sleep(1.5)
+
+    response = StreamingHttpResponse(event_stream(), content_type='text/event-stream')
+    response['Cache-Control'] = 'no-cache'
+    response['X-Accel-Buffering'] = 'no'
+    return response
+

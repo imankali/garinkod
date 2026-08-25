@@ -10,6 +10,7 @@ import { useAuthStore } from "../store/authStore";
 import { useCartStore } from "../store/cartStore";
 import type { CheckoutPayload, Order, PaymentProviderOption } from "../types";
 import { formatPrice } from "../utils/formatPrice";
+import { toEnglishDigits, normalizePhoneNumber, normalizeNumericInput } from "../utils/normalizeDigits";
 
 const EMPTY_FORM: CheckoutPayload = {
   customer_name: "",
@@ -173,9 +174,9 @@ export default function Checkout() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <Field id="checkout-customer_name" autoComplete="name" label="نام و نام خانوادگی" required value={form.customer_name} error={fieldErrors.customer_name} onChange={(value) => updateField("customer_name", value)} />
-            <Field id="checkout-phone" autoComplete="tel" label="شماره تماس" required inputMode="tel" value={form.phone} error={fieldErrors.phone} onChange={(value) => updateField("phone", value)} />
-            <Field id="checkout-email" autoComplete="email" label="ایمیل (اختیاری)" type="email" value={form.email || ""} error={fieldErrors.email} onChange={(value) => updateField("email", value)} />
-            <Field id="checkout-postal_code" autoComplete="postal-code" label="کد پستی (اختیاری)" inputMode="numeric" value={form.postal_code || ""} error={fieldErrors.postal_code} onChange={(value) => updateField("postal_code", value)} />
+            <Field id="checkout-phone" autoComplete="tel" label="شماره تماس" required inputMode="tel" value={form.phone} error={fieldErrors.phone} onChange={(value) => updateField("phone", normalizePhoneNumber(value))} />
+            <Field id="checkout-email" autoComplete="email" label="ایمیل (اختیاری)" type="email" value={form.email || ""} error={fieldErrors.email} onChange={(value) => updateField("email", value.trim())} />
+            <Field id="checkout-postal_code" autoComplete="postal-code" label="کد پستی (اختیاری)" inputMode="numeric" value={form.postal_code || ""} error={fieldErrors.postal_code} onChange={(value) => updateField("postal_code", normalizeNumericInput(value))} />
             <LocationPicker
               idPrefix="checkout"
               required
@@ -225,12 +226,12 @@ export default function Checkout() {
 
           <label className="block text-sm font-bold text-slate-700 dark:text-emerald-50">
             کد تخفیف خرید بعدی (اختیاری)
-            <input value={form.coupon_code || ''} onChange={(event) => updateField('coupon_code', event.target.value.toUpperCase())} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-normal outline-none transition focus:border-emerald-500 dark:border-emerald-700 dark:bg-emerald-900" placeholder="مثال: NEXT-..." dir="ltr" />
+            <input value={form.coupon_code || ''} onChange={(event) => updateField('coupon_code', toEnglishDigits(event.target.value).toUpperCase().trim())} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-normal outline-none transition focus:border-emerald-500 dark:border-emerald-700 dark:bg-emerald-900" placeholder="مثال: NEXT-..." dir="ltr" />
           </label>
 
           <label className="block text-sm font-bold text-slate-700 dark:text-emerald-50">
             کد همکاری در فروش (اختیاری)
-            <input value={form.affiliate_code || ''} onChange={(event) => updateField('affiliate_code', event.target.value.toUpperCase())} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-normal outline-none transition focus:border-emerald-500 dark:border-emerald-700 dark:bg-emerald-900" placeholder="مثال: GKAF-..." dir="ltr" />
+            <input value={form.affiliate_code || ''} onChange={(event) => updateField('affiliate_code', toEnglishDigits(event.target.value).toUpperCase().trim())} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-normal outline-none transition focus:border-emerald-500 dark:border-emerald-700 dark:bg-emerald-900" placeholder="مثال: GKAF-..." dir="ltr" />
           </label>
 
           <div>

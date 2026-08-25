@@ -16,6 +16,7 @@ import {
 import { agriApi, productsApi } from '../api/services';
 import { parseApiError } from '../api/errors';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import { normalizeNumericInput } from '../utils/normalizeDigits';
 import type { AgriInput, AreaUnit, DoseCalculation, MockProduct, ProductList } from '../types';
 
 interface AgriCalculatorProps {
@@ -299,12 +300,10 @@ export default function AgriCalculator({ onAddToCart }: AgriCalculatorProps) {
           </label>
           <input
             id="agri-area"
-            type="number"
-            min="0"
-            step="0.1"
+            type="text"
             inputMode="decimal"
             value={area}
-            onChange={(event) => setArea(event.target.value)}
+            onChange={(event) => setArea(normalizeNumericInput(event.target.value, true))}
             aria-invalid={Boolean(errors.area)}
             className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-emerald-800 dark:bg-emerald-950 dark:text-white"
           />

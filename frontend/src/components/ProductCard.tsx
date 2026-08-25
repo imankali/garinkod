@@ -88,7 +88,7 @@ export default function ProductCard({
       {/* ======================================== */}
       {/* Product Image */}
       {/* ======================================== */}
-      <div className="relative h-40 overflow-hidden bg-gradient-to-br from-emerald-50 via-white to-[#F7F3E8] dark:from-emerald-950 dark:to-emerald-900 md:h-48">
+      <div className="relative aspect-[4/3] h-40 w-full overflow-hidden bg-gradient-to-br from-emerald-50 via-white to-[#F7F3E8] dark:from-emerald-950 dark:to-emerald-900 md:h-48">
         <a
           href={productUrl || '#'}
           aria-label={`مشاهده ${product.name}`}
@@ -103,9 +103,11 @@ export default function ProductCard({
           <motion.img
             src={product.image}
             alt={product.name}
+            width={320}
+            height={240}
             whileHover={{ scale: 1.1 }}
             transition={{ duration: 0.4, ease: "easeOut" }}
-            className={`h-full w-full object-cover ${!product.inStock ? "grayscale" : ""}`}
+            className={`aspect-[4/3] h-full w-full object-cover ${!product.inStock ? "grayscale" : ""}`}
             loading="lazy"
             onError={(e) => {
               (e.target as HTMLImageElement).src = '/images/hero-farm.jpg';

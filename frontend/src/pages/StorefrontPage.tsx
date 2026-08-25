@@ -1271,18 +1271,23 @@ function StoryViewer({
   onIndexChange: (index: number) => void;
   onClose: () => void;
 }) {
+  const { dir } = useTranslation();
   const current = posts[index];
 
   useEffect(() => {
     function handleKey(event: KeyboardEvent) {
       if (event.key === 'Escape') onClose();
-      // The layout is RTL, so ArrowLeft advances and ArrowRight goes back.
-      if (event.key === 'ArrowLeft' && index < posts.length - 1) onIndexChange(index + 1);
-      if (event.key === 'ArrowRight' && index > 0) onIndexChange(index - 1);
+      if (dir === 'rtl') {
+        if (event.key === 'ArrowLeft' && index < posts.length - 1) onIndexChange(index + 1);
+        if (event.key === 'ArrowRight' && index > 0) onIndexChange(index - 1);
+      } else {
+        if (event.key === 'ArrowRight' && index < posts.length - 1) onIndexChange(index + 1);
+        if (event.key === 'ArrowLeft' && index > 0) onIndexChange(index - 1);
+      }
     }
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [index, posts.length, onIndexChange, onClose]);
+  }, [index, posts.length, onIndexChange, onClose, dir]);
 
   if (!current) return null;
 
@@ -1319,6 +1324,8 @@ function StoryViewer({
         <img
           src={current.image_url}
           alt={current.caption || 'استوری'}
+          width={400}
+          height={600}
           className="max-h-[75vh] w-full rounded-2xl object-contain"
         />
         {current.caption && (
@@ -1326,7 +1333,7 @@ function StoryViewer({
         )}
       </figure>
 
-      {/* Tap zones: right goes back, left advances (RTL). */}
+      {/* Tap zones: start zone goes back, end zone advances. */}
       <button
         type="button"
         aria-label="استوری قبلی"

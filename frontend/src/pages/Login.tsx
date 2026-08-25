@@ -6,6 +6,7 @@ import { LogIn, UserPlus, Eye, EyeOff, Mail, Lock, User } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
+import { toEnglishDigits } from "../utils/normalizeDigits";
 
 // ========================================
 // Types
@@ -43,7 +44,9 @@ export default function Login() {
   // Handlers
   // ========================================
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    const { name, value } = e.target;
+    const cleanValue = name === 'username' ? toEnglishDigits(value).trim() : value;
+    setFormData(prev => ({ ...prev, [name]: cleanValue }));
   }
 
   async function handleSubmit(e: React.FormEvent) {

@@ -20,6 +20,7 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.pagination import PageNumberPagination
 
+from .pest_vision import analyze_crop_image
 from .filters import ProductFilter
 from .models import (
     Category, Product, Comment, UserAccount, Cart, CartItem, Order, OrderItem,
@@ -1242,9 +1243,17 @@ def visual_search(request):
     serializer = VisualSearchRequestSerializer(data={'image': upload, 'target': request.data.get('target', 'product')})
     serializer.is_valid(raise_exception=True)
     search_request = serializer.save(user=request.user if request.user.is_authenticated else None)
+
+    # Execute intelligent agricultural pest & disease analysis pipeline
+    diagnosis = analyze_crop_image(upload)
+    search_request.status = 'completed' if diagnosis.get('status') == 'completed' else 'rejected'
+    search_request.result_payload = diagnosis
+    search_request.save(update_fields=['status', 'result_payload', 'updated_at'])
+
     return Response({
         'request': VisualSearchRequestSerializer(search_request).data,
-        'message': 'تصویر ثبت شد. تا اتصال موتور بینایی ماشین، نتیجهٔ خودکار نمایش داده نمی‌شود.'
+        'diagnosis': diagnosis,
+        'message': f"تحلیل هوشمند تصویر انجام شد: {diagnosis.get('title', 'نتیجه بررسی')}",
     }, status=status.HTTP_201_CREATED)
 
 

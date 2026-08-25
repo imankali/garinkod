@@ -88,6 +88,17 @@ class ErrorBoundary extends (await import("react")).Component<
 }
 
 // ========================================
+// Register Service Worker for Offline PWA Support
+// ========================================
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch((err) => {
+      console.warn('Service worker registration failed:', err);
+    });
+  });
+}
+
+// ========================================
 // Render App
 // ========================================
 const rootElement = document.getElementById("root");

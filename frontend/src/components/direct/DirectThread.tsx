@@ -69,9 +69,53 @@ export default function DirectThread({
 
   useEffect(() => {
     void load();
-    const interval = setInterval(() => void load(true), POLL_MS);
-    return () => clearInterval(interval);
-  }, [load]);
+
+    let eventSource: EventSource | null = null;
+    let pollInterval: ReturnType<typeof setInterval> | null = null;
+
+    if (typeof window !== 'undefined' && 'EventSource' in window && conversationId) {
+      try {
+        eventSource = new EventSource(`/api/marketplace/conversations/${conversationId}/stream/`, {
+          withCredentials: true,
+        });
+
+        eventSource.addEventListener('message', (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.results && Array.isArray(data.results) && data.results.length > 0) {
+              setMessages((prev) => {
+                const existingIds = new Set(prev.map((m) => m.id));
+                const incoming = data.results.filter((m: StorefrontMessage) => !existingIds.has(m.id));
+                if (incoming.length === 0) return prev;
+                return [...prev, ...incoming];
+              });
+            }
+          } catch {
+            // Ignore parse failures
+          }
+        });
+
+        eventSource.onerror = () => {
+          if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+          }
+          if (!pollInterval) {
+            pollInterval = setInterval(() => void load(true), POLL_MS);
+          }
+        };
+      } catch {
+        pollInterval = setInterval(() => void load(true), POLL_MS);
+      }
+    } else {
+      pollInterval = setInterval(() => void load(true), POLL_MS);
+    }
+
+    return () => {
+      if (eventSource) eventSource.close();
+      if (pollInterval) clearInterval(pollInterval);
+    };
+  }, [conversationId, load]);
 
   useEffect(() => {
     // Keep the newest message in view as the thread grows.

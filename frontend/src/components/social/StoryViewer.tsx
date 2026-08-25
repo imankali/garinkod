@@ -9,6 +9,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { X } from 'lucide-react';
 
+import { useTranslation } from '../../i18n';
 import type { StorefrontPost } from '../../types';
 
 export default function StoryViewer({
@@ -24,6 +25,7 @@ export default function StoryViewer({
   onSeen: (story: StorefrontPost) => void;
   onClose: () => void;
 }) {
+  const { dir } = useTranslation();
   const [index, setIndex] = useState(0);
   const current = stories[index];
 
@@ -35,6 +37,10 @@ export default function StoryViewer({
     });
   }, [stories.length, onClose]);
 
+  const previous = useCallback(() => {
+    setIndex((position) => Math.max(position - 1, 0));
+  }, []);
+
   // Report each story as watched as it appears, not on close: leaving halfway
   // through should still grey out the ones actually seen.
   useEffect(() => {
@@ -45,13 +51,19 @@ export default function StoryViewer({
   useEffect(() => {
     function handleKey(event: KeyboardEvent) {
       if (event.key === 'Escape') onClose();
-      // The layout is RTL, so ArrowLeft advances and ArrowRight goes back.
-      if (event.key === 'ArrowLeft') advance();
-      if (event.key === 'ArrowRight') setIndex((position) => Math.max(position - 1, 0));
+      // In RTL, ArrowLeft advances and ArrowRight goes back.
+      // In LTR, ArrowRight advances and ArrowLeft goes back.
+      if (dir === 'rtl') {
+        if (event.key === 'ArrowLeft') advance();
+        if (event.key === 'ArrowRight') previous();
+      } else {
+        if (event.key === 'ArrowRight') advance();
+        if (event.key === 'ArrowLeft') previous();
+      }
     }
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [advance, onClose]);
+  }, [advance, previous, onClose, dir]);
 
   if (!current) return null;
 
@@ -83,6 +95,8 @@ export default function StoryViewer({
           <img
             src={current.storefront_avatar_url || current.image_url}
             alt=""
+            width={32}
+            height={32}
             className="h-full w-full object-cover"
           />
         </span>
@@ -109,12 +123,12 @@ export default function StoryViewer({
         )}
       </figure>
 
-      {/* Tap zones: right goes back, left advances (RTL). */}
+      {/* Tap zones: start zone goes to previous, end zone advances to next */}
       <button
         type="button"
         aria-label="استوری قبلی"
         disabled={index === 0}
-        onClick={() => setIndex((position) => Math.max(position - 1, 0))}
+        onClick={previous}
         className="absolute inset-y-0 start-0 w-1/3 cursor-pointer disabled:cursor-default"
       />
       <button
@@ -126,3 +140,4 @@ export default function StoryViewer({
     </motion.div>
   );
 }
+
