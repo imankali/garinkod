@@ -13,6 +13,7 @@ from .models import (
     StorefrontPostLike, StorefrontPostComment, StorefrontStoryView,
     FarmLand, FarmCalendarEvent, FarmConsultationRequest, AdminAuditLog
 )
+from .phone_numbers import normalize_iranian_mobile
 from .slugs import slugify_fa, unique_storefront_slug
 
 
@@ -168,13 +169,16 @@ class UserAccountSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserAccount
         fields = [
-            'id', 'username', 'email', 'full_name', 'phone',
+            'id', 'username', 'email', 'full_name', 'phone', 'phone_verified_at',
             'gender', 'address', 'avatar', 'avatar_url', 'level', 'level_label',
             'has_storefront', 'created', 'updated'
         ]
         # `level` is derived from what the user owns and may only be changed
         # through the management API, never by the profile endpoint.
-        read_only_fields = ['created', 'updated', 'level', 'level_label', 'avatar_url', 'has_storefront']
+        read_only_fields = [
+            'created', 'updated', 'level', 'level_label', 'avatar_url',
+            'has_storefront', 'phone_verified_at',
+        ]
 
     def get_full_name(self, obj):
         return obj.user.get_full_name()
@@ -187,6 +191,27 @@ class UserAccountSerializer(serializers.ModelSerializer):
 
     def get_has_storefront(self, obj):
         return Storefront.objects.filter(user_id=obj.user_id).exists()
+
+    def validate_phone(self, value):
+        if not value:
+            return ''
+        try:
+            normalised = normalize_iranian_mobile(value)
+        except ValueError as exc:
+            raise serializers.ValidationError(str(exc)) from exc
+        duplicates = UserAccount.objects.filter(phone=normalised)
+        if self.instance and self.instance.pk:
+            duplicates = duplicates.exclude(pk=self.instance.pk)
+        if duplicates.exists():
+            raise serializers.ValidationError('این شماره موبایل قبلاً برای حساب دیگری ثبت شده است.')
+        return normalised
+
+    def update(self, instance, validated_data):
+        # Changing a verified number must require a fresh OTP before it can be
+        # trusted for passwordless login again.
+        if 'phone' in validated_data and validated_data['phone'] != instance.phone:
+            instance.phone_verified_at = None
+        return super().update(instance, validated_data)
 
     def validate_avatar(self, image):
         """Reject anything that is not a reasonably sized, real raster image."""
@@ -307,6 +332,35 @@ class RegisterSerializer(serializers.ModelSerializer):
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField()
     password = serializers.CharField(write_only=True)
+
+
+class OtpRequestSerializer(serializers.Serializer):
+    phone = serializers.CharField(max_length=32)
+    channel = serializers.ChoiceField(
+        choices=['auto', 'sms', 'bale'],
+        default='auto',
+        required=False,
+    )
+
+    def validate_phone(self, value):
+        try:
+            return normalize_iranian_mobile(value)
+        except ValueError as exc:
+            raise serializers.ValidationError(str(exc)) from exc
+
+
+class OtpVerifySerializer(serializers.Serializer):
+    request_id = serializers.UUIDField()
+    phone = serializers.CharField(max_length=32)
+    code = serializers.CharField(min_length=4, max_length=8, trim_whitespace=True)
+    first_name = serializers.CharField(max_length=150, allow_blank=True, required=False, default='')
+    last_name = serializers.CharField(max_length=150, allow_blank=True, required=False, default='')
+
+    def validate_phone(self, value):
+        try:
+            return normalize_iranian_mobile(value)
+        except ValueError as exc:
+            raise serializers.ValidationError(str(exc)) from exc
 
 
 # ========================================

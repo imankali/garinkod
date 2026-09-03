@@ -1,6 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from . import api_views, marketplace_views, reference_views, farm_views
+from .messaging.webhooks import whatsapp_webhook
 
 # ساخت Router
 router = DefaultRouter()
@@ -21,8 +22,13 @@ urlpatterns = [
     # Auth Routes
     path('auth/register/', api_views.register, name='api_register'),
     path('auth/login/', api_views.login_view, name='api_login'),
+    path('auth/otp/request/', api_views.request_login_otp, name='api_otp_request'),
+    path('auth/otp/verify/', api_views.verify_login_otp_view, name='api_otp_verify'),
     path('auth/logout/', api_views.logout_view, name='api_logout'),
     path('auth/session/', api_views.auth_session, name='api_auth_session'),
+
+    # Signed official-provider callbacks (no browser/session authentication).
+    path('messaging/webhooks/whatsapp/', whatsapp_webhook, name='api_whatsapp_webhook'),
 
     # Profile Route
     path('profile/', api_views.user_profile, name='api_profile'),

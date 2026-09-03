@@ -1,4 +1,7 @@
-from django.contrib import admin
+from django.conf import settings
+from django.contrib import admin, messages
+from django.utils import timezone
+
 from .models import Category, Product
 from .models import FertilizerDetail, PesticideDetail, SeedDetail, EquipmentDetail
 from .models import (
@@ -7,7 +10,8 @@ from .models import (
     AffiliateConversion, FinancialLedgerEntry, PlatformFeedback,
     StorefrontComplaint, VisualSearchRequest, Coupon, Wallet, WalletTransaction,
     StorefrontPost, FarmLand, FarmCalendarEvent, FarmConsultationRequest,
-    AdminAuditLog
+    AdminAuditLog, OneTimePassword, NotificationTemplate,
+    NotificationRecipient, NotificationDelivery,
 )
 from .rewards import mark_order_paid_and_reward
 
@@ -138,10 +142,10 @@ class AdminProduct(admin.ModelAdmin):
 # --- Admin UserAccount ---
 @admin.register(UserAccount)
 class AdminUserAccount(admin.ModelAdmin):
-    list_display = ('user', 'phone', 'gender', 'created')
-    list_filter = ('gender', 'created')
+    list_display = ('user', 'phone', 'phone_verified_at', 'gender', 'created')
+    list_filter = ('gender', 'phone_verified_at', 'created')
     search_fields = ('user__username', 'user__first_name', 'user__last_name', 'phone')
-    readonly_fields = ('created', 'updated')
+    readonly_fields = ('phone_verified_at', 'created', 'updated')
     ordering = ('-created',)
 
 
@@ -349,6 +353,141 @@ class AdminAdminAuditLog(admin.ModelAdmin):
         return False
 
     def has_change_permission(self, request, obj=None):
+        return False
+
+
+# --- Transactional messaging hub ---
+def queue_test_messages(modeladmin, request, queryset):
+    from .messaging.outbox import enqueue_test_delivery
+
+    queued = 0
+    errors = 0
+    for recipient in queryset:
+        try:
+            enqueue_test_delivery(recipient)
+            queued += 1
+        except ValueError:
+            errors += 1
+    modeladmin.message_user(
+        request,
+        f'{queued} پیام آزمایشی در صف قرار گرفت؛ نتیجه در تاریخچه ارسال نمایش داده می‌شود.',
+        level=messages.SUCCESS if not errors else messages.WARNING,
+    )
+    if errors:
+        modeladmin.message_user(
+            request,
+            f'{errors} گیرنده به‌دلیل غیرفعال بودن کانال در تنظیمات محیطی رد شد.',
+            level=messages.WARNING,
+        )
+
+
+queue_test_messages.short_description = 'قرار دادن پیام آزمایشی در صف ارسال'
+
+
+def retry_failed_messages(modeladmin, request, queryset):
+    eligible = queryset.filter(
+        status__in=[NotificationDelivery.STATUS_FAILED, NotificationDelivery.STATUS_RETRY]
+    )
+    updated = eligible.update(
+        status=NotificationDelivery.STATUS_PENDING,
+        attempt_count=0,
+        next_attempt_at=timezone.now(),
+        locked_at=None,
+        last_error='',
+        updated_at=timezone.now(),
+    )
+    modeladmin.message_user(request, f'{updated} پیام برای تلاش مجدد در صف قرار گرفت.')
+
+
+retry_failed_messages.short_description = 'تلاش مجدد برای پیام‌های ناموفق انتخاب‌شده'
+
+
+@admin.register(NotificationTemplate)
+class AdminNotificationTemplate(admin.ModelAdmin):
+    list_display = ('name', 'event', 'audience', 'channel', 'is_active', 'updated_at')
+    list_filter = ('event', 'audience', 'channel', 'is_active')
+    search_fields = ('name', 'body', 'provider_template_name')
+    list_editable = ('is_active',)
+    readonly_fields = ('created_at', 'updated_at')
+    fieldsets = (
+        ('مسیر', {'fields': ('name', 'event', 'audience', 'channel', 'is_active')}),
+        ('محتوا', {'fields': ('body', 'provider_template_name', 'language_code')}),
+        ('تاریخچه', {'fields': ('created_at', 'updated_at'), 'classes': ('collapse',)}),
+    )
+
+
+@admin.register(NotificationRecipient)
+class AdminNotificationRecipient(admin.ModelAdmin):
+    list_display = (
+        'name', 'channel', 'destination', 'channel_enabled',
+        'receive_order_created', 'receive_order_status_changed', 'is_active',
+    )
+    list_filter = ('channel', 'receive_order_created', 'receive_order_status_changed', 'is_active')
+    search_fields = ('name', 'destination')
+    list_editable = ('receive_order_created', 'receive_order_status_changed', 'is_active')
+    readonly_fields = ('created_at', 'updated_at')
+    actions = [queue_test_messages]
+
+    @admin.display(boolean=True, description='فعال در محیط')
+    def channel_enabled(self, obj):
+        if settings.MESSAGING_FAKE:
+            return True
+        return {
+            'sms': settings.MESSAGING_ENABLE_SMS,
+            'bale': settings.MESSAGING_ENABLE_BALE,
+            'telegram': settings.MESSAGING_ENABLE_TELEGRAM,
+            'whatsapp': settings.MESSAGING_ENABLE_WHATSAPP,
+        }.get(obj.channel, False)
+
+
+@admin.register(NotificationDelivery)
+class AdminNotificationDelivery(admin.ModelAdmin):
+    list_display = (
+        'created_at', 'event', 'channel', 'audience', 'order', 'status',
+        'attempt_count', 'sent_at',
+    )
+    list_filter = ('status', 'event', 'channel', 'audience', 'created_at')
+    search_fields = ('order__code', 'recipient', 'provider_message_id', 'idempotency_key')
+    date_hierarchy = 'created_at'
+    ordering = ('-created_at',)
+    actions = [retry_failed_messages]
+    readonly_fields = (
+        'id', 'order', 'template', 'event', 'audience', 'channel', 'recipient',
+        'rendered_content', 'payload', 'idempotency_key', 'status', 'attempt_count',
+        'max_attempts', 'next_attempt_at', 'locked_at', 'provider_message_id',
+        'provider_response', 'last_error', 'sent_at', 'delivered_at',
+        'created_at', 'updated_at',
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(OneTimePassword)
+class AdminOneTimePassword(admin.ModelAdmin):
+    list_display = (
+        'created_at', 'phone', 'purpose', 'delivery_channel', 'status',
+        'attempts', 'expires_at', 'consumed_at',
+    )
+    list_filter = ('status', 'purpose', 'delivery_channel', 'created_at')
+    search_fields = ('phone', 'request_id', 'provider_message_id')
+    readonly_fields = (
+        'request_id', 'phone', 'purpose', 'delivery_channel',
+        'provider_message_id', 'last_error', 'status', 'attempts', 'max_attempts',
+        'requested_ip', 'expires_at', 'consumed_at', 'created_at',
+    )
+    fields = readonly_fields
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
         return False
 
 

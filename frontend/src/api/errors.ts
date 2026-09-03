@@ -21,6 +21,7 @@ export type ApiErrorCode =
   | 'payload_too_large'
   | 'throttled'
   | 'server_error'
+  | 'service_unavailable'
   | 'network_error'
   | 'timeout'
   | 'error';

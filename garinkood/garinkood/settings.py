@@ -12,6 +12,7 @@ SECRET_KEY = config("SECRET_KEY", default="django-insecure-local-development-onl
 DEBUG = config("DEBUG", default=False, cast=bool)
 SITE_URL = config("SITE_URL", default="https://garinkood.ir").rstrip("/")
 FRONTEND_URL = config("FRONTEND_URL", default=SITE_URL).rstrip("/")
+ADMIN_PUBLIC_URL = config("ADMIN_PUBLIC_URL", default=SITE_URL).rstrip("/")
 ALLOWED_HOSTS = config(
     "ALLOWED_HOSTS",
     default="localhost,127.0.0.1,testserver",
@@ -173,6 +174,8 @@ REST_FRAMEWORK = {
         "user": config("THROTTLE_USER", default="600/hour"),
         "login": config("THROTTLE_LOGIN", default="10/min"),
         "register": config("THROTTLE_REGISTER", default="5/hour"),
+        "otp_request": config("THROTTLE_OTP_REQUEST", default="30/hour"),
+        "otp_verify": config("THROTTLE_OTP_VERIFY", default="60/hour"),
         "search": config("THROTTLE_SEARCH", default="60/min"),
         "checkout": config("THROTTLE_CHECKOUT", default="12/hour"),
         "upload": config("THROTTLE_UPLOAD", default="20/hour"),
@@ -277,6 +280,72 @@ EMAIL_HOST = config("EMAIL_HOST", default="localhost")
 EMAIL_PORT = config("EMAIL_PORT", default=25, cast=int)
 EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=False, cast=bool)
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="noreply@garinkood.ir")
+
+# Transactional messaging. All credentials are environment-only; the database
+# contains editable copy, routing destinations and delivery history, never API
+# secrets. OTP is immediate because it is interactive; commerce events use the
+# durable outbox processed by ``manage.py process_notifications --watch``.
+MESSAGING_HTTP_TIMEOUT = config("MESSAGING_HTTP_TIMEOUT", default=8, cast=int)
+MESSAGING_FAKE = config("MESSAGING_FAKE", default=False, cast=bool)
+MESSAGING_ENABLE_SMS = config("MESSAGING_ENABLE_SMS", default=False, cast=bool)
+MESSAGING_ENABLE_BALE = config("MESSAGING_ENABLE_BALE", default=False, cast=bool)
+MESSAGING_ENABLE_TELEGRAM = config("MESSAGING_ENABLE_TELEGRAM", default=False, cast=bool)
+MESSAGING_ENABLE_WHATSAPP = config("MESSAGING_ENABLE_WHATSAPP", default=False, cast=bool)
+NOTIFICATION_MAX_ATTEMPTS = config("NOTIFICATION_MAX_ATTEMPTS", default=6, cast=int)
+NOTIFICATION_WORKER_STALE_SECONDS = config("NOTIFICATION_WORKER_STALE_SECONDS", default=600, cast=int)
+NOTIFICATION_ADMIN_TELEGRAM_CHAT_IDS = config(
+    "NOTIFICATION_ADMIN_TELEGRAM_CHAT_IDS", default="", cast=Csv()
+)
+NOTIFICATION_ADMIN_BALE_CHAT_IDS = config(
+    "NOTIFICATION_ADMIN_BALE_CHAT_IDS", default="", cast=Csv()
+)
+NOTIFICATION_ADMIN_SMS_NUMBERS = config(
+    "NOTIFICATION_ADMIN_SMS_NUMBERS", default="", cast=Csv()
+)
+NOTIFICATION_ADMIN_WHATSAPP_NUMBERS = config(
+    "NOTIFICATION_ADMIN_WHATSAPP_NUMBERS", default="", cast=Csv()
+)
+NOTIFICATION_CUSTOMER_STATUS_CHANNELS = config(
+    "NOTIFICATION_CUSTOMER_STATUS_CHANNELS", default="", cast=Csv()
+)
+
+# OTP policy and provider fallback order. Debug-code responses require both
+# DEBUG=True and the explicit OTP_RETURN_DEBUG_CODE flag.
+OTP_CODE_LENGTH = config("OTP_CODE_LENGTH", default=6, cast=int)
+OTP_TTL_SECONDS = config("OTP_TTL_SECONDS", default=180, cast=int)
+OTP_RESEND_COOLDOWN_SECONDS = config("OTP_RESEND_COOLDOWN_SECONDS", default=60, cast=int)
+OTP_MAX_VERIFY_ATTEMPTS = config("OTP_MAX_VERIFY_ATTEMPTS", default=5, cast=int)
+OTP_PHONE_RATE_LIMIT = config("OTP_PHONE_RATE_LIMIT", default=8, cast=int)
+OTP_PHONE_RATE_WINDOW_SECONDS = config("OTP_PHONE_RATE_WINDOW_SECONDS", default=3600, cast=int)
+OTP_DELIVERY_CHANNELS = config("OTP_DELIVERY_CHANNELS", default="sms,bale", cast=Csv())
+OTP_RETURN_DEBUG_CODE = config("OTP_RETURN_DEBUG_CODE", default=False, cast=bool)
+
+# Iranian SMS providers (choose exactly one for the ``sms`` adapter).
+SMS_PROVIDER = config("SMS_PROVIDER", default="smsir").strip().lower()
+SMSIR_API_KEY = config("SMSIR_API_KEY", default="")
+SMSIR_OTP_TEMPLATE_ID = config("SMSIR_OTP_TEMPLATE_ID", default=0, cast=int)
+SMSIR_OTP_PARAMETER = config("SMSIR_OTP_PARAMETER", default="Code")
+SMSIR_LINE_NUMBER = config("SMSIR_LINE_NUMBER", default=0, cast=int)
+KAVENEGAR_API_KEY = config("KAVENEGAR_API_KEY", default="")
+KAVENEGAR_OTP_TEMPLATE = config("KAVENEGAR_OTP_TEMPLATE", default="")
+KAVENEGAR_SENDER = config("KAVENEGAR_SENDER", default="")
+
+# Bale Safir sends by verified phone (including OTP); the Bot API sends owner
+# alerts to chat ids. Both are official Bale services.
+BALE_SAFIR_API_KEY = config("BALE_SAFIR_API_KEY", default="")
+BALE_SAFIR_BOT_ID = config("BALE_SAFIR_BOT_ID", default=0, cast=int)
+BALE_BOT_TOKEN = config("BALE_BOT_TOKEN", default="")
+TELEGRAM_BOT_TOKEN = config("TELEGRAM_BOT_TOKEN", default="")
+
+# Official Meta WhatsApp Cloud API only. Free-form messages are disabled by
+# default because outside the 24-hour service window an approved template is
+# mandatory. Put template names on NotificationTemplate rows in Django admin.
+WHATSAPP_ACCESS_TOKEN = config("WHATSAPP_ACCESS_TOKEN", default="")
+WHATSAPP_PHONE_NUMBER_ID = config("WHATSAPP_PHONE_NUMBER_ID", default="")
+WHATSAPP_APP_SECRET = config("WHATSAPP_APP_SECRET", default="")
+WHATSAPP_WEBHOOK_VERIFY_TOKEN = config("WHATSAPP_WEBHOOK_VERIFY_TOKEN", default="")
+WHATSAPP_API_VERSION = config("WHATSAPP_API_VERSION", default="v23.0")
+WHATSAPP_ALLOW_FREEFORM = config("WHATSAPP_ALLOW_FREEFORM", default=False, cast=bool)
 
 # Payment providers are opt-in.  Never add merchant, secret, wallet or webhook
 # credentials to Git; use the production environment/secrets manager.

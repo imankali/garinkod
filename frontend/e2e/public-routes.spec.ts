@@ -45,6 +45,15 @@ test('checkout clearly communicates the five purchase stages', async ({ page }) 
   await expect(steps.locator('[aria-current="step"]')).toHaveCount(1);
 });
 
+test('login defaults to mobile OTP and keeps password compatibility', async ({ page }) => {
+  await page.goto('/login');
+  await expect(page.getByRole('tab', { name: /کد یک‌بارمصرف/ })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByLabel('شماره موبایل')).toBeVisible();
+  await page.getByRole('tab', { name: /رمز عبور/ }).click();
+  await expect(page.getByLabel('نام کاربری')).toBeVisible();
+  await expect(page.getByLabel('رمز عبور', { exact: true })).toBeVisible();
+});
+
 test('language selector changes document direction safely', async ({ page }) => {
   await page.goto('/');
   const language = page.getByLabel('زبان').first();

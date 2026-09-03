@@ -4,6 +4,10 @@ ROLE_PERMISSIONS = {
     "عملیات": [
         "view_order", "change_order", "view_orderitem", "view_cart", "view_cartitem",
         "view_product", "change_product", "view_coupon", "change_coupon",
+        "view_notificationdelivery", "change_notificationdelivery",
+        "view_notificationrecipient", "add_notificationrecipient", "change_notificationrecipient",
+        "view_notificationtemplate", "add_notificationtemplate", "change_notificationtemplate",
+        "view_onetimepassword",
     ],
     "مالی": [
         "view_order", "change_order", "view_paymentattempt", "change_paymentattempt",

@@ -9,6 +9,7 @@ import type {
   Comment,
   PaginatedResponse,
   AuthResponse,
+  OtpRequestResponse,
   ProfileResponse,
   ProductQueryParams,
   Order,
@@ -241,6 +242,19 @@ export const authApi = {
   }) => {
     return apiClient.post<AuthResponse>('/auth/register/', data);
   },
+
+  /** Request a provider-delivered login code without exposing account existence. */
+  requestOtp: (phone: string, channel: 'auto' | 'sms' | 'bale' = 'auto') =>
+    apiClient.post<OtpRequestResponse>('/auth/otp/request/', { phone, channel }),
+
+  /** Verify a challenge; Django returns the regular HttpOnly auth cookie. */
+  verifyOtp: (data: {
+    request_id: string;
+    phone: string;
+    code: string;
+    first_name?: string;
+    last_name?: string;
+  }) => apiClient.post<AuthResponse>('/auth/otp/verify/', data),
 
   /**
    * خروج کاربر

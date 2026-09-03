@@ -212,6 +212,7 @@ export interface UserAccount {
   email: string;
   full_name: string;
   phone: string;
+  phone_verified_at: string | null;
   gender: 'male' | 'female';
   address: string;
   avatar: string | null;
@@ -255,7 +256,20 @@ export interface PaginatedResponse<T> {
 
 export interface AuthResponse {
   user: User;
+  account: UserAccount | null;
   message: string;
+  created?: boolean;
+}
+
+export interface OtpRequestResponse {
+  request_id: string;
+  masked_phone: string;
+  channel: 'sms' | 'bale';
+  expires_in: number;
+  resend_after: number;
+  message: string;
+  /** Returned only when Django DEBUG and OTP_RETURN_DEBUG_CODE are both enabled. */
+  debug_code?: string;
 }
 
 export interface ProfileResponse {

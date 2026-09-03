@@ -335,6 +335,10 @@ Backend
 cd garinkood
 python manage.py collectstatic
 فایل‌های static در پوشه staticfiles/ جمع‌آوری می‌شوند.
+📨 Messaging Hub و ورود OTP
+راهنمای پیکربندی providerهای رسمی، worker، قالب‌ها، webhook واتساپ و امنیت OTP:
+[docs/messaging-hub.md](docs/messaging-hub.md)
+
 🌍 Environment Variables
 Backend (garinkood/.env)
 SECRET_KEY=your-secret-key-here

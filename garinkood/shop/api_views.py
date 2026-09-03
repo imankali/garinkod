@@ -12,12 +12,12 @@ from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.models import Group, User
-from django.db import connection, transaction
+from django.db import IntegrityError, connection, transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import APIException, PermissionDenied, Throttled, ValidationError
 from rest_framework.pagination import PageNumberPagination
 
 from .pest_vision import analyze_crop_image
@@ -35,7 +35,8 @@ from .models import (
 from .serializers import (
     CategorySerializer, ProductSerializer, ProductListSerializer,
     CommentSerializer, UserAccountSerializer, CartSerializer,
-    UserSerializer, RegisterSerializer, CheckoutSerializer, OrderSerializer,
+    UserSerializer, RegisterSerializer, OtpRequestSerializer, OtpVerifySerializer,
+    CheckoutSerializer, OrderSerializer,
     ServiceRequestSerializer, ProcurementRequestSerializer, StorefrontSerializer,
     MarketplaceListingSerializer, PaymentAttemptSerializer, AffiliateProfileSerializer,
     AffiliateConversionSerializer, FinancialLedgerEntrySerializer, PlatformFeedbackSerializer,
@@ -49,11 +50,24 @@ from .payments import get_provider, provider_options
 from .rewards import mark_order_paid_and_reward
 from .settlements import record_marketplace_sale, reverse_marketplace_sale, restore_listing_quantities
 from .notifications import notify_comment_reply
+from .messaging.outbox import enqueue_order_event
+from .messaging.otp import (
+    OtpAccountError,
+    OtpCooldown,
+    OtpDeliveryUnavailable,
+    OtpRequestLimit,
+    OtpVerificationError,
+    issue_login_otp,
+    otp_public_payload,
+    verify_login_otp,
+)
 from .permissions import IsModerator, IsAdminLevel, IsOwnerLevel
+from .phone_numbers import normalize_iranian_mobile
 from .slugs import slugify_fa, unique_storefront_slug, unique_listing_slug
 from .throttling import (
-    LoginRateThrottle, RegisterRateThrottle, SearchRateThrottle,
-    CheckoutRateThrottle, UploadRateThrottle, FeedbackRateThrottle,
+    LoginRateThrottle, RegisterRateThrottle, OtpRequestRateThrottle,
+    OtpVerifyRateThrottle, SearchRateThrottle, CheckoutRateThrottle,
+    UploadRateThrottle, FeedbackRateThrottle,
 )
 
 class ClientConfigurablePagination(PageNumberPagination):
@@ -92,6 +106,12 @@ def _clear_auth_cookie(response):
     return response
 
 
+class MessagingUnavailable(APIException):
+    status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    default_detail = 'سرویس ارسال کد موقتاً در دسترس نیست؛ کمی بعد تلاش کنید.'
+    default_code = 'messaging_unavailable'
+
+
 def _generate_affiliate_code() -> str:
     """Generate a short code while respecting the database uniqueness rule."""
     while True:
@@ -124,8 +144,10 @@ def login_view(request):
         login(request, user)
         token, created = Token.objects.get_or_create(user=user)
 
+        account = getattr(user, 'account', None)
         response = Response({
             'user': UserSerializer(user).data,
+            'account': UserAccountSerializer(account, context={'request': request}).data if account else None,
             'message': 'ورود با موفقیت انجام شد'
         })
         return _set_auth_cookie(response, token)
@@ -144,30 +166,104 @@ def register(request):
     serializer = RegisterSerializer(data=request.data)
 
     if serializer.is_valid():
-        user = serializer.save()
+        phone = str(request.data.get('phone', '')).strip()
+        if phone:
+            try:
+                phone = normalize_iranian_mobile(phone)
+            except ValueError as exc:
+                return Response({'phone': [str(exc)]}, status=status.HTTP_400_BAD_REQUEST)
+            if UserAccount.objects.filter(phone=phone).exists():
+                return Response(
+                    {'phone': ['این شماره موبایل قبلاً برای حساب دیگری ثبت شده است.']},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        try:
+            with transaction.atomic():
+                user = serializer.save()
 
-        # ساخت UserAccount
-        # A level-1 account row already exists (created by the post_save
-        # signal); fill in the optional profile details the form supplied.
-        UserAccount.objects.update_or_create(
-            user=user,
-            defaults={
-                'phone': request.data.get('phone', ''),
-                'gender': request.data.get('gender', 'male'),
-                'address': request.data.get('address', ''),
-            },
-        )
+                # A level-1 account row already exists (created by the
+                # post_save signal); fill optional profile details atomically.
+                UserAccount.objects.update_or_create(
+                    user=user,
+                    defaults={
+                        'phone': phone,
+                        'gender': request.data.get('gender', 'male'),
+                        'address': request.data.get('address', ''),
+                    },
+                )
+                token, _created = Token.objects.get_or_create(user=user)
+        except IntegrityError:
+            return Response(
+                {'phone': ['نام کاربری یا شماره موبایل هم‌زمان توسط حساب دیگری ثبت شد.']},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        # ساخت Token
-        token, created = Token.objects.get_or_create(user=user)
-
+        account = user.account
         response = Response({
             'user': UserSerializer(user).data,
+            'account': UserAccountSerializer(account, context={'request': request}).data,
             'message': 'ثبت‌نام با موفقیت انجام شد'
         }, status=status.HTTP_201_CREATED)
         return _set_auth_cookie(response, token)
 
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.AllowAny])
+@throttle_classes([OtpRequestRateThrottle])
+def request_login_otp(request):
+    """Issue a short-lived OTP without revealing whether an account exists."""
+
+    serializer = OtpRequestSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    try:
+        result = issue_login_otp(
+            serializer.validated_data['phone'],
+            requested_ip=request.META.get('REMOTE_ADDR'),
+            requested_channel=serializer.validated_data.get('channel', 'auto'),
+        )
+    except OtpCooldown as exc:
+        raise Throttled(wait=exc.wait, detail=str(exc)) from exc
+    except OtpRequestLimit as exc:
+        raise Throttled(wait=settings.OTP_PHONE_RATE_WINDOW_SECONDS, detail=str(exc)) from exc
+    except OtpDeliveryUnavailable as exc:
+        raise MessagingUnavailable() from exc
+    return Response(otp_public_payload(result), status=status.HTTP_201_CREATED)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.AllowAny])
+@throttle_classes([OtpVerifyRateThrottle])
+def verify_login_otp_view(request):
+    """Consume an OTP and issue the same HttpOnly auth cookie as password login."""
+
+    serializer = OtpVerifySerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    data = serializer.validated_data
+    try:
+        user, account, created = verify_login_otp(
+            request_id=data['request_id'],
+            phone_value=data['phone'],
+            code=data['code'],
+            first_name=data.get('first_name', ''),
+            last_name=data.get('last_name', ''),
+        )
+    except (OtpVerificationError, OtpAccountError) as exc:
+        raise ValidationError(str(exc)) from exc
+
+    login(request, user)
+    token, _created = Token.objects.get_or_create(user=user)
+    response = Response(
+        {
+            'user': UserSerializer(user).data,
+            'account': UserAccountSerializer(account, context={'request': request}).data,
+            'created': created,
+            'message': 'ورود با شماره موبایل با موفقیت انجام شد.',
+        },
+        status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+    )
+    return _set_auth_cookie(response, token)
 
 
 @api_view(['POST'])
@@ -721,6 +817,10 @@ def checkout(request):
                     description=f'کمیسیون همکاری در فروش سفارش {order.code}',
                 )
             CartItem.objects.filter(cart=cart).delete()
+            # The outbox rows are part of this transaction, but no provider is
+            # called here. A rollback removes both order and alerts; a provider
+            # outage can therefore never delay or invalidate checkout.
+            enqueue_order_event(order, 'order_created')
 
     return Response({
         'order': OrderSerializer(order).data,
@@ -986,12 +1086,18 @@ def user_profile(request):
         if not account_serializer.is_valid():
             return Response(account_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    with transaction.atomic():
-        user_serializer.save()
-        if account_serializer:
-            account, _created = UserAccount.objects.get_or_create(user=user)
-            account_serializer.instance = account
-            account_serializer.save()
+    try:
+        with transaction.atomic():
+            user_serializer.save()
+            if account_serializer:
+                account, _created = UserAccount.objects.get_or_create(user=user)
+                account_serializer.instance = account
+                account_serializer.save()
+    except IntegrityError:
+        return Response(
+            {'phone': ['این شماره موبایل هم‌زمان برای حساب دیگری ثبت شد.']},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
     return Response({
         'user': UserSerializer(user).data,

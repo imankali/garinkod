@@ -22,10 +22,12 @@ function unique() {
 
 async function registerAndSignIn(page: Page, username: string) {
   await page.goto('/login');
+  await page.getByRole('tab', { name: /رمز عبور/ }).click();
   const registerToggle = page.getByRole('button', { name: /ثبت‌نام|ایجاد حساب/ });
   if (await registerToggle.count()) await registerToggle.first().click();
 
   await page.getByLabel(/نام کاربری/).first().fill(username);
+  await page.getByLabel('ایمیل').fill(`${username}@example.test`);
   const passwords = page.locator('input[type="password"]');
   await passwords.first().fill('SafePassword!234');
   if ((await passwords.count()) > 1) await passwords.nth(1).fill('SafePassword!234');
@@ -161,6 +163,7 @@ test.describe('moderation console', () => {
 
   async function signInAsModerator(page: Page) {
     await page.goto('/login');
+    await page.getByRole('tab', { name: /رمز عبور/ }).click();
     await page.getByLabel(/نام کاربری/).first().fill(MODERATOR!);
     await page.locator('input[type="password"]').first().fill(MODERATOR_PASSWORD!);
     await page.getByRole('button', { name: /ورود/ }).last().click();
