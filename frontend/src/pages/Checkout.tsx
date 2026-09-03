@@ -127,7 +127,7 @@ export default function Checkout() {
   if (order) {
     return (
       <main className="mx-auto max-w-3xl px-[var(--page-gutter)] py-8 md:py-12">
-        <PurchaseSteps currentStep="confirmation" completed />
+        <PurchaseSteps currentStep="complete" completed />
         <section className="mt-5 rounded-3xl border border-emerald-100 bg-white p-7 text-center shadow-xl shadow-emerald-100/60 dark:border-emerald-800 dark:bg-emerald-950 dark:shadow-none">
           <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-900 dark:text-lime-300">
             <CheckCircle2 size={36} />
@@ -169,7 +169,7 @@ export default function Checkout() {
   return (
     <main className="mx-auto max-w-6xl px-[var(--page-gutter)] py-7 md:py-10">
       <Link to="/" className="inline-flex items-center gap-2 text-sm font-bold text-emerald-700 dark:text-lime-300">بازگشت به فروشگاه</Link>
-      <PurchaseSteps currentStep="delivery" className="mt-5" />
+      <PurchaseSteps currentStep="details" className="mt-5" />
       <div className="mt-5 grid gap-6 lg:grid-cols-[1fr_360px]">
         <form onSubmit={submit} className="space-y-5 rounded-3xl border border-slate-100 bg-white p-5 shadow-sm md:p-7 dark:border-emerald-900 dark:bg-emerald-950">
           <div>
