@@ -47,7 +47,7 @@ def record_marketplace_sale(order: Order) -> list[FinancialLedgerEntry]:
                 entry_type='sale',
                 status='pending',
                 amount=net,
-                currency='IRR',
+                currency='IRT',
                 description=f'فروش «{item.product_title}» در سفارش {order.code}',
                 metadata={
                     'order_item_id': item.id,
@@ -64,7 +64,7 @@ def record_marketplace_sale(order: Order) -> list[FinancialLedgerEntry]:
                 entry_type='commission',
                 status='pending',
                 amount=item.commission_amount,
-                currency='IRR',
+                currency='IRT',
                 description=f'کمیسیون {item.commission_rate}٪ فروش «{item.product_title}»',
                 metadata={'order_item_id': item.id, 'rate': str(item.commission_rate)},
             ))

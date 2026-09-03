@@ -10,6 +10,9 @@ const publicRoutes = [
   '/farmer-sell',
   '/marketplace',
   '/support',
+  '/privacy',
+  '/terms',
+  '/returns',
   '/affiliate',
   '/finance',
   '/studio',
@@ -31,6 +34,37 @@ test('all public routes render without a browser crash', async ({ page }) => {
     await expect(page.locator('#root')).not.toBeEmpty();
     await expect(page.locator('text=خطای غیرمنتظره')).toHaveCount(0);
   }
+});
+
+test('route metadata indexes public pages and protects account pages', async ({ page }) => {
+  await page.goto('/privacy');
+  await expect(page).toHaveTitle(/حریم خصوصی/);
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', /\/privacy$/);
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /index,follow/);
+
+  await page.goto('/orders');
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex,nofollow');
+});
+
+test('checkout clearly communicates the five purchase stages', async ({ page }) => {
+  await page.goto('/checkout');
+
+  const steps = page.getByRole('navigation', { name: 'مراحل خرید' });
+  await expect(steps).toBeVisible();
+  await expect(steps.getByRole('listitem')).toHaveCount(5);
+  for (const label of ['فروشگاه', 'سبد خرید', 'اطلاعات', 'پرداخت', 'تکمیل']) {
+    await expect(steps.getByText(label, { exact: true })).toBeVisible();
+  }
+  await expect(steps.locator('[aria-current="step"]')).toHaveCount(1);
+});
+
+test('login defaults to mobile OTP and keeps password compatibility', async ({ page }) => {
+  await page.goto('/login');
+  await expect(page.getByRole('tab', { name: /کد یک‌بارمصرف/ })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByLabel('شماره موبایل')).toBeVisible();
+  await page.getByRole('tab', { name: /رمز عبور/ }).click();
+  await expect(page.getByLabel('نام کاربری')).toBeVisible();
+  await expect(page.getByLabel('رمز عبور', { exact: true })).toBeVisible();
 });
 
 test('language selector changes document direction safely', async ({ page }) => {

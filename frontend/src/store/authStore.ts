@@ -3,7 +3,13 @@ import toast from 'react-hot-toast';
 
 import { authApi, avatarApi } from '../api/services';
 import { parseApiError } from '../api/errors';
-import { USER_LEVEL, type User, type UserAccount, type UserLevel } from '../types';
+import {
+  USER_LEVEL,
+  type OtpRequestResponse,
+  type User,
+  type UserAccount,
+  type UserLevel,
+} from '../types';
 
 interface AuthState {
   user: User | null;
@@ -13,6 +19,14 @@ interface AuthState {
   isSessionChecked: boolean;
   initializeSession: () => Promise<void>;
   login: (username: string, password: string) => Promise<void>;
+  requestOtp: (phone: string, channel?: 'auto' | 'sms' | 'bale') => Promise<OtpRequestResponse>;
+  verifyOtp: (data: {
+    request_id: string;
+    phone: string;
+    code: string;
+    first_name?: string;
+    last_name?: string;
+  }) => Promise<void>;
   register: (data: {
     username: string;
     email?: string;
@@ -70,7 +84,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true });
     try {
       const response = await authApi.login(username, password);
-      set({ user: response.data.user, account: null, isAuthenticated: true, isLoading: false, isSessionChecked: true });
+      set({ user: response.data.user, account: response.data.account, isAuthenticated: true, isLoading: false, isSessionChecked: true });
       toast.success('ورود با موفقیت انجام شد');
     } catch (error) {
       const parsed = parseApiError(error);
@@ -82,11 +96,43 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
 
+  requestOtp: async (phone, channel = 'auto') => {
+    set({ isLoading: true });
+    try {
+      const response = await authApi.requestOtp(phone, channel);
+      set({ isLoading: false });
+      toast.success('کد تأیید ارسال شد');
+      return response.data;
+    } catch (error) {
+      // The OTP form renders provider, validation and cooldown errors inline.
+      set({ isLoading: false });
+      throw error;
+    }
+  },
+
+  verifyOtp: async (data) => {
+    set({ isLoading: true });
+    try {
+      const response = await authApi.verifyOtp(data);
+      set({
+        user: response.data.user,
+        account: response.data.account,
+        isAuthenticated: true,
+        isLoading: false,
+        isSessionChecked: true,
+      });
+      toast.success(response.data.created ? 'حساب شما ساخته شد؛ خوش آمدید' : 'ورود با موفقیت انجام شد');
+    } catch (error) {
+      set({ isLoading: false, isSessionChecked: true });
+      throw error;
+    }
+  },
+
   register: async (data) => {
     set({ isLoading: true });
     try {
       const response = await authApi.register(data);
-      set({ user: response.data.user, account: null, isAuthenticated: true, isLoading: false, isSessionChecked: true });
+      set({ user: response.data.user, account: response.data.account, isAuthenticated: true, isLoading: false, isSessionChecked: true });
       toast.success('ثبت‌نام با موفقیت انجام شد');
     } catch (error) {
       const parsed = parseApiError(error);

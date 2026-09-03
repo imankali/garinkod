@@ -11,5 +11,6 @@ class ShopConfig(AppConfig):
     def ready(self):
         # Register database connection tuning without importing models at
         # module load time.
+        from . import checks  # noqa: F401
         from . import db  # noqa: F401
         from . import signals  # noqa: F401

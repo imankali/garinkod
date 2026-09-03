@@ -1,4 +1,10 @@
-from django.contrib import admin
+from django.conf import settings
+from django.contrib import admin, messages
+from django.db import transaction
+from django.utils import timezone
+from import_export.admin import ExportMixin, ImportExportMixin
+from simple_history.admin import SimpleHistoryAdmin
+
 from .models import Category, Product
 from .models import FertilizerDetail, PesticideDetail, SeedDetail, EquipmentDetail
 from .models import (
@@ -7,8 +13,11 @@ from .models import (
     AffiliateConversion, FinancialLedgerEntry, PlatformFeedback,
     StorefrontComplaint, VisualSearchRequest, Coupon, Wallet, WalletTransaction,
     StorefrontPost, FarmLand, FarmCalendarEvent, FarmConsultationRequest,
-    AdminAuditLog
+    AdminAuditLog, OneTimePassword, NotificationTemplate,
+    NotificationRecipient, NotificationDelivery, WebPushSubscription,
+    Shipment, ShipmentTrackingEvent,
 )
+from .resources import OrderResource, ProductResource
 from .rewards import mark_order_paid_and_reward
 
 
@@ -48,16 +57,32 @@ class OrderItemInline(admin.TabularInline):
     readonly_fields = ('product', 'product_title', 'product_slug', 'unit_price', 'quantity', 'total_price')
 
 
+class ShipmentTrackingEventInline(admin.TabularInline):
+    model = ShipmentTrackingEvent
+    extra = 0
+    readonly_fields = ('created_at',)
+    ordering = ('-occurred_at',)
+
+
 # --- اکشن‌ها ---
+def _set_product_status(queryset, next_status):
+    """Use model saves so selective history is not bypassed by a bulk update."""
+    with transaction.atomic():
+        for product in queryset.select_for_update().iterator():
+            if product.status != next_status:
+                product.status = next_status
+                product.save(update_fields=['status', 'updated'])
+
+
 def make_published(modeladmin, request, queryset):
-    queryset.update(status='published')
+    _set_product_status(queryset, 'published')
 
 
 make_published.short_description = "انتشار انتخاب‌شده‌ها"
 
 
 def make_draft(modeladmin, request, queryset):
-    queryset.update(status='draft')
+    _set_product_status(queryset, 'draft')
 
 
 make_draft.short_description = "پیش‌نویس کردن انتخاب‌شده‌ها"
@@ -79,7 +104,7 @@ disapprove_comments.short_description = "غیرفعال کردن نظرات ان
 
 # --- Admin Category ---
 @admin.register(Category)
-class AdminCategory(admin.ModelAdmin):
+class AdminCategory(SimpleHistoryAdmin):
     list_display = ('name', 'slug', 'get_product_count')
     search_fields = ('name',)
     prepopulated_fields = {'slug': ('name',)}
@@ -93,7 +118,8 @@ class AdminCategory(admin.ModelAdmin):
 
 # --- Admin Item (محصول) ---
 @admin.register(Product)
-class AdminProduct(admin.ModelAdmin):
+class AdminProduct(ImportExportMixin, SimpleHistoryAdmin):
+    resource_classes = [ProductResource]
     list_filter = ('status', 'publish', 'created', 'author', 'category')
     list_display = ('title', 'author', 'category', 'slug', 'status', 'publish', 'price', 'stock')
     search_fields = ('title', 'description', 'author__username')
@@ -111,8 +137,10 @@ class AdminProduct(admin.ModelAdmin):
 
     fieldsets = (
         ('اطلاعات اصلی', {'fields': ('title', 'slug', 'author', 'status')}),
-        ('دسته‌بندی و قیمت', {'fields': ('category', 'price', 'stock')}),
-        ('محتوا', {'fields': ('description', 'image')}),
+        ('دسته‌بندی و قیمت', {'fields': ('category', 'subcategory', 'price', 'stock', 'available', 'is_featured', 'discount_percent')}),
+        ('محتوا', {'fields': ('description', 'image', 'brand', 'sku', 'gtin')}),
+        ('سئو', {'fields': ('seo_title', 'seo_description'), 'classes': ('collapse',)}),
+        ('ارسال', {'fields': ('shipping_weight_grams', 'shipping_length_cm', 'shipping_width_cm', 'shipping_height_cm'), 'classes': ('collapse',)}),
         ('تاریخ‌ها', {'fields': ('publish', 'created', 'updated'), 'classes': ('collapse',)}),
     )
 
@@ -138,10 +166,10 @@ class AdminProduct(admin.ModelAdmin):
 # --- Admin UserAccount ---
 @admin.register(UserAccount)
 class AdminUserAccount(admin.ModelAdmin):
-    list_display = ('user', 'phone', 'gender', 'created')
-    list_filter = ('gender', 'created')
+    list_display = ('user', 'phone', 'phone_verified_at', 'gender', 'created')
+    list_filter = ('gender', 'phone_verified_at', 'created')
     search_fields = ('user__username', 'user__first_name', 'user__last_name', 'phone')
-    readonly_fields = ('created', 'updated')
+    readonly_fields = ('phone_verified_at', 'created', 'updated')
     ordering = ('-created',)
 
 
@@ -189,7 +217,8 @@ mark_orders_paid_and_issue_rewards.short_description = 'تأیید پرداخت 
 
 
 @admin.register(Order)
-class AdminOrder(admin.ModelAdmin):
+class AdminOrder(ExportMixin, SimpleHistoryAdmin):
+    resource_classes = [OrderResource]
     list_display = ('code', 'customer_name', 'phone', 'total_price', 'payment_status', 'status', 'created_at')
     list_filter = ('status', 'payment_status', 'payment_method', 'created_at')
     search_fields = ('code', 'customer_name', 'phone', 'email')
@@ -199,6 +228,23 @@ class AdminOrder(admin.ModelAdmin):
     actions = [cancel_orders_and_restore_stock, mark_orders_paid_and_issue_rewards]
     date_hierarchy = 'created_at'
     ordering = ('-created_at',)
+
+
+@admin.register(Shipment)
+class AdminShipment(SimpleHistoryAdmin):
+    list_display = ('order', 'provider', 'service_name', 'tracking_code', 'status', 'last_event_at', 'updated_at')
+    list_filter = ('provider', 'status', 'created_at')
+    search_fields = ('order__code', 'tracking_code', 'external_id')
+    readonly_fields = ('id', 'created_at', 'updated_at', 'provider_payload')
+    inlines = [ShipmentTrackingEventInline]
+
+
+@admin.register(ShipmentTrackingEvent)
+class AdminShipmentTrackingEvent(admin.ModelAdmin):
+    list_display = ('shipment', 'status', 'description', 'location', 'occurred_at')
+    list_filter = ('status', 'occurred_at')
+    search_fields = ('shipment__order__code', 'shipment__tracking_code', 'description')
+    readonly_fields = ('created_at', 'raw_payload')
 
 
 @admin.register(ServiceRequest)
@@ -243,7 +289,7 @@ class AdminMarketplaceListing(admin.ModelAdmin):
 
 
 @admin.register(PaymentAttempt)
-class AdminPaymentAttempt(admin.ModelAdmin):
+class AdminPaymentAttempt(SimpleHistoryAdmin):
     list_display = ('order', 'provider', 'amount', 'currency', 'status', 'external_reference', 'created_at')
     list_filter = ('provider', 'status', 'currency', 'created_at')
     search_fields = ('order__code', 'external_reference', 'idempotency_key')
@@ -349,6 +395,149 @@ class AdminAdminAuditLog(admin.ModelAdmin):
         return False
 
     def has_change_permission(self, request, obj=None):
+        return False
+
+
+# --- Transactional messaging hub ---
+def queue_test_messages(modeladmin, request, queryset):
+    from .messaging.outbox import enqueue_test_delivery
+
+    queued = 0
+    errors = 0
+    for recipient in queryset:
+        try:
+            enqueue_test_delivery(recipient)
+            queued += 1
+        except ValueError:
+            errors += 1
+    modeladmin.message_user(
+        request,
+        f'{queued} پیام آزمایشی در صف قرار گرفت؛ نتیجه در تاریخچه ارسال نمایش داده می‌شود.',
+        level=messages.SUCCESS if not errors else messages.WARNING,
+    )
+    if errors:
+        modeladmin.message_user(
+            request,
+            f'{errors} گیرنده به‌دلیل غیرفعال بودن کانال در تنظیمات محیطی رد شد.',
+            level=messages.WARNING,
+        )
+
+
+queue_test_messages.short_description = 'قرار دادن پیام آزمایشی در صف ارسال'
+
+
+def retry_failed_messages(modeladmin, request, queryset):
+    eligible = queryset.filter(
+        status__in=[NotificationDelivery.STATUS_FAILED, NotificationDelivery.STATUS_RETRY]
+    )
+    updated = eligible.update(
+        status=NotificationDelivery.STATUS_PENDING,
+        attempt_count=0,
+        next_attempt_at=timezone.now(),
+        locked_at=None,
+        last_error='',
+        updated_at=timezone.now(),
+    )
+    modeladmin.message_user(request, f'{updated} پیام برای تلاش مجدد در صف قرار گرفت.')
+
+
+retry_failed_messages.short_description = 'تلاش مجدد برای پیام‌های ناموفق انتخاب‌شده'
+
+
+@admin.register(NotificationTemplate)
+class AdminNotificationTemplate(SimpleHistoryAdmin):
+    list_display = ('name', 'event', 'audience', 'channel', 'is_active', 'updated_at')
+    list_filter = ('event', 'audience', 'channel', 'is_active')
+    search_fields = ('name', 'body', 'provider_template_name')
+    list_editable = ('is_active',)
+    readonly_fields = ('created_at', 'updated_at')
+    fieldsets = (
+        ('مسیر', {'fields': ('name', 'event', 'audience', 'channel', 'is_active')}),
+        ('محتوا', {'fields': ('body', 'provider_template_name', 'language_code')}),
+        ('تاریخچه', {'fields': ('created_at', 'updated_at'), 'classes': ('collapse',)}),
+    )
+
+
+@admin.register(WebPushSubscription)
+class AdminWebPushSubscription(admin.ModelAdmin):
+    list_display = ('user', 'is_active', 'failure_count', 'last_used_at', 'updated_at')
+    list_filter = ('is_active', 'created_at', 'updated_at')
+    search_fields = ('user__username', 'user__email', 'endpoint')
+    readonly_fields = ('id', 'user', 'endpoint', 'p256dh', 'auth', 'user_agent', 'failure_count', 'last_used_at', 'last_error', 'created_at', 'updated_at')
+
+
+@admin.register(NotificationRecipient)
+class AdminNotificationRecipient(admin.ModelAdmin):
+    list_display = (
+        'name', 'channel', 'destination', 'channel_enabled',
+        'receive_order_created', 'receive_order_status_changed', 'is_active',
+    )
+    list_filter = ('channel', 'receive_order_created', 'receive_order_status_changed', 'is_active')
+    search_fields = ('name', 'destination')
+    list_editable = ('receive_order_created', 'receive_order_status_changed', 'is_active')
+    readonly_fields = ('created_at', 'updated_at')
+    actions = [queue_test_messages]
+
+    @admin.display(boolean=True, description='فعال در محیط')
+    def channel_enabled(self, obj):
+        if settings.MESSAGING_FAKE:
+            return True
+        return {
+            'sms': settings.MESSAGING_ENABLE_SMS,
+            'bale': settings.MESSAGING_ENABLE_BALE,
+            'telegram': settings.MESSAGING_ENABLE_TELEGRAM,
+            'whatsapp': settings.MESSAGING_ENABLE_WHATSAPP,
+        }.get(obj.channel, False)
+
+
+@admin.register(NotificationDelivery)
+class AdminNotificationDelivery(admin.ModelAdmin):
+    list_display = (
+        'created_at', 'event', 'channel', 'audience', 'order', 'status',
+        'attempt_count', 'sent_at',
+    )
+    list_filter = ('status', 'event', 'channel', 'audience', 'created_at')
+    search_fields = ('order__code', 'recipient', 'provider_message_id', 'idempotency_key')
+    date_hierarchy = 'created_at'
+    ordering = ('-created_at',)
+    actions = [retry_failed_messages]
+    readonly_fields = (
+        'id', 'order', 'template', 'event', 'audience', 'channel', 'recipient',
+        'rendered_content', 'payload', 'idempotency_key', 'status', 'attempt_count',
+        'max_attempts', 'next_attempt_at', 'locked_at', 'provider_message_id',
+        'provider_response', 'last_error', 'sent_at', 'delivered_at',
+        'created_at', 'updated_at',
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(OneTimePassword)
+class AdminOneTimePassword(admin.ModelAdmin):
+    list_display = (
+        'created_at', 'phone', 'purpose', 'delivery_channel', 'status',
+        'attempts', 'expires_at', 'consumed_at',
+    )
+    list_filter = ('status', 'purpose', 'delivery_channel', 'created_at')
+    search_fields = ('phone', 'request_id', 'provider_message_id')
+    readonly_fields = (
+        'request_id', 'phone', 'purpose', 'delivery_channel',
+        'provider_message_id', 'last_error', 'status', 'attempts', 'max_attempts',
+        'requested_ip', 'expires_at', 'consumed_at', 'created_at',
+    )
+    fields = readonly_fields
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
         return False
 
 

@@ -22,6 +22,8 @@ export default function SiteFooter() {
   const { t } = useTranslation();
   const sections = visibleSections({ level, isAuthenticated });
   const year = new Date().toLocaleDateString('fa-IR', { year: 'numeric' });
+  const supportPhone = import.meta.env.VITE_PHONE_NUMBER?.trim();
+  const supportEmail = import.meta.env.VITE_SUPPORT_EMAIL?.trim();
 
   return (
     <footer
@@ -38,18 +40,22 @@ export default function SiteFooter() {
             </p>
 
             <ul className="mt-5 space-y-2 text-fluid-xs text-slate-500 dark:text-emerald-200">
-              <li className="flex items-center gap-2">
-                <Phone size={14} aria-hidden="true" className="shrink-0 text-emerald-600" />
-                <a href="tel:+982100000000" dir="ltr" className="flex min-h-11 items-center hover:underline">
-                  ۰۲۱-۰۰۰۰۰۰۰۰
-                </a>
-              </li>
-              <li className="flex items-center gap-2">
-                <Mail size={14} aria-hidden="true" className="shrink-0 text-emerald-600" />
-                <a href="mailto:info@garinkood.ir" dir="ltr" className="flex min-h-11 items-center hover:underline">
-                  info@garinkood.ir
-                </a>
-              </li>
+              {supportPhone && (
+                <li className="flex items-center gap-2">
+                  <Phone size={14} aria-hidden="true" className="shrink-0 text-emerald-600" />
+                  <a href={`tel:${supportPhone.replace(/[^+\d]/g, '')}`} dir="ltr" className="flex min-h-11 items-center hover:underline">
+                    {supportPhone}
+                  </a>
+                </li>
+              )}
+              {supportEmail && (
+                <li className="flex items-center gap-2">
+                  <Mail size={14} aria-hidden="true" className="shrink-0 text-emerald-600" />
+                  <a href={`mailto:${supportEmail}`} dir="ltr" className="flex min-h-11 items-center hover:underline">
+                    {supportEmail}
+                  </a>
+                </li>
+              )}
               <li className="flex items-start gap-2">
                 <MapPin size={14} aria-hidden="true" className="mt-1 shrink-0 text-emerald-600" />
                 <span>{t('footer.shipping')}</span>
@@ -87,6 +93,20 @@ export default function SiteFooter() {
 
         <div className="mt-9 flex flex-col items-center justify-between gap-3 border-t border-slate-100 pt-5 text-fluid-2xs text-slate-400 dark:border-emerald-900 sm:flex-row">
           <p>© {year} — {t('footer.rights')}</p>
+          <nav aria-label="قوانین" className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+            <Link className="min-h-11 py-3 hover:text-emerald-700 hover:underline" to="/privacy">حریم خصوصی</Link>
+            <Link className="min-h-11 py-3 hover:text-emerald-700 hover:underline" to="/terms">شرایط استفاده</Link>
+            <Link className="min-h-11 py-3 hover:text-emerald-700 hover:underline" to="/returns">لغو و مرجوعی</Link>
+            {import.meta.env.VITE_ANALYTICS_DOMAIN && import.meta.env.VITE_ANALYTICS_SCRIPT_URL && (
+              <button
+                type="button"
+                className="min-h-11 py-3 hover:text-emerald-700 hover:underline"
+                onClick={() => window.dispatchEvent(new Event('garinkood:privacy-settings'))}
+              >
+                تنظیم حریم خصوصی
+              </button>
+            )}
+          </nav>
           <p className="flex items-center gap-1.5">
             <ShieldCheck size={13} aria-hidden="true" className="text-emerald-600" />
             پرداخت امن و بازگشت وجه طبق قوانین پلتفرم

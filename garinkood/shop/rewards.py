@@ -10,7 +10,14 @@ from secrets import token_hex
 from django.db import transaction
 from django.utils import timezone
 
-from .models import Coupon, Order, Wallet, WalletTransaction
+from .models import (
+    AffiliateConversion,
+    Coupon,
+    FinancialLedgerEntry,
+    Order,
+    Wallet,
+    WalletTransaction,
+)
 from .settlements import release_seller_earnings
 
 LOYALTY_PERCENT = 2
@@ -41,8 +48,16 @@ def mark_order_paid_and_reward(order: Order) -> tuple[Order, Coupon | None]:
             order.status = 'confirmed'
         order.save(update_fields=['payment_status', 'status', 'updated_at'])
 
-        # Marketplace sellers are credited only once the money has arrived.
+        # Marketplace and affiliate earnings become valid only after verified
+        # money arrival. Conditional updates keep callback replay idempotent.
         release_seller_earnings(order)
+        AffiliateConversion.objects.filter(order=order, status='pending').update(status='approved')
+        FinancialLedgerEntry.objects.filter(
+            order=order,
+            owner_type='affiliate',
+            entry_type='affiliate_commission',
+            status='pending',
+        ).update(status='available', available_at=timezone.now())
 
         reward = min(int(order.subtotal * LOYALTY_PERCENT / 100), LOYALTY_MAX_REWARD)
         if order.user and reward:

@@ -21,8 +21,8 @@ import { useAuthStore } from '../store/authStore';
 import { useDirectStore } from '../store/directStore';
 import { cn } from '../utils/cn';
 
-const PHONE_NUMBER = import.meta.env.VITE_PHONE_NUMBER || '02112345678';
-const WHATSAPP_NUMBER = import.meta.env.VITE_WHATSAPP_NUMBER || '989123456789';
+const PHONE_NUMBER = import.meta.env.VITE_PHONE_NUMBER?.trim();
+const WHATSAPP_NUMBER = import.meta.env.VITE_WHATSAPP_NUMBER?.replace(/\D/g, '');
 
 /** How often the badge refreshes while the button is on screen. */
 const UNREAD_POLL_MS = 30000;
@@ -205,42 +205,38 @@ export default function GlobalMessengerButton() {
                       hint="برای گفتگو با غرفه‌داران و کارشناسان وارد شوید"
                       onClick={openInbox}
                     />
-                    <a
-                      href={`tel:${PHONE_NUMBER}`}
-                      className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3.5 transition-colors hover:bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-900/50 dark:hover:bg-emerald-900"
-                      aria-label={`تماس تلفنی با شماره ${PHONE_NUMBER}`}
-                    >
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-[#0F8A5F] shadow-sm dark:bg-emerald-950 dark:text-lime-300">
-                        <Phone size={18} />
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block text-sm font-bold text-slate-700 dark:text-emerald-50">
-                          تماس تلفنی مستقیم
+                    {PHONE_NUMBER && (
+                      <a
+                        href={`tel:${PHONE_NUMBER.replace(/[^+\d]/g, '')}`}
+                        className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3.5 transition-colors hover:bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-900/50 dark:hover:bg-emerald-900"
+                        aria-label={`تماس تلفنی با شماره ${PHONE_NUMBER}`}
+                      >
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-[#0F8A5F] shadow-sm dark:bg-emerald-950 dark:text-lime-300">
+                          <Phone size={18} />
                         </span>
-                        <span className="block text-xs text-slate-400 dark:text-emerald-300" dir="ltr">
-                          {PHONE_NUMBER}
+                        <span className="min-w-0">
+                          <span className="block text-sm font-bold text-slate-700 dark:text-emerald-50">تماس تلفنی مستقیم</span>
+                          <span className="block text-xs text-slate-400 dark:text-emerald-300" dir="ltr">{PHONE_NUMBER}</span>
                         </span>
-                      </span>
-                    </a>
-                    <a
-                      href={`https://wa.me/${WHATSAPP_NUMBER}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3.5 transition-colors hover:bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-900/50 dark:hover:bg-emerald-900"
-                      aria-label="گفتگو در واتس‌اپ"
-                    >
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-[#0F8A5F] shadow-sm dark:bg-emerald-950 dark:text-lime-300">
-                        <MessageCircle size={18} />
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block text-sm font-bold text-slate-700 dark:text-emerald-50">
-                          گفتگو در واتس‌اپ
+                      </a>
+                    )}
+                    {WHATSAPP_NUMBER && (
+                      <a
+                        href={`https://wa.me/${WHATSAPP_NUMBER}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3.5 transition-colors hover:bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-900/50 dark:hover:bg-emerald-900"
+                        aria-label="گفتگو در واتس‌اپ"
+                      >
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-[#0F8A5F] shadow-sm dark:bg-emerald-950 dark:text-lime-300">
+                          <MessageCircle size={18} />
                         </span>
-                        <span className="block text-xs text-slate-400 dark:text-emerald-300">
-                          پاسخ در کمتر از ۵ دقیقه
+                        <span className="min-w-0">
+                          <span className="block text-sm font-bold text-slate-700 dark:text-emerald-50">گفتگو در واتس‌اپ</span>
+                          <span className="block text-xs text-slate-400 dark:text-emerald-300">انتقال به واتس‌اپ</span>
                         </span>
-                      </span>
-                    </a>
+                      </a>
+                    )}
                   </>
                 )}
               </div>

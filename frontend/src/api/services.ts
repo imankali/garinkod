@@ -9,6 +9,7 @@ import type {
   Comment,
   PaginatedResponse,
   AuthResponse,
+  OtpRequestResponse,
   ProfileResponse,
   ProductQueryParams,
   Order,
@@ -18,6 +19,9 @@ import type {
   Storefront,
   MarketplaceListing,
   PaymentProviderOption,
+  PaymentAttempt,
+  ShippingQuote,
+  WebPushSubscriptionSummary,
   AffiliateProfile,
   AffiliateConversion,
   FinancialLedgerEntry,
@@ -242,6 +246,19 @@ export const authApi = {
     return apiClient.post<AuthResponse>('/auth/register/', data);
   },
 
+  /** Request a provider-delivered login code without exposing account existence. */
+  requestOtp: (phone: string, channel: 'auto' | 'sms' | 'bale' = 'auto') =>
+    apiClient.post<OtpRequestResponse>('/auth/otp/request/', { phone, channel }),
+
+  /** Verify a challenge; Django returns the regular HttpOnly auth cookie. */
+  verifyOtp: (data: {
+    request_id: string;
+    phone: string;
+    code: string;
+    first_name?: string;
+    last_name?: string;
+  }) => apiClient.post<AuthResponse>('/auth/otp/verify/', data),
+
   /**
    * خروج کاربر
    * POST /api/auth/logout/
@@ -277,11 +294,16 @@ export const authApi = {
 };
 
 // ========================================
-// Orders — interim expert-coordination checkout
+// Orders and verified payment initialization
 // ========================================
 export const ordersApi = {
   checkout: (data: CheckoutPayload) =>
-    apiClient.post<{ order: Order; message: string }>('/orders/checkout/', data),
+    apiClient.post<{
+      order: Order;
+      payment: PaymentAttempt | null;
+      payment_error: string;
+      message: string;
+    }>('/orders/checkout/', data),
   lookup: (code: string, phone: string) =>
     apiClient.get<Order>('/orders/lookup/', { params: { code, phone } }),
   cancel: (code: string, phone: string) =>
@@ -413,8 +435,33 @@ export const agriApi = {
 // ========================================
 // Payment readiness, affiliate, finance and trust
 // ========================================
+export const featureFlagsApi = {
+  get: () => apiClient.get<{ flags: Record<string, boolean> }>('/features/'),
+};
+
+export const shippingApi = {
+  quote: (province: string, city: string) =>
+    apiClient.post<{ quotes: ShippingQuote[]; authoritative_at_checkout: boolean }>(
+      '/shipping/quote/',
+      { province, city },
+    ),
+};
+
 export const paymentsApi = {
   options: () => apiClient.get<{ providers: PaymentProviderOption[] }>('/payments/options/'),
+  restartZarinpal: (code: string, phone = '') =>
+    apiClient.post<{ payment: PaymentAttempt }>('/payments/zarinpal/restart/', { code, phone }),
+};
+
+export const webPushApi = {
+  status: () => apiClient.get<{
+    enabled: boolean;
+    public_key: string;
+    subscriptions: WebPushSubscriptionSummary[];
+  }>('/notifications/webpush/'),
+  subscribe: (subscription: PushSubscriptionJSON) =>
+    apiClient.post<WebPushSubscriptionSummary>('/notifications/webpush/', { subscription }),
+  remove: (id: string) => apiClient.delete('/notifications/webpush/', { data: { id } }),
 };
 
 export const affiliateApi = {

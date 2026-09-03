@@ -9,6 +9,7 @@ from datetime import timedelta
 import json
 import time
 
+from .schema import documented_api
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
@@ -226,6 +227,7 @@ class StorefrontDirectoryViewSet(viewsets.ReadOnlyModelViewSet):
         })
 
 
+@documented_api
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def my_following(request):
@@ -250,6 +252,7 @@ def my_following(request):
     return Response({'count': len(feed), 'results': feed})
 
 
+@documented_api
 @api_view(['GET'])
 @permission_classes([permissions.AllowAny])
 @throttle_classes([SearchRateThrottle])
@@ -412,6 +415,7 @@ def _participant_conversations(user):
     )
 
 
+@documented_api
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def my_conversations(request):
@@ -456,6 +460,7 @@ def my_conversations(request):
     })
 
 
+@documented_api
 @api_view(['GET', 'POST'])
 @permission_classes([permissions.IsAuthenticated])
 def service_conversation(request, channel):
@@ -480,6 +485,7 @@ def service_conversation(request, channel):
     )
 
 
+@documented_api
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
 def start_farmer_conversation(request, user_id):
@@ -502,6 +508,7 @@ def start_farmer_conversation(request, user_id):
     )
 
 
+@documented_api
 @api_view(['GET', 'POST'])
 @permission_classes([permissions.IsAuthenticated])
 def storefront_conversation(request, slug):
@@ -542,6 +549,7 @@ def storefront_conversation(request, slug):
     )
 
 
+@documented_api
 @api_view(['GET', 'POST'])
 @permission_classes([permissions.IsAuthenticated])
 def conversation_messages(request, conversation_id):
@@ -636,6 +644,7 @@ def conversation_messages(request, conversation_id):
     )
 
 
+@documented_api
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def conversation_events(request, conversation_id):

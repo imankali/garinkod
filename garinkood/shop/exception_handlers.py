@@ -33,6 +33,7 @@ STATUS_MESSAGES = {
     413: 'حجم فایل ارسالی بیش از حد مجاز است.',
     429: 'تعداد درخواست‌های شما بیش از حد مجاز است. لطفاً کمی صبر کنید.',
     500: 'خطای غیرمنتظره‌ای رخ داد. تیم فنی در جریان قرار گرفت.',
+    503: 'سرویس پیام‌رسان موقتاً در دسترس نیست؛ کمی بعد تلاش کنید.',
 }
 
 STATUS_CODES = {
@@ -45,6 +46,7 @@ STATUS_CODES = {
     413: 'payload_too_large',
     429: 'throttled',
     500: 'server_error',
+    503: 'service_unavailable',
 }
 
 # Keys DRF uses for whole-request (not field-specific) errors.

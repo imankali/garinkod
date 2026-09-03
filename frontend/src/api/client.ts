@@ -49,6 +49,8 @@ const SILENT_PATHS = [
   '/auth/session/',
   '/auth/login/',
   '/auth/register/',
+  '/auth/otp/request/',
+  '/auth/otp/verify/',
   '/marketplace/storefront/availability/',
   '/agri/calculate/',
 ];
@@ -81,7 +83,7 @@ apiClient.interceptors.response.use(
       }
     } else if (parsed.code === 'throttled') {
       const now = Date.now();
-      if (now - lastThrottleToastAt > 3000) {
+      if (!silent && now - lastThrottleToastAt > 3000) {
         lastThrottleToastAt = now;
         toast.error(parsed.message);
         (error as { __handled?: boolean }).__handled = true;

@@ -5,9 +5,22 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+import * as Sentry from "@sentry/react";
+import { HelmetProvider } from "react-helmet-async";
+import { registerSW } from "virtual:pwa-register";
 import App from "./App";
 import { I18nProvider } from "./i18n";
 import "./index.css";
+
+const sentryDsn = import.meta.env.VITE_SENTRY_DSN?.trim();
+if (sentryDsn) {
+  Sentry.init({
+    dsn: sentryDsn,
+    environment: import.meta.env.VITE_SENTRY_ENVIRONMENT || import.meta.env.MODE,
+    tracesSampleRate: Number(import.meta.env.VITE_SENTRY_TRACES_SAMPLE_RATE || 0),
+    sendDefaultPii: false,
+  });
+}
 
 // ========================================
 // React Query Client Configuration
@@ -60,6 +73,7 @@ class ErrorBoundary extends (await import("react")).Component<
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error("React Error Boundary caught:", error, errorInfo);
+    if (sentryDsn) Sentry.captureException(error, { extra: { componentStack: errorInfo.componentStack } });
   }
 
   render() {
@@ -87,14 +101,14 @@ class ErrorBoundary extends (await import("react")).Component<
   }
 }
 
-// ========================================
-// Register Service Worker for Offline PWA Support
-// ========================================
+// Workbox precaching, runtime agricultural-reference caches and Push events
+// are built together by vite-plugin-pwa. Auto-update prevents clients from
+// remaining pinned to vulnerable, obsolete bundles.
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch((err) => {
-      console.warn('Service worker registration failed:', err);
-    });
+  registerSW({
+    immediate: true,
+    onRegisterError: (error) => console.warn('Service worker registration failed:', error),
+    onOfflineReady: () => console.info('GarinKood is ready for offline reference use.'),
   });
 }
 
@@ -110,13 +124,15 @@ if (!rootElement) {
 createRoot(rootElement).render(
   <StrictMode>
     <ErrorBoundary>
-      <I18nProvider>
-        <QueryClientProvider client={queryClient}>
-          <App />
-          {/* React Query DevTools - فقط در حالت development */}
-          {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
-        </QueryClientProvider>
-      </I18nProvider>
+      <HelmetProvider>
+        <I18nProvider>
+          <QueryClientProvider client={queryClient}>
+            <App />
+            {/* React Query DevTools - فقط در حالت development */}
+            {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
+          </QueryClientProvider>
+        </I18nProvider>
+      </HelmetProvider>
     </ErrorBoundary>
   </StrictMode>
 );

@@ -1,13 +1,13 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
-  AlertTriangle, ArrowLeft, BadgeCheck, BarChart3, Building2, ClipboardList, Edit3, ExternalLink,
+  AlertTriangle, ArrowLeft, BadgeCheck, BarChart3, Bell, BellOff, Building2, ClipboardList, Edit3, ExternalLink,
   Leaf, LogOut, Moon, Package, Plus, Save, Settings2, ShoppingBag, Sprout,
   Store, Sun, UserRound, X,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
-import { agricultureApi, ordersApi } from "../api/services";
+import { agricultureApi, ordersApi, webPushApi } from "../api/services";
 import AvatarUploader from "../components/AvatarUploader";
 import FarmPanel from "../components/farm/FarmPanel";
 import LocationPicker from "../components/LocationPicker";
@@ -425,9 +425,136 @@ function SettingsPanel({ form, setForm, editing, setEditing, saving, onSave, onC
         </form>
       </section>
 
+      <BrowserNotificationsSection />
+
       {/* Site settings: language + theme */}
       <SiteSettingsSection t={t} />
     </div>
+  );
+}
+
+function vapidKeyBytes(value: string): ArrayBuffer {
+  const padded = `${value}${'='.repeat((4 - (value.length % 4)) % 4)}`;
+  const raw = atob(padded.replace(/-/g, '+').replace(/_/g, '/'));
+  const buffer = new ArrayBuffer(raw.length);
+  const bytes = new Uint8Array(buffer);
+  for (let index = 0; index < raw.length; index += 1) bytes[index] = raw.charCodeAt(index);
+  return buffer;
+}
+
+async function endpointFingerprint(endpoint: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(endpoint));
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('')
+    .slice(0, 24);
+}
+
+function BrowserNotificationsSection() {
+  const supported = typeof window !== 'undefined'
+    && 'serviceWorker' in navigator
+    && 'PushManager' in window
+    && 'Notification' in window;
+  const [available, setAvailable] = useState(false);
+  const [publicKey, setPublicKey] = useState('');
+  const [currentSubscriptionId, setCurrentSubscriptionId] = useState<string | null>(null);
+  const [busy, setBusy] = useState(true);
+
+  useEffect(() => {
+    if (!supported) {
+      setBusy(false);
+      return;
+    }
+    let cancelled = false;
+    async function loadStatus() {
+      try {
+        const [{ data }, registration] = await Promise.all([
+          webPushApi.status(),
+          navigator.serviceWorker.getRegistration(),
+        ]);
+        const browserSubscription = await registration?.pushManager.getSubscription();
+        const fingerprint = browserSubscription
+          ? await endpointFingerprint(browserSubscription.endpoint)
+          : '';
+        if (!cancelled) {
+          setAvailable(data.enabled);
+          setPublicKey(data.public_key);
+          setCurrentSubscriptionId(
+            data.subscriptions.find((item) => item.endpoint_fingerprint === fingerprint)?.id || null,
+          );
+        }
+      } finally {
+        if (!cancelled) setBusy(false);
+      }
+    }
+    loadStatus().catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [supported]);
+
+  async function enableNotifications() {
+    setBusy(true);
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        toast.error('اجازه نمایش اعلان داده نشد. می‌توانید آن را از تنظیمات مرورگر تغییر دهید.');
+        return;
+      }
+      const registration = await navigator.serviceWorker.ready;
+      const existing = await registration.pushManager.getSubscription();
+      const browserSubscription = existing || await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: vapidKeyBytes(publicKey),
+      });
+      const response = await webPushApi.subscribe(browserSubscription.toJSON());
+      setCurrentSubscriptionId(response.data.id);
+      toast.success('اعلان وضعیت سفارش برای این مرورگر فعال شد.');
+    } catch {
+      toast.error('فعال‌سازی اعلان انجام نشد. اتصال و تنظیمات مرورگر را بررسی کنید.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function disableNotifications() {
+    setBusy(true);
+    try {
+      const registration = await navigator.serviceWorker.getRegistration();
+      const browserSubscription = await registration?.pushManager.getSubscription();
+      await browserSubscription?.unsubscribe();
+      if (currentSubscriptionId) await webPushApi.remove(currentSubscriptionId);
+      setCurrentSubscriptionId(null);
+      toast.success('اعلان این مرورگر غیرفعال شد.');
+    } catch {
+      toast.error('غیرفعال‌سازی اعلان کامل نشد؛ دوباره تلاش کنید.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const active = Boolean(currentSubscriptionId);
+  return (
+    <section className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm dark:border-emerald-900 dark:bg-emerald-950 sm:p-6">
+      <h2 className="flex items-center gap-2 text-xl font-extrabold text-slate-800 dark:text-white">
+        {active ? <Bell size={19} className="text-emerald-600 dark:text-lime-300" /> : <BellOff size={19} className="text-slate-400" />}
+        اعلان وضعیت سفارش
+      </h2>
+      <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-emerald-200">
+        با اجازه صریح شما، تغییر وضعیت سفارش روی همین مرورگر نمایش داده می‌شود. هر زمان بخواهید می‌توانید اشتراک را حذف کنید.
+      </p>
+      {!supported ? (
+        <p className="mt-4 rounded-xl bg-slate-50 p-3 text-xs text-slate-500 dark:bg-emerald-900/40 dark:text-emerald-200">این مرورگر از اعلان Push پشتیبانی نمی‌کند.</p>
+      ) : !available ? (
+        <p className="mt-4 rounded-xl bg-amber-50 p-3 text-xs text-amber-800 dark:bg-amber-950/40 dark:text-amber-100">این قابلیت هنوز برای حساب شما فعال نشده است.</p>
+      ) : (
+        <button type="button" onClick={active ? disableNotifications : enableNotifications} disabled={busy} className={cn(
+          "mt-4 inline-flex min-h-11 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50",
+          active ? "bg-rose-600" : "bg-emerald-600",
+        )}>
+          {active ? <BellOff size={16} /> : <Bell size={16} />}
+          {busy ? 'در حال بررسی…' : active ? 'غیرفعال کردن اعلان' : 'فعال کردن اعلان'}
+        </button>
+      )}
+    </section>
   );
 }
 

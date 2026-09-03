@@ -8,7 +8,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_GET
 
-from .models import Category, Product
+from .models import Category, Product, Storefront
 
 
 def _absolute(path: str) -> str:
@@ -35,8 +35,18 @@ def robots_txt(_request):
 @require_GET
 def sitemap_xml(_request):
     """Expose only indexable, published catalogue URLs in the sitemap."""
+    today = timezone.now().date().isoformat()
     entries: list[tuple[str, str, str]] = [
-        (_absolute("/"), timezone.now().date().isoformat(), "daily"),
+        (_absolute("/"), today, "daily"),
+        (_absolute("/products"), today, "daily"),
+        (_absolute("/marketplace"), today, "daily"),
+        (_absolute("/storefronts"), today, "daily"),
+        (_absolute("/services"), today, "monthly"),
+        (_absolute("/farmer-sell"), today, "monthly"),
+        (_absolute("/support"), today, "monthly"),
+        (_absolute("/privacy"), today, "yearly"),
+        (_absolute("/terms"), today, "yearly"),
+        (_absolute("/returns"), today, "yearly"),
     ]
 
     for category in Category.objects.all().only("slug"):
@@ -45,6 +55,15 @@ def sitemap_xml(_request):
     for product in Product.objects.filter(status="published").only("slug", "updated"):
         entries.append(
             (_absolute(f"/products/{product.slug}"), product.updated.date().isoformat(), "weekly")
+        )
+
+    for storefront in Storefront.objects.filter(is_active=True).only("slug", "updated_at"):
+        entries.append(
+            (
+                _absolute(f"/storefronts/{storefront.slug}"),
+                storefront.updated_at.date().isoformat(),
+                "weekly",
+            )
         )
 
     body = [
@@ -123,7 +142,8 @@ def ai_facts_json(_request):
                 'name': product.title,
                 'url': _absolute(f'/products/{product.slug}'),
                 'category': product.category.name if product.category else None,
-                'price_irr': product.price,
+                'price': product.price,
+                'price_currency': 'IRT',
                 'in_stock': product.is_in_stock,
                 'updated_at': product.updated.isoformat(),
             }

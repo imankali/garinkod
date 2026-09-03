@@ -7,6 +7,7 @@ or the API says so plainly.
 
 from decimal import Decimal, InvalidOperation
 
+from .schema import documented_api
 from django.db.models import Q
 from rest_framework import permissions, status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
@@ -32,6 +33,7 @@ AREA_UNIT_LABELS = {
 }
 
 
+@documented_api
 @api_view(['GET'])
 @permission_classes([permissions.AllowAny])
 @throttle_classes([SearchRateThrottle])
@@ -76,6 +78,7 @@ def locations(request):
     })
 
 
+@documented_api
 @api_view(['GET'])
 @permission_classes([permissions.AllowAny])
 @throttle_classes([SearchRateThrottle])
@@ -104,6 +107,7 @@ def agri_inputs(request):
     })
 
 
+@documented_api
 @api_view(['GET'])
 @permission_classes([permissions.AllowAny])
 def agri_crops(request):
@@ -118,6 +122,7 @@ def agri_crops(request):
     return Response({'results': list(crops)})
 
 
+@documented_api
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
 @throttle_classes([SearchRateThrottle])

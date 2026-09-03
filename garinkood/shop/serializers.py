@@ -1,6 +1,9 @@
+import hashlib
+
 from rest_framework import serializers
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.utils import timezone
 from .models import (
     Category, SubCategory, Product, Location, AgriInput, AgriInputDose,
     StorefrontFollow, StorefrontHighlight, StorefrontHighlightItem,
@@ -11,8 +14,10 @@ from .models import (
     PlatformFeedback, StorefrontComplaint, VisualSearchRequest, Coupon, Wallet,
     WalletTransaction, StorefrontPost, StorefrontConversation, StorefrontMessage,
     StorefrontPostLike, StorefrontPostComment, StorefrontStoryView,
-    FarmLand, FarmCalendarEvent, FarmConsultationRequest, AdminAuditLog
+    FarmLand, FarmCalendarEvent, FarmConsultationRequest, AdminAuditLog,
+    Shipment, ShipmentTrackingEvent, WebPushSubscription,
 )
+from .phone_numbers import normalize_iranian_mobile
 from .slugs import slugify_fa, unique_storefront_slug
 
 
@@ -31,9 +36,12 @@ class CategorySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Category
-        fields = ['id', 'name', 'slug', 'image', 'subcategories', 'product_count']
+        fields = [
+            'id', 'name', 'slug', 'image', 'description', 'seo_title', 'seo_description',
+            'subcategories', 'product_count',
+        ]
 
-    def get_product_count(self, obj):
+    def get_product_count(self, obj) -> int:
         return obj.get_product_count()
 
 
@@ -74,11 +82,10 @@ class ProductSerializer(serializers.ModelSerializer):
     image_url = serializers.SerializerMethodField()
     is_in_stock = serializers.SerializerMethodField()
 
-    # ✅ اصلاح: source با underscore (مطابق related_name در models.py)
-    fertilizer_detail = FertilizerDetailSerializer(read_only=True, source='fertilizer_detail')
-    pesticide_detail = PesticideDetailSerializer(read_only=True, source='pesticide_detail')
-    seed_detail = SeedDetailSerializer(read_only=True, source='seed_detail')
-    equipment_detail = EquipmentDetailSerializer(read_only=True, source='equipment_detail')
+    fertilizer_detail = FertilizerDetailSerializer(read_only=True)
+    pesticide_detail = PesticideDetailSerializer(read_only=True)
+    seed_detail = SeedDetailSerializer(read_only=True)
+    equipment_detail = EquipmentDetailSerializer(read_only=True)
 
     discounted_price = serializers.SerializerMethodField()
 
@@ -89,18 +96,20 @@ class ProductSerializer(serializers.ModelSerializer):
             'description', 'publish', 'created', 'updated', 'status',
             'price', 'stock', 'available', 'is_featured', 'image', 'image_url',
             'is_in_stock', 'discount_percent', 'sales_count', 'discounted_price',
-            'fertilizer_detail', 'pesticide_detail',
+            'brand', 'sku', 'gtin', 'seo_title', 'seo_description',
+            'shipping_weight_grams', 'shipping_length_cm', 'shipping_width_cm',
+            'shipping_height_cm', 'fertilizer_detail', 'pesticide_detail',
             'seed_detail', 'equipment_detail'
         ]
         read_only_fields = ['created', 'updated']
 
-    def get_discounted_price(self, obj):
+    def get_discounted_price(self, obj) -> int:
         return obj.discounted_price
 
-    def get_image_url(self, obj):
+    def get_image_url(self, obj) -> str:
         return obj.image_url
 
-    def get_is_in_stock(self, obj):
+    def get_is_in_stock(self, obj) -> bool:
         return obj.is_in_stock
 
 
@@ -117,16 +126,16 @@ class ProductListSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'title', 'slug', 'category', 'price', 'stock',
             'available', 'is_featured', 'image', 'image_url', 'is_in_stock',
-            'discount_percent', 'sales_count', 'discounted_price',
+            'discount_percent', 'sales_count', 'discounted_price', 'brand', 'sku',
         ]
 
-    def get_image_url(self, obj):
+    def get_image_url(self, obj) -> str:
         return obj.image_url
 
-    def get_is_in_stock(self, obj):
+    def get_is_in_stock(self, obj) -> bool:
         return obj.is_in_stock
 
-    def get_discounted_price(self, obj):
+    def get_discounted_price(self, obj) -> int:
         return obj.discounted_price
 
 
@@ -149,7 +158,7 @@ class CommentSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('حجم تصویر نظر از حد مجاز بیشتر است.')
         return image
 
-    def get_replies(self, obj):
+    def get_replies(self, obj) -> list[dict]:
         replies = obj.replies.filter(active=True)
         return CommentSerializer(replies, many=True).data
 
@@ -168,18 +177,21 @@ class UserAccountSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserAccount
         fields = [
-            'id', 'username', 'email', 'full_name', 'phone',
+            'id', 'username', 'email', 'full_name', 'phone', 'phone_verified_at',
             'gender', 'address', 'avatar', 'avatar_url', 'level', 'level_label',
             'has_storefront', 'created', 'updated'
         ]
         # `level` is derived from what the user owns and may only be changed
         # through the management API, never by the profile endpoint.
-        read_only_fields = ['created', 'updated', 'level', 'level_label', 'avatar_url', 'has_storefront']
+        read_only_fields = [
+            'created', 'updated', 'level', 'level_label', 'avatar_url',
+            'has_storefront', 'phone_verified_at',
+        ]
 
     def get_full_name(self, obj):
         return obj.user.get_full_name()
 
-    def get_avatar_url(self, obj):
+    def get_avatar_url(self, obj) -> str:
         request = self.context.get('request')
         if not obj.avatar:
             return ''
@@ -187,6 +199,27 @@ class UserAccountSerializer(serializers.ModelSerializer):
 
     def get_has_storefront(self, obj):
         return Storefront.objects.filter(user_id=obj.user_id).exists()
+
+    def validate_phone(self, value):
+        if not value:
+            return ''
+        try:
+            normalised = normalize_iranian_mobile(value)
+        except ValueError as exc:
+            raise serializers.ValidationError(str(exc)) from exc
+        duplicates = UserAccount.objects.filter(phone=normalised)
+        if self.instance and self.instance.pk:
+            duplicates = duplicates.exclude(pk=self.instance.pk)
+        if duplicates.exists():
+            raise serializers.ValidationError('این شماره موبایل قبلاً برای حساب دیگری ثبت شده است.')
+        return normalised
+
+    def update(self, instance, validated_data):
+        # Changing a verified number must require a fresh OTP before it can be
+        # trusted for passwordless login again.
+        if 'phone' in validated_data and validated_data['phone'] != instance.phone:
+            instance.phone_verified_at = None
+        return super().update(instance, validated_data)
 
     def validate_avatar(self, image):
         """Reject anything that is not a reasonably sized, real raster image."""
@@ -227,7 +260,7 @@ class CartListingSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = fields
 
-    def get_image_url(self, obj):
+    def get_image_url(self, obj) -> str:
         return obj.image_url
 
 
@@ -249,7 +282,7 @@ class CartItemSerializer(serializers.ModelSerializer):
             'total_price', 'available_quantity', 'min_order_quantity', 'is_in_stock',
         ]
 
-    def get_min_order_quantity(self, obj):
+    def get_min_order_quantity(self, obj) -> int:
         return obj.listing.minimum_order if obj.listing_id else 1
 
 
@@ -262,10 +295,10 @@ class CartSerializer(serializers.ModelSerializer):
         model = Cart
         fields = ['id', 'items', 'total_price', 'total_items', 'created_at', 'updated_at']
 
-    def get_total_price(self, obj):
+    def get_total_price(self, obj) -> int:
         return obj.total_price
 
-    def get_total_items(self, obj):
+    def get_total_items(self, obj) -> int:
         return obj.total_items
 
 
@@ -309,9 +342,72 @@ class LoginSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True)
 
 
+class OtpRequestSerializer(serializers.Serializer):
+    phone = serializers.CharField(max_length=32)
+    channel = serializers.ChoiceField(
+        choices=['auto', 'sms', 'bale'],
+        default='auto',
+        required=False,
+    )
+
+    def validate_phone(self, value):
+        try:
+            return normalize_iranian_mobile(value)
+        except ValueError as exc:
+            raise serializers.ValidationError(str(exc)) from exc
+
+
+class OtpVerifySerializer(serializers.Serializer):
+    request_id = serializers.UUIDField()
+    phone = serializers.CharField(max_length=32)
+    code = serializers.CharField(min_length=4, max_length=8, trim_whitespace=True)
+    first_name = serializers.CharField(max_length=150, allow_blank=True, required=False, default='')
+    last_name = serializers.CharField(max_length=150, allow_blank=True, required=False, default='')
+
+    def validate_phone(self, value):
+        try:
+            return normalize_iranian_mobile(value)
+        except ValueError as exc:
+            raise serializers.ValidationError(str(exc)) from exc
+
+
 # ========================================
-# Orders and checkout
+# Orders, shipping and checkout
 # ========================================
+class ShipmentTrackingEventSerializer(serializers.ModelSerializer):
+    status_label = serializers.CharField(source='get_status_display', read_only=True)
+
+    class Meta:
+        model = ShipmentTrackingEvent
+        fields = ['id', 'status', 'status_label', 'description', 'location', 'occurred_at']
+        read_only_fields = fields
+
+
+class ShipmentTrackingEventCreateSerializer(serializers.Serializer):
+    """Validated staff input; provider payloads remain server/admin controlled."""
+
+    status = serializers.ChoiceField(choices=Shipment.STATUS_CHOICES)
+    description = serializers.CharField(max_length=500, trim_whitespace=True)
+    location = serializers.CharField(max_length=160, required=False, allow_blank=True)
+    occurred_at = serializers.DateTimeField(required=False, default=timezone.now)
+    provider_event_id = serializers.CharField(max_length=160, required=False, allow_blank=True)
+
+
+class ShipmentSerializer(serializers.ModelSerializer):
+    provider_label = serializers.CharField(source='get_provider_display', read_only=True)
+    status_label = serializers.CharField(source='get_status_display', read_only=True)
+    events = ShipmentTrackingEventSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Shipment
+        fields = [
+            'id', 'provider', 'provider_label', 'service_name', 'status', 'status_label',
+            'tracking_code', 'tracking_url', 'shipping_cost', 'shipped_at', 'delivered_at',
+            'last_event_at', 'events', 'created_at', 'updated_at',
+        ]
+        read_only_fields = fields
+
+
 class OrderItemSerializer(serializers.ModelSerializer):
     total_price = serializers.IntegerField(read_only=True)
     kind_label = serializers.CharField(source='get_kind_display', read_only=True)
@@ -334,6 +430,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
 
 class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
+    shipments = ShipmentSerializer(many=True, read_only=True)
     status_label = serializers.CharField(source='get_status_display', read_only=True)
     payment_status_label = serializers.CharField(source='get_payment_status_display', read_only=True)
     payment_method_label = serializers.CharField(source='get_payment_method_display', read_only=True)
@@ -343,10 +440,11 @@ class OrderSerializer(serializers.ModelSerializer):
         model = Order
         fields = [
             'id', 'code', 'customer_name', 'phone', 'email', 'province', 'city',
-            'address', 'postal_code', 'notes', 'subtotal', 'discount_amount',
-            'coupon_code', 'shipping_price', 'total_price', 'status', 'status_label', 'payment_status',
-            'payment_status_label', 'payment_method', 'payment_method_label', 'affiliate_code',
-            'total_items', 'items', 'created_at', 'updated_at'
+            'address', 'postal_code', 'latitude', 'longitude', 'notes', 'subtotal', 'discount_amount',
+            'coupon_code', 'shipping_price', 'shipping_provider', 'shipping_service', 'total_price',
+            'status', 'status_label', 'payment_status', 'payment_status_label', 'payment_method',
+            'payment_method_label', 'affiliate_code', 'total_items', 'items', 'shipments',
+            'created_at', 'updated_at'
         ]
         read_only_fields = fields
 
@@ -359,6 +457,12 @@ class CheckoutSerializer(serializers.Serializer):
     city = serializers.CharField(max_length=80)
     address = serializers.CharField(max_length=500)
     postal_code = serializers.CharField(max_length=20, required=False, allow_blank=True)
+    latitude = serializers.DecimalField(
+        max_digits=9, decimal_places=6, min_value=-90, max_value=90, required=False, allow_null=True
+    )
+    longitude = serializers.DecimalField(
+        max_digits=9, decimal_places=6, min_value=-180, max_value=180, required=False, allow_null=True
+    )
     notes = serializers.CharField(max_length=1000, required=False, allow_blank=True)
     # Providers are validated against server configuration at checkout time.
     # A frontend never decides whether a gateway is operational.
@@ -445,28 +549,28 @@ class StorefrontSerializer(serializers.ModelSerializer):
             'followers_count', 'listing_count', 'is_following', 'is_owner',
         ]
 
-    def get_owner_name(self, obj):
+    def get_owner_name(self, obj) -> str:
         return obj.user.get_full_name() or obj.user.username
 
-    def get_is_owner(self, obj):
+    def get_is_owner(self, obj) -> bool:
         request = self.context.get('request')
         return bool(request and request.user.is_authenticated and obj.user_id == request.user.id)
 
-    def get_avatar_url(self, obj):
+    def get_avatar_url(self, obj) -> str:
         return obj.avatar_url
 
-    def get_cover_url(self, obj):
+    def get_cover_url(self, obj) -> str:
         return obj.cover_url
 
-    def get_followers_count(self, obj):
+    def get_followers_count(self, obj) -> int:
         annotated = getattr(obj, 'followers_total', None)
         return annotated if annotated is not None else obj.followers_count
 
-    def get_listing_count(self, obj):
+    def get_listing_count(self, obj) -> int:
         annotated = getattr(obj, 'listings_total', None)
         return annotated if annotated is not None else obj.published_listing_count
 
-    def get_is_following(self, obj):
+    def get_is_following(self, obj) -> bool:
         request = self.context.get('request')
         if not request or not request.user.is_authenticated:
             return False
@@ -554,7 +658,7 @@ class StorefrontHighlightSerializer(serializers.ModelSerializer):
         fields = ['id', 'title', 'cover', 'cover_url', 'position', 'items', 'post_ids', 'created_at']
         read_only_fields = ['id', 'cover_url', 'items', 'created_at']
 
-    def get_cover_url(self, obj):
+    def get_cover_url(self, obj) -> str:
         return obj.cover_url
 
     def validate_post_ids(self, post_ids):
@@ -599,10 +703,10 @@ class MarketplaceListingSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at',
         ]
 
-    def get_image_url(self, obj):
+    def get_image_url(self, obj) -> str:
         return obj.image_url
 
-    def get_discounted_price(self, obj):
+    def get_discounted_price(self, obj) -> int:
         return obj.discounted_price
 
     def validate_min_order_quantity(self, value):
@@ -673,6 +777,29 @@ class AgriInputSerializer(serializers.ModelSerializer):
 # ========================================
 # Payments, finance, affiliate and trust
 # ========================================
+class WebPushSubscriptionSerializer(serializers.ModelSerializer):
+    endpoint = serializers.URLField(max_length=1000, write_only=True)
+    p256dh = serializers.CharField(max_length=255, write_only=True)
+    auth = serializers.CharField(max_length=255, write_only=True)
+    endpoint_fingerprint = serializers.SerializerMethodField()
+
+    class Meta:
+        model = WebPushSubscription
+        fields = [
+            'id', 'endpoint', 'endpoint_fingerprint', 'p256dh', 'auth',
+            'is_active', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'endpoint_fingerprint', 'created_at', 'updated_at']
+
+    def get_endpoint_fingerprint(self, obj) -> str:
+        return hashlib.sha256(obj.endpoint.encode('utf-8')).hexdigest()[:24]
+
+    def validate_endpoint(self, value):
+        if not value.startswith('https://'):
+            raise serializers.ValidationError('نشانی سرویس Push باید HTTPS باشد.')
+        return value
+
+
 class PaymentAttemptSerializer(serializers.ModelSerializer):
     provider_label = serializers.CharField(source='get_provider_display', read_only=True)
     status_label = serializers.CharField(source='get_status_display', read_only=True)
@@ -809,18 +936,18 @@ class StorefrontPostCommentSerializer(serializers.ModelSerializer):
             'can_moderate', 'replies', 'created_at',
         ]
 
-    def get_author_name(self, obj):
+    def get_author_name(self, obj) -> str:
         return obj.user.get_full_name() or obj.user.username
 
-    def get_author_avatar_url(self, obj):
+    def get_author_avatar_url(self, obj) -> str:
         account = getattr(obj.user, 'account', None)
         return account.avatar_url if account else ''
 
-    def get_is_mine(self, obj):
+    def get_is_mine(self, obj) -> bool:
         request = self.context.get('request')
         return bool(request and request.user.is_authenticated and obj.user_id == request.user.id)
 
-    def get_can_moderate(self, obj):
+    def get_can_moderate(self, obj) -> bool:
         """The post's owner may remove comments on their own post."""
         request = self.context.get('request')
         if not request or not request.user.is_authenticated:
@@ -829,7 +956,7 @@ class StorefrontPostCommentSerializer(serializers.ModelSerializer):
             return True
         return obj.post.storefront.user_id == request.user.id
 
-    def get_replies(self, obj):
+    def get_replies(self, obj) -> list[dict]:
         # Only root comments carry replies; nesting stops at one level.
         if obj.parent_id is not None:
             return []
@@ -879,16 +1006,16 @@ class StorefrontPostSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('حجم تصویر پست از حد مجاز بیشتر است.')
         return image
 
-    def get_image_url(self, obj):
+    def get_image_url(self, obj) -> str:
         return obj.image_url
 
     # The list views annotate these; the fallbacks keep a single-object
     # serialisation (detail, create response) correct without them.
-    def get_like_count(self, obj):
+    def get_like_count(self, obj) -> int:
         annotated = getattr(obj, 'likes_total', None)
         return annotated if annotated is not None else obj.likes.count()
 
-    def get_comment_count(self, obj):
+    def get_comment_count(self, obj) -> int:
         annotated = getattr(obj, 'comments_total', None)
         return annotated if annotated is not None else obj.comments.filter(is_hidden=False).count()
 
@@ -897,21 +1024,21 @@ class StorefrontPostSerializer(serializers.ModelSerializer):
         user = getattr(request, 'user', None)
         return user if (user and user.is_authenticated) else None
 
-    def get_is_liked(self, obj):
+    def get_is_liked(self, obj) -> bool:
         annotated = getattr(obj, 'liked_by_me', None)
         if annotated is not None:
             return bool(annotated)
         user = self._user()
         return bool(user and obj.likes.filter(user=user).exists())
 
-    def get_is_seen(self, obj):
+    def get_is_seen(self, obj) -> bool:
         annotated = getattr(obj, 'seen_by_me', None)
         if annotated is not None:
             return bool(annotated)
         user = self._user()
         return bool(user and obj.views.filter(user=user).exists())
 
-    def get_is_owner(self, obj):
+    def get_is_owner(self, obj) -> bool:
         user = self._user()
         return bool(user and obj.storefront.user_id == user.id)
 
@@ -966,7 +1093,7 @@ class StorefrontMessageSerializer(serializers.ModelSerializer):
     def get_attachment_url(self, obj):
         return obj.attachment_url
 
-    def get_is_mine(self, obj):
+    def get_is_mine(self, obj) -> bool:
         request = self.context.get('request')
         return bool(request and request.user.is_authenticated and obj.sender_id == request.user.id)
 

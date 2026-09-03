@@ -31,13 +31,36 @@ export default defineConfig({
     timezoneId: 'Asia/Tehran',
   },
   projects: [
+    // Chromium runs the exhaustive behavioural, accessibility and explicit
+    // multi-viewport suite. Other engines run routing/navigation smoke tests;
+    // this retains compatibility coverage without multiplying 120+ tests by 6.
     { name: 'desktop-chromium', use: { ...devices['Desktop Chrome'] } },
-    { name: 'desktop-firefox', use: { ...devices['Desktop Firefox'] } },
-    // WebKit stands in for Safari on both macOS and iOS.
-    { name: 'desktop-webkit', use: { ...devices['Desktop Safari'] } },
-    { name: 'mobile-chromium', use: { ...devices['Pixel 7'] } },
-    { name: 'mobile-safari', use: { ...devices['iPhone 13'] } },
-    { name: 'tablet', use: { ...devices['iPad (gen 7)'] } },
+    {
+      name: 'desktop-firefox',
+      testMatch: /public-routes\.spec\.ts/,
+      use: { ...devices['Desktop Firefox'] },
+    },
+    {
+      // WebKit stands in for Safari on macOS.
+      name: 'desktop-webkit',
+      testMatch: /public-routes\.spec\.ts/,
+      use: { ...devices['Desktop Safari'] },
+    },
+    {
+      name: 'mobile-chromium',
+      testMatch: /(?:public-routes|navigation)\.spec\.ts/,
+      use: { ...devices['Pixel 7'] },
+    },
+    {
+      name: 'mobile-safari',
+      testMatch: /(?:public-routes|navigation)\.spec\.ts/,
+      use: { ...devices['iPhone 13'] },
+    },
+    {
+      name: 'tablet',
+      testMatch: /public-routes\.spec\.ts/,
+      use: { ...devices['iPad (gen 7)'] },
+    },
   ],
   webServer: usesExternalServer
     ? undefined

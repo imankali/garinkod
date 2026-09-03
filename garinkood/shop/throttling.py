@@ -74,6 +74,14 @@ class RegisterRateThrottle(IPRateThrottle):
     scope = 'register'
 
 
+class OtpRequestRateThrottle(IPRateThrottle):
+    scope = 'otp_request'
+
+
+class OtpVerifyRateThrottle(IPRateThrottle):
+    scope = 'otp_verify'
+
+
 class SearchRateThrottle(UserOrIPRateThrottle):
     scope = 'search'
 
