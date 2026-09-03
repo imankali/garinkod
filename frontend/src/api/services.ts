@@ -19,6 +19,9 @@ import type {
   Storefront,
   MarketplaceListing,
   PaymentProviderOption,
+  PaymentAttempt,
+  ShippingQuote,
+  WebPushSubscriptionSummary,
   AffiliateProfile,
   AffiliateConversion,
   FinancialLedgerEntry,
@@ -291,11 +294,16 @@ export const authApi = {
 };
 
 // ========================================
-// Orders — interim expert-coordination checkout
+// Orders and verified payment initialization
 // ========================================
 export const ordersApi = {
   checkout: (data: CheckoutPayload) =>
-    apiClient.post<{ order: Order; message: string }>('/orders/checkout/', data),
+    apiClient.post<{
+      order: Order;
+      payment: PaymentAttempt | null;
+      payment_error: string;
+      message: string;
+    }>('/orders/checkout/', data),
   lookup: (code: string, phone: string) =>
     apiClient.get<Order>('/orders/lookup/', { params: { code, phone } }),
   cancel: (code: string, phone: string) =>
@@ -427,8 +435,33 @@ export const agriApi = {
 // ========================================
 // Payment readiness, affiliate, finance and trust
 // ========================================
+export const featureFlagsApi = {
+  get: () => apiClient.get<{ flags: Record<string, boolean> }>('/features/'),
+};
+
+export const shippingApi = {
+  quote: (province: string, city: string) =>
+    apiClient.post<{ quotes: ShippingQuote[]; authoritative_at_checkout: boolean }>(
+      '/shipping/quote/',
+      { province, city },
+    ),
+};
+
 export const paymentsApi = {
   options: () => apiClient.get<{ providers: PaymentProviderOption[] }>('/payments/options/'),
+  restartZarinpal: (code: string, phone = '') =>
+    apiClient.post<{ payment: PaymentAttempt }>('/payments/zarinpal/restart/', { code, phone }),
+};
+
+export const webPushApi = {
+  status: () => apiClient.get<{
+    enabled: boolean;
+    public_key: string;
+    subscriptions: WebPushSubscriptionSummary[];
+  }>('/notifications/webpush/'),
+  subscribe: (subscription: PushSubscriptionJSON) =>
+    apiClient.post<WebPushSubscriptionSummary>('/notifications/webpush/', { subscription }),
+  remove: (id: string) => apiClient.delete('/notifications/webpush/', { data: { id } }),
 };
 
 export const affiliateApi = {

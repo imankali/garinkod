@@ -17,8 +17,7 @@ const messages = [
 // TopBar Component
 // ========================================
 export default function TopBar(_props: { isDark?: boolean; onToggleDark?: () => void }) {
-  // ✅ شماره تلفن از environment variable (با fallback)
-  const PHONE_NUMBER = import.meta.env.VITE_PHONE_NUMBER || "02112345678";
+  const phoneNumber = import.meta.env.VITE_PHONE_NUMBER?.trim();
 
   return (
     <div className="hidden overflow-hidden bg-brand-gradient text-emerald-50 sm:block">
@@ -54,15 +53,16 @@ export default function TopBar(_props: { isDark?: boolean; onToggleDark?: () => 
         {/* بخش راست - تماس و شبکه‌های اجتماعی */}
         {/* ======================================== */}
         <div className="flex items-center gap-3 whitespace-nowrap">
-          {/* شماره تلفن */}
-          <a
-            href={`tel:${PHONE_NUMBER}`}
-            className="hidden min-h-11 items-center gap-1 hover:text-lime-300 md:flex"
-            aria-label={`تماس با شماره ${PHONE_NUMBER}`}
-          >
-            <Phone size={13} />
-            <span dir="ltr">{PHONE_NUMBER}</span>
-          </a>
+          {phoneNumber && (
+            <a
+              href={`tel:${phoneNumber.replace(/[^+\d]/g, '')}`}
+              className="hidden min-h-11 items-center gap-1 hover:text-lime-300 md:flex"
+              aria-label={`تماس با شماره ${phoneNumber}`}
+            >
+              <Phone size={13} />
+              <span dir="ltr">{phoneNumber}</span>
+            </a>
+          )}
 
         </div>
       </div>

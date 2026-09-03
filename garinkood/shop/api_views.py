@@ -3,7 +3,9 @@ from decimal import Decimal, InvalidOperation
 from datetime import timedelta
 from secrets import token_urlsafe
 from threading import Lock
+from uuid import UUID
 
+from .schema import documented_api
 from django.conf import settings
 from django.db.models import Count, Exists, F, OuterRef, Prefetch, Q, Sum
 from rest_framework import mixins, viewsets, permissions, status
@@ -13,15 +15,19 @@ from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.models import Group, User
 from django.db import IntegrityError, connection, transaction
+from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.exceptions import APIException, PermissionDenied, Throttled, ValidationError
 from rest_framework.pagination import PageNumberPagination
+from waffle import flag_is_active
+from drf_spectacular.utils import extend_schema
 
 from .pest_vision import analyze_crop_image
 from .filters import ProductFilter
+from .search import ResilientProductSearchFilter
 from .models import (
     Category, Product, Comment, UserAccount, Cart, CartItem, Order, OrderItem,
     ServiceRequest, ProcurementRequest, Storefront, MarketplaceListing,
@@ -30,7 +36,7 @@ from .models import (
     WalletTransaction, StorefrontPost, AdminAuditLog, Location, AgriInput,
     AgriInputDose, StorefrontFollow, StorefrontHighlight, StorefrontHighlightItem,
     StorefrontPostComment, StorefrontPostLike, StorefrontStoryView,
-    UserAccount, account_level
+    UserAccount, Shipment, WebPushSubscription, account_level
 )
 from .serializers import (
     CategorySerializer, ProductSerializer, ProductListSerializer,
@@ -43,12 +49,22 @@ from .serializers import (
     StorefrontComplaintSerializer, VisualSearchRequestSerializer, CouponSerializer,
     WalletSerializer, StorefrontPostSerializer, AdminAuditLogSerializer,
     LocationSerializer, AgriInputSerializer, StorefrontHighlightSerializer,
-    StorefrontPostCommentSerializer
+    StorefrontPostCommentSerializer, WebPushSubscriptionSerializer,
+    ShipmentTrackingEventSerializer, ShipmentTrackingEventCreateSerializer,
 )
 from .management_roles import ROLE_PERMISSIONS
-from .payments import get_provider, provider_options
+from .payments import (
+    PaymentError,
+    PaymentProviderError,
+    cancel_zarinpal_attempt,
+    get_provider,
+    provider_options,
+    start_zarinpal_payment,
+    verify_zarinpal_payment,
+)
 from .rewards import mark_order_paid_and_reward
 from .settlements import record_marketplace_sale, reverse_marketplace_sale, restore_listing_quantities
+from .shipping import create_initial_shipment, quote_shipping, record_tracking_event
 from .notifications import notify_comment_reply
 from .messaging.outbox import enqueue_order_event
 from .messaging.otp import (
@@ -124,6 +140,7 @@ def _generate_affiliate_code() -> str:
 # Auth Views
 # ========================================
 
+@documented_api
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
 @throttle_classes([LoginRateThrottle])
@@ -138,7 +155,7 @@ def login_view(request):
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    user = authenticate(username=username, password=password)
+    user = authenticate(request=request, username=username, password=password)
 
     if user:
         login(request, user)
@@ -158,6 +175,7 @@ def login_view(request):
     )
 
 
+@documented_api
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
 @throttle_classes([RegisterRateThrottle])
@@ -209,6 +227,7 @@ def register(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+@documented_api
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
 @throttle_classes([OtpRequestRateThrottle])
@@ -232,6 +251,7 @@ def request_login_otp(request):
     return Response(otp_public_payload(result), status=status.HTTP_201_CREATED)
 
 
+@documented_api
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
 @throttle_classes([OtpVerifyRateThrottle])
@@ -252,7 +272,10 @@ def verify_login_otp_view(request):
     except (OtpVerificationError, OtpAccountError) as exc:
         raise ValidationError(str(exc)) from exc
 
-    login(request, user)
+    # OTP is already verified by the dedicated challenge flow. Explicitly use
+    # Django's model backend so adding Axes for password login does not route an
+    # OTP-created user through the password-failure backend.
+    login(request, user, backend="django.contrib.auth.backends.ModelBackend")
     token, _created = Token.objects.get_or_create(user=user)
     response = Response(
         {
@@ -266,6 +289,7 @@ def verify_login_otp_view(request):
     return _set_auth_cookie(response, token)
 
 
+@documented_api
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
 def logout_view(request):
@@ -275,6 +299,7 @@ def logout_view(request):
     return _clear_auth_cookie(Response({'message': 'خروج با موفقیت انجام شد'}))
 
 
+@documented_api
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def auth_session(request):
@@ -299,7 +324,7 @@ class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
 # ========================================
 class ProductViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Product.objects.filter(status='published').select_related('category', 'subcategory')
-    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filter_backends = [DjangoFilterBackend, ResilientProductSearchFilter, OrderingFilter]
     filterset_class = ProductFilter
     search_fields = ['title', 'description']
     ordering_fields = ['price', 'publish', 'created', 'sales_count', 'discount_percent']
@@ -367,6 +392,7 @@ class CartViewSet(viewsets.ViewSet):
     """
     سبد خرید با پشتیبانی از کاربران مهمان (Guest)
     """
+    serializer_class = CartSerializer
     permission_classes = [permissions.AllowAny]  # ✅ AllowAny برای guest cart
 
     def _get_or_create_cart(self, request):
@@ -607,24 +633,44 @@ class CartViewSet(viewsets.ViewSet):
 # ========================================
 # Checkout and order tracking
 # ========================================
-SHIPPING_FREE_THRESHOLD = 3_000_000
-STANDARD_SHIPPING_PRICE = 45_000
-
-
 def _checkout_cart(request):
     """Use the same guest/authenticated cart semantics as the cart API."""
     return CartViewSet()._get_or_create_cart(request)
 
 
+@documented_api
+@api_view(['POST'])
+@permission_classes([permissions.AllowAny])
+def shipping_quote_view(request):
+    """Preview the safe fallback quote; checkout always recalculates it."""
+    province = str(request.data.get('province', '')).strip()
+    city = str(request.data.get('city', '')).strip()
+    if not province or not city:
+        return Response(
+            {'error': 'استان و شهر را انتخاب کنید.'}, status=status.HTTP_400_BAD_REQUEST
+        )
+    cart = _checkout_cart(request)
+    items = list(cart.items.select_related('product', 'listing'))
+    subtotal = sum(item.total_price for item in items)
+    weight_grams = sum(
+        (item.product.shipping_weight_grams if item.product_id else 0) * item.quantity
+        for item in items
+    )
+    quote = quote_shipping(
+        subtotal=subtotal, province=province, city=city, weight_grams=weight_grams
+    )
+    return Response({'quotes': [quote.as_dict()], 'authoritative_at_checkout': True})
+
+
+@documented_api
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
 @throttle_classes([CheckoutRateThrottle])
 def checkout(request):
-    """Create a reviewable order from the caller's cart.
+    """Atomically reserve stock, then initialize online payment if requested.
 
-    No gateway is called here. Before Zarinpal is wired in, payment is clearly
-    marked unpaid and an expert coordinates the order. Stock is reserved in the
-    same transaction so two buyers cannot confirm more than what is available.
+    Gateway I/O starts only after the order transaction commits, so a provider
+    outage cannot corrupt stock, coupons, marketplace ledgers, or the outbox.
     """
     serializer = CheckoutSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
@@ -714,7 +760,12 @@ def checkout(request):
                     )
                 except ValueError as error:
                     return Response({'error': str(error)}, status=status.HTTP_400_BAD_REQUEST)
-            shipping_price = 0 if subtotal - discount_amount >= SHIPPING_FREE_THRESHOLD else STANDARD_SHIPPING_PRICE
+            shipping_quote = quote_shipping(
+                subtotal=subtotal - discount_amount,
+                province=details['province'],
+                city=details['city'],
+            )
+            shipping_price = shipping_quote.amount
             affiliate_code = details.get('affiliate_code', '').strip().upper()
             affiliate = None
             if affiliate_code:
@@ -730,11 +781,15 @@ def checkout(request):
                 city=details['city'],
                 address=details['address'],
                 postal_code=details.get('postal_code', ''),
+                latitude=details.get('latitude'),
+                longitude=details.get('longitude'),
                 notes=details.get('notes', ''),
                 subtotal=subtotal,
                 discount_amount=discount_amount,
                 coupon_code=coupon_code,
                 shipping_price=shipping_price,
+                shipping_provider=shipping_quote.provider,
+                shipping_service=shipping_quote.service,
                 total_price=subtotal - discount_amount + shipping_price,
                 payment_method=details['payment_method'],
                 affiliate_code=affiliate_code,
@@ -813,21 +868,44 @@ def checkout(request):
                     entry_type='affiliate_commission',
                     status='pending',
                     amount=commission_amount,
-                    currency='IRR',
+                    currency='IRT',
                     description=f'کمیسیون همکاری در فروش سفارش {order.code}',
                 )
             CartItem.objects.filter(cart=cart).delete()
+            create_initial_shipment(order)
             # The outbox rows are part of this transaction, but no provider is
             # called here. A rollback removes both order and alerts; a provider
             # outage can therefore never delay or invalidate checkout.
             enqueue_order_event(order, 'order_created')
 
-    return Response({
-        'order': OrderSerializer(order).data,
-        'message': 'سفارش ثبت شد. کارشناس برای تأیید موجودی و هماهنگی پرداخت با شما تماس می‌گیرد.'
-    }, status=status.HTTP_201_CREATED)
+    payment_data = None
+    payment_error = ''
+    if details['payment_method'] == 'zarinpal':
+        try:
+            payment_data = PaymentAttemptSerializer(start_zarinpal_payment(order)).data
+        except PaymentError as exc:
+            # The order is valid and remains retryable even when provider I/O is
+            # down. Never roll stock/coupons back merely due to a gateway outage.
+            payment_error = str(exc)
+
+    if payment_data:
+        message = 'سفارش ثبت شد. برای تکمیل پرداخت به درگاه امن زرین‌پال بروید.'
+    elif payment_error:
+        message = 'سفارش ثبت شد، اما ساخت لینک پرداخت انجام نشد. از بخش سفارش‌ها دوباره تلاش کنید.'
+    else:
+        message = 'سفارش ثبت شد. کارشناس برای تأیید موجودی و هماهنگی پرداخت با شما تماس می‌گیرد.'
+    return Response(
+        {
+            'order': OrderSerializer(order).data,
+            'payment': payment_data,
+            'payment_error': payment_error,
+            'message': message,
+        },
+        status=status.HTTP_201_CREATED,
+    )
 
 
+@documented_api
 @api_view(['GET'])
 @permission_classes([permissions.AllowAny])
 def order_lookup(request):
@@ -836,10 +914,13 @@ def order_lookup(request):
     if not code or not phone:
         return Response({'error': 'کد سفارش و شماره تماس الزامی است.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    order = get_object_or_404(Order.objects.prefetch_related('items'), code=code, phone=phone)
+    order = get_object_or_404(
+        Order.objects.prefetch_related('items', 'shipments__events'), code=code, phone=phone
+    )
     return Response(OrderSerializer(order).data)
 
 
+@documented_api
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
 def cancel_order(request):
@@ -855,16 +936,18 @@ def cancel_order(request):
     return Response({'order': OrderSerializer(order).data, 'message': 'سفارش لغو شد و موجودی رزروشده آزاد شد.'})
 
 
+@documented_api
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def my_orders(request):
-    orders = Order.objects.filter(user=request.user).prefetch_related('items')
+    orders = Order.objects.filter(user=request.user).prefetch_related('items', 'shipments__events')
     return Response(OrderSerializer(orders, many=True).data)
 
 
 # ========================================
 # Agricultural services and farmer procurement
 # ========================================
+@documented_api
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
 def create_service_request(request):
@@ -877,6 +960,7 @@ def create_service_request(request):
     }, status=status.HTTP_201_CREATED)
 
 
+@documented_api
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
 def create_procurement_request(request):
@@ -1004,6 +1088,7 @@ class MarketplaceListingViewSet(viewsets.ModelViewSet):
         return Response(self.get_serializer(listings, many=True).data)
 
 
+@documented_api
 @api_view(['GET', 'POST', 'PATCH'])
 @permission_classes([permissions.IsAuthenticated])
 def my_storefront(request):
@@ -1039,6 +1124,7 @@ def my_storefront(request):
 # ========================================
 # User Profile View - ✅ اصلاح شده
 # ========================================
+@documented_api
 @api_view(['GET', 'PUT', 'PATCH'])
 @permission_classes([permissions.IsAuthenticated])
 def user_profile(request):
@@ -1105,6 +1191,7 @@ def user_profile(request):
         'message': 'پروفایل با موفقیت بروزرسانی شد'
     })
 
+@documented_api
 @api_view(['POST', 'DELETE'])
 @permission_classes([permissions.IsAuthenticated])
 @throttle_classes([UploadRateThrottle])
@@ -1144,6 +1231,20 @@ def user_avatar(request):
 # ========================================
 # Payments, affiliate, finance and trust centre
 # ========================================
+PUBLIC_FEATURE_FLAGS = ('web_push', 'external_search', 'carrier_quotes', 'privacy_analytics')
+
+
+@documented_api
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def feature_flags_view(request):
+    """Return only explicitly allowlisted, request-aware rollout decisions."""
+    return Response({
+        'flags': {name: flag_is_active(request, name) for name in PUBLIC_FEATURE_FLAGS},
+    })
+
+
+@documented_api
 @api_view(['GET'])
 @permission_classes([permissions.AllowAny])
 def payment_options_view(_request):
@@ -1163,6 +1264,116 @@ def payment_options_view(_request):
     })
 
 
+def _payment_frontend_redirect(result: str, order_code: str = ''):
+    from urllib.parse import urlencode
+
+    query = urlencode({'payment': result, 'order': order_code})
+    return HttpResponseRedirect(f'{settings.FRONTEND_URL}/orders?{query}')
+
+
+@documented_api
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def zarinpal_callback(request):
+    """Consume Zarinpal's browser callback and independently verify server-side."""
+    authority = request.query_params.get('Authority', '').strip()
+    callback_status = request.query_params.get('Status', '').strip().upper()
+    if not authority or len(authority) > 255:
+        return _payment_frontend_redirect('invalid')
+
+    if callback_status != 'OK':
+        attempt = cancel_zarinpal_attempt(authority)
+        return _payment_frontend_redirect('cancelled', attempt.order.code if attempt else '')
+
+    try:
+        attempt, newly_paid = verify_zarinpal_payment(authority)
+    except PaymentProviderError:
+        return _payment_frontend_redirect('verification_failed')
+    except PaymentError:
+        return _payment_frontend_redirect('invalid')
+    return _payment_frontend_redirect('success' if newly_paid else 'already_paid', attempt.order.code)
+
+
+@documented_api
+@api_view(['POST'])
+@permission_classes([permissions.AllowAny])
+@throttle_classes([CheckoutRateThrottle])
+def restart_zarinpal_payment(request):
+    """Create another authority for an owned order or a guest code/phone pair."""
+    code = str(request.data.get('code', '')).strip().upper()
+    phone = str(request.data.get('phone', '')).strip().replace(' ', '').replace('-', '')
+    order = Order.objects.filter(code=code, payment_method='zarinpal').first()
+    allowed = bool(
+        order
+        and (
+            (request.user.is_authenticated and (request.user.is_staff or order.user_id == request.user.id))
+            or (not order.user_id and phone and phone == order.phone)
+        )
+    )
+    if not allowed:
+        return Response({'error': 'سفارش پیدا نشد.'}, status=status.HTTP_404_NOT_FOUND)
+    if order.status == 'cancelled':
+        return Response({'error': 'سفارش لغوشده قابل پرداخت نیست.'}, status=status.HTTP_409_CONFLICT)
+    try:
+        attempt = start_zarinpal_payment(order)
+    except PaymentError as exc:
+        return Response({'error': str(exc)}, status=status.HTTP_409_CONFLICT)
+    return Response({'payment': PaymentAttemptSerializer(attempt).data})
+
+
+@documented_api
+@api_view(['GET', 'POST', 'DELETE'])
+@permission_classes([permissions.IsAuthenticated])
+def webpush_subscriptions(request):
+    """Opt the current browser in or out; private VAPID material never leaves server."""
+    rollout_active = flag_is_active(request, 'web_push')
+    webpush_available = settings.WEBPUSH_ENABLED and rollout_active
+    if request.method == 'GET':
+        subscriptions = WebPushSubscription.objects.filter(user=request.user, is_active=True)
+        return Response({
+            'enabled': webpush_available,
+            'public_key': settings.WEBPUSH_VAPID_PUBLIC_KEY if webpush_available else '',
+            'subscriptions': WebPushSubscriptionSerializer(subscriptions, many=True).data,
+        })
+    if request.method == 'DELETE':
+        subscription_id = str(request.data.get('id', '')).strip()
+        try:
+            subscription_id = UUID(subscription_id)
+        except (ValueError, TypeError, AttributeError):
+            return Response({'error': 'شناسه اشتراک معتبر نیست.'}, status=status.HTTP_400_BAD_REQUEST)
+        deleted, _ = WebPushSubscription.objects.filter(
+            id=subscription_id, user=request.user
+        ).delete()
+        if not deleted:
+            return Response({'error': 'اشتراک پیدا نشد.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+    if not webpush_available:
+        return Response({'error': 'اعلان مرورگر فعال نیست.'}, status=status.HTTP_409_CONFLICT)
+
+    browser_subscription = request.data.get('subscription', request.data)
+    keys = browser_subscription.get('keys', {}) if isinstance(browser_subscription, dict) else {}
+    payload = {
+        'endpoint': browser_subscription.get('endpoint', '') if isinstance(browser_subscription, dict) else '',
+        'p256dh': keys.get('p256dh', ''),
+        'auth': keys.get('auth', ''),
+        'is_active': True,
+    }
+    existing = WebPushSubscription.objects.filter(endpoint=payload['endpoint']).first()
+    serializer = WebPushSubscriptionSerializer(existing, data=payload)
+    serializer.is_valid(raise_exception=True)
+    subscription = serializer.save(
+        user=request.user,
+        user_agent=request.headers.get('User-Agent', '')[:500],
+        failure_count=0,
+        last_error='',
+    )
+    return Response(
+        WebPushSubscriptionSerializer(subscription).data,
+        status=status.HTTP_200_OK if existing else status.HTTP_201_CREATED,
+    )
+
+
+@documented_api
 @api_view(['GET', 'POST'])
 @permission_classes([permissions.IsAuthenticated])
 def affiliate_me(request):
@@ -1188,6 +1399,7 @@ def affiliate_me(request):
     })
 
 
+@documented_api
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def storefront_finance(request):
@@ -1244,6 +1456,7 @@ def storefront_finance(request):
     })
 
 
+@documented_api
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def storefront_finance_export(request):
@@ -1308,6 +1521,7 @@ def storefront_finance_export(request):
     return response
 
 
+@documented_api
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
 @throttle_classes([FeedbackRateThrottle])
@@ -1321,6 +1535,7 @@ def submit_feedback(request):
     }, status=status.HTTP_201_CREATED)
 
 
+@documented_api
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
 @throttle_classes([FeedbackRateThrottle])
@@ -1334,6 +1549,7 @@ def submit_storefront_complaint(request):
     }, status=status.HTTP_201_CREATED)
 
 
+@documented_api
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
 @throttle_classes([UploadRateThrottle])
@@ -1366,6 +1582,7 @@ def visual_search(request):
 # ========================================
 # Loyalty rewards, wallet and seller publishing
 # ========================================
+@documented_api
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def my_rewards(request):
@@ -1376,6 +1593,7 @@ def my_rewards(request):
     return Response(CouponSerializer(coupons, many=True).data)
 
 
+@documented_api
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def my_wallet(request):
@@ -1627,6 +1845,51 @@ def _audit(actor, action: str, target, summary: str, metadata: dict | None = Non
     )
 
 
+@extend_schema(
+    request=ShipmentTrackingEventCreateSerializer,
+    responses={200: ShipmentTrackingEventSerializer, 201: ShipmentTrackingEventSerializer},
+)
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def management_record_tracking_event(request, shipment_id):
+    """Append a normalized shipment event; customers have no write endpoint."""
+    if not (
+        _can_manage(request.user, 'add_shipmenttrackingevent')
+        or _can_manage(request.user, 'change_shipment')
+    ):
+        raise PermissionDenied('اجازه ثبت رویداد رهگیری را ندارید.')
+
+    shipment = get_object_or_404(Shipment.objects.select_related('order'), pk=shipment_id)
+    serializer = ShipmentTrackingEventCreateSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    payload = serializer.validated_data
+    provider_event_id = payload.get('provider_event_id', '')
+    already_exists = bool(
+        provider_event_id
+        and shipment.events.filter(provider_event_id=provider_event_id).exists()
+    )
+    event = record_tracking_event(
+        shipment,
+        status=payload['status'],
+        description=payload['description'],
+        occurred_at=payload['occurred_at'],
+        location=payload.get('location', ''),
+        provider_event_id=provider_event_id,
+    )
+    _audit(
+        request.user,
+        'shipment_tracking_recorded',
+        shipment,
+        f'رویداد رهگیری سفارش {shipment.order.code} ثبت شد.',
+        {'event_id': event.pk, 'status': event.status, 'idempotent_replay': already_exists},
+    )
+    return Response(
+        ShipmentTrackingEventSerializer(event).data,
+        status=status.HTTP_200_OK if already_exists else status.HTTP_201_CREATED,
+    )
+
+
+@documented_api
 @api_view(['GET'])
 @permission_classes([IsModerator])
 def management_dashboard(request):
@@ -1680,6 +1943,7 @@ def management_dashboard(request):
     })
 
 
+@documented_api
 @api_view(['GET', 'PATCH'])
 @permission_classes([IsAdminLevel])
 def management_staff(request):
@@ -1722,6 +1986,7 @@ def management_staff(request):
     return Response({'username': member.username, 'groups': list(member.groups.values_list('name', flat=True)), 'is_active': member.is_active})
 
 
+@documented_api
 @api_view(['GET'])
 @permission_classes([IsModerator])
 def management_audit(request):
@@ -1730,6 +1995,7 @@ def management_audit(request):
     return Response(AdminAuditLogSerializer(AdminAuditLog.objects.select_related('actor')[:100], many=True).data)
 
 
+@documented_api
 @api_view(['POST'])
 @permission_classes([IsModerator])
 def management_mark_order_paid(request, code):
@@ -1744,6 +2010,7 @@ def management_mark_order_paid(request, code):
     return Response({'order': OrderSerializer(order).data, 'coupon': CouponSerializer(coupon).data if coupon else None})
 
 
+@documented_api
 @api_view(['POST'])
 @permission_classes([IsModerator])
 def management_moderate_content(request, content_type, object_id):
@@ -1805,6 +2072,7 @@ def management_moderate_content(request, content_type, object_id):
     return Response({'id': obj.id, 'status': status_value, 'reason': reason})
 
 
+@documented_api
 @api_view(['POST'])
 @permission_classes([IsModerator])
 def management_bulk_moderate(request):
@@ -1876,6 +2144,7 @@ def management_bulk_moderate(request):
     return Response({'updated': updated, 'status': status_value})
 
 
+@documented_api
 @api_view(['GET'])
 @permission_classes([IsModerator])
 def management_moderation_queue(request):
@@ -2022,6 +2291,7 @@ def management_moderation_queue(request):
     })
 
 
+@documented_api
 @api_view(['GET', 'PATCH'])
 @permission_classes([IsAdminLevel])
 def management_users(request):

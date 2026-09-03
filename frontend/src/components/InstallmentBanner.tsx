@@ -1,6 +1,6 @@
 import { Calendar, Handshake, Landmark, Percent } from "lucide-react";
 
-const PHONE_NUMBER = import.meta.env.VITE_PHONE_NUMBER || "02112345678";
+const phoneNumber = import.meta.env.VITE_PHONE_NUMBER?.trim();
 
 /**
  * Commercial finance is intentionally presented as a pre-registration service
@@ -22,7 +22,7 @@ export default function InstallmentBanner() {
           </div>
           <div className="mt-6 flex items-center justify-between border-t border-slate-100 pt-4 dark:border-emerald-900/40">
             <span className="flex items-center gap-1.5 text-xs font-bold text-[#0F8A5F] dark:text-lime-300"><Landmark size={14} /> هنوز پیشنهاد مالی قطعی صادر نشده است</span>
-            <a href={`tel:${PHONE_NUMBER}`} className="inline-flex min-h-11 items-center rounded-xl bg-[#0F8A5F] px-4 text-xs font-bold text-white shadow-md transition-colors hover:bg-[#064E3B]">گفت‌وگو با کارشناس</a>
+            <a href={phoneNumber ? `tel:${phoneNumber.replace(/[^+\d]/g, '')}` : '/services'} className="inline-flex min-h-11 items-center rounded-xl bg-[#0F8A5F] px-4 text-xs font-bold text-white shadow-md transition-colors hover:bg-[#064E3B]">{phoneNumber ? 'گفت‌وگو با کارشناس' : 'ثبت درخواست'}</a>
           </div>
         </article>
 

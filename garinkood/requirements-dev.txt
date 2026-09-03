@@ -3,8 +3,7 @@
 
 -r requirements.txt
 
-# HTTP smoke-test helper used by garinkood/test_api.py
-requests==2.32.5
+# ``requests`` is a runtime dependency because official provider adapters use it.
 
 # Test coverage and dependency vulnerability checks
 coverage==7.10.6

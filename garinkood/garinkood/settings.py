@@ -1,5 +1,6 @@
 """Django settings for the GarinKood API."""
 
+from datetime import timedelta
 from pathlib import Path
 
 from decouple import Csv, config
@@ -24,14 +25,23 @@ if DEBUG:
     ALLOWED_HOSTS = [*ALLOWED_HOSTS, ".e2b.app"]
 
 INSTALLED_APPS = [
+    # django-prometheus must precede Django's apps to instrument ORM/cache use.
+    "django_prometheus",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "axes",
+    "health_check",
+    "import_export",
+    "simple_history",
+    "storages",
+    "waffle",
     "rest_framework",
     "rest_framework.authtoken",
+    "drf_spectacular",
     "corsheaders",
     "django_filters",
     "django.contrib.humanize",
@@ -40,6 +50,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "django_prometheus.middleware.PrometheusBeforeMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -47,8 +58,14 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    # Axes protects password authentication; the existing OTP limits stay
+    # independent and continue to provide phone/IP/cooldown protection.
+    "axes.middleware.AxesMiddleware",
+    "simple_history.middleware.HistoryRequestMiddleware",
+    "waffle.middleware.WaffleMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "django_prometheus.middleware.PrometheusAfterMiddleware",
 ]
 
 ROOT_URLCONF = "garinkood.urls"
@@ -134,6 +151,16 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
+AUTHENTICATION_BACKENDS = [
+    "axes.backends.AxesStandaloneBackend",
+    "django.contrib.auth.backends.ModelBackend",
+]
+AXES_FAILURE_LIMIT = config("AXES_FAILURE_LIMIT", default=5, cast=int)
+AXES_COOLOFF_TIME = timedelta(minutes=config("AXES_COOLOFF_MINUTES", default=30, cast=int))
+AXES_RESET_ON_SUCCESS = True
+AXES_LOCKOUT_PARAMETERS = [["username", "ip_address"]]
+AXES_VERBOSE = config("AXES_VERBOSE", default=False, cast=bool)
+
 LANGUAGE_CODE = "fa-ir"
 TIME_ZONE = "Asia/Tehran"
 USE_I18N = True
@@ -144,16 +171,38 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 SHOP_STATIC_DIR = BASE_DIR / "shop" / "static"
 STATICFILES_DIRS = [SHOP_STATIC_DIR] if SHOP_STATIC_DIR.exists() else []
 
+MEDIA_STORAGE_BACKEND = config("MEDIA_STORAGE_BACKEND", default="local").strip().lower()
+if MEDIA_STORAGE_BACKEND not in {"local", "s3"}:
+    raise ValueError("MEDIA_STORAGE_BACKEND must be either 'local' or 's3'.")
+
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
 }
+if MEDIA_STORAGE_BACKEND == "s3":
+    # Supports AWS S3 and providers implementing the S3 API. Public-read ACLs
+    # are never granted implicitly; bucket/CDN policy remains operator-owned.
+    STORAGES["default"] = {
+        "BACKEND": "storages.backends.s3.S3Storage",
+        "OPTIONS": {
+            "bucket_name": config("S3_BUCKET_NAME", default=""),
+            "access_key": config("S3_ACCESS_KEY_ID", default="") or None,
+            "secret_key": config("S3_SECRET_ACCESS_KEY", default="") or None,
+            "endpoint_url": config("S3_ENDPOINT_URL", default="") or None,
+            "region_name": config("S3_REGION_NAME", default="") or None,
+            "custom_domain": config("S3_CUSTOM_DOMAIN", default="") or None,
+            "default_acl": None,
+            "querystring_auth": config("S3_QUERYSTRING_AUTH", default=True, cast=bool),
+            "file_overwrite": False,
+        },
+    }
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "products"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "shop.authentication.CookieTokenAuthentication",
         "rest_framework.authentication.SessionAuthentication",
@@ -193,6 +242,26 @@ REST_FRAMEWORK = {
         if DEBUG
         else ["rest_framework.renderers.JSONRenderer"]
     ),
+}
+
+# OpenAPI is generated for maintainers but never served anonymously. Schema and
+# interactive documentation views use these settings in garinkood.urls.
+IMPORT_EXPORT_IMPORT_PERMISSION_CODE = "change"
+IMPORT_EXPORT_EXPORT_PERMISSION_CODE = "view"
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "GarinKood API",
+    "DESCRIPTION": "Commerce, marketplace, account, messaging and operations API.",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "SERVE_AUTHENTICATION": ["rest_framework.authentication.SessionAuthentication"],
+    "SERVE_PERMISSIONS": ["rest_framework.permissions.IsAdminUser"],
+    "SCHEMA_PATH_PREFIX": r"/api",
+    # Several resources call their choice field `status`; give the shipment
+    # lifecycle a stable client-facing component name instead of a hash.
+    "ENUM_NAME_OVERRIDES": {
+        "ShipmentStatusEnum": "shop.models.Shipment.STATUS_CHOICES",
+    },
 }
 
 # The frontend uses a same-origin reverse proxy in both development and
@@ -250,11 +319,12 @@ LOGGING = {
             "format": "{levelname} {asctime} {name} {message}",
             "style": "{",
         },
+        "json": {"()": "shop.logging.JsonFormatter"},
     },
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
-            "formatter": "verbose",
+            "formatter": "verbose" if DEBUG else "json",
         },
     },
     "root": {
@@ -349,10 +419,16 @@ WHATSAPP_ALLOW_FREEFORM = config("WHATSAPP_ALLOW_FREEFORM", default=False, cast=
 
 # Payment providers are opt-in.  Never add merchant, secret, wallet or webhook
 # credentials to Git; use the production environment/secrets manager.
+PAYMENT_HTTP_TIMEOUT = config("PAYMENT_HTTP_TIMEOUT", default=10, cast=int)
+PAYMENT_CALLBACK_BASE_URL = config("PAYMENT_CALLBACK_BASE_URL", default=SITE_URL).rstrip("/")
 PAYMENT_PROVIDER_CONFIG = {
     "zarinpal": {
         "enabled": config("PAYMENT_ENABLE_ZARINPAL", default=False, cast=bool),
         "merchant_id": config("ZARINPAL_MERCHANT_ID", default=""),
+        # Catalogue and order integer prices are تومان. Zarinpal's explicit IRT
+        # mode therefore avoids a hidden tenfold IRR conversion.
+        "currency": "IRT",
+        "sandbox": config("ZARINPAL_SANDBOX", default=False, cast=bool),
     },
     "stripe_card": {
         "enabled": config("PAYMENT_ENABLE_STRIPE", default=False, cast=bool),
@@ -409,3 +485,43 @@ MESSAGE_ATTACHMENT_CONTENT_TYPES = {
         cast=Csv(),
     ),
 }
+
+# Optional full-text index. Every search call falls back to the ORM when this is
+# disabled, unhealthy, or cannot complete within the small latency budget.
+MEILISEARCH_ENABLED = config("MEILISEARCH_ENABLED", default=False, cast=bool)
+MEILISEARCH_URL = config("MEILISEARCH_URL", default="http://localhost:7700").rstrip("/")
+MEILISEARCH_API_KEY = config("MEILISEARCH_API_KEY", default="")
+MEILISEARCH_PRODUCTS_INDEX = config("MEILISEARCH_PRODUCTS_INDEX", default="products")
+MEILISEARCH_TIMEOUT_SECONDS = config("MEILISEARCH_TIMEOUT_SECONDS", default=1.5, cast=float)
+
+# Browser Push uses VAPID and the existing durable notification outbox. VAPID
+# private material is environment-only and subscriptions are user-controlled.
+WEBPUSH_ENABLED = config("WEBPUSH_ENABLED", default=False, cast=bool)
+WEBPUSH_VAPID_PUBLIC_KEY = config("WEBPUSH_VAPID_PUBLIC_KEY", default="")
+WEBPUSH_VAPID_PRIVATE_KEY = config("WEBPUSH_VAPID_PRIVATE_KEY", default="")
+WEBPUSH_VAPID_SUBJECT = config("WEBPUSH_VAPID_SUBJECT", default="mailto:ops@garinkood.ir")
+
+# Deterministic shipping remains available when no verified carrier integration
+# is configured. Amounts are in تومان, like the catalogue and Order totals.
+SHIPPING_FLAT_RATE = config("SHIPPING_FLAT_RATE", default=45_000, cast=int)
+SHIPPING_FREE_THRESHOLD = config("SHIPPING_FREE_THRESHOLD", default=2_000_000, cast=int)
+
+# Operational details are privileged. Staff sessions or a constant-time checked
+# bearer token can access readiness/metrics; public liveness reveals one bit.
+OPERATIONS_TOKEN = config("OPERATIONS_TOKEN", default="")
+
+# Sentry is completely inert without a DSN. PII remains disabled by default.
+SENTRY_DSN = config("SENTRY_DSN", default="")
+SENTRY_ENVIRONMENT = config("SENTRY_ENVIRONMENT", default="development" if DEBUG else "production")
+SENTRY_TRACES_SAMPLE_RATE = config("SENTRY_TRACES_SAMPLE_RATE", default=0.0, cast=float)
+if SENTRY_DSN:
+    import sentry_sdk
+    from sentry_sdk.integrations.django import DjangoIntegration
+
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        environment=SENTRY_ENVIRONMENT,
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=SENTRY_TRACES_SAMPLE_RATE,
+        send_default_pii=False,
+    )

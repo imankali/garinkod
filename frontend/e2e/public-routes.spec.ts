@@ -10,6 +10,9 @@ const publicRoutes = [
   '/farmer-sell',
   '/marketplace',
   '/support',
+  '/privacy',
+  '/terms',
+  '/returns',
   '/affiliate',
   '/finance',
   '/studio',
@@ -31,6 +34,16 @@ test('all public routes render without a browser crash', async ({ page }) => {
     await expect(page.locator('#root')).not.toBeEmpty();
     await expect(page.locator('text=خطای غیرمنتظره')).toHaveCount(0);
   }
+});
+
+test('route metadata indexes public pages and protects account pages', async ({ page }) => {
+  await page.goto('/privacy');
+  await expect(page).toHaveTitle(/حریم خصوصی/);
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', /\/privacy$/);
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /index,follow/);
+
+  await page.goto('/orders');
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex,nofollow');
 });
 
 test('checkout clearly communicates the five purchase stages', async ({ page }) => {

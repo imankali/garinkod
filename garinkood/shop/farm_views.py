@@ -10,12 +10,14 @@ Two audiences share these endpoints:
   land. The farmer sees those entries flagged as the consultant's notes.
 """
 
+from .schema import documented_api
 from django.contrib.auth.models import User
 from django.db.models import Prefetch, Q
 from django.shortcuts import get_object_or_404
 from rest_framework import permissions, status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.response import Response
+from drf_spectacular.utils import extend_schema
 
 from .models import (
     FarmCalendarEvent, FarmConsultationRequest, FarmLand, UserAccount,
@@ -31,6 +33,9 @@ def _own_land(user, land_id):
     return get_object_or_404(FarmLand, pk=land_id, owner=user, is_active=True)
 
 
+@extend_schema(methods=['GET'], operation_id='farm_lands_list')
+@extend_schema(methods=['POST'], operation_id='farm_lands_create')
+@documented_api
 @api_view(['GET', 'POST'])
 @permission_classes([permissions.IsAuthenticated])
 def my_lands(request):
@@ -52,6 +57,10 @@ def my_lands(request):
     )
 
 
+@extend_schema(methods=['GET'], operation_id='farm_land_retrieve')
+@extend_schema(methods=['PATCH'], operation_id='farm_land_update')
+@extend_schema(methods=['DELETE'], operation_id='farm_land_destroy')
+@documented_api
 @api_view(['GET', 'PATCH', 'DELETE'])
 @permission_classes([permissions.IsAuthenticated])
 def land_detail(request, land_id):
@@ -76,6 +85,7 @@ def land_detail(request, land_id):
     return Response(serializer.data)
 
 
+@documented_api
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
 def land_events(request, land_id):
@@ -90,6 +100,7 @@ def land_events(request, land_id):
     )
 
 
+@documented_api
 @api_view(['PATCH', 'DELETE'])
 @permission_classes([permissions.IsAuthenticated])
 def event_detail(request, event_id):
@@ -110,6 +121,7 @@ def event_detail(request, event_id):
     return Response(serializer.data)
 
 
+@documented_api
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def my_calendar(request):
@@ -134,6 +146,7 @@ def my_calendar(request):
     return Response(FarmCalendarEventSerializer(events, many=True, context={'request': request}).data)
 
 
+@documented_api
 @api_view(['GET', 'POST'])
 @permission_classes([permissions.IsAuthenticated])
 def my_consultations(request):
@@ -169,6 +182,7 @@ def _consultant_queryset():
     ).prefetch_related('land__calendar_events')
 
 
+@documented_api
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def consulting_requests(request):
@@ -196,6 +210,7 @@ def consulting_requests(request):
     )
 
 
+@documented_api
 @api_view(['PATCH'])
 @permission_classes([permissions.IsAuthenticated])
 def consulting_reply(request, consultation_id):
@@ -219,6 +234,8 @@ def consulting_reply(request, consultation_id):
     )
 
 
+@extend_schema(operation_id='farm_consulting_farmer_list')
+@documented_api
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 @throttle_classes([SearchRateThrottle])
@@ -257,6 +274,8 @@ def consulting_farmers(request):
     return Response({'count': len(results), 'results': results})
 
 
+@extend_schema(operation_id='farm_consulting_farmer_retrieve')
+@documented_api
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def consulting_farmer_dossier(request, user_id):
@@ -299,6 +318,7 @@ def consulting_farmer_dossier(request, user_id):
     })
 
 
+@documented_api
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
 def consulting_land_event(request, land_id):

@@ -6,6 +6,7 @@ import hashlib
 import hmac
 from datetime import datetime, timezone as datetime_timezone
 
+from ..schema import documented_api
 from django.conf import settings
 from django.http import HttpResponse
 from django.utils import timezone
@@ -83,6 +84,7 @@ def _apply_whatsapp_status(status_payload: dict) -> None:
     delivery.save(update_fields=fields)
 
 
+@documented_api
 @api_view(['GET', 'POST'])
 @authentication_classes([])
 @permission_classes([permissions.AllowAny])

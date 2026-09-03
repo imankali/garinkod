@@ -33,6 +33,8 @@ import ServiceShortcuts from "./components/home/ServiceShortcuts";
 import CategoryGrid from "./components/home/CategoryGrid";
 import FeaturedStorefronts from "./components/home/FeaturedStorefronts";
 import DirectMessagesDrawer from "./components/direct/DirectMessagesDrawer";
+import RouteSeo from "./components/RouteSeo";
+import PrivacyAnalytics from "./components/PrivacyAnalytics";
 
 // ========================================
 // Pages (Lazy Loaded)
@@ -56,6 +58,7 @@ const StorefrontPage = lazy(() => import("./pages/StorefrontPage"));
 const Shop = lazy(() => import("./pages/Shop"));
 const Messages = lazy(() => import("./pages/Messages"));
 const Farmers = lazy(() => import("./pages/Farmers"));
+const Legal = lazy(() => import("./pages/Legal"));
 
 // ========================================
 // Stores
@@ -281,6 +284,8 @@ export default function App() {
   // ========================================
   return (
     <BrowserRouter>
+      <RouteSeo />
+      <PrivacyAnalytics />
       {/* ✅ div اصلی با min-h-screen و w-full */}
       <div
         className={`min-h-screen w-full overflow-x-hidden ${isDark ? 'dark' : ''}`}
@@ -458,6 +463,9 @@ export default function App() {
               <Route path="/farmer-sell" element={<FarmerSell />} />
               <Route path="/marketplace" element={<Marketplace />} />
               <Route path="/support" element={<Support />} />
+              <Route path="/privacy" element={<Legal />} />
+              <Route path="/terms" element={<Legal />} />
+              <Route path="/returns" element={<Legal />} />
               <Route path="/affiliate" element={<Affiliate />} />
               <Route path="/finance" element={<Finance />} />
               <Route path="/rewards" element={<Rewards />} />

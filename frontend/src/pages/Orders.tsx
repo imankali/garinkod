@@ -1,6 +1,7 @@
 // frontend/src/pages/Orders.tsx
 
 import { FormEvent, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle,
   Check,
@@ -17,7 +18,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-import { ordersApi } from '../api/services';
+import { ordersApi, paymentsApi } from '../api/services';
 import { parseApiError, type FieldErrors } from '../api/errors';
 import { useAuthStore } from '../store/authStore';
 import Button from '../components/ui/Button';
@@ -132,11 +133,13 @@ function OrderTimelineStepper({ status }: { status: string }) {
 
 export default function Orders() {
   const { isAuthenticated } = useAuthStore();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [code, setCode] = useState(() => localStorage.getItem('last_order_code') || '');
   const [phone, setPhone] = useState(() => localStorage.getItem('last_order_phone') || '');
   const [foundOrder, setFoundOrder] = useState<Order | null>(null);
   const [myOrders, setMyOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
+  const [restartingOrderId, setRestartingOrderId] = useState<number | null>(null);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [lookupError, setLookupError] = useState('');
 
@@ -147,6 +150,35 @@ export default function Orders() {
       .then((response) => setMyOrders(response.data))
       .catch(() => undefined);
   }, [isAuthenticated]);
+
+  useEffect(() => {
+    const result = searchParams.get('payment');
+    const returnedCode = searchParams.get('order');
+    if (!result) return;
+    if (returnedCode) {
+      setCode(returnedCode);
+      localStorage.setItem('last_order_code', returnedCode);
+    }
+    if (result === 'success' || result === 'already_paid') {
+      toast.success(result === 'success' ? 'پرداخت با موفقیت تأیید شد.' : 'این پرداخت قبلاً تأیید شده بود.');
+    } else if (result === 'cancelled') {
+      toast.error('پرداخت در درگاه لغو شد؛ سفارش شما همچنان قابل پیگیری است.');
+    } else {
+      toast.error('تأیید پرداخت انجام نشد. پیش از تلاش مجدد وضعیت سفارش را بررسی کنید.');
+    }
+    setSearchParams({}, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  async function restartPayment(order: Order) {
+    setRestartingOrderId(order.id);
+    try {
+      const response = await paymentsApi.restartZarinpal(order.code, order.phone);
+      window.location.assign(response.data.payment.checkout_url);
+    } catch (error) {
+      toast.error(parseApiError(error).message);
+      setRestartingOrderId(null);
+    }
+  }
 
   async function cancel(order: Order) {
     if (!window.confirm('آیا از لغو این سفارش مطمئن هستید؟ موجودی رزروشده آزاد می‌شود.')) return;
@@ -291,7 +323,7 @@ export default function Orders() {
         )}
       </section>
 
-      {foundOrder && <OrderCard order={foundOrder} className="mt-6" onCancel={cancel} />}
+      {foundOrder && <OrderCard order={foundOrder} className="mt-6" onCancel={cancel} onRestartPayment={restartPayment} restarting={restartingOrderId === foundOrder.id} />}
 
       {/* Signed-in history */}
       {isAuthenticated && (
@@ -306,7 +338,7 @@ export default function Orders() {
           {myOrders.length ? (
             <div className="space-y-4">
               {myOrders.map((order) => (
-                <OrderCard key={order.id} order={order} onCancel={cancel} />
+                <OrderCard key={order.id} order={order} onCancel={cancel} onRestartPayment={restartPayment} restarting={restartingOrderId === order.id} />
               ))}
             </div>
           ) : (
@@ -324,12 +356,19 @@ function OrderCard({
   order,
   className = '',
   onCancel,
+  onRestartPayment,
+  restarting = false,
 }: {
   order: Order;
   className?: string;
   onCancel?: (order: Order) => void;
+  onRestartPayment?: (order: Order) => void;
+  restarting?: boolean;
 }) {
   const cancellable = order.status === 'awaiting_review' && order.payment_status === 'unpaid';
+  const canPay = order.payment_method === 'zarinpal'
+    && order.payment_status !== 'paid'
+    && order.status !== 'cancelled';
 
   return (
     <article
@@ -404,11 +443,49 @@ function OrderCard({
         </div>
       </dl>
 
+      {order.shipments?.map((shipment) => (
+        <section key={shipment.id} className="mt-4 rounded-2xl border border-sky-100 bg-sky-50/60 p-3.5 dark:border-sky-900 dark:bg-sky-950/30">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-fluid-2xs text-slate-500 dark:text-sky-200">{shipment.service_name || shipment.provider_label}</p>
+              <p className="text-fluid-sm font-extrabold text-sky-800 dark:text-sky-100">{shipment.status_label}</p>
+            </div>
+            {shipment.tracking_url && (
+              <a href={shipment.tracking_url} target="_blank" rel="noreferrer" className="rounded-lg bg-sky-700 px-3 py-2 text-fluid-2xs font-bold text-white">
+                رهگیری در سایت حامل
+              </a>
+            )}
+          </div>
+          {shipment.tracking_code && <p className="mt-2 text-fluid-xs text-slate-600 dark:text-sky-100">کد مرسوله: <b dir="ltr">{shipment.tracking_code}</b></p>}
+          {shipment.events?.length > 0 && (
+            <ol className="mt-3 space-y-2 border-s border-sky-200 ps-3 dark:border-sky-800">
+              {shipment.events.slice(0, 3).map((event) => (
+                <li key={event.id} className="text-fluid-2xs text-slate-600 dark:text-sky-100">
+                  <b>{event.status_label}</b> — {event.description}
+                  {event.location && <span>، {event.location}</span>}
+                  <time className="ms-2 text-slate-400">{new Date(event.occurred_at).toLocaleString('fa-IR')}</time>
+                </li>
+              ))}
+            </ol>
+          )}
+        </section>
+      ))}
+
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <span className="flex items-center gap-1.5 text-fluid-2xs text-slate-500 dark:text-emerald-200">
           <Truck size={13} aria-hidden="true" />
           {order.province}، {order.city}
         </span>
+        {canPay && onRestartPayment && (
+          <Button
+            size="sm"
+            className="ms-auto"
+            loading={restarting}
+            onClick={() => onRestartPayment(order)}
+          >
+            پرداخت با زرین‌پال
+          </Button>
+        )}
         {cancellable && onCancel && (
           <Button
             variant="danger"

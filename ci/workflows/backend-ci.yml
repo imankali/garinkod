@@ -5,6 +5,9 @@ on:
     branches: ["master", "arena/**"]
   pull_request:
 
+permissions:
+  contents: read
+
 concurrency:
   group: backend-${{ github.ref }}
   cancel-in-progress: true
@@ -59,11 +62,19 @@ jobs:
         run: python manage.py check
         env:
           DEBUG: "True"
+          DB_ENGINE: sqlite
 
       - name: Migrations are complete
         run: python manage.py makemigrations --check --dry-run
         env:
           DEBUG: "True"
+          DB_ENGINE: sqlite
+
+      - name: Validate OpenAPI contract
+        run: python manage.py spectacular --validate --file /tmp/openapi.yml
+        env:
+          DEBUG: "True"
+          DB_ENGINE: sqlite
 
       - name: Tests on SQLite with coverage
         run: |
@@ -72,6 +83,7 @@ jobs:
           coverage xml
         env:
           DEBUG: "True"
+          DB_ENGINE: sqlite
 
       # PostgreSQL is what production runs, so the suite must pass there too —
       # row locking and constraint behaviour differ from SQLite.
@@ -149,6 +161,10 @@ jobs:
           SECRET_KEY: ci-only-a7Xq2LmZ9pR4tYw8Nc3Vb6Hj1Kd5Fg0SsUuEeIiOoPpQqWw
           ALLOWED_HOSTS: garinkood.ir
           SECURE_SSL_REDIRECT: "True"
+          DB_ENGINE: sqlite
+          DB_NAME: /tmp/garinkood-ci.sqlite3
+          CACHE_URL: redis://127.0.0.1:6379/15
+          OPERATIONS_TOKEN: ci-only-operations-token-not-used-outside-this-job
 
       - name: Audit dependencies for known vulnerabilities
         run: pip-audit -r requirements.txt --strict

@@ -3,11 +3,18 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.http import HttpResponseRedirect
 from django.urls import include, path
+from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
 
-from shop import seo_views
+from shop import operational, seo_views
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path("api/docs/schema/", SpectacularAPIView.as_view(), name="api-schema"),
+    path("api/docs/", SpectacularSwaggerView.as_view(url_name="api-schema"), name="api-swagger"),
+    path("api/docs/redoc/", SpectacularRedocView.as_view(url_name="api-schema"), name="api-redoc"),
+    path("health/live/", operational.liveness, name="health-live"),
+    path("ops/health/ready/", operational.ProtectedReadinessView.as_view(), name="health-ready"),
+    path("ops/metrics/", operational.metrics, name="prometheus-metrics"),
     path("api/", include("shop.api_urls")),
     path("robots.txt", seo_views.robots_txt, name="robots"),
     path("sitemap.xml", seo_views.sitemap_xml, name="sitemap"),

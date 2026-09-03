@@ -8,23 +8,44 @@
 # Core web framework and REST API
 Django==5.2.17
 # https://www.django-rest-framework.org/
-djangorestframework==3.16.1
+djangorestframework==3.17.2
 # Filtering used by the public catalogue and marketplace endpoints
 django-filter==25.2
 # Same-origin/CORS handling for the frontend proxy
 django-cors-headers==4.9.0
+# Protected OpenAPI schema and Swagger/Redoc views
+drf-spectacular==0.30.0
+
+# Operations, audit and controlled administration
+django-import-export==4.4.1
+django-simple-history==3.13.0
+django-axes==8.3.1
+django-health-check==4.5.1
+django-prometheus==2.5.0
+django-waffle==5.0.0
+sentry-sdk==2.68.1
 
 # Database and configuration
 # PostgreSQL driver used when DB_ENGINE=postgresql.
 # The binary distribution keeps local/container installs reproducible.
 psycopg2-binary==2.9.12
 python-decouple==3.8
+# Official-provider HTTP clients (payments, shipping and Web Push)
+requests==2.33.0
 
 # Media uploads and static assets
 # Validates/resizes product, comment, visual-search and storefront images.
 Pillow==12.3.0
 # Production static-file serving; the brotli extra enables compressed responses.
 whitenoise[brotli]==6.12.0
+# Optional S3-compatible media backend; local development remains filesystem based.
+django-storages[s3]==1.14.6
+boto3==1.43.87
+
+# Search and browser notifications
+# Both integrations are opt-in and keep a database/browser fallback when unconfigured.
+meilisearch==0.43.0
+pywebpush==2.5.0
 
 # WSGI production server
 gunicorn==23.0.0

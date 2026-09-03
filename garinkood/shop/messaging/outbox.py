@@ -16,6 +16,7 @@ from shop.models import (
     NotificationRecipient,
     NotificationTemplate,
     Order,
+    WebPushSubscription,
 )
 from shop.phone_numbers import mask_phone, normalize_iranian_mobile
 
@@ -70,10 +71,13 @@ DEFAULT_BODIES: dict[tuple[str, str, str], str] = {
     ('order_status_changed', 'customer', 'whatsapp'): (
         'گرین کود: وضعیت سفارش {order_code} به «{status_label}» تغییر کرد.'
     ),
+    ('order_status_changed', 'customer', 'webpush'): (
+        'وضعیت سفارش {order_code} به «{status_label}» تغییر کرد.'
+    ),
 }
 
 _TOKEN_PATTERN = re.compile(r'\{([A-Za-z0-9_]+)\}')
-_CHANNEL_LIMITS = {'sms': 1800, 'bale': 4000, 'telegram': 4000, 'whatsapp': 4000}
+_CHANNEL_LIMITS = {'sms': 1800, 'bale': 4000, 'telegram': 4000, 'whatsapp': 4000, 'webpush': 500}
 
 
 @dataclass(frozen=True)
@@ -91,6 +95,7 @@ def _channel_enabled(channel: str) -> bool:
         'bale': settings.MESSAGING_ENABLE_BALE,
         'telegram': settings.MESSAGING_ENABLE_TELEGRAM,
         'whatsapp': settings.MESSAGING_ENABLE_WHATSAPP,
+        'webpush': settings.WEBPUSH_ENABLED,
     }.get(channel, False)
 
 
@@ -121,9 +126,24 @@ def _database_owner_routes(event: str) -> Iterable[Route]:
             yield Route(recipient.channel, recipient.destination)
 
 
+def _webpush_active_for_user(user) -> bool:
+    if not user or not _channel_enabled('webpush'):
+        return False
+    from waffle.models import Flag
+
+    flag = Flag.objects.filter(name='web_push').first()
+    return bool(flag and (flag.everyone is True or flag.is_active_for_user(user) is True))
+
+
 def _customer_routes(order: Order, event: str) -> Iterable[Route]:
     if event != NotificationTemplate.EVENT_ORDER_STATUS_CHANGED:
         return
+    if order.user_id and _webpush_active_for_user(order.user):
+        subscriptions = WebPushSubscription.objects.filter(user_id=order.user_id, is_active=True)
+        for subscription_id in subscriptions.values_list('id', flat=True).iterator():
+            yield Route(
+                'webpush', str(subscription_id), NotificationTemplate.AUDIENCE_CUSTOMER
+            )
     for channel in settings.NOTIFICATION_CUSTOMER_STATUS_CHANNELS:
         channel = str(channel).strip()
         if channel not in {'sms', 'bale', 'whatsapp'} or not _channel_enabled(channel):
@@ -272,6 +292,9 @@ def enqueue_order_event(order: Order, event: str) -> int:
                     'payload': {
                         'order_code': context['order_code'],
                         'provider_options': provider_options,
+                        'push_title': 'به‌روزرسانی سفارش گرین کود',
+                        'push_url': f'/orders?order={context["order_code"]}',
+                        'push_tag': f'order-{context["order_code"]}',
                     },
                     'max_attempts': settings.NOTIFICATION_MAX_ATTEMPTS,
                 },

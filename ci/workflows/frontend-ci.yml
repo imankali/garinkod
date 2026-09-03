@@ -5,6 +5,9 @@ on:
     branches: ["master", "arena/**"]
   pull_request:
 
+permissions:
+  contents: read
+
 concurrency:
   group: frontend-${{ github.ref }}
   cancel-in-progress: true
@@ -45,19 +48,12 @@ jobs:
           retention-days: 7
 
   e2e:
-    name: End-to-end (${{ matrix.project }})
+    # One runner executes all six Playwright projects. This avoids paying six
+    # times for dependency installation, database seeding and browser downloads.
+    name: Cross-browser end-to-end
     runs-on: ubuntu-latest
+    timeout-minutes: 35
     needs: quality
-    strategy:
-      fail-fast: false
-      matrix:
-        project:
-          - desktop-chromium
-          - desktop-firefox
-          - desktop-webkit
-          - mobile-chromium
-          - mobile-safari
-          - tablet
 
     services:
       postgres:
@@ -151,7 +147,7 @@ jobs:
         run: npm run build
 
       - name: Run end-to-end tests
-        run: npx playwright test --project=${{ matrix.project }}
+        run: npx playwright test
         env:
           E2E_MODERATOR_USERNAME: e2e-moderator
           E2E_MODERATOR_PASSWORD: E2eModerator!234
@@ -160,7 +156,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report-${{ matrix.project }}
+          name: playwright-report
           path: |
             frontend/playwright-report
             frontend/test-results

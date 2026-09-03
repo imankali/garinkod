@@ -23,6 +23,7 @@ import {
   X,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { Helmet } from 'react-helmet-async';
 
 import { agricultureApi, messagesApi, storefrontPostsApi, storefrontsApi } from '../api/services';
 import { parseApiError } from '../api/errors';
@@ -242,6 +243,8 @@ export default function StorefrontPage() {
 
   if (loadError || !profile) {
     return (
+      <>
+      <Helmet><title>غرفه پیدا نشد | گرین کود</title><meta name="robots" content="noindex,nofollow" /></Helmet>
       <div className="mx-auto max-w-3xl px-[var(--page-gutter)] py-16 text-center">
         <h1 className="text-xl font-extrabold text-slate-800 dark:text-white">غرفه پیدا نشد</h1>
         <p className="mt-2 text-sm text-slate-500 dark:text-emerald-200">
@@ -254,14 +257,53 @@ export default function StorefrontPage() {
           مشاهده همه غرفه‌ها
         </Link>
       </div>
+      </>
     );
   }
 
   const { storefront, listings, posts, stories, highlights, counts } = profile;
   const isOwner = storefront.is_owner;
+  const siteUrl = (import.meta.env.VITE_SITE_URL || window.location.origin).replace(/\/$/, '');
+  const storefrontUrl = `${siteUrl}/storefronts/${encodeURIComponent(storefront.slug)}`;
+  const seoDescription = (
+    storefront.bio.trim()
+    || `${storefront.seller_type_label} در ${[storefront.city, storefront.province].filter(Boolean).join('، ') || 'بازار کشاورزی گرین کود'}`
+  ).slice(0, 160);
+  const socialImage = storefront.cover_url || storefront.avatar_url;
+  const structuredData = {
+    '@context': 'https://schema.org',
+    '@type': 'Store',
+    '@id': `${storefrontUrl}#store`,
+    name: storefront.name,
+    description: seoDescription,
+    url: storefrontUrl,
+    ...(socialImage ? { image: new URL(socialImage, `${siteUrl}/`).href } : {}),
+    ...(storefront.city || storefront.province ? {
+      address: {
+        '@type': 'PostalAddress',
+        addressLocality: storefront.city || undefined,
+        addressRegion: storefront.province || undefined,
+        addressCountry: 'IR',
+      },
+    } : {}),
+  };
 
   return (
-    <div className="mx-auto max-w-5xl px-[var(--page-gutter)] py-6">
+    <>
+      <Helmet>
+        <title>{`${storefront.name} | غرفه‌های گرین کود`}</title>
+        <meta name="description" content={seoDescription} />
+        <meta name="robots" content="index,follow,max-image-preview:large" />
+        <link rel="canonical" href={storefrontUrl} />
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content={`${storefront.name} | گرین کود`} />
+        <meta property="og:description" content={seoDescription} />
+        <meta property="og:url" content={storefrontUrl} />
+        {socialImage && <meta property="og:image" content={new URL(socialImage, `${siteUrl}/`).href} />}
+        <meta name="twitter:card" content={socialImage ? 'summary_large_image' : 'summary'} />
+        <script type="application/ld+json">{JSON.stringify(structuredData)}</script>
+      </Helmet>
+      <div className="mx-auto max-w-5xl px-[var(--page-gutter)] py-6">
       {/* Cover */}
       <div className="relative h-36 overflow-hidden rounded-3xl bg-gradient-to-l from-emerald-600 to-lime-500 sm:h-48">
         {storefront.cover_url && (
@@ -759,7 +801,8 @@ export default function StorefrontPage() {
           />
         )}
       </AnimatePresence>
-    </div>
+      </div>
+    </>
   );
 }
 

@@ -17,6 +17,9 @@ export interface Category {
   name: string;
   slug: string;
   image: string | null;
+  description?: string;
+  seo_title?: string;
+  seo_description?: string;
   subcategories?: SubCategory[];
   product_count: number;
 }
@@ -73,6 +76,18 @@ export interface Product {
   image: string | null;
   image_url: string;
   is_in_stock: boolean;
+  discount_percent: number;
+  sales_count: number;
+  discounted_price: number;
+  brand: string;
+  sku: string;
+  gtin: string;
+  seo_title: string;
+  seo_description: string;
+  shipping_weight_grams: number;
+  shipping_length_cm: number;
+  shipping_width_cm: number;
+  shipping_height_cm: number;
 
   // ✅ فیلدهای detail (اختیاری - فقط در detail endpoint برمی‌گردند)
   fertilizer_detail?: FertilizerDetail;
@@ -100,6 +115,8 @@ export interface ProductList {
   discount_percent: number;
   sales_count: number;
   discounted_price: number;
+  brand: string;
+  sku: string;
 }
 
 // ========================================
@@ -298,6 +315,33 @@ export interface OrderItem {
   total_price: number;
 }
 
+export interface ShipmentTrackingEvent {
+  id: number;
+  status: string;
+  status_label: string;
+  description: string;
+  location: string;
+  occurred_at: string;
+}
+
+export interface Shipment {
+  id: string;
+  provider: string;
+  provider_label: string;
+  service_name: string;
+  status: string;
+  status_label: string;
+  tracking_code: string;
+  tracking_url: string;
+  shipping_cost: number;
+  shipped_at: string | null;
+  delivered_at: string | null;
+  last_event_at: string | null;
+  events: ShipmentTrackingEvent[];
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Order {
   id: number;
   code: string;
@@ -308,11 +352,15 @@ export interface Order {
   city: string;
   address: string;
   postal_code: string;
+  latitude: string | null;
+  longitude: string | null;
   notes: string;
   subtotal: number;
   discount_amount: number;
   coupon_code: string;
   shipping_price: number;
+  shipping_provider: string;
+  shipping_service: string;
   total_price: number;
   status: string;
   status_label: string;
@@ -322,6 +370,7 @@ export interface Order {
   payment_method_label: string;
   total_items: number;
   items: OrderItem[];
+  shipments: Shipment[];
   created_at: string;
   updated_at: string;
 }
@@ -334,6 +383,8 @@ export interface CheckoutPayload {
   city: string;
   address: string;
   postal_code?: string;
+  latitude?: number;
+  longitude?: number;
   notes?: string;
   payment_method: 'coordination' | 'zarinpal' | 'stripe_card' | 'paypal' | 'crypto';
   affiliate_code?: string;
@@ -348,6 +399,37 @@ export interface PaymentProviderOption {
   enabled: boolean;
   configured: boolean;
   reason: string;
+}
+
+export interface PaymentAttempt {
+  id: number;
+  provider: string;
+  provider_label: string;
+  status: string;
+  status_label: string;
+  amount: number;
+  currency: string;
+  checkout_url: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ShippingQuote {
+  provider: string;
+  service: string;
+  label: string;
+  amount: number;
+  currency: 'IRT';
+  estimated_days_min: number | null;
+  estimated_days_max: number | null;
+}
+
+export interface WebPushSubscriptionSummary {
+  id: string;
+  endpoint_fingerprint: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface AffiliateProfile {

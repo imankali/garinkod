@@ -1,382 +1,152 @@
+# گرین کود (GarinKood)
 
-# 🌱 گرین کود | GarinKood
+پلتفرم فارسی و RTL برای فروش نهاده‌های کشاورزی، بازار غرفه‌داران، خدمات مزرعه و پیگیری سفارش؛ با **Django 5.2 + Django REST Framework** و **React + TypeScript + Vite**.
 
-<div align="center">
+> اتصال‌های بیرونی این مخزن به‌صورت امن و پیش‌فرض غیرفعال‌اند. وجود کد یک درگاه، پیام‌رسان، object storage یا موتور جستجو به معنی فعال بودن سرویس واقعی نیست؛ فعال‌سازی فقط پس از تنظیم secret، آزمون sandbox و تأیید سمت ارائه‌دهنده انجام می‌شود.
 
-![GarinKood](https://img.shields.io/badge/GarinKood-فروشگاه%20کشاورزی-0F8A5F?style=for-the-badge)
-![Django](https://img.shields.io/badge/Django-5.2-092E20?style=flat-square&logo=django&logoColor=white)
-![React](https://img.shields.io/badge/React-18.3-61DAFB?style=flat-square&logo=react&logoColor=black)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6?style=flat-square&logo=typescript&logoColor=white)
-![Tailwind](https://img.shields.io/badge/Tailwind-4.0-38B2AC?style=flat-square&logo=tailwind-css&logoColor=white)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=flat-square&logo=postgresql&logoColor=white)
+## قابلیت‌های اصلی
 
-**فروشگاه تخصصی نهاده‌های کشاورزی**  
-*سموم، کودها، بذور، ادوات و تجهیزات کشاورزی*
+- فروشگاه، فیلتر و جستجو، سبد مهمان/کاربر، کوپن و checkout اتمیک
+- سفارش، رزرو و بازگردانی موجودی، تاریخچه وضعیت و پیگیری مرسوله
+- بازار غرفه‌داران، آگهی، پست/استوری، دنبال‌کردن، گفت‌وگو و تسویه ثبت‌شده
+- ورود با کوکی HttpOnly، رمز عبور یا OTP موبایل، محدودسازی نرخ و قفل brute-force با Axes
+- صندوق پیام داخلی و outbox پایدار برای SMS، بله، تلگرام، WhatsApp و Web Push
+- پنل مدیریت نقش‌محور، audit log کسب‌وکار، تاریخچه انتخابی و import/export کنترل‌شده
+- داده مرجع استان/شهر، تقویم مزرعه، درخواست مشاوره و ماشین‌حساب دوز
+- PWA مبتنی بر Workbox، cache محدود، نصب‌پذیری و اعلان مرورگر چنددستگاهی
+- SEO مسیر/محصول، canonical و JSON-LD، sitemap/robots، صفحات حریم خصوصی و شرایط
+- health/readiness، Prometheus، JSON logging و Sentry اختیاری
 
-[🚀 شروع سریع](#-شروع-سریع) • [📚 مستندات](#-مستندات) • [🎨 ویژگی‌ها](#-ویژگی‌ها)
+## وضعیت اتصال‌های اختیاری
 
-</div>
+| قابلیت | وضعیت کد | شرط بهره‌برداری واقعی |
+|---|---|---|
+| Zarinpal v4 (IRT) | چرخه request/verify و replay-safe پیاده‌سازی شده، خاموش | Merchant ID، HTTPS callback و آزمون موفق sandbox/production |
+| ارسال | نرخ ثابت و fulfillment دستی فعال | هیچ carrier زنده‌ای بدون قرارداد و مستند رسمی ادعا نشده است |
+| Meilisearch | رتبه‌بندی اختیاری با fallback خودکار ORM | کلید/API سالم، sync index و Waffle flag `external_search` |
+| Web Push | VAPID + outbox + مالکیت per-browser | VAPID معتبر، worker و Waffle flag `web_push` |
+| S3-compatible media | backend اختیاری | bucket/IAM/CORS/lifecycle/backup تأییدشده |
+| Sentry | backend و frontend اختیاری، PII پیش‌فرض خاموش | DSN پروژه و سیاست retention تأییدشده |
+| آمار بازدید | Plausible-compatible و فقط پس از رضایت | تنظیم build و Waffle flag `privacy_analytics` |
+| SMS/بله/تلگرام/WhatsApp | providerهای رسمی در Messaging Hub | credential، template/webhook و آزمون تحویل واقعی |
 
----
+Stripe، PayPal و رمزارز در registry فقط به‌عنوان گزینه‌های **غیرفعال و پیاده‌نشده** نمایش داده می‌شوند و checkout آن‌ها را فعال تلقی نمی‌کند.
 
-## 📖 درباره پروژه
+## پیش‌نیازها
 
-**گرین کود** یک پلتفرم فروشگاهی کامل و مدرن برای فروش نهاده‌های کشاورزی است که با ترکیب **Django REST Framework** در بک‌اند و **React + TypeScript** در فرانت‌اند ساخته شده است.
+- Python 3.11 یا 3.12
+- Node.js 22 و npm
+- SQLite برای توسعه ساده؛ PostgreSQL 16 و Redis برای production/multi-worker
 
-این پروژه با تمرکز بر **تجربه کاربری کشاورزان ایرانی** طراحی شده و شامل ویژگی‌های تخصصی مانند:
-- 🌤️ ویجت هواشناسی با توصیه زراعی
-- 🧮 ماشین‌حساب مصرف سم و کود
-- 🌾 انتخاب محصول کشاورزی برای فیلتر هوشمند
-- 💳 خرید اقساطی با چک صیادی
-- 📸 تشخیص آفت با عکس
-- 🛒 سبد خرید با پشتیبانی از کاربران مهمان
+## شروع سریع
 
----
-
-## 🎨 ویژگی‌ها
-
-### 🛍️ فروشگاه
-- ✅ لیست محصولات با فیلتر و مرتب‌سازی پیشرفته
-- ✅ جستجوی هوشمند با پشتیبانی از جستجوی صوتی
-- ✅ مقایسه محصولات (تا ۳ محصول)
-- ✅ لیست علاقه‌مندی‌ها
-- ✅ سبد خرید با پشتیبانی از Guest Cart
-- ✅ انیمیشن FlyToCart هنگام افزودن به سبد
-
-### 👤 احراز هویت و سطوح دسترسی
-- ✅ ثبت‌نام و ورود با Token Authentication (کوکی HttpOnly)
-- ✅ پروفایل کاربر با آپلود تصویر پروفایل
-- ✅ پشتیبانی از کاربران مهمان (بدون لاگین)
-- ✅ **سطوح دسترسی ۱ تا ۵**: خریدار، غرفه‌دار، ناظر، مدیر، مالک سیستم
-
-### 🏪 بازار غرفه‌داران
-- ✅ صفحه عمومی هر غرفه با پست، استوری، هایلایت و Follow
-- ✅ فهرست کامل غرفه‌داران با فیلتر استان/شهر/نوع فروشنده
-- ✅ خرید مستقیم آگهی غرفه با رعایت حداقل سفارش
-- ✅ کمیسیون خودکار و تسویه به کیف پول فروشنده
-- ✅ پنل بررسی محتوا با دلیل رد و عملیات گروهی
-
-### 🌾 ویژگی‌های تخصصی کشاورزی
-- ✅ ویجت هواشناسی با توصیه زراعی
-- ✅ ماشین‌حساب مصرف سم و کود
-- ✅ انتخاب محصول کشاورزی (گندم، پسته، برنج، ...)
-- ✅ تشخیص آفت با عکس
-- ✅ خرید اقساطی با چک صیادی
-- ✅ تخفیف پلکانی برای خرید عمده B2B
-
-### 🎨 UI/UX
-- ✅ طراحی کاملاً Responsive (موبایل، تبلت، دسکتاپ)
-- ✅ Dark Mode با ذخیره در localStorage
-- ✅ انیمیشن‌های نرم با Framer Motion
-- ✅ فونت فارسی Vazirmatn
-- ✅ پشتیبانی کامل از RTL
-
-### 🔧 تکنیکال
-- ✅ TypeScript برای type safety
-- ✅ React Query برای مدیریت cache
-- ✅ Zustand برای state management
-- ✅ Vite Proxy برای ارتباط با Django
-- ✅ WhiteNoise برای serving static files
-- ✅ CORS و CSRF configuration
-
----
-
-## 🛠️ تکنولوژی‌ها
-
-### 🔙 Backend
-| تکنولوژی | نسخه | توضیح |
-|----------|------|-------|
-| Python | 3.11+ | زبان برنامه‌نویسی |
-| Django | 5.2 | فریم‌ورک وب |
-| Django REST Framework | 3.15+ | ساخت API |
-| PostgreSQL | 16+ | دیتابیس |
-| Pillow | 10.0+ | پردازش تصاویر |
-| django-cors-headers | 4.3+ | مدیریت CORS |
-| django-filter | 24.0+ | فیلتر کردن API |
-| whitenoise | 6.6+ | serving static files |
-| python-decouple | 3.8+ | مدیریت environment variables |
-
-### 🎨 Frontend
-| تکنولوژی | نسخه | توضیح |
-|----------|------|-------|
-| React | 18.3 | کتابخانه UI |
-| TypeScript | 5.7 | type safety |
-| Vite | 6.0+ | build tool |
-| Tailwind CSS | 4.0 | utility-first CSS |
-| Framer Motion | 11.0+ | انیمیشن‌ها |
-| React Router | 7.1+ | routing |
-| React Query | 5.62+ | data fetching |
-| Zustand | 5.0+ | state management |
-| Axios | 1.7+ | HTTP client |
-| Lucide React | 0.468+ | آیکون‌ها |
-| React Hot Toast | 2.4+ | notifications |
-
----
-
-## 📦 پیش‌نیازها
-
-قبل از شروع، مطمئن شوید که این‌ها نصب شده‌اند:
-
-- ✅ **Python 3.11+** - [دانلود](https://www.python.org/downloads/)
-- ✅ **Node.js 18+** - [دانلود](https://nodejs.org/)
-- ✅ **PostgreSQL 16+** - [دانلود](https://www.postgresql.org/download/)
-- ✅ **Git** - [دانلود](https://git-scm.com/)
-
----
-
-## 🚀 شروع سریع
-
-### ۱. کلون کردن پروژه
+### Backend
 
 ```bash
-git clone https://github.com/your-username/garinkood.git
 cd garinkood
-۲. راه‌اندازی Backend (Django)
-# ساخت virtual environment
-python -m venv venv
-
-# فعال‌سازی virtual environment
-# Windows:
-venv\Scripts\activate
-# Linux/Mac:
-source venv/bin/activate
-
-# نصب dependencies
-pip install -r requirements.txt
-
-# ساخت فایل .env
-cd garinkood
-copy .env.example .env  # Windows
-# cp .env.example .env  # Linux/Mac
-
-# ویرایش .env و وارد کردن اطلاعات دیتابیس
-
-# اعمال migrations
+python -m venv .venv
+source .venv/bin/activate       # Windows: .venv\Scripts\activate
+python -m pip install --upgrade pip
+pip install -r requirements-dev.txt
+cp .env.example .env
 python manage.py migrate
-
-# بارگذاری داده‌های مرجع (لازم برای فرم آدرس و محاسبه‌گر)
-python manage.py seed_locations         # ۳۱ استان و ۵۷۶ شهر ایران
-python manage.py seed_agri_inputs       # ۱۲ کود/سم و ۵۳ دوز ثبت‌شده
+python manage.py seed_locations
+python manage.py seed_agri_inputs
 python manage.py bootstrap_management_roles
-
-# داده نمونه بازار (اختیاری — فقط برای توسعه)
-python manage.py seed_demo_marketplace
-
-# ساخت superuser (ادمین — به‌صورت خودکار سطح ۵ می‌گیرد)
 python manage.py createsuperuser
-
-# اجرای سرور Django
 python manage.py runserver 0.0.0.0:8000
-۳. راه‌اندازی Frontend (React)
-# در یک terminal جدید
-cd frontend
-
-# نصب dependencies
-npm install
-
-# کپی فایل .env
-copy .env.example .env  # Windows
-# cp .env.example .env  # Linux/Mac
-
-# اجرای سرور Vite
-npm run dev
-۴. دسترسی به پروژه
-🌐 فرانت‌اند: http://localhost:5173
-🔙 بک‌اند API: http://localhost:8000/api/
-👨‍💼 پنل ادمین: http://localhost:8000/admin/
-📁 ساختار پروژه
-mysite/
-│
-├── 📁 frontend/                              # 🎨 پروژه React (فرانت‌اند)
-│   ├── 📁 node_modules/                      # ⚠️ Library root (نباید commit شود)
-│   ├── 📁 public/
-│   │   └── 📁 images/
-│   │       └── 📁 products/                  # 📸 تصاویر محصولات
-│   ├── 📁 src/
-│   │   ├── 📁 api/                           # 🔌 لایه ارتباط با API
-│   │   │   ├── 📄 client.ts                  # ✅ Axios instance
-│   │   │   └── 📄 services.ts                # ✅ API services
-│   │   ├── 📁 components/                    # 🧩 کامپوننت‌های React (۲۲ فایل)
-│   │   ├── 📁 data/
-│   │   │   └── 📄 shopData.ts                # داده‌های استاتیک
-│   │   ├── 📁 hooks/
-│   │   │   └── 📄 useDarkMode.ts
-│   │   ├── 📁 pages/                         # 📄 صفحات اصلی
-│   │   │   ├── 📄 Login.tsx
-│   │   │   └── 📄 Profile.tsx
-│   │   ├── 📁 store/                         # 🗄️ Zustand stores
-│   │   │   ├── 📄 authStore.ts
-│   │   │   └── 📄 cartStore.ts
-│   │   ├── 📁 types/
-│   │   │   └── 📄 index.ts                   # ✅ TypeScript interfaces
-│   │   ├── 📁 utils/
-│   │   │   ├── 📄 cn.ts
-│   │   │   └── 📄 formatPrice.ts
-│   │   ├── 📄 App.tsx                        # ✅ اصلی با Router
-│   │   ├── 📄 index.css                      # Tailwind + custom styles
-│   │   └── 📄 main.tsx                       # ✅ با QueryClient
-│   ├── 📄 index.html
-│   ├── 📄 package.json
-│   ├── 📄 tsconfig.json
-│   └── 📄 vite.config.ts                     # ✅ با proxy
-│
-├── 📁 garinkood/                             # 🐍 پروژه Django (بک‌اند)
-│   ├── 📁 garinkood/                         # ⚙️ پکیج اصلی Django
-│   │   ├── 📄 settings.py                    # ✅ CORS + ALLOWED_HOSTS
-│   │   ├── 📄 urls.py                        # ✅ Redirect به React
-│   │   └── 📄 wsgi.py
-│   ├── 📁 products/                          # 📸 Media files
-│   ├── 📁 shop/                              # 🛒 اپلیکیشن فروشگاه
-│   │   ├── 📁 migrations/
-│   │   ├── 📄 admin.py
-│   │   ├── 📄 api_urls.py                    # ✅ API URLs
-│   │   ├── 📄 api_views.py                   # ✅ API Views
-│   │   ├── 📄 models.py                      # ✅ مدل‌ها
-│   │   ├── 📄 serializers.py                 # ✅ DRF Serializers
-│   │   └── 📄 views.py
-│   ├── 📁 staticfiles/                       # 📦 Static files
-│   ├── 📄 .env                               # ✅ Environment variables
-│   └── 📄 manage.py
-│
-├── 📁 venv/                                  # 🐍 محیط مجازی Python
-├── 📄 .gitignore
-└── 📄 README.md
-🔌 API Endpoints
-📦 Products
-Method
-Endpoint
-توضیح
-GET
-/api/products/
-لیست محصولات (paginated)
-GET
-/api/products/{slug}/
-جزئیات محصول
-GET
-/api/products/featured/
-محصولات ویژه
-GET
-/api/products/by_category/?category=slug
-محصولات بر اساس دسته
-📂 Categories
-Method
-Endpoint
-توضیح
-GET
-/api/categories/
-لیست دسته‌بندی‌ها
-GET
-/api/categories/{slug}/
-جزئیات دسته‌بندی
-🛒 Cart
-Method
-Endpoint
-توضیح
-GET
-/api/cart/
-دریافت سبد خرید
-POST
-/api/cart/add/
-افزودن به سبد
-POST
-/api/cart/remove/
-حذف از سبد
-POST
-/api/cart/update_quantity/
-به‌روزرسانی تعداد
-👤 Authentication
-Method
-Endpoint
-توضیح
-POST
-/api/auth/login/
-ورود
-POST
-/api/auth/register/
-ثبت‌نام
-POST
-/api/auth/logout/
-خروج
-GET
-/api/profile/
-دریافت پروفایل
-PATCH
-/api/profile/
-به‌روزرسانی پروفایل
-💬 Comments
-Method
-Endpoint
-توضیح
-GET
-/api/comments/
-لیست نظرات
-POST
-/api/comments/
-ثبت نظر
-GET
-/api/comments/by_product/?product=slug
-نظرات یک محصول
-🧪 تست
-Backend Tests
-cd garinkood
-python manage.py test shop
-Frontend Type Check
-cd frontend
-npm run type-check
-Frontend Lint
-cd frontend
-npm run lint
-🏗️ Build برای Production
-Frontend
-cd frontend
-npm run build
-خروجی در پوشه frontend/dist/ قرار می‌گیرد.
-Backend
-cd garinkood
-python manage.py collectstatic
-فایل‌های static در پوشه staticfiles/ جمع‌آوری می‌شوند.
-📨 Messaging Hub و ورود OTP
-راهنمای پیکربندی providerهای رسمی، worker، قالب‌ها، webhook واتساپ و امنیت OTP:
-[docs/messaging-hub.md](docs/messaging-hub.md)
-
-🌍 Environment Variables
-Backend (garinkood/.env)
-SECRET_KEY=your-secret-key-here
-DEBUG=True
-DB_NAME=garinkood
-DB_USER=postgres
-DB_PASSWORD=your-password
-DB_HOST=localhost
-DB_PORT=5432
-Frontend (frontend/.env)
-VITE_PHONE_NUMBER=02112345678
-VITE_WHATSAPP_NUMBER=989123456789
-VITE_APP_NAME=گرین کود
-🤝 مشارکت
-مشارکت شما باعث خوشحالی ماست! 🎉
-Fork پروژه را بگیرید
-Branch جدید بسازید (git checkout -b feature/AmazingFeature)
-Commit کنید (git commit -m 'Add some AmazingFeature')
-Push کنید (git push origin feature/AmazingFeature)
-Pull Request باز کنید
-📝 لایسنس
-این پروژه تحت لایسنس MIT منتشر شده است - جزئیات را در فایل LICENSE ببینید.
-👥 تیم توسعه
-توسعه‌دهنده اصلی - [imannosrati]
-طراح UI/UX - [imannosrati]
-📞 تماس
-🌐 وبسایت: garinkood.ir
-📧 ایمیل: info@garinkood.ir
-📱 تلفن: ۰۲۱-۱۲۳۴۵۶۷۸
-🙏 قدردانی
-🎨 Tailwind CSS
-⚛️ React
-🐍 Django
-🎬 Framer Motion
-🎯 Lucide Icons
-<div align="center">
-
-ساخته شده با ❤️ برای کشاورزان ایران
-⭐ اگر این پروژه برایتان مفید بود، لطفاً یک ستاره بدهید!
-</div>
 ```
+
+فایل نمونه برای توسعه از SQLite استفاده می‌کند. برای production همه مقادیر نمونه و placeholderها را با secret/config واقعی جایگزین کنید.
+
+Worker پیام‌های پایدار باید جدا از web process اجرا شود:
+
+```bash
+python manage.py process_notifications --watch
+```
+
+### Frontend
+
+```bash
+cd frontend
+npm ci
+cp .env.example .env.local
+npm run dev -- --host 0.0.0.0
+```
+
+در توسعه، Vite درخواست‌های `/api`، `/media` و `/static` را به Django روی پورت 8000 proxy می‌کند. در production نیز reverse proxy باید همین مسیرهای same-origin را مسیریابی کند.
+
+- فروشگاه: `http://localhost:5173`
+- API: `http://localhost:8000/api/`
+- مدیریت: `http://localhost:8000/admin/`
+- OpenAPI/Swagger: `/api/docs/` (فقط نشست staff)
+- liveness عمومی: `/health/live/`
+- readiness محافظت‌شده: `/ops/health/ready/`
+- metrics محافظت‌شده: `/ops/metrics/`
+
+## کنترل کیفیت
+
+```bash
+# Backend
+cd garinkood
+DB_ENGINE=sqlite DEBUG=True python manage.py check
+DB_ENGINE=sqlite DEBUG=True python manage.py makemigrations --check --dry-run
+DB_ENGINE=sqlite DEBUG=True python manage.py spectacular --validate --file /tmp/openapi.yml
+DB_ENGINE=sqlite DEBUG=True python manage.py test shop
+
+# Frontend
+cd ../frontend
+npm run type-check
+npm run lint
+npm run build
+npm audit
+```
+
+Production باید علاوه بر SQLite روی PostgreSQL آزموده شود، چون row lock و partial unique constraint رفتار متفاوتی دارند. قالب‌های تعمیرشده CI هر دو backend را پوشش می‌دهند؛ به‌دلیل محدودیت permission اپ GitHub، روش فعال‌سازی آن‌ها در `ci/README.md` ثبت شده است.
+
+## deployment خلاصه
+
+1. image/dependencyهای pin‌شده را build و audit کنید.
+2. PostgreSQL backup بگیرید و migration را ابتدا در staging اجرا کنید.
+3. `python manage.py check --deploy --fail-level WARNING` را با env واقعی اجرا کنید.
+4. `collectstatic` و build فرانت‌اند را تولید کنید.
+5. web process و notification worker را با health/restart policy مستقل بالا بیاورید.
+6. reverse proxy را برای TLS، `/api`، `/admin`، `/static` و `/media` تنظیم کنید.
+7. readiness و metrics را فقط با staff session یا `OPERATIONS_TOKEN` مانیتور کنید.
+8. هر اتصال خارجی را جداگانه با sandbox/test destination فعال و سپس Waffle rollout کنید.
+
+جزئیات rollback، backup، monitoring و rotation در [راهنمای عملیات](docs/operations-runbook.md) و تنظیم providerها در [راهنمای integrationها](docs/integrations.md) آمده است.
+
+## ساختار مهم
+
+```text
+garinkood/                 Django project
+  garinkood/settings.py    security, database and optional integration config
+  shop/                    commerce, marketplace, messaging and operations
+  .env.example             backend configuration reference
+frontend/                  React/Vite application
+  src/                     pages, components, API contracts and stores
+  public/push-sw.js        Push event helper imported by generated Workbox SW
+  .env.example             public build-time settings (never secrets)
+docs/                      architecture, product and operations documentation
+ci/workflows/              repaired CI awaiting activation by a maintainer
+```
+
+## امنیت و داده
+
+- secretها فقط در environment/secret manager؛ متغیرهای `VITE_*` عمومی‌اند.
+- endpointهای Push، token احراز هویت و credential ارائه‌دهندگان نباید log شوند.
+- گزارش آسیب‌پذیری را عمومی منتشر نکنید؛ آن را خصوصی به maintainer مخزن ارسال کنید.
+- متن‌های حقوقی داخل محصول باید پیش از عرضه هر کشور توسط مسئول حقوقی همان حوزه بازبینی شوند.
+
+## مستندات تکمیلی
+
+- [Messaging Hub و OTP](docs/messaging-hub.md)
+- [راهنمای عملیات و انتشار](docs/operations-runbook.md)
+- [اتصال‌های اختیاری و هزینه عملیاتی](docs/integrations.md)
+- [مرکز فرمان مدیریت](docs/management-command-centre-fa.md)
+- [استانداردهای UI/UX](docs/ui-ux-standards-fa.md)
+
+## مجوز
+
+این مخزن در حال حاضر فایل مجوز صریح ندارد؛ پیش از توزیع یا استفاده تجاری، مالک پروژه باید مجوز مناسب را تعیین کند.

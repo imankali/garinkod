@@ -8,6 +8,7 @@ from django.urls import reverse
 from django.conf import settings
 from django.db.models import Q, Sum, F
 from django.db.models.functions import Lower
+from simple_history.models import HistoricalRecords
 
 
 # --- Managers ---
@@ -24,6 +25,10 @@ class Category(models.Model):
     name = models.CharField(max_length=100, verbose_name="نام دسته")
     slug = models.SlugField(unique=True, verbose_name="اسلاگ")
     image = models.ImageField(upload_to='categories/', blank=True, null=True)
+    description = models.TextField(blank=True, max_length=1000, verbose_name="توضیح سئو")
+    seo_title = models.CharField(max_length=70, blank=True, verbose_name="عنوان سئو")
+    seo_description = models.CharField(max_length=170, blank=True, verbose_name="توضیح متا")
+    history = HistoricalRecords()
 
     class Meta:
         verbose_name = "دسته"
@@ -78,8 +83,18 @@ class Product(models.Model):
     image = models.ImageField(upload_to='products/', blank=True, null=True, verbose_name="تصویر")
     discount_percent = models.PositiveSmallIntegerField(default=0, verbose_name="درصد تخفیف")
     sales_count = models.PositiveIntegerField(default=0, verbose_name="تعداد فروش")
+    brand = models.CharField(max_length=120, blank=True, verbose_name="برند")
+    sku = models.CharField(max_length=80, blank=True, db_index=True, verbose_name="شناسه کالا")
+    gtin = models.CharField(max_length=14, blank=True, db_index=True, verbose_name="GTIN")
+    seo_title = models.CharField(max_length=70, blank=True, verbose_name="عنوان سئو")
+    seo_description = models.CharField(max_length=170, blank=True, verbose_name="توضیح متا")
+    shipping_weight_grams = models.PositiveIntegerField(default=0, verbose_name="وزن ارسال (گرم)")
+    shipping_length_cm = models.PositiveSmallIntegerField(default=0, verbose_name="طول بسته (سانتی‌متر)")
+    shipping_width_cm = models.PositiveSmallIntegerField(default=0, verbose_name="عرض بسته (سانتی‌متر)")
+    shipping_height_cm = models.PositiveSmallIntegerField(default=0, verbose_name="ارتفاع بسته (سانتی‌متر)")
 
     objects = ProductManager()
+    history = HistoricalRecords()
 
     class Meta:
         ordering = ('-publish',)
@@ -104,7 +119,7 @@ class Product(models.Model):
 
     @property
     def discounted_price(self) -> int:
-        """The price after the site-wide discount, rounded down to the rial."""
+        """The price after the site-wide discount, rounded down to تومان."""
         if self.discount_percent and self.discount_percent > 0:
             return max(int(self.price * (100 - self.discount_percent) / 100), 0)
         return self.price
@@ -465,11 +480,15 @@ class Order(models.Model):
     city = models.CharField(max_length=80, verbose_name='شهر')
     address = models.TextField(max_length=500, verbose_name='نشانی')
     postal_code = models.CharField(max_length=20, blank=True, verbose_name='کد پستی')
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     notes = models.TextField(max_length=1000, blank=True, verbose_name='توضیحات مشتری')
     subtotal = models.PositiveBigIntegerField(default=0)
     discount_amount = models.PositiveBigIntegerField(default=0)
     coupon_code = models.CharField(max_length=40, blank=True, db_index=True)
     shipping_price = models.PositiveBigIntegerField(default=0)
+    shipping_provider = models.CharField(max_length=30, default='flat')
+    shipping_service = models.CharField(max_length=80, default='standard')
     total_price = models.PositiveBigIntegerField(default=0)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='awaiting_review', db_index=True)
     payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='unpaid', db_index=True)
@@ -477,6 +496,7 @@ class Order(models.Model):
     affiliate_code = models.CharField(max_length=32, blank=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    history = HistoricalRecords()
 
     class Meta:
         ordering = ('-created_at',)
@@ -500,6 +520,8 @@ class Order(models.Model):
                 return order
             if order.payment_status == 'paid':
                 raise ValueError('Paid orders require a refund workflow before cancellation.')
+            if order.payment_attempts.filter(status__in=['created', 'pending', 'processing']).exists():
+                raise ValueError('درخواست پرداخت فعال است؛ ابتدا نتیجه درگاه مشخص شود.')
             if order.status not in {'awaiting_review', 'confirmed'}:
                 raise ValueError('This order can no longer be self-cancelled.')
 
@@ -585,6 +607,88 @@ class OrderItem(models.Model):
     def seller_net_amount(self) -> int:
         """What the storefront owner earns once the platform fee is taken."""
         return max(self.total_price - self.commission_amount, 0)
+
+
+class Shipment(models.Model):
+    """A persisted fulfilment record independent of any one carrier API."""
+
+    PROVIDER_CHOICES = (
+        ('manual', 'ثبت دستی'),
+        ('postex', 'پستکس'),
+        ('tipax', 'تیپاکس'),
+        ('chapar', 'چاپار'),
+    )
+    STATUS_CHOICES = (
+        ('pending', 'در انتظار آماده‌سازی'),
+        ('ready', 'آماده تحویل به حامل'),
+        ('picked_up', 'تحویل به حامل'),
+        ('in_transit', 'در مسیر'),
+        ('out_for_delivery', 'در حال توزیع'),
+        ('delivered', 'تحویل‌شده'),
+        ('exception', 'نیازمند پیگیری'),
+        ('returned', 'مرجوع‌شده'),
+        ('cancelled', 'لغوشده'),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='shipments')
+    provider = models.CharField(max_length=30, choices=PROVIDER_CHOICES, default='manual')
+    service_name = models.CharField(max_length=100, blank=True)
+    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='pending', db_index=True)
+    tracking_code = models.CharField(max_length=120, blank=True, db_index=True)
+    tracking_url = models.URLField(blank=True)
+    external_id = models.CharField(max_length=160, blank=True, db_index=True)
+    shipping_cost = models.PositiveBigIntegerField(default=0, help_text='مبلغ به تومان')
+    provider_payload = models.JSONField(default=dict, blank=True)
+    shipped_at = models.DateTimeField(null=True, blank=True)
+    delivered_at = models.DateTimeField(null=True, blank=True)
+    last_event_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    history = HistoricalRecords()
+
+    class Meta:
+        ordering = ('-created_at',)
+        verbose_name = 'مرسوله'
+        verbose_name_plural = 'مرسوله‌ها'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['provider', 'external_id'],
+                condition=~Q(external_id=''),
+                name='unique_shipment_provider_external_id',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.order.code} — {self.get_provider_display()} — {self.get_status_display()}'
+
+
+class ShipmentTrackingEvent(models.Model):
+    """Append-only normalized carrier or manually entered tracking update."""
+
+    shipment = models.ForeignKey(Shipment, on_delete=models.CASCADE, related_name='events')
+    provider_event_id = models.CharField(max_length=160, blank=True)
+    status = models.CharField(max_length=30, choices=Shipment.STATUS_CHOICES)
+    description = models.CharField(max_length=500)
+    location = models.CharField(max_length=160, blank=True)
+    occurred_at = models.DateTimeField(db_index=True)
+    raw_payload = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ('-occurred_at', '-id')
+        verbose_name = 'رویداد رهگیری'
+        verbose_name_plural = 'رویدادهای رهگیری'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['shipment', 'provider_event_id'],
+                condition=~Q(provider_event_id=''),
+                name='unique_tracking_provider_event',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.shipment_id} — {self.get_status_display()}'
 
 
 # --- Agricultural service and procurement leads ---
@@ -873,7 +977,7 @@ class PaymentAttempt(models.Model):
     provider = models.CharField(max_length=20, choices=PROVIDER_CHOICES)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='created', db_index=True)
     amount = models.PositiveBigIntegerField()
-    currency = models.CharField(max_length=8, default='IRR')
+    currency = models.CharField(max_length=8, default='IRT')
     idempotency_key = models.CharField(max_length=64, unique=True)
     external_reference = models.CharField(max_length=255, blank=True, db_index=True)
     checkout_url = models.URLField(blank=True)
@@ -882,11 +986,19 @@ class PaymentAttempt(models.Model):
     expires_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    history = HistoricalRecords()
 
     class Meta:
         ordering = ('-created_at',)
         verbose_name = 'تلاش پرداخت'
         verbose_name_plural = 'تلاش‌های پرداخت'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['order', 'provider'],
+                condition=Q(status__in=['created', 'pending', 'processing']),
+                name='unique_active_payment_attempt',
+            ),
+        ]
 
     def __str__(self):
         return f"{self.order.code} — {self.provider} — {self.status}"
@@ -970,7 +1082,7 @@ class FinancialLedgerEntry(models.Model):
     entry_type = models.CharField(max_length=30, choices=ENTRY_TYPE_CHOICES)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending', db_index=True)
     amount = models.BigIntegerField(help_text='Positive for credit, negative for debit.')
-    currency = models.CharField(max_length=8, default='IRR')
+    currency = models.CharField(max_length=8, default='IRT')
     description = models.CharField(max_length=500)
     metadata = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -1129,7 +1241,7 @@ class Coupon(models.Model):
 
 class Wallet(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='wallet')
-    currency = models.CharField(max_length=8, default='IRR')
+    currency = models.CharField(max_length=8, default='IRT')
     balance = models.BigIntegerField(default=0)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -1839,11 +1951,13 @@ class NotificationTemplate(models.Model):
     CHANNEL_BALE = 'bale'
     CHANNEL_TELEGRAM = 'telegram'
     CHANNEL_WHATSAPP = 'whatsapp'
+    CHANNEL_WEBPUSH = 'webpush'
     CHANNEL_CHOICES = (
         (CHANNEL_SMS, 'پیامک'),
         (CHANNEL_BALE, 'بله'),
         (CHANNEL_TELEGRAM, 'تلگرام'),
         (CHANNEL_WHATSAPP, 'واتساپ رسمی'),
+        (CHANNEL_WEBPUSH, 'اعلان مرورگر'),
     )
 
     name = models.CharField(max_length=120, verbose_name='نام داخلی')
@@ -1863,6 +1977,7 @@ class NotificationTemplate(models.Model):
     is_active = models.BooleanField(default=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    history = HistoricalRecords()
 
     class Meta:
         ordering = ('event', 'audience', 'channel')
@@ -1877,6 +1992,40 @@ class NotificationTemplate(models.Model):
 
     def __str__(self):
         return f'{self.get_event_display()} / {self.get_audience_display()} / {self.get_channel_display()}'
+
+
+class WebPushSubscription(models.Model):
+    """One browser push endpoint explicitly opted in by an authenticated user."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='webpush_subscriptions'
+    )
+    endpoint = models.URLField(max_length=1000, unique=True)
+    p256dh = models.CharField(max_length=255)
+    auth = models.CharField(max_length=255)
+    user_agent = models.CharField(max_length=500, blank=True)
+    is_active = models.BooleanField(default=True, db_index=True)
+    failure_count = models.PositiveSmallIntegerField(default=0)
+    last_used_at = models.DateTimeField(null=True, blank=True)
+    last_error = models.CharField(max_length=500, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ('-updated_at',)
+        verbose_name = 'اشتراک اعلان مرورگر'
+        verbose_name_plural = 'اشتراک‌های اعلان مرورگر'
+
+    def __str__(self):
+        return f'{self.user.username} — {str(self.id)[:8]}'
+
+    @property
+    def subscription_info(self) -> dict:
+        return {
+            'endpoint': self.endpoint,
+            'keys': {'p256dh': self.p256dh, 'auth': self.auth},
+        }
 
 
 class NotificationRecipient(models.Model):

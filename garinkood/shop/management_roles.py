@@ -7,7 +7,8 @@ ROLE_PERMISSIONS = {
         "view_notificationdelivery", "change_notificationdelivery",
         "view_notificationrecipient", "add_notificationrecipient", "change_notificationrecipient",
         "view_notificationtemplate", "add_notificationtemplate", "change_notificationtemplate",
-        "view_onetimepassword",
+        "view_onetimepassword", "view_shipment", "add_shipment", "change_shipment",
+        "view_shipmenttrackingevent", "add_shipmenttrackingevent", "change_shipmenttrackingevent",
     ],
     "مالی": [
         "view_order", "change_order", "view_paymentattempt", "change_paymentattempt",
@@ -29,5 +30,7 @@ ROLE_PERMISSIONS = {
     ],
     "انبار": [
         "view_product", "change_product", "view_order", "view_orderitem",
+        "view_shipment", "add_shipment", "change_shipment",
+        "view_shipmenttrackingevent", "add_shipmenttrackingevent",
     ],
 }

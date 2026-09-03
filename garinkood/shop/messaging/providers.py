@@ -324,6 +324,64 @@ def _send_whatsapp(phone: str, text: str, options: dict[str, Any]) -> ProviderRe
     return ProviderResult(str(message_id), _safe_response(data))
 
 
+def _send_webpush(delivery: Any, text: str) -> ProviderResult:
+    if not settings.WEBPUSH_ENABLED:
+        raise ProviderConfigurationError('کانال اعلان مرورگر غیرفعال است.')
+    _require(settings.WEBPUSH_VAPID_PUBLIC_KEY, 'WEBPUSH_VAPID_PUBLIC_KEY')
+    private_key = _require(settings.WEBPUSH_VAPID_PRIVATE_KEY, 'WEBPUSH_VAPID_PRIVATE_KEY')
+    subject = _require(settings.WEBPUSH_VAPID_SUBJECT, 'WEBPUSH_VAPID_SUBJECT')
+
+    from django.utils import timezone
+    from pywebpush import WebPushException, webpush
+    from shop.models import WebPushSubscription
+
+    subscription = WebPushSubscription.objects.filter(
+        pk=delivery.recipient, is_active=True
+    ).first()
+    if not subscription:
+        raise ProviderConfigurationError('اشتراک اعلان مرورگر فعال نیست.')
+    payload = delivery.payload if isinstance(delivery.payload, dict) else {}
+    data = json.dumps(
+        {
+            'title': str(payload.get('push_title') or 'گرین کود')[:120],
+            'body': text[:500],
+            'url': str(payload.get('push_url') or '/orders')[:500],
+            'tag': str(payload.get('push_tag') or f'notification-{delivery.id}')[:120],
+        },
+        ensure_ascii=False,
+    )
+    try:
+        response = webpush(
+            subscription_info=subscription.subscription_info,
+            data=data,
+            vapid_private_key=private_key,
+            vapid_claims={'sub': subject},
+            ttl=3600,
+            timeout=getattr(settings, 'MESSAGING_HTTP_TIMEOUT', 8),
+        )
+    except WebPushException as exc:
+        status_code = getattr(getattr(exc, 'response', None), 'status_code', None)
+        terminal = status_code in {404, 410}
+        WebPushSubscription.objects.filter(pk=subscription.pk).update(
+            is_active=False if terminal else subscription.is_active,
+            failure_count=subscription.failure_count + 1,
+            last_error=f'HTTP {status_code}' if status_code else 'Push delivery failed',
+            updated_at=timezone.now(),
+        )
+        raise ProviderError(
+            'نشانی اعلان مرورگر منقضی شده است.' if terminal else 'ارسال اعلان مرورگر ناموفق بود.',
+            retryable=not terminal,
+        ) from exc
+    WebPushSubscription.objects.filter(pk=subscription.pk).update(
+        failure_count=0,
+        last_error='',
+        last_used_at=timezone.now(),
+        updated_at=timezone.now(),
+    )
+    status_code = getattr(response, 'status_code', 201)
+    return ProviderResult(str(delivery.id), {'status_code': status_code})
+
+
 def _fake_result(prefix: str) -> ProviderResult:
     return ProviderResult(f'fake-{prefix}', {'provider': 'fake', 'accepted': True})
 
@@ -381,4 +439,6 @@ def send_delivery(delivery: Any) -> ProviderResult:
         if not settings.MESSAGING_ENABLE_WHATSAPP:
             raise ProviderConfigurationError('کانال واتساپ غیرفعال است.')
         return _send_whatsapp(delivery.recipient, text, options)
+    if delivery.channel == 'webpush':
+        return _send_webpush(delivery, text)
     raise ProviderConfigurationError('کانال پیام‌رسان پشتیبانی نمی‌شود.')
