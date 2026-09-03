@@ -6,6 +6,7 @@ import toast from "react-hot-toast";
 import { ordersApi, paymentsApi } from "../api/services";
 import { parseApiError, type FieldErrors } from "../api/errors";
 import LocationPicker from "../components/LocationPicker";
+import PurchaseSteps from "../components/PurchaseSteps";
 import { useAuthStore } from "../store/authStore";
 import { useCartStore } from "../store/cartStore";
 import type { CheckoutPayload, Order, PaymentProviderOption } from "../types";
@@ -125,8 +126,9 @@ export default function Checkout() {
 
   if (order) {
     return (
-      <main className="mx-auto max-w-3xl px-[var(--page-gutter)] py-12">
-        <section className="rounded-3xl border border-emerald-100 bg-white p-7 text-center shadow-xl shadow-emerald-100/60 dark:border-emerald-800 dark:bg-emerald-950 dark:shadow-none">
+      <main className="mx-auto max-w-3xl px-[var(--page-gutter)] py-8 md:py-12">
+        <PurchaseSteps currentStep="confirmation" completed />
+        <section className="mt-5 rounded-3xl border border-emerald-100 bg-white p-7 text-center shadow-xl shadow-emerald-100/60 dark:border-emerald-800 dark:bg-emerald-950 dark:shadow-none">
           <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-900 dark:text-lime-300">
             <CheckCircle2 size={36} />
           </span>
@@ -152,11 +154,14 @@ export default function Checkout() {
 
   if (!isLoading && !cart?.items.length) {
     return (
-      <main className="mx-auto flex min-h-[55vh] max-w-3xl flex-col items-center justify-center px-4 text-center">
-        <ClipboardCheck size={50} className="text-emerald-500" />
-        <h1 className="mt-4 text-2xl font-extrabold text-slate-800 dark:text-white">سبد خرید شما خالی است</h1>
-        <p className="mt-2 text-slate-500 dark:text-emerald-200">ابتدا محصولات مورد نیاز مزرعه یا باغ خود را انتخاب کنید.</p>
-        <Link to="/products" className="mt-6 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white">مشاهده محصولات</Link>
+      <main className="mx-auto min-h-[55vh] max-w-3xl px-[var(--page-gutter)] py-8 md:py-12">
+        <PurchaseSteps currentStep="cart" />
+        <section className="flex flex-col items-center justify-center py-12 text-center">
+          <ClipboardCheck size={50} className="text-emerald-500" />
+          <h1 className="mt-4 text-2xl font-extrabold text-slate-800 dark:text-white">سبد خرید شما خالی است</h1>
+          <p className="mt-2 text-slate-500 dark:text-emerald-200">ابتدا محصولات مورد نیاز مزرعه یا باغ خود را انتخاب کنید.</p>
+          <Link to="/products" className="mt-6 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white">مشاهده محصولات</Link>
+        </section>
       </main>
     );
   }
@@ -164,6 +169,7 @@ export default function Checkout() {
   return (
     <main className="mx-auto max-w-6xl px-[var(--page-gutter)] py-7 md:py-10">
       <Link to="/" className="inline-flex items-center gap-2 text-sm font-bold text-emerald-700 dark:text-lime-300">بازگشت به فروشگاه</Link>
+      <PurchaseSteps currentStep="delivery" className="mt-5" />
       <div className="mt-5 grid gap-6 lg:grid-cols-[1fr_360px]">
         <form onSubmit={submit} className="space-y-5 rounded-3xl border border-slate-100 bg-white p-5 shadow-sm md:p-7 dark:border-emerald-900 dark:bg-emerald-950">
           <div>

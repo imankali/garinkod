@@ -33,6 +33,18 @@ test('all public routes render without a browser crash', async ({ page }) => {
   }
 });
 
+test('checkout clearly communicates the three purchase stages', async ({ page }) => {
+  await page.goto('/checkout');
+
+  const steps = page.getByRole('navigation', { name: 'مراحل خرید' });
+  await expect(steps).toBeVisible();
+  await expect(steps.getByRole('listitem')).toHaveCount(3);
+  await expect(steps.getByText('سبد خرید', { exact: true })).toBeVisible();
+  await expect(steps.getByText('اطلاعات تحویل', { exact: true })).toBeVisible();
+  await expect(steps.getByText('ثبت و پیگیری', { exact: true })).toBeVisible();
+  await expect(steps.locator('[aria-current="step"]')).toHaveCount(1);
+});
+
 test('language selector changes document direction safely', async ({ page }) => {
   await page.goto('/');
   const language = page.getByLabel('زبان').first();

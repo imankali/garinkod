@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useFocusTrap } from "../hooks/useFocusTrap";
 import { useCartStore } from "../store/cartStore";
+import PurchaseSteps from "./PurchaseSteps";
 import { productsApi } from "../api/services";
 import type { CartItem, ProductList } from "../types";
 import { formatPrice } from "../utils/formatPrice";
@@ -230,6 +231,11 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                 </span>
               </div>
             </div>
+
+            {/* Keep the checkout journey visible from its first stage. */}
+            {items.length > 0 && (
+              <PurchaseSteps currentStep="cart" compact className="mx-4 mt-3" />
+            )}
 
             {/* ======================================== */}
             {/* Pesticide Safety Warning */}
