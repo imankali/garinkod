@@ -9,32 +9,14 @@ import {
   useScroll,
   useSpring,
 } from "framer-motion";
-import {
-  Gift,
-  Heart,
-  LogIn,
-  LogOut,
-  Menu,
-  MessageCircle,
-  Moon,
-  MoreHorizontal,
-  Package,
-  ShoppingCart,
-  Store,
-  Sun,
-  UserRound,
-  X,
-} from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Heart, Menu, ShoppingCart, X } from "lucide-react";
 
-import { useAuthStore } from "../store/authStore";
 import TopBar from "./TopBar";
 import Logo from "./Logo";
 import DesktopNav from "./DesktopNav";
 import SearchBar from "./SearchBar";
 import MobileMenu from "./MobileMenu";
 import { useCartStore } from "../store/cartStore";
-import { messagesApi } from "../api/services";
 import { useTranslation } from "../i18n";
 
 // ========================================
@@ -205,204 +187,6 @@ const IconButton = memo(function IconButton({
 });
 
 // ========================================
-// ✅ منوی «بیشتر» دسکتاپ: شب، پیام‌ها و حساب کاربری
-// ========================================
-function MoreMenu({ isDark, onToggleDark }: { isDark: boolean; onToggleDark: () => void }) {
-  const [open, setOpen] = useState(false);
-  const [unread, setUnread] = useState(0);
-  const ref = useRef<HTMLDivElement>(null);
-  const navigate = useNavigate();
-  const { t } = useTranslation();
-  const { user, isAuthenticated, logout } = useAuthStore();
-
-  useEffect(() => {
-    function handleClick(event: MouseEvent) {
-      if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false);
-    }
-    function handleKey(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpen(false);
-    }
-    document.addEventListener("mousedown", handleClick);
-    document.addEventListener("keydown", handleKey);
-    return () => {
-      document.removeEventListener("mousedown", handleClick);
-      document.removeEventListener("keydown", handleKey);
-    };
-  }, []);
-
-  // Live unread count for the direct-messages shortcut.
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    let cancelled = false;
-    const refresh = () =>
-      messagesApi
-        .conversations()
-        .then((response) => {
-          if (!cancelled) setUnread(response.data.unread_total || 0);
-        })
-        .catch(() => undefined);
-    void refresh();
-    const interval = setInterval(() => void refresh(), 20000);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, [isAuthenticated]);
-
-  const fullName = [user?.first_name, user?.last_name].filter(Boolean).join(" ") || user?.username;
-
-  async function signOut() {
-    setOpen(false);
-    await logout();
-    navigate("/");
-  }
-
-  const items = [
-    { icon: MessageCircle, label: t("nav.messages"), desc: t("direct.title"), href: "/messages" },
-    { icon: UserRound, label: t("nav.profile"), desc: t("account.title"), href: "/profile" },
-    { icon: Package, label: t("nav.orders"), desc: t("account.orders"), href: "/orders" },
-    { icon: Store, label: t("account.seller"), desc: t("account.sellerDescription"), href: "/profile?tab=seller" },
-    { icon: Gift, label: t("nav.offers"), desc: "Rewards", href: "/rewards" },
-  ];
-
-  return (
-    <div ref={ref} className="relative">
-      <IconButton
-        onClick={() => setOpen((current) => !current)}
-        label={t("nav.more")}
-        rotateOnHover
-        className={`text-slate-500 hover:bg-emerald-50 dark:text-emerald-200 dark:hover:bg-emerald-900/50 ${open ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/60" : ""}`}
-      >
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.span
-            key={open ? "close" : "more"}
-            initial={{ rotate: -90, opacity: 0 }}
-            animate={{ rotate: 0, opacity: 1 }}
-            exit={{ rotate: 90, opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            className="flex"
-          >
-            {open ? <X size={18} /> : <MoreHorizontal size={18} />}
-          </motion.span>
-        </AnimatePresence>
-      </IconButton>
-
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, y: 8, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 8, scale: 0.96 }}
-            transition={SPRING_SOFT}
-            className="absolute end-0 top-[calc(100%+10px)] z-50 w-72 overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-2xl shadow-emerald-900/10 dark:border-emerald-800 dark:bg-emerald-950"
-            role="menu"
-            aria-label={t("nav.more")}
-          >
-            {/* Theme */}
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                onToggleDark();
-                setOpen(false);
-              }}
-              className="flex min-h-12 w-full items-center gap-3 px-4 text-start text-sm font-bold text-slate-700 transition-colors hover:bg-emerald-50 dark:text-emerald-100 dark:hover:bg-emerald-900/60"
-            >
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 text-amber-600 dark:bg-amber-950/50 dark:text-amber-300">
-                {isDark ? <Sun size={17} /> : <Moon size={17} />}
-              </span>
-              <span className="flex-1">{isDark ? t("header.themeToLight") : t("header.themeToDark")}</span>
-              <span
-                aria-hidden="true"
-                className={`relative h-5 w-9 rounded-full transition-colors ${isDark ? "bg-emerald-600" : "bg-slate-300"}`}
-              >
-                <span
-                  className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${isDark ? "start-[18px]" : "start-0.5"}`}
-                />
-              </span>
-            </button>
-
-            <div className="mx-4 h-px bg-slate-100 dark:bg-emerald-900" />
-
-            {/* Direct messages */}
-            <Link
-              to="/messages"
-              role="menuitem"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-3 px-4 py-3 text-start transition-colors hover:bg-emerald-50 dark:hover:bg-emerald-900/60"
-            >
-              <span className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-sky-100 text-sky-600 dark:bg-sky-950/50 dark:text-sky-300">
-                <MessageCircle size={17} />
-                {unread > 0 && (
-                  <span className="absolute -end-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-fluid-2xs font-bold text-white">
-                    {unread > 9 ? "۹+" : unread.toLocaleString("fa-IR")}
-                  </span>
-                )}
-              </span>
-              <span className="flex-1">
-                <span className="block text-sm font-bold text-slate-700 dark:text-emerald-50">{t("nav.messages")}</span>
-                <span className="block text-fluid-2xs text-slate-400 dark:text-emerald-300/70">{t("direct.title")}</span>
-              </span>
-            </Link>
-
-            <div className="mx-4 h-px bg-slate-100 dark:bg-emerald-900" />
-
-            {/* Account */}
-            {isAuthenticated ? (
-              <>
-                <div className="flex items-center gap-3 px-4 py-3">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-gradient text-sm font-extrabold text-white">
-                    {(fullName || "؟").charAt(0)}
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-bold text-slate-800 dark:text-white">{fullName}</span>
-                    <span className="block truncate text-fluid-2xs text-slate-400 dark:text-emerald-300/70">{user?.email || user?.username}</span>
-                  </span>
-                </div>
-                {items.map(({ icon: Icon, label, desc, href }) => (
-                  <Link
-                    key={href}
-                    to={href}
-                    role="menuitem"
-                    onClick={() => setOpen(false)}
-                    className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-emerald-50 dark:hover:bg-emerald-900/60"
-                  >
-                    <Icon size={16} className="text-emerald-600 dark:text-lime-300" />
-                    <span className="flex-1">
-                      <span className="block text-sm font-bold text-slate-700 dark:text-emerald-50">{label}</span>
-                      <span className="block text-fluid-2xs text-slate-400 dark:text-emerald-300/70">{desc}</span>
-                    </span>
-                  </Link>
-                ))}
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={signOut}
-                  className="flex min-h-12 w-full items-center gap-3 border-t border-slate-100 px-4 text-start text-sm font-bold text-rose-600 transition-colors hover:bg-rose-50 dark:border-emerald-900 dark:text-rose-300 dark:hover:bg-rose-950/40"
-                >
-                  <LogOut size={16} />
-                  {t("nav.logout")}
-                </button>
-              </>
-            ) : (
-              <Link
-                to="/login"
-                role="menuitem"
-                onClick={() => setOpen(false)}
-                className="flex items-center gap-3 px-4 py-3 text-sm font-bold text-emerald-700 transition-colors hover:bg-emerald-50 dark:text-lime-300 dark:hover:bg-emerald-900/60"
-              >
-                <LogIn size={16} />
-                {t("nav.login")}
-              </Link>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
-// ========================================
 // Header Props
 // ========================================
 interface HeaderProps {
@@ -534,7 +318,7 @@ export default function Header({
               whileHover={prefersReducedMotion ? undefined : { scale: 1.05 }}
               whileTap={{ scale: 0.92 }}
               transition={SPRING}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-[#0F8A5F] transition-colors hover:bg-emerald-100 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300 lg:hidden"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-[#0F8A5F] transition-colors hover:bg-emerald-100 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300"
               aria-label={mobileOpen ? t("header.closeMenu") : t("header.openMenu")}
               aria-expanded={mobileOpen}
               aria-controls="mobile-menu"
@@ -564,9 +348,8 @@ export default function Header({
               <SearchBar />
             </div>
 
-            {/* Desktop Actions: تنها علاقه‌مندی و سبد بیرون می‌مانند؛
-                حالت شب، پیام‌ها و حساب کاربری داخل منوی «بیشتر» قرار گرفته‌اند.
-                گزینه «دسته‌بندی‌ها» حذف شد — دسته‌بندی‌ها در صفحه محصولات هستند. */}
+            {/* Desktop Actions: علاقه‌مندی و سبد خرید؛ بقیهٔ امکانات (حالت شب،
+                پیام‌ها، حساب کاربری و…) در منوی اصلی (همه‌ی اندازه‌ها) هستند. */}
             <div className="ms-auto hidden shrink-0 items-center gap-1 sm:flex sm:gap-1.5 md:gap-2">
               {/* Wishlist */}
               <IconButton
@@ -593,9 +376,6 @@ export default function Header({
                   )}
                 </AnimatePresence>
               </IconButton>
-
-              {/* منوی «بیشتر»: حالت شب / پیام‌ها / حساب کاربری */}
-              <MoreMenu isDark={isDark} onToggleDark={onToggleDark} />
 
               {/* Cart - Desktop */}
               <CartButton

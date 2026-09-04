@@ -23,7 +23,6 @@ import CompareModal from "./components/CompareModal";
 import FilterSortBar from "./components/FilterSortBar";
 import WeatherWidget from "./components/WeatherWidget";
 import InstallmentBanner from "./components/InstallmentBanner";
-import ScrollProgressBar from "./components/ScrollProgressBar";
 import FlyToCart, { type FlyingItem } from "./components/FlyToCart";
 import GlobalMessengerButton from "./components/GlobalMessengerButton";
 import CropSelector from "./components/CropSelector";
@@ -291,11 +290,6 @@ export default function App() {
         className={`min-h-screen w-full overflow-x-hidden ${isDark ? 'dark' : ''}`}
         dir={dir}
       >
-        {/* ======================================== */}
-        {/* Scroll Progress Bar */}
-        {/* ======================================== */}
-        <ScrollProgressBar />
-
         {/* ======================================== */}
         {/* Toast Notifications */}
         {/* ======================================== */}
