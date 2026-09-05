@@ -674,6 +674,17 @@ export type MessageChannel = 'storefront' | 'support' | 'consulting' | 'comment'
 
 export type MessageAttachmentType = 'image' | 'video' | 'audio';
 
+/** The compact quote of the message a reply answers. */
+export interface QuotedMessage {
+  id: number;
+  sender_name: string;
+  is_mine: boolean;
+  body: string;
+  attachment_type: MessageAttachmentType | '';
+  listing_title: string;
+  is_deleted: boolean;
+}
+
 export interface StorefrontMessage {
   id: number;
   conversation: number;
@@ -687,6 +698,14 @@ export interface StorefrontMessage {
   attachment_url: string;
   attachment_type: MessageAttachmentType | '';
   attachment_duration: number | null;
+  reply_to: QuotedMessage | null;
+  is_edited: boolean;
+  edited_at: string | null;
+  is_deleted: boolean;
+  deleted_at: string | null;
+  /** Server-side verdicts, so the menu never offers what the API refuses. */
+  can_edit: boolean;
+  can_delete: boolean;
   is_read: boolean;
   created_at: string;
 }

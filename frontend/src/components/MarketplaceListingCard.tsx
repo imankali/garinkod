@@ -14,6 +14,7 @@ import { useDirectStore } from '../store/directStore';
 import { useTranslation } from '../i18n';
 import type { MarketplaceListing } from '../types';
 import { formatPrice } from '../utils/formatPrice';
+import { listingHref } from '../utils/listingHref';
 
 export default function MarketplaceListingCard({ listing, index = 0 }: { listing: MarketplaceListing; index?: number }) {
   const { t } = useTranslation();
@@ -55,7 +56,7 @@ export default function MarketplaceListingCard({ listing, index = 0 }: { listing
       transition={{ delay: (index % 4) * 0.05, duration: 0.35 }}
       className="group flex flex-col overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-sm transition hover:shadow-lg hover:shadow-emerald-900/5 dark:border-emerald-900 dark:bg-[#08392a]"
     >
-      <Link to={`/storefronts/${listing.storefront.slug}`} className="relative block aspect-[4/3] overflow-hidden bg-emerald-50 dark:bg-emerald-950">
+      <Link to={listingHref(listing)} className="relative block aspect-[4/3] overflow-hidden bg-emerald-50 dark:bg-emerald-950">
         <img
           src={listing.image_url || '/images/hero-farm.jpg'}
           alt={listing.title}
@@ -78,7 +79,7 @@ export default function MarketplaceListingCard({ listing, index = 0 }: { listing
 
       <div className="flex flex-1 flex-col p-3.5">
         <Link
-          to={`/storefronts/${listing.storefront.slug}`}
+          to={listingHref(listing)}
           className="line-clamp-2 min-h-11 py-1 text-fluid-sm font-extrabold text-slate-800 transition-colors hover:text-emerald-700 dark:text-white dark:hover:text-lime-300"
         >
           {listing.title}

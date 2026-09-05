@@ -60,6 +60,12 @@ urlpatterns = [
         marketplace_views.conversation_messages,
         name='api_conversation_messages',
     ),
+    # Edit / delete one of the caller's own messages.
+    path(
+        'marketplace/conversations/<int:conversation_id>/messages/<int:message_id>/',
+        marketplace_views.conversation_message_detail,
+        name='api_conversation_message_detail',
+    ),
     path(
         'marketplace/conversations/<int:conversation_id>/stream/',
         marketplace_views.conversation_events,

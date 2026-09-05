@@ -15,11 +15,13 @@ import {
   ClipboardList,
   Gift,
   Handshake,
+  Heart,
   Home,
   Landmark,
   LayoutGrid,
   LifeBuoy,
   type LucideIcon,
+  MessageCircle,
   Package,
   Camera,
   ShieldCheck,
@@ -47,6 +49,11 @@ export interface NavItem {
   primary?: boolean;
   /** Show in the mobile bottom bar (max four plus the cart). */
   mobileBar?: boolean;
+  /**
+   * Some destinations are dialogs rather than pages (the wishlist). Menus that
+   * can open the dialog treat the item as a button; others fall back to `to`.
+   */
+  action?: 'wishlist';
 }
 
 export interface NavSection {
@@ -109,7 +116,13 @@ export const SHOP_ITEMS: NavItem[] = [
   },
 ];
 
-/** Everything tied to the signed-in user's own account. */
+/**
+ * Everything tied to the signed-in user's own account.
+ *
+ * Ordered by how often people reach for each one (the convention most apps
+ * follow): identity first, then the two things they check daily — messages
+ * and saved items — then purchase history, then the perks.
+ */
 export const ACCOUNT_ITEMS: NavItem[] = [
   {
     id: 'profile',
@@ -119,6 +132,23 @@ export const ACCOUNT_ITEMS: NavItem[] = [
     icon: UserRound,
     requiresAuth: true,
     mobileBar: true,
+  },
+  {
+    id: 'messages',
+    label: 'پیام‌ها',
+    description: 'گفتگو با غرفه‌داران و پشتیبانی',
+    to: '/messages',
+    icon: MessageCircle,
+  },
+  {
+    id: 'wishlist',
+    label: 'علاقه‌مندی‌ها',
+    description: 'محصولات نشان‌شده',
+    // Opened as a dialog by the menus; the catalogue is the fallback route.
+    to: '/products',
+    icon: Heart,
+    /** Rendered as an action (opens the wishlist dialog), not a plain link. */
+    action: 'wishlist',
   },
   {
     id: 'orders',

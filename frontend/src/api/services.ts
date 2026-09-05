@@ -561,6 +561,8 @@ export const messagesApi = {
       attachment?: Blob | null;
       attachmentName?: string;
       attachmentDuration?: number;
+      /** Quote another message in this thread. */
+      replyTo?: number | null;
     },
   ) => {
     const url = `/marketplace/conversations/${conversationId}/messages/`;
@@ -568,6 +570,7 @@ export const messagesApi = {
       return apiClient.post<StorefrontMessage>(url, {
         body: data.body,
         listing: data.listing,
+        reply_to: data.replyTo ?? undefined,
       });
     }
     // A media message goes as multipart; the request interceptor drops the
@@ -575,12 +578,26 @@ export const messagesApi = {
     const formData = new FormData();
     if (data.body) formData.append('body', data.body);
     if (data.listing) formData.append('listing', String(data.listing));
+    if (data.replyTo) formData.append('reply_to', String(data.replyTo));
     formData.append('attachment', data.attachment, data.attachmentName || 'attachment');
     if (data.attachmentDuration !== undefined) {
       formData.append('attachment_duration', String(Math.round(data.attachmentDuration)));
     }
     return apiClient.post<StorefrontMessage>(url, formData);
   },
+
+  /** Change the text of one of the caller's own messages. */
+  edit: (conversationId: number, messageId: number, body: string) =>
+    apiClient.patch<StorefrontMessage>(
+      `/marketplace/conversations/${conversationId}/messages/${messageId}/`,
+      { body },
+    ),
+
+  /** Soft-delete one of the caller's own messages (a placeholder remains). */
+  remove: (conversationId: number, messageId: number) =>
+    apiClient.delete<StorefrontMessage>(
+      `/marketplace/conversations/${conversationId}/messages/${messageId}/`,
+    ),
 };
 
 // ========================================

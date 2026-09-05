@@ -1565,6 +1565,18 @@ class StorefrontMessage(models.Model):
     attachment_duration = models.PositiveIntegerField(
         null=True, blank=True, verbose_name='مدت (ثانیه)'
     )
+    # Quoted reply, like Telegram/WhatsApp: the message this one answers. It
+    # is SET_NULL so deleting the original never takes the reply with it.
+    reply_to = models.ForeignKey(
+        'self', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='replies', verbose_name='پاسخ به',
+    )
+    # Editing keeps the row and stamps it, so the other party can see that the
+    # text changed after they may have read it.
+    edited_at = models.DateTimeField(null=True, blank=True, verbose_name='ویرایش در')
+    # Deletion is a soft delete: the bubble stays in place as "پیام حذف شد" so
+    # replies that quote it still make sense, and the body/attachment go away.
+    deleted_at = models.DateTimeField(null=True, blank=True, verbose_name='حذف در')
     is_read = models.BooleanField(default=False, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -1582,6 +1594,29 @@ class StorefrontMessage(models.Model):
     @property
     def attachment_url(self) -> str:
         return self.attachment.url if self.attachment else ''
+
+    @property
+    def is_deleted(self) -> bool:
+        return self.deleted_at is not None
+
+    @property
+    def is_edited(self) -> bool:
+        return self.edited_at is not None
+
+    def soft_delete(self):
+        """Blank the content but keep the row so quoted replies stay coherent."""
+        if self.attachment:
+            self.attachment.delete(save=False)
+        self.body = ''
+        self.listing = None
+        self.attachment = None
+        self.attachment_type = ''
+        self.attachment_duration = None
+        self.deleted_at = timezone.now()
+        self.save(update_fields=[
+            'body', 'listing', 'attachment', 'attachment_type',
+            'attachment_duration', 'deleted_at',
+        ])
 
 
 # --- Farm profile: lands, calendars and consultation ---

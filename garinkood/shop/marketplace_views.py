@@ -407,7 +407,7 @@ def _participant_conversations(user):
             'messages',
             queryset=StorefrontMessage.objects.order_by('-created_at').select_related(
                 'sender', 'sender__account', 'listing', 'listing__storefront',
-                'conversation', 'conversation__storefront',
+                'conversation', 'conversation__storefront', 'reply_to', 'reply_to__sender',
             ),
         ))
         .order_by('-updated_at')
@@ -572,6 +572,7 @@ def conversation_messages(request, conversation_id):
         messages = conversation.messages.select_related(
             'sender', 'sender__account', 'listing', 'listing__storefront',
             'conversation', 'conversation__storefront',
+            'reply_to', 'reply_to__sender', 'reply_to__listing',
         ).order_by('created_at')
         # Fetching a thread means the viewer has seen it.
         StorefrontMessage.objects.filter(conversation=conversation, is_read=False).exclude(
@@ -620,11 +621,30 @@ def conversation_messages(request, conversation_id):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
+    # A quoted reply must point at a message in *this* thread; anything else
+    # would let a caller probe message ids across conversations.
+    reply_to = None
+    raw_reply_to = request.data.get('reply_to')
+    if raw_reply_to not in (None, ''):
+        try:
+            reply_to_id = int(raw_reply_to)
+        except (TypeError, ValueError):
+            return Response({'error': 'پیام مرجع نامعتبر است.'}, status=status.HTTP_400_BAD_REQUEST)
+        reply_to = StorefrontMessage.objects.filter(
+            pk=reply_to_id, conversation=conversation
+        ).first()
+        if reply_to is None:
+            return Response(
+                {'error': 'پیام مرجع در این گفتگو پیدا نشد.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
     message = StorefrontMessage.objects.create(
         conversation=conversation, sender=request.user,
         body=body[:2000], listing=listing,
         attachment=attachment, attachment_type=attachment_type,
         attachment_duration=attachment_duration,
+        reply_to=reply_to,
     )
     # A staff reply claims an unassigned service thread, so the farmer sees a
     # consistent counterpart and other operators know it is being handled.
@@ -645,6 +665,64 @@ def conversation_messages(request, conversation_id):
 
 
 @documented_api
+@api_view(['PATCH', 'DELETE'])
+@permission_classes([permissions.IsAuthenticated])
+def conversation_message_detail(request, conversation_id, message_id):
+    """Edit (PATCH) or delete (DELETE) one of the caller's own messages.
+
+    Only the author may change a message. Editing is limited to the text of
+    text-only messages; media and voice notes can be deleted but not edited.
+    Deletion is soft — the bubble stays as a "پیام حذف شد" placeholder so any
+    reply quoting it still reads correctly for the other side.
+    """
+    conversation = get_object_or_404(
+        StorefrontConversation.objects.select_related('storefront', 'customer'),
+        pk=conversation_id,
+    )
+    if not conversation.is_participant(request.user):
+        return Response({'error': 'شما عضو این گفتگو نیستید.'}, status=status.HTTP_403_FORBIDDEN)
+
+    message = get_object_or_404(
+        StorefrontMessage.objects.select_related(
+            'sender', 'sender__account', 'listing', 'listing__storefront',
+            'conversation', 'conversation__storefront', 'reply_to', 'reply_to__sender',
+        ),
+        pk=message_id, conversation=conversation,
+    )
+    if message.sender_id != request.user.id:
+        return Response(
+            {'error': 'فقط فرستنده می‌تواند پیام خود را تغییر دهد.'},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+    if message.is_deleted:
+        return Response({'error': 'این پیام قبلاً حذف شده است.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    context = {'request': request}
+
+    if request.method == 'DELETE':
+        message.soft_delete()
+        conversation.save(update_fields=['updated_at'])
+        return Response(StorefrontMessageSerializer(message, context=context).data)
+
+    if message.attachment:
+        return Response(
+            {'error': 'پیام‌های دارای پیوست قابل ویرایش نیستند؛ آن را حذف و دوباره ارسال کنید.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    body = (request.data.get('body') or '').strip()
+    if not body and message.listing_id is None:
+        return Response({'error': 'متن پیام نمی‌تواند خالی باشد.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    body = body[:2000]
+    if body != message.body:
+        message.body = body
+        message.edited_at = timezone.now()
+        message.save(update_fields=['body', 'edited_at'])
+        conversation.save(update_fields=['updated_at'])
+    return Response(StorefrontMessageSerializer(message, context=context).data)
+
+
+@documented_api
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def conversation_events(request, conversation_id):
@@ -660,11 +738,17 @@ def conversation_events(request, conversation_id):
         yield f"event: connected\ndata: {json.dumps({'status': 'connected', 'conversation_id': conversation.id})}\n\n"
         start_time = time.time()
         timeout = 25
+        # Edits and deletions change existing rows, which an id watermark
+        # cannot see; a timestamp watermark over edited_at/deleted_at does.
+        since = timezone.now()
 
         while time.time() - start_time < timeout:
             new_msgs = StorefrontMessage.objects.filter(
                 conversation=conversation, id__gt=last_id
-            ).select_related('sender', 'listing').order_by('id')
+            ).select_related(
+                'sender', 'sender__account', 'listing', 'listing__storefront',
+                'conversation', 'conversation__storefront', 'reply_to', 'reply_to__sender',
+            ).order_by('id')
 
             if new_msgs.exists():
                 serializer = StorefrontMessageSerializer(
@@ -672,6 +756,20 @@ def conversation_events(request, conversation_id):
                 )
                 last_id = max(m.id for m in new_msgs)
                 yield f"event: message\ndata: {json.dumps({'results': serializer.data, 'last_id': last_id})}\n\n"
+
+            changed = StorefrontMessage.objects.filter(
+                Q(edited_at__gt=since) | Q(deleted_at__gt=since),
+                conversation=conversation,
+            ).select_related(
+                'sender', 'sender__account', 'listing', 'listing__storefront',
+                'conversation', 'conversation__storefront', 'reply_to', 'reply_to__sender',
+            ).order_by('id')
+            if changed.exists():
+                since = timezone.now()
+                serializer = StorefrontMessageSerializer(
+                    changed, many=True, context={'request': request}
+                )
+                yield f"event: update\ndata: {json.dumps({'results': serializer.data})}\n\n"
 
             yield f": ping {int(time.time())}\n\n"
             time.sleep(1.5)

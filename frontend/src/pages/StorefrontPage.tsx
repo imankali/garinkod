@@ -1,7 +1,7 @@
 // frontend/src/pages/StorefrontPage.tsx
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   BadgeCheck,
@@ -35,6 +35,7 @@ import { useTranslation } from '../i18n';
 import { formatPrice } from '../utils/formatPrice';
 import { cn } from '../utils/cn';
 import ListingComposer from '../components/storefront/ListingComposer';
+import ListingDetailModal from '../components/storefront/ListingDetailModal';
 import type { MarketplaceListing, StorefrontPost, StorefrontProfile } from '../types';
 
 /**
@@ -69,6 +70,25 @@ const TABS: { key: TabKey; labelKey: string; icon: typeof Grid3x3 }[] = [
 export default function StorefrontPage() {
   const { slug = '' } = useParams<{ slug: string }>();
   const { t } = useTranslation();
+  // `?listing=<slug>` opens one آگهی's detail. Keeping it in the URL means the
+  // "محصول پیوست‌شده" link in a message, a shared address and the back button
+  // all land on the same product.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const openListingSlug = searchParams.get('listing');
+  const openListing = useCallback(
+    (listingSlug: string | null) => {
+      setSearchParams(
+        (previous) => {
+          const next = new URLSearchParams(previous);
+          if (listingSlug) next.set('listing', listingSlug);
+          else next.delete('listing');
+          return next;
+        },
+        { replace: !listingSlug },
+      );
+    },
+    [setSearchParams],
+  );
   const [profile, setProfile] = useState<StorefrontProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -604,7 +624,12 @@ export default function StorefrontPage() {
                   key={listing.id}
                   className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm dark:border-emerald-900 dark:bg-emerald-950/40"
                 >
-                  <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => openListing(listing.slug)}
+                    className="relative block w-full text-start"
+                    aria-label={`مشاهده جزئیات ${listing.title}`}
+                  >
                     <img src={listing.image_url} alt="" className="h-32 w-full object-cover" />
                     {listing.discount_percent > 0 && (
                       <span className="absolute start-2 top-2 rounded-full bg-brand-orange px-2 py-0.5 text-fluid-2xs font-bold text-white">
@@ -625,10 +650,16 @@ export default function StorefrontPage() {
                         {listing.status_label}
                       </span>
                     )}
-                  </div>
+                  </button>
                   <div className="p-3">
                     <h3 className="truncate text-sm font-bold text-slate-800 dark:text-white">
-                      {listing.title}
+                      <button
+                        type="button"
+                        onClick={() => openListing(listing.slug)}
+                        className="max-w-full truncate text-start hover:text-emerald-700 hover:underline dark:hover:text-lime-300"
+                      >
+                        {listing.title}
+                      </button>
                     </h3>
                     <p className="mt-1 flex items-baseline gap-1.5 text-xs text-slate-500 dark:text-emerald-200">
                       <strong className="text-emerald-700 dark:text-lime-300">
@@ -776,6 +807,14 @@ export default function StorefrontPage() {
           )}
         </div>
       )}
+
+      {/* One آگهی's detail, deep-linkable via ?listing=<slug>. */}
+      <ListingDetailModal
+        slug={openListingSlug}
+        initial={openListingSlug ? listings.find((item) => item.slug === openListingSlug) ?? null : null}
+        onClose={() => openListing(null)}
+        isOwner={isOwner}
+      />
 
       {/* Owner dialogs: آگهی composer/editor and post caption editor. */}
       {isOwner && (

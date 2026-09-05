@@ -16,14 +16,14 @@ import { messagesApi } from '../../api/services';
 import { useDirectStore } from '../../store/directStore';
 import { useTranslation } from '../../i18n';
 import type { MessageChannel, StorefrontConversation } from '../../types';
-import { cn } from '../../utils/cn';
+import ChannelChips, { type ChannelFilter } from './ChannelChips';
 import ConversationRow from './ConversationRow';
 import DirectThread from './DirectThread';
 
 const LIST_POLL_MS = 6000;
 
 export default function DirectMessagesDrawer() {
-  const { t } = useTranslation();
+  const { t, dir } = useTranslation();
   const {
     open,
     view,
@@ -39,7 +39,7 @@ export default function DirectMessagesDrawer() {
   const [conversations, setConversations] = useState<StorefrontConversation[]>([]);
   const [channels, setChannels] = useState<{ value: MessageChannel; label: string }[]>([]);
   const [unreadByChannel, setUnreadByChannel] = useState<Partial<Record<MessageChannel, number>>>({});
-  const [filter, setFilter] = useState<'all' | MessageChannel>('all');
+  const [filter, setFilter] = useState<ChannelFilter>('all');
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -132,6 +132,9 @@ export default function DirectMessagesDrawer() {
     if (!open) setFilter('all');
   }, [open]);
 
+  // Slide in from the start edge: +100% in RTL (off the right), -100% in LTR.
+  const slideOffset = dir === 'rtl' ? '100%' : '-100%';
+
   const showThread =
     view === 'thread' ||
     Boolean(conversationId) ||
@@ -152,14 +155,16 @@ export default function DirectMessagesDrawer() {
             className="fixed inset-0 z-[55] bg-emerald-950/40 backdrop-blur-sm"
           />
           <motion.aside
-            initial={{ x: '100%' }}
+            // The drawer lives on the *start* edge — the right in RTL — which
+            // is where the menu and the thumb both are on a Persian layout.
+            initial={{ x: slideOffset }}
             animate={{ x: 0 }}
-            exit={{ x: '100%' }}
+            exit={{ x: slideOffset }}
             transition={{ type: 'spring', damping: 30, stiffness: 300 }}
             // 100dvh (not the drawer's implicit 100vh) keeps the composer
             // above the mobile browser's collapsing address bar.
             style={{ height: '100dvh' }}
-            className="fixed inset-y-0 end-0 z-[60] flex w-[min(26rem,100vw)] flex-col border-s border-emerald-100 bg-white dark:border-emerald-800 dark:bg-emerald-950"
+            className="fixed inset-y-0 start-0 z-[60] flex w-[min(26rem,100vw)] flex-col border-e border-emerald-100 bg-white shadow-2xl dark:border-emerald-800 dark:bg-emerald-950"
             role="dialog"
             aria-modal="true"
             aria-label={t('direct.title')}
@@ -189,25 +194,17 @@ export default function DirectMessagesDrawer() {
                 </header>
 
                 {/* One chip per notification source, so "where did this come
-                    from?" is answerable before opening anything. */}
+                    from?" is answerable before opening anything. Compact and
+                    swipeable so it never spills out of the drawer. */}
                 {channels.length > 0 && (
-                  <div className="no-scrollbar flex shrink-0 gap-1.5 overflow-x-auto border-b border-emerald-100 px-3 py-2.5 dark:border-emerald-800">
-                    <ChannelChip
-                      label={t('common.all')}
-                      active={filter === 'all'}
-                      count={Object.values(unreadByChannel).reduce((sum, n) => sum + (n || 0), 0)}
-                      onClick={() => setFilter('all')}
-                    />
-                    {channels.map((channel) => (
-                      <ChannelChip
-                        key={channel.value}
-                        label={channel.label}
-                        active={filter === channel.value}
-                        count={unreadByChannel[channel.value] || 0}
-                        onClick={() => setFilter(channel.value)}
-                      />
-                    ))}
-                  </div>
+                  <ChannelChips
+                    channels={channels}
+                    unreadByChannel={unreadByChannel}
+                    value={filter}
+                    onChange={setFilter}
+                    allLabel={t('common.all')}
+                    className="border-b border-emerald-100 dark:border-emerald-800"
+                  />
                 )}
 
                 <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3">
@@ -241,44 +238,5 @@ export default function DirectMessagesDrawer() {
         </>
       )}
     </AnimatePresence>
-  );
-}
-
-/** A channel filter chip inside the drawer's inbox header. */
-function ChannelChip({
-  label,
-  active,
-  count,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  count: number;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={cn(
-        'flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border px-3 text-fluid-2xs font-bold transition',
-        active
-          ? 'border-emerald-600 bg-emerald-600 text-white'
-          : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-300 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200',
-      )}
-    >
-      {label}
-      {count > 0 && (
-        <span
-          className={cn(
-            'flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-fluid-2xs',
-            active ? 'bg-white/25 text-white' : 'bg-emerald-600 text-white',
-          )}
-        >
-          {count.toLocaleString('fa-IR')}
-        </span>
-      )}
-    </button>
   );
 }

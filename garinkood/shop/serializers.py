@@ -1049,18 +1049,52 @@ class StorefrontMessageSerializer(serializers.ModelSerializer):
     is_mine = serializers.SerializerMethodField()
     listing = serializers.SerializerMethodField()
     attachment_url = serializers.SerializerMethodField()
+    reply_to = serializers.SerializerMethodField()
+    is_edited = serializers.BooleanField(read_only=True)
+    is_deleted = serializers.BooleanField(read_only=True)
+    can_edit = serializers.SerializerMethodField()
+    can_delete = serializers.SerializerMethodField()
 
     class Meta:
         model = StorefrontMessage
         fields = [
             'id', 'conversation', 'sender', 'sender_name', 'sender_avatar_url', 'is_mine', 'body',
             'listing', 'attachment', 'attachment_url', 'attachment_type', 'attachment_duration',
-            'is_read', 'created_at',
+            'reply_to', 'is_edited', 'edited_at', 'is_deleted', 'deleted_at',
+            'can_edit', 'can_delete', 'is_read', 'created_at',
         ]
         read_only_fields = [
             'id', 'conversation', 'sender', 'sender_name', 'sender_avatar_url', 'is_mine',
-            'attachment_url', 'is_read', 'created_at',
+            'attachment_url', 'reply_to', 'is_edited', 'edited_at', 'is_deleted', 'deleted_at',
+            'can_edit', 'can_delete', 'is_read', 'created_at',
         ]
+
+    def get_reply_to(self, obj):
+        """A compact quote of the parent message, enough to render the bubble
+        header without a second request. Nested one level only."""
+        parent = obj.reply_to
+        if parent is None:
+            return None
+        return {
+            'id': parent.id,
+            'sender_name': self.get_sender_name(parent),
+            'is_mine': self.get_is_mine(parent),
+            'body': '' if parent.is_deleted else parent.body,
+            'attachment_type': '' if parent.is_deleted else parent.attachment_type,
+            'listing_title': (
+                parent.listing.title if parent.listing_id and not parent.is_deleted else ''
+            ),
+            'is_deleted': parent.is_deleted,
+        }
+
+    def get_can_edit(self, obj) -> bool:
+        # Only the author, only text, and not once it has been deleted.
+        return bool(
+            self.get_is_mine(obj) and not obj.is_deleted and not obj.attachment
+        )
+
+    def get_can_delete(self, obj) -> bool:
+        return bool(self.get_is_mine(obj) and not obj.is_deleted)
 
     def get_sender_name(self, obj):
         """Who is speaking — by role, not by username, for service channels.

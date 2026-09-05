@@ -20,7 +20,10 @@ export default function SiteFooter() {
   const { isAuthenticated } = useAuthStore();
   const level = useUserLevel();
   const { t } = useTranslation();
-  const sections = visibleSections({ level, isAuthenticated });
+  // Dialog-only entries (the wishlist) have no page of their own to link to.
+  const sections = visibleSections({ level, isAuthenticated })
+    .map((section) => ({ ...section, items: section.items.filter((item) => !item.action) }))
+    .filter((section) => section.items.length > 0);
   const year = new Date().toLocaleDateString('fa-IR', { year: 'numeric' });
   const supportPhone = import.meta.env.VITE_PHONE_NUMBER?.trim();
   const supportEmail = import.meta.env.VITE_SUPPORT_EMAIL?.trim();
