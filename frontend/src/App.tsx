@@ -1,12 +1,11 @@
 // frontend/src/App.tsx
 // ✅ فایل اصلی اپلیکیشن - نقطه اتصال همه کامپوننت‌ها
 
-import { useEffect, useState, lazy, Suspense } from "react";
+import { useEffect, useMemo, useState, lazy, Suspense } from "react";
 import { BrowserRouter, Navigate, Routes, Route } from "react-router-dom";
 import RequireLevel from "./components/RequireLevel";
 import { USER_LEVEL } from "./types";
 import { Toaster } from "react-hot-toast";
-import { useQuery } from "@tanstack/react-query";
 
 // ========================================
 // Components
@@ -15,12 +14,11 @@ import Header from "./components/Header";
 import MobileBottomNav from "./components/MobileBottomNav";
 import SiteFooter from "./components/SiteFooter";
 import CartDrawer from "./components/CartDrawer";
-import ProductCard from "./components/ProductCard";
 import ProductDetailModal from "./components/ProductDetailModal";
 import WishlistModal from "./components/WishlistModal";
 import CompareBar from "./components/CompareBar";
 import CompareModal from "./components/CompareModal";
-import FilterSortBar from "./components/FilterSortBar";
+import CategorySections from "./components/home/CategorySections";
 import WeatherWidget from "./components/WeatherWidget";
 import InstallmentBanner from "./components/InstallmentBanner";
 import FlyToCart, { type FlyingItem } from "./components/FlyToCart";
@@ -69,7 +67,6 @@ import { useWishlistStore } from "./store/wishlistStore";
 // ========================================
 // API Services
 // ========================================
-import { productsApi } from "./api/services";
 
 // ========================================
 // Hooks
@@ -81,7 +78,10 @@ import { useTranslation } from "./i18n";
 // Types
 // ========================================
 import type { MockProduct } from "./types";
-import { convertToMockProduct } from "./utils/convertProduct";
+
+// Crop tags are not yet part of the product API (convertToMockProduct always
+// yields an empty list), so the crop selector stays hidden until they are.
+const HAS_CROP_TAGS = false;
 
 // ========================================
 // Loading Spinner Component
@@ -118,14 +118,7 @@ export default function App() {
   const [compareOpen, setCompareOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<MockProduct | null>(null);
   const [activeCrop, setActiveCrop] = useState<string | null>(null);
-  const [activeCategory, setActiveCategory] = useState<string>(() => {
-    const category = new URLSearchParams(window.location.search).get("category");
-    return category || "all";
-  });
   const [featuredOnly] = useState(() => new URLSearchParams(window.location.search).get("featured") === "true");
-  const [sort, setSort] = useState<"popular" | "cheapest" | "expensive">("popular");
-  const [priceLimit, setPriceLimit] = useState<number>(10000000);
-  const [inStockOnly, setInStockOnly] = useState<boolean>(false);
 
   // ========================================
   // Wishlist (shared store) & Compare
@@ -135,6 +128,8 @@ export default function App() {
   const removeFromWishlist = useWishlistStore((state) => state.remove);
 
   const [compareItems, setCompareItems] = useState<MockProduct[]>([]);
+  const wishlistIds = useMemo(() => new Set(wishlist.map((p) => p.id)), [wishlist]);
+  const compareIds = useMemo(() => new Set(compareItems.map((p) => p.id)), [compareItems]);
 
   // ========================================
   // FlyToCart Animation
@@ -166,57 +161,6 @@ export default function App() {
     fetchCart();
     if (isAuthenticated) fetchProfile();
   }, [fetchCart, isAuthenticated, fetchProfile]);
-
-  // ========================================
-  // Fetch Products from API
-  // ========================================
-  const { data: productsData, isLoading: productsLoading } = useQuery({
-    queryKey: ['products', activeCategory, sort, inStockOnly, featuredOnly, priceLimit],
-    queryFn: async () => {
-      const params: any = { page: 1 };
-
-      if (activeCategory !== 'all') {
-        params.category = activeCategory;
-      }
-
-      if (inStockOnly) {
-        params.in_stock = true;
-      }
-
-      if (featuredOnly) {
-        params.is_featured = true;
-      }
-
-      if (priceLimit < 10000000) {
-        params.max_price = priceLimit;
-      }
-
-      // Sort mapping
-      const sortMapping: Record<string, string> = {
-        'popular': '-publish',
-        'cheapest': 'price',
-        'expensive': '-price',
-      };
-
-      if (sort !== 'popular') {
-        params.ordering = sortMapping[sort];
-      }
-
-      const response = await productsApi.getAll(params);
-      return response.data.results || [];
-    },
-    staleTime: 30000, // 30 ثانیه cache
-  });
-
-  // تبدیل محصولات API به MockProduct
-  const products: MockProduct[] = (productsData || []).map(convertToMockProduct);
-
-  // ========================================
-  // Filter by Crop
-  // ========================================
-  const filteredProducts = activeCrop
-    ? products.filter((p) => p.cropTags.includes(activeCrop))
-    : products;
 
   // ========================================
   // Handlers
@@ -270,13 +214,6 @@ export default function App() {
   function handleFlyingComplete(key: number) {
     setFlyingItems((prev) => prev.filter((item) => item.key !== key));
   }
-
-  // ========================================
-  // Max Price for Filter
-  // ========================================
-  const maxPrice = products.length > 0
-    ? Math.max(...products.map((p) => p.price))
-    : 10000000;
 
   // ========================================
   // Render
@@ -381,62 +318,29 @@ export default function App() {
                     <WeatherWidget />
 
                     {/* Crop selector is shown only when the catalogue has verified crop tags. */}
-                    {products.some((product) => product.cropTags.length > 0) && (
+                    {HAS_CROP_TAGS && (
                       <CropSelector activeCrop={activeCrop} onSelectCrop={setActiveCrop} />
                     )}
 
                     {/* Installment Banner */}
                     <InstallmentBanner />
 
-                    {/* Filter & Sort Bar */}
-                    <div className="mx-auto max-w-7xl px-4">
-                      <FilterSortBar
-                        activeCategory={activeCategory}
-                        onCategoryChange={setActiveCategory}
-                        sort={sort}
-                        onSortChange={setSort}
-                        maxPrice={maxPrice}
-                        priceLimit={priceLimit}
-                        onPriceLimitChange={setPriceLimit}
-                        resultsCount={filteredProducts.length}
-                        inStockOnly={inStockOnly}
-                        onInStockChange={setInStockOnly}
-                      />
-                    </div>
-
-                    {/* Products Grid */}
-                    <section id="products" className="mx-auto max-w-7xl px-4 py-8" aria-label="فهرست محصولات">
-                      {productsLoading ? (
-                        <LoadingSpinner />
-                      ) : filteredProducts.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-12 text-center">
-                          <div className="text-6xl mb-4">🔍</div>
-                          <p className="text-lg font-bold text-slate-700 dark:text-white">
-                            محصولی یافت نشد
-                          </p>
-                          <p className="mt-2 text-sm text-slate-500 dark:text-emerald-300">
-                            فیلترها را تغییر دهید یا عبارت دیگری جستجو کنید
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3 lg:grid-cols-4">
-                          {filteredProducts.map((product, idx) => (
-                            <ProductCard
-                              key={product.id}
-                              product={product}
-                              index={idx}
-                              isWishlisted={wishlist.some((p) => p.id === product.id)}
-                              isComparing={compareItems.some((p) => p.id === product.id)}
-                              compareDisabled={compareItems.length >= 3}
-                              onToggleWishlist={handleToggleWishlist}
-                              onAddToCart={(product, event) => handleAddToCart(product, 1, event)}
-                              onQuickView={setSelectedProduct}
-                              onToggleCompare={handleToggleCompare}
-                            />
-                          ))}
-                        </div>
-                      )}
-                    </section>
+                    {/*
+                      Catalogue: one section per department (سم، کود، بذر، …),
+                      each with its own results/filter/sort bar and grid, so
+                      every category is visible without picking a chip first.
+                    */}
+                    <CategorySections
+                      featuredOnly={featuredOnly}
+                      activeCrop={activeCrop}
+                      wishlistIds={wishlistIds}
+                      compareIds={compareIds}
+                      compareDisabled={compareItems.length >= 3}
+                      onToggleWishlist={handleToggleWishlist}
+                      onAddToCart={(product, event) => handleAddToCart(product, 1, event)}
+                      onQuickView={setSelectedProduct}
+                      onToggleCompare={handleToggleCompare}
+                    />
 
                     {/* AgriCalculator */}
                     <AgriCalculator onAddToCart={handleAddToCart} />

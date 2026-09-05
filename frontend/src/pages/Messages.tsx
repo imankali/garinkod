@@ -9,14 +9,12 @@ import { Link } from 'react-router-dom';
 import { MessageCircle } from 'lucide-react';
 
 import { messagesApi } from '../api/services';
+import ChannelChips, { type ChannelFilter } from '../components/direct/ChannelChips';
 import ConversationRow from '../components/direct/ConversationRow';
 import DirectThread from '../components/direct/DirectThread';
 import { useAuthStore } from '../store/authStore';
 import { useTranslation } from '../i18n';
 import type { MessageChannel, StorefrontConversation } from '../types';
-import { cn } from '../utils/cn';
-
-type ChannelFilter = 'all' | MessageChannel;
 
 export default function Messages() {
   const { t } = useTranslation();
@@ -119,23 +117,14 @@ export default function Messages() {
         <aside className={`${activeId ? 'hidden' : ''} flex h-full min-h-0 flex-col overflow-hidden lg:flex`}>
           {/* Channel filters, each badged with its own unread count. */}
           {channels.length > 0 && (
-            <div className="no-scrollbar flex shrink-0 gap-1.5 overflow-x-auto border-b border-emerald-100 p-2.5 dark:border-emerald-800">
-              <FilterChip
-                label={t('common.all')}
-                active={filter === 'all'}
-                count={Object.values(unreadByChannel).reduce((sum, n) => sum + (n || 0), 0)}
-                onClick={() => setFilter('all')}
-              />
-              {channels.map((channel) => (
-                <FilterChip
-                  key={channel.value}
-                  label={channel.label}
-                  active={filter === channel.value}
-                  count={unreadByChannel[channel.value] || 0}
-                  onClick={() => setFilter(channel.value)}
-                />
-              ))}
-            </div>
+            <ChannelChips
+              channels={channels}
+              unreadByChannel={unreadByChannel}
+              value={filter}
+              onChange={setFilter}
+              allLabel={t('common.all')}
+              className="border-b border-emerald-100 dark:border-emerald-800"
+            />
           )}
 
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3">
@@ -178,44 +167,5 @@ export default function Messages() {
         </section>
       </div>
     </main>
-  );
-}
-
-/** One channel filter, with its unread badge. */
-function FilterChip({
-  label,
-  active,
-  count,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  count: number;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={cn(
-        'flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border px-3 text-fluid-2xs font-bold transition',
-        active
-          ? 'border-emerald-600 bg-emerald-600 text-white'
-          : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-300 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200',
-      )}
-    >
-      {label}
-      {count > 0 && (
-        <span
-          className={cn(
-            'flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-fluid-2xs',
-            active ? 'bg-white/25 text-white' : 'bg-emerald-600 text-white',
-          )}
-        >
-          {count.toLocaleString('fa-IR')}
-        </span>
-      )}
-    </button>
   );
 }

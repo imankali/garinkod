@@ -1345,6 +1345,101 @@ class StorefrontMessagingTests(TestCase):
         response = owner.post(f'/api/marketplace/storefronts/{self.storefront.slug}/conversation/')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+    # --- reply / edit / delete -------------------------------------------
+
+    def _thread_with_message(self, body='سلام، موجودی دارید؟'):
+        buyer = self._client('msg-buyer')
+        conversation_id = buyer.post(
+            f'/api/marketplace/storefronts/{self.storefront.slug}/conversation/'
+        ).data['id']
+        message = buyer.post(
+            f'/api/marketplace/conversations/{conversation_id}/messages/',
+            {'body': body}, format='json',
+        ).data
+        return buyer, conversation_id, message
+
+    def test_reply_quotes_the_parent_message(self):
+        buyer, conversation_id, original = self._thread_with_message()
+        owner = self._client('msg-owner')
+
+        response = owner.post(
+            f'/api/marketplace/conversations/{conversation_id}/messages/',
+            {'body': 'بله، ۲۰۰ کیلو موجود است.', 'reply_to': original['id']}, format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['reply_to']['id'], original['id'])
+        self.assertEqual(response.data['reply_to']['body'], original['body'])
+        # From the buyer's point of view the quoted message is theirs.
+        thread = buyer.get(f'/api/marketplace/conversations/{conversation_id}/messages/').data
+        reply = thread['results'][-1]
+        self.assertTrue(reply['reply_to']['is_mine'])
+
+    def test_reply_must_reference_a_message_in_the_same_thread(self):
+        buyer, conversation_id, _ = self._thread_with_message()
+        # A message in a different conversation.
+        other_conversation = buyer.post(
+            f'/api/marketplace/storefronts/{self.other_storefront.slug}/conversation/'
+        ).data['id']
+        foreign = buyer.post(
+            f'/api/marketplace/conversations/{other_conversation}/messages/',
+            {'body': 'پیام دیگر'}, format='json',
+        ).data
+        response = buyer.post(
+            f'/api/marketplace/conversations/{conversation_id}/messages/',
+            {'body': 'پاسخ', 'reply_to': foreign['id']}, format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_author_can_edit_own_text_message(self):
+        buyer, conversation_id, message = self._thread_with_message()
+        url = f'/api/marketplace/conversations/{conversation_id}/messages/{message["id"]}/'
+        response = buyer.patch(url, {'body': 'سلام، موجودی عمده دارید؟'}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['body'], 'سلام، موجودی عمده دارید؟')
+        self.assertTrue(response.data['is_edited'])
+        self.assertIsNotNone(response.data['edited_at'])
+
+    def test_only_the_author_can_edit_or_delete(self):
+        _, conversation_id, message = self._thread_with_message()
+        owner = self._client('msg-owner')
+        url = f'/api/marketplace/conversations/{conversation_id}/messages/{message["id"]}/'
+        self.assertEqual(
+            owner.patch(url, {'body': 'x'}, format='json').status_code, status.HTTP_403_FORBIDDEN
+        )
+        self.assertEqual(owner.delete(url).status_code, status.HTTP_403_FORBIDDEN)
+        # Non-participants get the same answer.
+        other = self._client('msg-other')
+        self.assertEqual(other.delete(url).status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_delete_is_soft_and_keeps_the_placeholder(self):
+        buyer, conversation_id, message = self._thread_with_message()
+        url = f'/api/marketplace/conversations/{conversation_id}/messages/{message["id"]}/'
+        response = buyer.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['is_deleted'])
+        self.assertEqual(response.data['body'], '')
+        self.assertFalse(response.data['can_edit'])
+        self.assertFalse(response.data['can_delete'])
+
+        # The row is still in the thread, as a placeholder, for both parties.
+        owner = self._client('msg-owner')
+        thread = owner.get(f'/api/marketplace/conversations/{conversation_id}/messages/').data
+        self.assertEqual(len(thread['results']), 1)
+        self.assertTrue(thread['results'][0]['is_deleted'])
+
+        # And it can neither be edited nor deleted twice.
+        self.assertEqual(
+            buyer.patch(url, {'body': 'باز'}, format='json').status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+        self.assertEqual(buyer.delete(url).status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_edit_rejects_empty_text(self):
+        buyer, conversation_id, message = self._thread_with_message()
+        url = f'/api/marketplace/conversations/{conversation_id}/messages/{message["id"]}/'
+        response = buyer.patch(url, {'body': '   '}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
 
 class StorefrontOffersTests(TestCase):
     """Best-seller and most-discounted listing ordering."""

@@ -57,6 +57,7 @@ export function conversationPreview(
 ): string {
   const message = conversation.last_message;
   if (!message) return fallback;
+  if (message.is_deleted) return '🚫 پیام حذف شد';
   if (message.body) return message.body;
   if (message.attachment_type === 'image') return '🖼 تصویر';
   if (message.attachment_type === 'video') return '🎬 ویدیو';

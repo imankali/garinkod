@@ -331,6 +331,10 @@ class ProductViewSet(viewsets.ReadOnlyModelViewSet):
     ordering = ['-publish']
     lookup_field = 'slug'
     throttle_classes = [SearchRateThrottle]
+    # The home page renders one section per category and asks for each
+    # department's products in a single request; ``page_size`` (capped) lets
+    # it do that without paging through the default twelve at a time.
+    pagination_class = ClientConfigurablePagination
 
     def get_serializer_class(self):
         if self.action == 'list':

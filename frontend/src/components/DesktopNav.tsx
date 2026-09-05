@@ -74,9 +74,11 @@ export default function DesktopNav() {
   const shopLinks = visibleItems(SHOP_ITEMS, { level, isAuthenticated });
   // Everything that is not a shop link becomes a grouped dropdown, mirroring
   // the sections of the mobile drawer one for one.
-  const groups: NavSection[] = visibleSections({ level, isAuthenticated }).filter(
-    (section) => section.id !== 'shop',
-  );
+  // The header already has a wishlist button, so the dialog-only entry is
+  // dropped from the dropdowns rather than duplicated as a dead link.
+  const groups: NavSection[] = visibleSections({ level, isAuthenticated })
+    .filter((section) => section.id !== 'shop')
+    .map((section) => ({ ...section, items: section.items.filter((item) => !item.action) }));
 
   return (
     <nav

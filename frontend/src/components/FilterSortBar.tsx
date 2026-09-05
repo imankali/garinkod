@@ -13,8 +13,12 @@ import type { Category } from "../types";
 export type SortOption = "popular" | "cheapest" | "expensive";
 
 interface FilterSortBarProps {
-  activeCategory: string;
-  onCategoryChange: (id: string) => void;
+  /**
+   * Category chips. Omit both to render the bar without them — the home page
+   * shows one bar per category section, where a chip row would be redundant.
+   */
+  activeCategory?: string;
+  onCategoryChange?: (id: string) => void;
   sort: SortOption;
   onSortChange: (sort: SortOption) => void;
   maxPrice: number;
@@ -23,6 +27,10 @@ interface FilterSortBarProps {
   resultsCount: number;
   inStockOnly: boolean;
   onInStockChange: (value: boolean) => void;
+  /** True while the results are being (re)fetched; dims the count. */
+  loading?: boolean;
+  /** Extra classes on the wrapper (e.g. to drop the bottom margin). */
+  className?: string;
 }
 
 // ========================================
@@ -48,7 +56,10 @@ export default function FilterSortBar({
   resultsCount,
   inStockOnly,
   onInStockChange,
+  loading = false,
+  className,
 }: FilterSortBarProps) {
+  const showCategories = typeof onCategoryChange === 'function';
   /**
    * Only one of the two panels is ever open.
    *
@@ -76,6 +87,7 @@ export default function FilterSortBar({
       return response.data.results || [];
     },
     staleTime: 5 * 60 * 1000, // 5 دقیقه cache
+    enabled: showCategories,
   });
 
   // اطمینان از اینکه categories همیشه آرایه است
@@ -107,10 +119,11 @@ export default function FilterSortBar({
   // Render
   // ========================================
   return (
-    <div className="mb-6">
+    <div className={className ?? "mb-6"}>
       {/* ======================================== */}
       {/* Category Chips */}
       {/* ======================================== */}
+      {showCategories && (
       <div className="no-scrollbar mb-4 flex items-center gap-2 overflow-x-auto pb-1">
         <motion.button
           whileTap={{ scale: 0.95 }}
@@ -151,13 +164,17 @@ export default function FilterSortBar({
           ))
         )}
       </div>
+      )}
 
       {/* ======================================== */}
       {/* Sort + Filter Row */}
       {/* ======================================== */}
       <div className="flex flex-col gap-3 rounded-2xl border border-slate-100 bg-white p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between dark:border-emerald-800 dark:bg-emerald-950">
         {/* Results Count */}
-        <p className="text-xs text-slate-400 dark:text-emerald-300">
+        <p
+          className={`text-xs text-slate-400 transition-opacity dark:text-emerald-300 ${loading ? "opacity-50" : ""}`}
+          aria-live="polite"
+        >
           <span className="font-bold text-[#0F8A5F] dark:text-lime-300">
             {resultsCount.toLocaleString("fa-IR")}
           </span>{" "}

@@ -3,9 +3,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { ChevronLeft, Heart, LogIn, LogOut, MessageCircle, Moon, Sun, X } from 'lucide-react';
+import { ChevronLeft, LogIn, LogOut, Moon, Sun, X } from 'lucide-react';
 
-import { visibleSections } from '../config/navigation';
+import { visibleSections, type NavItem } from '../config/navigation';
 import { useAuthStore, useUserLevel } from '../store/authStore';
 import { messagesApi } from '../api/services';
 import { useTranslation } from '../i18n';
@@ -38,6 +38,8 @@ const TILE_STYLES: Record<string, string> = {
   services: 'bg-teal-100 text-teal-600 dark:bg-teal-950/60 dark:text-teal-300',
   offers: 'bg-rose-100 text-rose-600 dark:bg-rose-950/60 dark:text-rose-300',
   profile: 'bg-violet-100 text-violet-600 dark:bg-violet-950/60 dark:text-violet-300',
+  messages: 'bg-sky-100 text-sky-600 dark:bg-sky-950/60 dark:text-sky-300',
+  wishlist: 'bg-rose-100 text-rose-600 dark:bg-rose-950/60 dark:text-rose-300',
   orders: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-300',
   rewards: 'bg-fuchsia-100 text-fuchsia-600 dark:bg-fuchsia-950/60 dark:text-fuchsia-300',
   affiliate: 'bg-cyan-100 text-cyan-600 dark:bg-cyan-950/60 dark:text-cyan-300',
@@ -73,13 +75,25 @@ export default function MobileMenu({
   const { pathname } = useLocation();
   const { isAuthenticated, user, account, logout } = useAuthStore();
   const level = useUserLevel();
-  const { t } = useTranslation();
+  const { t, dir } = useTranslation();
   const panelRef = useRef<HTMLDivElement>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
   const reduceMotion = useReducedMotion();
   const [unread, setUnread] = useState(0);
 
-  const sections = visibleSections({ level, isAuthenticated });
+  // The personal section leads: حساب من، پیام‌ها، علاقه‌مندی‌ها، سفارش‌ها —
+  // the things people open a menu for most — then the catalogue and the rest.
+  const sections = [...visibleSections({ level, isAuthenticated })].sort(
+    (a, b) => Number(b.id === 'account') - Number(a.id === 'account'),
+  );
+
+  // The panel is anchored to the *start* edge — the right side in RTL, under
+  // the hamburger button — and slides in from off-screen on that same side.
+  const slideOffset = dir === 'rtl' ? '100%' : '-100%';
+
+  // Per-item badges: live unread count on پیام‌ها, saved count on علاقه‌مندی‌ها.
+  const badgeFor = (item: NavItem) =>
+    item.id === 'messages' ? unread : item.id === 'wishlist' ? wishlistCount : 0;
 
   // Close automatically when the route changes, so a tap always feels final.
   useEffect(() => {
@@ -168,11 +182,12 @@ export default function MobileMenu({
             role="dialog"
             aria-modal="true"
             aria-label="منوی اصلی"
-            initial={reduceMotion ? { opacity: 0 } : { x: '100%' }}
+            id="mobile-menu"
+            initial={reduceMotion ? { opacity: 0 } : { x: slideOffset }}
             animate={reduceMotion ? { opacity: 1 } : { x: 0 }}
-            exit={reduceMotion ? { opacity: 0 } : { x: '100%' }}
+            exit={reduceMotion ? { opacity: 0 } : { x: slideOffset }}
             transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-            className="absolute inset-y-0 end-0 flex w-[min(24rem,90vw)] flex-col bg-white shadow-2xl dark:bg-emerald-950"
+            className="absolute inset-y-0 start-0 flex w-[min(24rem,90vw)] flex-col bg-white shadow-2xl dark:bg-emerald-950"
           >
             <header className="flex items-center justify-between gap-2 border-b border-slate-100 p-4 dark:border-emerald-900">
               <Logo />
@@ -224,47 +239,88 @@ export default function MobileMenu({
                     {section.items.map((item) => {
                       const Icon = item.icon;
                       const isActive =
-                        item.to === '/' ? pathname === '/' : pathname.startsWith(item.to.split('?')[0]!);
+                        !item.action &&
+                        (item.to === '/' ? pathname === '/' : pathname.startsWith(item.to.split('?')[0]!));
+                      const badge = badgeFor(item);
+                      const label = (() => {
+                        const key = `nav.${item.id}`;
+                        const translated = t(key);
+                        return translated === key ? item.label : translated;
+                      })();
+                      const rowClass = cn(
+                        'flex min-h-11 w-full items-center gap-3 rounded-xl p-2 text-start transition-colors',
+                        isActive
+                          ? 'bg-emerald-600 text-white'
+                          : 'hover:bg-emerald-50 dark:hover:bg-emerald-900/60',
+                      );
+                      const content = (
+                        <>
+                          <span
+                            className={cn(
+                              'relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl',
+                              isActive ? 'bg-white/20 text-white' : (TILE_STYLES[item.id] ?? DEFAULT_TILE),
+                            )}
+                          >
+                            <Icon size={17} aria-hidden="true" />
+                            {badge > 0 && (
+                              <span
+                                className="absolute -end-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-fluid-2xs font-bold text-white"
+                                aria-label={`${badge.toLocaleString('fa-IR')} مورد`}
+                              >
+                                {badge > 9 ? '۹+' : badge.toLocaleString('fa-IR')}
+                              </span>
+                            )}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span
+                              className={cn(
+                                'block text-fluid-sm font-bold',
+                                isActive ? 'text-white' : 'text-slate-700 dark:text-emerald-50',
+                              )}
+                            >
+                              {label}
+                            </span>
+                            {item.description && (
+                              <span
+                                className={cn(
+                                  'block truncate text-fluid-2xs',
+                                  isActive ? 'text-emerald-50' : 'text-slate-400 dark:text-emerald-300/70',
+                                )}
+                              >
+                                {item.description}
+                              </span>
+                            )}
+                          </span>
+                        </>
+                      );
+
+                      // The wishlist is a dialog, not a page: open it in place.
+                      if (item.action === 'wishlist' && onOpenWishlist) {
+                        return (
+                          <li key={item.id}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onClose();
+                                onOpenWishlist();
+                              }}
+                              className={rowClass}
+                            >
+                              {content}
+                            </button>
+                          </li>
+                        );
+                      }
+
                       return (
                         <li key={item.id}>
                           <Link
                             to={item.to}
+                            onClick={onClose}
                             aria-current={isActive ? 'page' : undefined}
-                            className={cn(
-                              'flex min-h-11 items-center gap-3 rounded-xl p-2 transition-colors',
-                              isActive
-                                ? 'bg-emerald-600 text-white'
-                                : 'hover:bg-emerald-50 dark:hover:bg-emerald-900/60',
-                            )}
+                            className={rowClass}
                           >
-                            <span
-                              className={cn(
-                                'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl',
-                                isActive ? 'bg-white/20 text-white' : (TILE_STYLES[item.id] ?? DEFAULT_TILE),
-                              )}
-                            >
-                              <Icon size={17} aria-hidden="true" />
-                            </span>
-                            <span className="min-w-0 flex-1">
-                              <span
-                                className={cn(
-                                  'block text-fluid-sm font-bold',
-                                  isActive ? 'text-white' : 'text-slate-700 dark:text-emerald-50',
-                                )}
-                              >
-                                {item.label}
-                              </span>
-                              {item.description && (
-                                <span
-                                  className={cn(
-                                    'block truncate text-fluid-2xs',
-                                    isActive ? 'text-emerald-50' : 'text-slate-400 dark:text-emerald-300/70',
-                                  )}
-                                >
-                                  {item.description}
-                                </span>
-                              )}
-                            </span>
+                            {content}
                           </Link>
                         </li>
                       );
@@ -272,56 +328,6 @@ export default function MobileMenu({
                   </ul>
                 </div>
               ))}
-
-              {/* Direct messages shortcut — with the live unread badge. */}
-              <Link
-                to="/messages"
-                onClick={onClose}
-                className="flex min-h-11 w-full items-center gap-3 rounded-xl p-2 transition-colors hover:bg-emerald-50 dark:hover:bg-emerald-900/60"
-              >
-                <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-600 dark:bg-sky-950/60 dark:text-sky-300">
-                  <MessageCircle size={17} aria-hidden="true" />
-                  {unread > 0 && (
-                    <span className="absolute -end-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-fluid-2xs font-bold text-white">
-                      {unread > 9 ? '۹+' : unread.toLocaleString('fa-IR')}
-                    </span>
-                  )}
-                </span>
-                <span className="flex-1 text-start">
-                  <span className="block text-fluid-sm font-bold text-slate-700 dark:text-emerald-50">
-                    {t('nav.messages')}
-                  </span>
-                  <span className="block text-fluid-2xs text-slate-400 dark:text-emerald-300/70">
-                    {t('direct.title')}
-                  </span>
-                </span>
-              </Link>
-
-              {/* Wishlist — same tile style, rose accent. */}
-              {onOpenWishlist && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    onOpenWishlist();
-                  }}
-                  className="flex min-h-11 w-full items-center gap-3 rounded-xl p-2 transition-colors hover:bg-emerald-50 dark:hover:bg-emerald-900/60"
-                >
-                  <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-600 dark:bg-rose-950/60 dark:text-rose-300">
-                    <Heart size={17} aria-hidden="true" />
-                    {wishlistCount > 0 && (
-                      <span className="absolute -end-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-fluid-2xs font-bold text-white">
-                        {wishlistCount > 9 ? '۹+' : wishlistCount.toLocaleString('fa-IR')}
-                      </span>
-                    )}
-                  </span>
-                  <span className="flex-1 text-start">
-                    <span className="block text-fluid-sm font-bold text-slate-700 dark:text-emerald-50">
-                      {t('nav.wishlist')}
-                    </span>
-                  </span>
-                </button>
-              )}
             </nav>
 
             {/* Preferences and sign-out pinned to the bottom. */}
