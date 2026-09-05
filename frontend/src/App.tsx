@@ -58,6 +58,7 @@ const Shop = lazy(() => import("./pages/Shop"));
 const Messages = lazy(() => import("./pages/Messages"));
 const Farmers = lazy(() => import("./pages/Farmers"));
 const Legal = lazy(() => import("./pages/Legal"));
+const LegalHub = lazy(() => import("./pages/LegalHub"));
 const Blog = lazy(() => import("./pages/Blog"));
 const ArticlePage = lazy(() => import("./pages/ArticlePage"));
 const About = lazy(() => import("./pages/About"));
@@ -400,6 +401,12 @@ export default function App() {
               <Route path="/farmer-sell" element={<FarmerSell />} />
               <Route path="/marketplace" element={<Marketplace />} />
               <Route path="/support" element={<Support />} />
+              {/* Legal documents. /legal is the hub and /legal/<slug> the canonical
+                  address of each document; the three older routes stay alive
+                  because they are printed in e-mails and saved in bookmarks, and
+                  render the same component (which declares the canonical URL). */}
+              <Route path="/legal" element={<LegalHub />} />
+              <Route path="/legal/:slug" element={<Legal />} />
               <Route path="/privacy" element={<Legal />} />
               <Route path="/terms" element={<Legal />} />
               <Route path="/returns" element={<Legal />} />

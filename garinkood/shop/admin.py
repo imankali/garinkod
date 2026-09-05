@@ -307,7 +307,10 @@ class AdminOrder(ExportMixin, SimpleHistoryAdmin):
     list_filter = ('status', 'payment_status', 'payment_method', 'created_at')
     search_fields = ('code', 'customer_name', 'phone', 'email')
     list_editable = ('status', 'payment_status')
-    readonly_fields = ('code', 'user', 'subtotal', 'shipping_price', 'total_price', 'created_at', 'updated_at')
+    readonly_fields = (
+        'code', 'user', 'subtotal', 'shipping_price', 'total_price',
+        'terms_accepted_at', 'legal_version', 'created_at', 'updated_at',
+    )
     inlines = [OrderItemInline]
     actions = [cancel_orders_and_restore_stock, mark_orders_paid_and_issue_rewards]
     date_hierarchy = 'created_at'

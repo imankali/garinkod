@@ -1,7 +1,7 @@
 // frontend/src/components/CartDrawer.tsx
 
 import { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,
@@ -262,12 +262,12 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                 <span className="flex items-center gap-1">
                   <Truck size={11} /> زمان ارسال پس از هماهنگی
                 </span>
-                <span className="flex items-center gap-1">
+                <Link to="/legal/warranty" className="flex items-center gap-1 underline-offset-2 hover:underline">
                   <ShieldCheck size={11} /> ضمانت اصالت کالا
-                </span>
-                <span className="flex items-center gap-1">
-                  ثبت سفارش با هماهنگی کارشناس
-                </span>
+                </Link>
+                <Link to="/legal/shipping" className="flex items-center gap-1 underline-offset-2 hover:underline">
+                  ارسال و تحویل پس از هماهنگی
+                </Link>
               </div>
             </div>
 

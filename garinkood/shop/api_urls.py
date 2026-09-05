@@ -136,6 +136,9 @@ urlpatterns = [
     # Editorial/landing content, contact channels and the newsletter
     path('site/contact/', content_views.site_contact, name='api_site_contact'),
     path('site/about/', content_views.site_about, name='api_site_about'),
+    # Legal documents: the hub, then one document by slug.
+    path('legal/', content_views.legal_index, name='api_legal_index'),
+    path('legal/<slug:slug>/', content_views.legal_document, name='api_legal_document'),
     path('guides/index/', content_views.growing_index, name='api_growing_index'),
     path('newsletter/subscribe/', content_views.newsletter_subscribe, name='api_newsletter_subscribe'),
     path('newsletter/unsubscribe/', content_views.newsletter_unsubscribe, name='api_newsletter_unsubscribe'),

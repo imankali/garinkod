@@ -303,6 +303,13 @@ export default function ProductPage() {
 
           <p className="mt-5 whitespace-pre-line leading-8 text-slate-600 dark:text-emerald-100">{product.description}</p>
           <div className="mt-6 flex items-center gap-2 text-sm font-semibold">{product.is_in_stock ? <><PackageCheck size={18} className="text-emerald-600" /><span className="text-emerald-700 dark:text-lime-300">موجود در انبار</span></> : <><PackageX size={18} className="text-rose-500" /><span className="text-rose-600">ناموجود</span></>}</div>
+          {/* The promise is worth reading where the decision is made, not only
+              in the footer after the money has moved. */}
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-fluid-2xs font-bold text-slate-500 dark:text-emerald-200">
+            <Link to="/legal/warranty" className="inline-flex items-center gap-1 hover:text-emerald-700 hover:underline dark:hover:text-lime-300"><ShieldCheck size={13} aria-hidden="true" /> ضمانت اصالت کالا</Link>
+            <Link to="/legal/returns" className="hover:text-emerald-700 hover:underline dark:hover:text-lime-300">شرایط بازگشت کالا</Link>
+            <Link to="/legal/shipping" className="hover:text-emerald-700 hover:underline dark:hover:text-lime-300">زمان و هزینه ارسال</Link>
+          </div>
 
           {product.price_on_request && (
             <p className="mt-4 rounded-2xl bg-amber-50 p-3.5 text-fluid-xs leading-7 text-amber-800 dark:bg-amber-950/40 dark:text-amber-100">

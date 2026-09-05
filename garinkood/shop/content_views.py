@@ -18,6 +18,7 @@ from .models import (
     BrandPartner, MarketplaceListing, Product, Service, SiteArticle, SiteContact,
     SitePage, Storefront, TeamMember, NewsletterSubscriber, Order,
 )
+from . import legal
 from .schema import documented_api
 from .serializers import (
     BrandPartnerSerializer, NewsletterSubscribeSerializer, ServiceSerializer,
@@ -273,3 +274,34 @@ def newsletter_unsubscribe(request):
         is_active=False, unsubscribed_at=timezone.now()
     )
     return Response({'unsubscribed': updated > 0, 'count': updated})
+
+
+# ========================================
+# Legal documents
+# ========================================
+@documented_api
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def legal_index(request):
+    """The legal hub: every document, its summary and the current text version.
+
+    Public on purpose. A policy a buyer has to log in to read is not a policy,
+    and the checkout page links to these documents before anyone has an account.
+    """
+    return Response(legal.index_payload())
+
+
+@documented_api
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def legal_document(request, slug: str):
+    """One legal document, in full.
+
+    ``source`` distinguishes the text that ships with the code from a published
+    admin page, so the renderer can say which one the reader is looking at
+    instead of presenting an unreviewable block of prose as final.
+    """
+    doc = legal.get(slug)
+    if doc is None:
+        return Response({'detail': 'سند حقوقی پیدا نشد.'}, status=status.HTTP_404_NOT_FOUND)
+    return Response(legal.payload(doc))

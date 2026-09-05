@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { CheckCircle2, ClipboardCheck, LocateFixed, PackageCheck, Phone, ShieldCheck } from "lucide-react";
 import toast from "react-hot-toast";
 
+import { LEGAL_CORE_LINKS } from "../config/legal";
 import { ordersApi, paymentsApi, shippingApi } from "../api/services";
 import { parseApiError, type FieldErrors } from "../api/errors";
 import LocationPicker from "../components/LocationPicker";
@@ -201,6 +202,24 @@ export default function Checkout() {
             <p className="mt-1 text-xl font-extrabold tracking-wider text-emerald-700 dark:text-lime-300" dir="ltr">{order.code}</p>
             {order.discount_amount > 0 && <p className="mt-3 text-sm font-bold text-emerald-700 dark:text-lime-300">تخفیف اعمال‌شده: {formatPrice(order.discount_amount)}</p>}
             <p className="mt-3 text-sm font-bold text-slate-700 dark:text-white">مبلغ ثبت‌شده: {formatPrice(order.total_price)}</p>
+            {/*
+              The acceptance is written on the order, so the receipt says what it
+              says: the moment the box was ticked and the version of the text the
+              buyer agreed to. If a term is ever disputed, this is the answer.
+            */}
+            {order.terms_accepted_at && (
+              <p className="mt-3 text-fluid-2xs leading-6 text-slate-500 dark:text-emerald-300">
+                شرایط خرید در {new Date(order.terms_accepted_at).toLocaleString("fa-IR")} پذیرفته شد
+                {order.legal_version && (
+                  <>
+                    {' '}· نسخه متن <span dir="ltr" className="font-bold">{order.legal_version}</span>
+                  </>
+                )}{' '}
+                <Link to="/legal" className="font-bold text-emerald-700 hover:underline dark:text-lime-300">
+                  دیدن اسناد
+                </Link>
+              </p>
+            )}
           </div>
           <p className="mt-4 text-xs text-slate-400">پرداخت فقط از طریق روش فعال‌شده و تأییدشدهٔ سرور انجام می‌شود؛ هیچ درگاه غیرفعالی مبلغ دریافت نمی‌کند.</p>
           <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
@@ -313,7 +332,21 @@ export default function Checkout() {
           <div>
             <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-slate-50 p-3 text-xs leading-6 text-slate-600 dark:bg-emerald-900/40 dark:text-emerald-100">
               <input id="checkout-terms_accepted" type="checkbox" checked={form.terms_accepted} onChange={(event) => updateField("terms_accepted", event.target.checked)} aria-invalid={Boolean(fieldErrors.terms_accepted)} className="mt-1 h-4 w-4 accent-emerald-600" />
-              <span>صحت اطلاعات تحویل و مبلغ را تأیید می‌کنم و می‌پذیرم سفارش فقط پس از تأیید سمت سرور و، برای پرداخت آنلاین، تأیید زرین‌پال پرداخت‌شده تلقی شود.</span>
+              <span>
+                صحت اطلاعات تحویل و مبلغ را تأیید می‌کنم و می‌پذیرم سفارش فقط پس از تأیید سمت سرور و، برای پرداخت
+                آنلاین، تأیید درگاه پرداخت‌شده تلقی شود.
+                <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-fluid-2xs">
+                  <span className="text-slate-400">متن کامل:</span>
+                  {LEGAL_CORE_LINKS.map((item) => (
+                    <Link key={item.to} to={item.to} className="font-bold text-emerald-700 hover:underline dark:text-lime-300">
+                      {item.label}
+                    </Link>
+                  ))}
+                  {/* The number is stamped server-side on the order, so this line
+                      is a receipt, not a promise the frontend has to keep. */}
+                  <span className="text-slate-400">· شماره نسخه متن روی سفارش شما ثبت می‌شود.</span>
+                </span>
+              </span>
             </label>
             {fieldErrors.terms_accepted && <p role="alert" className="mt-1 text-fluid-xs font-semibold text-rose-600">{fieldErrors.terms_accepted}</p>}
           </div>

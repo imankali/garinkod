@@ -637,7 +637,11 @@ function StorefrontForm({
         <h2 className="text-xl font-extrabold text-slate-800 dark:text-white">ساخت غرفه فروشنده</h2>
       </div>
       <p className="mt-2 text-sm text-slate-500 dark:text-emerald-200">
-        پس از ساخت غرفه، آگهی‌ها در وضعیت بررسی قرار می‌گیرند و فقط پس از تأیید منتشر می‌شوند.
+        پس از ساخت غرفه، آگهی‌ها در وضعیت بررسی قرار می‌گیرند و فقط پس از تأیید منتشر می‌شوند.{' '}
+        <Link to="/legal/marketplace" className="font-bold text-emerald-700 underline dark:text-lime-300">
+          قوانین غرفه‌داری
+        </Link>
+        را پیش از انتشار بخوانید.
       </p>
 
       <div className="mt-5 grid gap-4 md:grid-cols-2">

@@ -2,6 +2,8 @@
 
 import apiClient from './client';
 import type {
+  LegalDocument,
+  LegalIndex,
   Product,
   ProductList,
   Category,
@@ -972,6 +974,18 @@ export const sitePagesApi = {
 
   getBySlug: (slug: string) => {
     return apiClient.get<SitePage>(`/pages/${slug}/`);
+  },
+};
+
+export const legalApi = {
+  /** GET /api/legal/ — the hub: every document, its summary and the text version. */
+  index: () => {
+    return apiClient.get<LegalIndex>('/legal/');
+  },
+
+  /** GET /api/legal/<slug>/ — one document, admin text or shipped wording. */
+  document: (slug: string) => {
+    return apiClient.get<LegalDocument>(`/legal/${slug}/`);
   },
 };
 

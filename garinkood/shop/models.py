@@ -597,6 +597,12 @@ class Order(models.Model):
     payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='unpaid', db_index=True)
     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES, default='coordination')
     affiliate_code = models.CharField(max_length=32, blank=True, db_index=True)
+    # Which legal text this order was placed under, and when it was accepted.
+    # ``terms_accepted`` in the request only proves that a checkbox arrived; the
+    # version says *which* promises the buyer saw, so a dispute two years later
+    # can be read against the text of that day rather than today's.
+    terms_accepted_at = models.DateTimeField(null=True, blank=True, verbose_name='زمان پذیرش شرایط')
+    legal_version = models.CharField(max_length=40, blank=True, verbose_name='نسخه متن حقوقی')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     history = HistoricalRecords()

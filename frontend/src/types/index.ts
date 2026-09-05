@@ -596,6 +596,9 @@ export interface Order {
   shipments: Shipment[];
   created_at: string;
   updated_at: string;
+  /** When the buyer accepted the terms, and which text they accepted. */
+  terms_accepted_at: string | null;
+  legal_version: string;
 }
 
 export interface CheckoutPayload {
@@ -1303,6 +1306,45 @@ export interface StorefrontPostComment {
   can_moderate: boolean;
   replies: StorefrontPostComment[];
   created_at: string;
+}
+
+// ========================================
+// Legal documents
+// ========================================
+
+/** A section of a legal document as authored in the admin panel. */
+export interface LegalBlock {
+  id: number;
+  type: SitePageBlockType;
+  title: string;
+  text: string;
+}
+
+export interface LegalDocumentSummary {
+  slug: string;
+  title: string;
+  /** The footer/menu label: shorter than the page heading. */
+  short_title: string;
+  group: string;
+  group_label: string;
+  icon: string;
+  summary: string;
+  /** `page` = published admin text, `code` = the wording shipped with the app. */
+  source: 'page' | 'code';
+  updated_at: string | null;
+  url: string;
+}
+
+export interface LegalDocument extends LegalDocumentSummary {
+  blocks: LegalBlock[];
+  sections: Array<{ title: string; body: string }>;
+}
+
+export interface LegalIndex {
+  groups: Array<{ id: string; label: string; items: LegalDocumentSummary[] }>;
+  documents: LegalDocumentSummary[];
+  /** Fingerprint of the text in force; recorded on every order. */
+  version: string;
 }
 
 // ========================================

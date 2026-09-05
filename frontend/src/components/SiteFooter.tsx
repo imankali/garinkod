@@ -1,6 +1,7 @@
 // frontend/src/components/SiteFooter.tsx
 
 import { Link } from 'react-router-dom';
+import { LEGAL_CORE_LINKS, LEGAL_HUB_LINK } from '../config/legal';
 import { Instagram, Mail, MapPin, MessageCircle, Phone, Send, ShieldCheck } from 'lucide-react';
 
 import { visibleSections } from '../config/navigation';
@@ -146,9 +147,18 @@ export default function SiteFooter() {
         <div className="mt-9 flex flex-col items-center justify-between gap-3 border-t border-slate-100 pt-5 text-fluid-2xs text-slate-400 dark:border-emerald-900 sm:flex-row">
           <p>© {year} — {t('footer.rights')}</p>
           <nav aria-label="قوانین" className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
-            <Link className="min-h-11 py-3 hover:text-emerald-700 hover:underline" to="/privacy">حریم خصوصی</Link>
-            <Link className="min-h-11 py-3 hover:text-emerald-700 hover:underline" to="/terms">شرایط استفاده</Link>
-            <Link className="min-h-11 py-3 hover:text-emerald-700 hover:underline" to="/returns">لغو و مرجوعی</Link>
+            {LEGAL_CORE_LINKS.map((item) => (
+              <Link
+                key={item.to}
+                className="min-h-11 py-3 hover:text-emerald-700 hover:underline"
+                to={item.to}
+              >
+                {item.label}
+              </Link>
+            ))}
+            <Link className="min-h-11 py-3 hover:text-emerald-700 hover:underline" to={LEGAL_HUB_LINK.to}>
+              {LEGAL_HUB_LINK.label}
+            </Link>
             {import.meta.env.VITE_ANALYTICS_DOMAIN && import.meta.env.VITE_ANALYTICS_SCRIPT_URL && (
               <button
                 type="button"

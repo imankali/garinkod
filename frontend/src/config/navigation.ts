@@ -31,6 +31,7 @@ import {
   PhoneCall,
   Camera,
   ShieldCheck,
+  Scale,
   Sprout,
   Store,
   Tractor,
@@ -310,6 +311,13 @@ export const KNOWLEDGE_ITEMS: NavItem[] = [
     description: 'تیم، برندها و قراداد ما با کشاورز',
     to: '/about',
     icon: Users,
+  },
+  {
+    id: 'legal',
+    label: 'قوانین و حریم خصوصی',
+    description: 'بازگشت کالا، ارسال، ضمانت، غرفه‌داری و شکایات',
+    to: '/legal',
+    icon: Scale,
   },
   {
     id: 'contact',

@@ -66,6 +66,7 @@ from .payments import (
 from .rewards import mark_order_paid_and_reward
 from .settlements import record_marketplace_sale, reverse_marketplace_sale, restore_listing_quantities
 from .shipping import create_initial_shipment, quote_shipping, record_tracking_event
+from . import legal
 from .notifications import notify_comment_reply
 from .messaging.outbox import enqueue_order_event
 from .messaging.otp import (
@@ -904,6 +905,11 @@ def checkout(request):
                 affiliate_code=affiliate_code,
                 payment_status='unpaid',
                 status='awaiting_review',
+                # The acceptance is recorded here rather than trusted from the
+                # request: the version is computed from the text the server is
+                # actually serving right now.
+                terms_accepted_at=timezone.now(),
+                legal_version=legal.legal_version(),
             )
 
             if coupon:

@@ -120,7 +120,7 @@ export default function PrivacyAnalytics() {
           <h2 id="privacy-consent-title" className="font-extrabold text-slate-800 dark:text-white">آمار بازدید با انتخاب شما</h2>
           <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-emerald-100">
             با اجازه شما، آمار کلی و بدون تبلیغات را برای بهبود سایت ثبت می‌کنیم. رد کردن این گزینه هیچ بخشی از خدمات را محدود نمی‌کند.{' '}
-            <Link to="/privacy" className="font-bold text-emerald-700 underline dark:text-lime-300">جزئیات حریم خصوصی</Link>
+            <Link to="/legal/privacy" className="font-bold text-emerald-700 underline dark:text-lime-300">جزئیات حریم خصوصی</Link>
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <button type="button" onClick={() => choose('granted')} className="min-h-11 rounded-xl bg-emerald-600 px-5 text-sm font-bold text-white hover:bg-emerald-700">اجازه می‌دهم</button>

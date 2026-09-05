@@ -550,6 +550,7 @@ class OrderSerializer(serializers.ModelSerializer):
             'coupon_code', 'shipping_price', 'shipping_provider', 'shipping_service', 'total_price',
             'status', 'status_label', 'payment_status', 'payment_status_label', 'payment_method',
             'payment_method_label', 'affiliate_code', 'total_items', 'items', 'shipments',
+            'terms_accepted_at', 'legal_version',
             'created_at', 'updated_at'
         ]
         read_only_fields = fields

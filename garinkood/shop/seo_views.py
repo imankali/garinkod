@@ -9,6 +9,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_GET
 
+from . import legal
 from .models import Category, Product, Service, SiteArticle, SitePage, Storefront
 
 # Only approved, top-level reviews that carry a score are quotable; a question
@@ -53,9 +54,11 @@ def sitemap_xml(_request):
         (_absolute("/contact"), today, "monthly"),
         (_absolute("/farmer-sell"), today, "monthly"),
         (_absolute("/support"), today, "monthly"),
-        (_absolute("/privacy"), today, "yearly"),
-        (_absolute("/terms"), today, "yearly"),
-        (_absolute("/returns"), today, "yearly"),
+        # The legal hub and its documents, at their canonical addresses. The older
+        # /privacy, /terms and /returns routes render the same text and declare
+        # /legal/<slug> as canonical, so a crawler is never asked to choose.
+        (_absolute("/legal"), today, "yearly"),
+        *[(f"{_absolute('/legal')}/{doc.slug}", today, "yearly") for doc in legal.documents()],
     ]
 
     for category in Category.objects.all().only("slug"):
@@ -134,6 +137,7 @@ def llms_txt(_request):
         f"- Farmer sourcing requests: {_absolute('/farmer-sell')}",
         f"- Moderated farmers marketplace: {_absolute('/marketplace')}",
         f"- Support and feedback: {_absolute('/support')}",
+        f"- Legal documents (terms, privacy, returns, shipping, warranty, marketplace rules, loyalty, complaints): {_absolute('/legal')}",
         f"- Machine-readable catalogue facts: {_absolute('/ai-facts.json')}",
         f"- XML sitemap: {_absolute('/sitemap.xml')}",
         "",
