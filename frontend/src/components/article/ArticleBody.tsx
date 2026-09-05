@@ -26,6 +26,18 @@ export function parseArticleBody(body: string): Segment[] {
   const segments: Segment[] = [];
   let paragraph: string[] = [];
   let list: string[] = [];
+  // Ids are assigned while parsing, so the table of contents is built from the
+  // very values the DOM carries: a heading whose text has no slug-safe
+  // characters (or a repeated heading) still gets a linkable, unique id.
+  const used = new Set<string>();
+  let headingOrder = 0;
+  const nextHeadingId = (text: string) => {
+    headingOrder += 1;
+    let id = slugifyClient(text) || `sec-${headingOrder}`;
+    if (used.has(id)) id = `${id}-${headingOrder}`;
+    used.add(id);
+    return id;
+  };
 
   const flushParagraph = () => {
     if (!paragraph.length) return;
@@ -45,7 +57,7 @@ export function parseArticleBody(body: string): Segment[] {
       flushParagraph();
       flushList();
       const text = line.replace(HEADING, '$1').trim();
-      segments.push({ kind: 'heading', text, items: [], id: slugifyClient(text) });
+      segments.push({ kind: 'heading', text, items: [], id: nextHeadingId(text) });
       continue;
     }
     if (BULLET.test(line)) {

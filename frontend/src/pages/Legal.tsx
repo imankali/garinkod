@@ -1,5 +1,20 @@
 import { Link, useLocation } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { FileText, RotateCcw, ShieldCheck } from 'lucide-react';
+
+import ArticleBody from '../components/article/ArticleBody';
+import { sitePagesApi } from '../api/services';
+
+// The wording below is what ships with the code, so a fresh deployment never
+// shows an empty legal page. Publishing a SitePage whose slug matches the route
+// (`privacy`, `terms`, `returns`) replaces these sections with the editable
+// blocks from the admin — legal text then follows the same content pipeline as
+// every other page, including the audit trail on each block.
+const LEGAL_PAGE_SLUGS: Record<string, string> = {
+  '/privacy': 'privacy',
+  '/terms': 'terms',
+  '/returns': 'returns',
+};
 
 type LegalDocument = {
   title: string;
@@ -49,17 +64,59 @@ export default function Legal() {
   const location = useLocation();
   const document = DOCUMENTS[location.pathname] ?? DOCUMENTS['/terms']!;
   const Icon = document.icon;
+  const editableSlug = LEGAL_PAGE_SLUGS[location.pathname];
+  const { data: override } = useQuery({
+    queryKey: ['legal-page', editableSlug],
+    queryFn: async () => (await sitePagesApi.getBySlug(editableSlug as string)).data,
+    enabled: Boolean(editableSlug),
+    retry: false,
+    staleTime: 5 * 60 * 1000,
+  });
+  const blocks = override?.blocks || [];
   return (
     <div className="page-shell py-8 md:py-12">
       <header className="max-w-3xl">
         <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-lime-300"><Icon /></span>
-        <h1 className="mt-4 text-fluid-2xl font-extrabold text-slate-800 dark:text-white">{document.title}</h1>
-        <p className="mt-3 leading-7 text-slate-500 dark:text-emerald-200">{document.intro}</p>
-        <p className="mt-2 text-fluid-xs text-slate-400">آخرین بازبینی: شهریور ۱۴۰۵</p>
+        <h1 className="mt-4 text-fluid-2xl font-extrabold text-slate-800 dark:text-white">{override?.title || document.title}</h1>
+        <p className="mt-3 leading-7 text-slate-500 dark:text-emerald-200">{override?.hero_text || document.intro}</p>
+        <p className="mt-2 text-fluid-xs text-slate-400">
+          آخرین بازبینی:{' '}
+          {override
+            ? new Date(override.updated_at).toLocaleDateString('fa-IR')
+            : 'شهریور ۱۴۰۵'}
+        </p>
       </header>
       <div className="mt-7 grid gap-4 lg:grid-cols-[1fr_250px]">
         <div className="space-y-4">
-          {document.sections.map((section) => (
+          {blocks.length > 0 &&
+            blocks.map((block) => (
+              <section
+                key={block.id}
+                className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm dark:border-emerald-900 dark:bg-emerald-950 sm:p-6"
+              >
+                {block.title && (
+                  <h2 className="text-fluid-lg font-extrabold text-slate-800 dark:text-white">{block.title}</h2>
+                )}
+                {block.block_type === 'bullets' ? (
+                  <ul className="mt-2 space-y-2 text-fluid-sm leading-8 text-slate-600 dark:text-emerald-100">
+                    {block.text
+                      .split('\n')
+                      .map((line) => line.trim())
+                      .filter(Boolean)
+                      .map((line) => (
+                        <li key={line}>• {line}</li>
+                      ))}
+                  </ul>
+                ) : (
+                  <div className="mt-2">
+                    <ArticleBody body={block.text} />
+                  </div>
+                )}
+              </section>
+            ))}
+
+          {blocks.length === 0 &&
+            document.sections.map((section) => (
             <section key={section.title} className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm dark:border-emerald-900 dark:bg-emerald-950 sm:p-6">
               <h2 className="text-fluid-lg font-extrabold text-slate-800 dark:text-white">{section.title}</h2>
               <p className="mt-2 text-fluid-sm leading-8 text-slate-600 dark:text-emerald-100">{section.body}</p>

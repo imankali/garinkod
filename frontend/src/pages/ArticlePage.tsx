@@ -20,7 +20,7 @@ import {
   Sprout,
 } from 'lucide-react';
 
-import ArticleBody from '../components/article/ArticleBody';
+import ArticleBody, { parseArticleBody } from '../components/article/ArticleBody';
 import ArticleCard, { articleHref, faDate } from '../components/article/ArticleCard';
 import SharePanel from '../components/SharePanel';
 import { articlesApi } from '../api/services';
@@ -51,7 +51,10 @@ export default function ArticlePage() {
   // drift apart; the API's `headings` list is the fallback.
   const toc = useMemo(() => {
     if (!article) return [];
-    return article.headings.length ? article.headings : [];
+    const headings = parseArticleBody(article.body)
+      .filter((segment) => segment.kind === 'heading')
+      .map((segment) => ({ title: segment.text, anchor: segment.id }));
+    return headings.length ? headings : article.headings;
   }, [article]);
 
   useEffect(() => {

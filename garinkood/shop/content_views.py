@@ -38,6 +38,12 @@ class SiteArticleViewSet(viewsets.ReadOnlyModelViewSet):
     ordering_fields = ['published_at', 'views', 'reading_minutes']
 
     def get_queryset(self):
+        """Published articles narrowed by the params the content UI sends.
+
+        Nothing is sliced here on purpose: the actions below keep filtering this
+        queryset, and a sliced queryset can neither be filtered nor made
+        distinct again — which used to turn ``?limit=`` into a 500.
+        """
         queryset = (
             SiteArticle.objects.filter(is_published=True)
             .select_related('author')
@@ -59,13 +65,24 @@ class SiteArticleViewSet(viewsets.ReadOnlyModelViewSet):
         if product:
             lookup = Q(pk=product) if product.isdigit() else Q(slug=product)
             queryset = queryset.filter(products__in=Product.objects.filter(lookup))
-        limit = params.get('limit', '').strip()
-        if limit.isdigit():
-            queryset = queryset[: min(int(limit), 24)]
-        return queryset.distinct()
+        # The product filter joins an M2M, so an article attached to two
+        # matching products would otherwise be listed twice.
+        queryset = queryset.distinct()
+        return queryset
+
+    def _apply_limit(self, queryset):
+        """``?limit=N`` for the unpaginated card lists (home rails, product page)."""
+        raw = self.request.query_params.get('limit', '').strip()
+        if raw.isdigit():
+            return queryset[: min(int(raw), 24)]
+        return queryset
 
     def get_serializer_class(self):
         return SiteArticleSerializer if self.action == 'retrieve' else SiteArticleListSerializer
+
+    def list(self, request, *args, **kwargs):
+        queryset = self._apply_limit(self.filter_queryset(self.get_queryset()))
+        return Response(self.get_serializer(queryset, many=True).data)
 
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -77,7 +94,7 @@ class SiteArticleViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='guides')
     def guides(self, request):
-        queryset = self.get_queryset().filter(kind=SiteArticle.KIND_GUIDE)
+        queryset = self._apply_limit(self.get_queryset().filter(kind=SiteArticle.KIND_GUIDE))
         serializer = SiteArticleListSerializer(queryset, many=True)
         return Response(serializer.data)
 

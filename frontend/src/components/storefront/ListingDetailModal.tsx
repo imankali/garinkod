@@ -26,6 +26,8 @@ import type { MarketplaceListing } from '../../types';
 import { formatPrice } from '../../utils/formatPrice';
 import { cn } from '../../utils/cn';
 import Modal from '../ui/Modal';
+import SharePanel from '../SharePanel';
+import SpecTable from '../SpecTable';
 
 export default function ListingDetailModal({
   slug,
@@ -42,6 +44,8 @@ export default function ListingDetailModal({
   isOwner?: boolean;
 }) {
   const { t } = useTranslation();
+  // Share links must be absolute, so the origin is taken from the deployment.
+  const siteUrl = (import.meta.env.VITE_SITE_URL || window.location.origin).replace(/\/$/, '');
   const addListingToCart = useCartStore((state) => state.addListingToCart);
   const openDirect = useDirectStore((state) => state.openDirect);
 
@@ -247,6 +251,25 @@ export default function ListingDetailModal({
                 {listing.description}
               </p>
             )}
+
+            {/*
+              The seller's own numbers (بسته‌بندی، درجه، گواهی) in the same table
+              shape the catalogue uses, so a buyer can compare an آگهی with a
+              store product instead of reading marketing prose.
+            */}
+            {listing.attributes && listing.attributes.length > 0 && (
+              <div className="mt-4">
+                <SpecTable rows={listing.attributes} title="مشخصات آگهی" />
+              </div>
+            )}
+
+            <div className="mt-4">
+              <SharePanel
+                url={`${siteUrl}/storefronts/${listing.storefront.slug}?listing=${listing.slug}`}
+                title={`${listing.title} — ${listing.storefront.name}`}
+                text={`${formatPrice(listing.discounted_price)} به ازای هر ${listing.unit} · ${listing.crop_name}`}
+              />
+            </div>
 
             <Link
               to={`/storefronts/${listing.storefront.slug}`}

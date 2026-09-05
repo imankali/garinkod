@@ -229,6 +229,33 @@ class ArticleAndGuideTests(TestCase):
         self.assertEqual([row['slug'] for row in guides.data], ['grow-cabbage'])
         self.assertEqual(crops.data, [{'crop': 'گل کلم', 'article_count': 1}])
 
+    def test_limit_param_trims_the_list_without_breaking_filters(self):
+        # ``?limit=`` is what the home rails and the product page send; slicing
+        # inside get_queryset used to make the later .distinct() raise a 500.
+        for _ in range(4):
+            SiteArticle.objects.create(
+                title='مقاله اضافه', slug=f'extra-{_}', body='متن', is_published=True,
+            )
+
+        response = self.client.get('/api/articles/?limit=2')
+        guides = self.client.get('/api/articles/guides/?limit=1')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 2)
+        self.assertEqual(guides.status_code, 200)
+        self.assertEqual(len(guides.data), 1)
+
+    def test_product_filter_does_not_duplicate_an_article(self):
+        # An article joined to two products of the same category must still be
+        # listed once: the ?product= filter goes through an M2M join.
+        second = make_product(self.product.category, self.product.author, title='بذر دوم', slug='cabbage-seed-2')
+        self.guide.products.add(second)
+
+        response = self.client.get('/api/articles/?product=cabbage-seed')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([row['slug'] for row in response.data], ['grow-cabbage'])
+
     def test_related_articles_backfill_from_the_same_kind(self):
         extra = SiteArticle.objects.create(
             title='مقاله دیگر', slug='other-guide', kind=SiteArticle.KIND_GUIDE,

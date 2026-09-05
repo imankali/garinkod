@@ -10,6 +10,7 @@
 
 import {
   BadgePercent,
+  BookOpen,
   Building2,
   Calculator,
   ClipboardList,
@@ -21,14 +22,18 @@ import {
   LayoutGrid,
   LifeBuoy,
   type LucideIcon,
+  Mail,
   MessageCircle,
+  Newspaper,
   Package,
+  PhoneCall,
   Camera,
   ShieldCheck,
   Sprout,
   Store,
   Tractor,
   UserRound,
+  Users,
 } from 'lucide-react';
 
 import { USER_LEVEL, type UserLevel } from '../types';
@@ -247,8 +252,54 @@ export const SUPPORT_ITEMS: NavItem[] = [
   },
 ];
 
+/**
+ * Knowledge and trust pages.
+ *
+ * These are the pages a wholesale buyer reads before transferring money — the
+ * growing guide for the crop they are about to plant, the team behind the
+ * shipment and the number to call when a carton arrives damaged.
+ */
+export const KNOWLEDGE_ITEMS: NavItem[] = [
+  {
+    id: 'blog',
+    label: 'بلاگ گرین کود',
+    description: 'مقاله تخصصی، اخبار قیمت و گزارش بازار نهاده',
+    to: '/blog',
+    icon: Newspaper,
+  },
+  {
+    id: 'guides',
+    label: 'راهنمای کشت گیاهان',
+    description: 'از آماده‌سازی بستر تا برداشت، برای هر محصول',
+    to: '/guides',
+    icon: BookOpen,
+  },
+  {
+    id: 'about',
+    label: 'درباره گرین کود',
+    description: 'تیم، برندها و قراداد ما با کشاورز',
+    to: '/about',
+    icon: Users,
+  },
+  {
+    id: 'contact',
+    label: 'تماس با ما',
+    description: 'شماره‌ها، نشانی، ساعات کاری و پیام‌رسان‌ها',
+    to: '/contact',
+    icon: PhoneCall,
+  },
+  {
+    id: 'newsletter',
+    label: 'خبرنامه هفتگی',
+    description: 'قیمت نهاده، موجودی تازه و راهنمای فصل',
+    to: '/newsletter',
+    icon: Mail,
+  },
+];
+
 export const NAV_SECTIONS: NavSection[] = [
   { id: 'shop', title: 'فروشگاه', items: SHOP_ITEMS },
+  { id: 'knowledge', title: 'بلاگ و راهنما', items: KNOWLEDGE_ITEMS },
   { id: 'account', title: 'حساب کاربری', items: ACCOUNT_ITEMS },
   { id: 'seller', title: 'فروشندگان', items: SELLER_ITEMS },
   { id: 'support', title: 'راهنما و پشتیبانی', items: SUPPORT_ITEMS },

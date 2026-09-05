@@ -29,7 +29,8 @@ export function slugifyClient(value: string): string {
     .toLowerCase()
     // Keep letters, digits, underscore and hyphen — the same set Django's
     // unicode slugify keeps.
-    .replace(/[^\p{L}\p{N}\s-]/gu, '');
+    // Python's \w also keeps '_' — mirror it so the two can never disagree.
+    .replace(/[^\p{L}\p{N}_\s-]/gu, '');
   const slug = folded.replace(/[-\s]+/g, '-').replace(/^[-_]+|[-_]+$/g, '');
   return slug.slice(0, 180);
 }

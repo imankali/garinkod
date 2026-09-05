@@ -19,6 +19,7 @@ import WishlistModal from "./components/WishlistModal";
 import CompareBar from "./components/CompareBar";
 import CompareModal from "./components/CompareModal";
 import CategorySections from "./components/home/CategorySections";
+import ContentRails from "./components/home/ContentRails";
 import WeatherWidget from "./components/WeatherWidget";
 import InstallmentBanner from "./components/InstallmentBanner";
 import FlyToCart, { type FlyingItem } from "./components/FlyToCart";
@@ -31,6 +32,7 @@ import CategoryGrid from "./components/home/CategoryGrid";
 import FeaturedStorefronts from "./components/home/FeaturedStorefronts";
 import DirectMessagesDrawer from "./components/direct/DirectMessagesDrawer";
 import RouteSeo from "./components/RouteSeo";
+import LoginModal from "./components/LoginModal";
 import PrivacyAnalytics from "./components/PrivacyAnalytics";
 
 // ========================================
@@ -56,6 +58,13 @@ const Shop = lazy(() => import("./pages/Shop"));
 const Messages = lazy(() => import("./pages/Messages"));
 const Farmers = lazy(() => import("./pages/Farmers"));
 const Legal = lazy(() => import("./pages/Legal"));
+const Blog = lazy(() => import("./pages/Blog"));
+const ArticlePage = lazy(() => import("./pages/ArticlePage"));
+const About = lazy(() => import("./pages/About"));
+const Contact = lazy(() => import("./pages/Contact"));
+const Newsletter = lazy(() => import("./pages/Newsletter"));
+const ServiceDetail = lazy(() => import("./pages/ServiceDetail"));
+const SitePageView = lazy(() => import("./pages/SitePageView"));
 
 // ========================================
 // Stores
@@ -342,6 +351,21 @@ export default function App() {
                       onToggleCompare={handleToggleCompare}
                     />
 
+                    {/*
+                      Freshness rails (new stock, live discounts, best rated) and
+                      the magazine block: what a returning buyer checks before
+                      they look at a department again.
+                    */}
+                    <ContentRails
+                      wishlistIds={wishlistIds}
+                      compareIds={compareIds}
+                      compareDisabled={compareItems.length >= 3}
+                      onToggleWishlist={handleToggleWishlist}
+                      onAddToCart={(product, event) => handleAddToCart(product, 1, event)}
+                      onQuickView={setSelectedProduct}
+                      onToggleCompare={handleToggleCompare}
+                    />
+
                     {/* AgriCalculator */}
                     <AgriCalculator onAddToCart={handleAddToCart} />
                   </>
@@ -358,6 +382,21 @@ export default function App() {
               <Route path="/checkout" element={<Checkout />} />
               <Route path="/orders" element={<Orders />} />
               <Route path="/services" element={<Services />} />
+              <Route path="/services/:slug" element={<ServiceDetail />} />
+
+              {/* ======================================== */}
+              {/* Content marketing: blog, per-crop guides, editable pages */}
+              {/* ======================================== */}
+              <Route path="/blog" element={<Blog />} />
+              <Route path="/blog/:slug" element={<ArticlePage />} />
+              <Route path="/guides" element={<Blog />} />
+              <Route path="/guides/:slug" element={<ArticlePage />} />
+              <Route path="/about" element={<About />} />
+              <Route path="/contact" element={<Contact />} />
+              <Route path="/newsletter" element={<Newsletter />} />
+              {/* Pages and campaign landings the team builds in the admin. */}
+              <Route path="/page/:slug" element={<SitePageView kind="page" />} />
+              <Route path="/offer/:slug" element={<SitePageView kind="landing" />} />
               <Route path="/farmer-sell" element={<FarmerSell />} />
               <Route path="/marketplace" element={<Marketplace />} />
               <Route path="/support" element={<Support />} />
@@ -520,6 +559,11 @@ export default function App() {
         {/* Consultation Button */}
         {/* ======================================== */}
         <GlobalMessengerButton />
+
+        {/* ======================================== */}
+        {/* Sign-in dialog used by every gated action (reviews, consult) */}
+        {/* ======================================== */}
+        <LoginModal />
       </div>
     </BrowserRouter>
   );

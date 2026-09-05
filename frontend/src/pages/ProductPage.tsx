@@ -391,7 +391,7 @@ export default function ProductPage() {
               <p className="mt-2 text-fluid-xs leading-7 text-slate-500 dark:text-emerald-200">
                 دوز و روش مصرف را با «ماشین‌حساب دوز» و بر پایه مساحت زمین خودتان حساب کنید؛ اعداد این صفحه جای برچسب رسمی محصول را نمی‌گیرد.
               </p>
-              <Link to="/agri-calculator" className="mt-3 inline-flex min-h-10 items-center rounded-xl bg-emerald-600 px-3 text-fluid-2xs font-bold text-white">ماشین‌حساب دوز</Link>
+              <Link to="/#agri-calculator" className="mt-3 inline-flex min-h-10 items-center rounded-xl bg-emerald-600 px-3 text-fluid-2xs font-bold text-white">ماشین‌حساب دوز</Link>
             </div>
           </div>
         )}

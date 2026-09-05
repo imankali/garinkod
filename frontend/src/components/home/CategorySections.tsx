@@ -32,6 +32,9 @@ const FALLBACK_MAX_PRICE = 10_000_000;
 
 const SORT_ORDERING: Record<SortOption, string | undefined> = {
   popular: undefined,
+  // Ordered by the approved review average, which the API annotates on the
+  // queryset — there is no client-side rating to sort by.
+  best_rated: "-avg_rating",
   cheapest: "price",
   expensive: "-price",
 };

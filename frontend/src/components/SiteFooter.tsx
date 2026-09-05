@@ -1,12 +1,14 @@
 // frontend/src/components/SiteFooter.tsx
 
 import { Link } from 'react-router-dom';
-import { Mail, MapPin, Phone, ShieldCheck } from 'lucide-react';
+import { Instagram, Mail, MapPin, MessageCircle, Phone, Send, ShieldCheck } from 'lucide-react';
 
 import { visibleSections } from '../config/navigation';
+import { useSiteContact } from '../hooks/useSiteContact';
 import { useAuthStore, useUserLevel } from '../store/authStore';
 import { useTranslation } from '../i18n';
 import Logo from './Logo';
+import NewsletterForm from './NewsletterForm';
 
 /**
  * The site footer.
@@ -25,8 +27,11 @@ export default function SiteFooter() {
     .map((section) => ({ ...section, items: section.items.filter((item) => !item.action) }))
     .filter((section) => section.items.length > 0);
   const year = new Date().toLocaleDateString('fa-IR', { year: 'numeric' });
-  const supportPhone = import.meta.env.VITE_PHONE_NUMBER?.trim();
-  const supportEmail = import.meta.env.VITE_SUPPORT_EMAIL?.trim();
+  // Contact details are editable in the admin (SiteContact); the build-time env
+  // values stay as the fallback so a deployment without rows still prints a phone.
+  const { contact, primaryPhone, whatsappDigits, supportEmail } = useSiteContact();
+  const phones = contact.phones.length ? contact.phones.slice(0, 2) : primaryPhone ? [primaryPhone] : [];
+  const emails = contact.emails.length ? contact.emails.slice(0, 2) : supportEmail ? [supportEmail] : [];
 
   return (
     <footer
@@ -43,27 +48,59 @@ export default function SiteFooter() {
             </p>
 
             <ul className="mt-5 space-y-2 text-fluid-xs text-slate-500 dark:text-emerald-200">
-              {supportPhone && (
-                <li className="flex items-center gap-2">
+              {phones.slice(0, 2).map((phone) => (
+                <li key={phone} className="flex items-center gap-2">
                   <Phone size={14} aria-hidden="true" className="shrink-0 text-emerald-600" />
-                  <a href={`tel:${supportPhone.replace(/[^+\d]/g, '')}`} dir="ltr" className="flex min-h-11 items-center hover:underline">
-                    {supportPhone}
+                  <a href={`tel:${phone.replace(/[^+\d]/g, '')}`} dir="ltr" className="flex min-h-11 items-center hover:underline">
+                    {phone}
                   </a>
                 </li>
-              )}
-              {supportEmail && (
-                <li className="flex items-center gap-2">
+              ))}
+              {emails.slice(0, 2).map((email) => (
+                <li key={email} className="flex items-center gap-2">
                   <Mail size={14} aria-hidden="true" className="shrink-0 text-emerald-600" />
-                  <a href={`mailto:${supportEmail}`} dir="ltr" className="flex min-h-11 items-center hover:underline">
-                    {supportEmail}
+                  <a href={`mailto:${email}`} dir="ltr" className="flex min-h-11 items-center hover:underline">
+                    {email}
                   </a>
                 </li>
-              )}
+              ))}
               <li className="flex items-start gap-2">
                 <MapPin size={14} aria-hidden="true" className="mt-1 shrink-0 text-emerald-600" />
-                <span>{t('footer.shipping')}</span>
+                <span>{contact.address || t('footer.shipping')}</span>
               </li>
             </ul>
+
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              {whatsappDigits && (
+                <a
+                  href={`https://wa.me/${whatsappDigits}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="واتساپ گرین کود"
+                  className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-50 text-slate-500 transition hover:bg-emerald-50 hover:text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-200"
+                >
+                  <MessageCircle size={16} aria-hidden="true" />
+                </a>
+              )}
+              {contact.telegram_url && (
+                <a href={contact.telegram_url} target="_blank" rel="noopener noreferrer" aria-label="تلگرام گرین کود" className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-50 text-slate-500 transition hover:bg-emerald-50 hover:text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-200">
+                  <Send size={16} aria-hidden="true" />
+                </a>
+              )}
+              {contact.instagram_url && (
+                <a href={contact.instagram_url} target="_blank" rel="noopener noreferrer" aria-label="اینستاگرام گرین کود" className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-50 text-slate-500 transition hover:bg-emerald-50 hover:text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-200">
+                  <Instagram size={16} aria-hidden="true" />
+                </a>
+              )}
+              {contact.eitaa_url && (
+                <a href={contact.eitaa_url} target="_blank" rel="noopener noreferrer" aria-label="ایتا گرین کود" className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-50 px-2 text-fluid-2xs font-bold text-slate-500 transition hover:bg-emerald-50 hover:text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-200">
+                  ایتا
+                </a>
+              )}
+              <Link to="/contact" className="flex h-11 items-center rounded-xl px-3 text-fluid-2xs font-bold text-emerald-700 transition hover:underline dark:text-lime-300">
+                همه راه‌های ارتباطی
+              </Link>
+            </div>
           </div>
 
           {/* Every reachable destination, grouped. */}
@@ -92,6 +129,18 @@ export default function SiteFooter() {
               </div>
             ))}
           </nav>
+        </div>
+
+        <div className="mt-9 grid gap-4 rounded-3xl bg-emerald-50/70 p-5 sm:grid-cols-[1fr_auto] sm:items-center dark:bg-emerald-900/30">
+          <div>
+            <p className="text-fluid-sm font-extrabold text-slate-800 dark:text-white">خبرنامه گرین کود</p>
+            <p className="mt-1 text-fluid-2xs leading-7 text-slate-500 dark:text-emerald-200">
+              قیمت روزنه‌اده‌ها، موجودی تازه و راهنمای کشت فصل — هفته‌ای یک پیام، بدون تبلیغ مزاحم.
+            </p>
+          </div>
+          <div className="sm:w-[340px]">
+            <NewsletterForm source="footer" variant="panel" />
+          </div>
         </div>
 
         <div className="mt-9 flex flex-col items-center justify-between gap-3 border-t border-slate-100 pt-5 text-fluid-2xs text-slate-400 dark:border-emerald-900 sm:flex-row">
