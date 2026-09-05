@@ -40,10 +40,6 @@ const DESKS = [
 
 const PRESENCE_REFRESH_MS = 30000;
 
-function faNumber(value: number) {
-  return value.toLocaleString('fa-IR');
-}
-
 export default function DeskEntries({
   conversations,
   onOpen,
@@ -148,7 +144,7 @@ export default function DeskEntries({
                 </span>
                 {unread > 0 && (
                   <span className="shrink-0 rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] font-extrabold text-white">
-                    {faNumber(unread)}
+                    {unread.toLocaleString('fa-IR')}
                   </span>
                 )}
                 {closed && (
@@ -167,13 +163,13 @@ export default function DeskEntries({
                   {presence === 'closed'
                     ? `خارج از ساعت کاری${state?.opens_at_label ? ` — بازگشایی ${state.opens_at_label}` : ''}`
                     : presence === 'online'
-                      ? `${faNumber(state?.online_count ?? 0)} نفر آنلاین`
+                      ? `${(state?.online_count ?? 0).toLocaleString('fa-IR')} نفر آنلاین`
                       : 'در ساعت کاری'}
                 </span>
                 {state?.tracked && <span className="text-slate-400 dark:text-emerald-300/70">{state.hours}</span>}
                 {unassigned > 0 && (
                   <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-amber-800 dark:bg-amber-950/60 dark:text-amber-200">
-                    {faNumber(unassigned)} گفتگوی بی‌سرپرست
+                    {unassigned.toLocaleString('fa-IR')} گفتگوی بی‌سرپرست
                   </span>
                 )}
               </span>

@@ -22,6 +22,7 @@ import PurchaseSteps from "./PurchaseSteps";
 import { productsApi } from "../api/services";
 import type { CartItem, ProductList } from "../types";
 import { formatPrice } from "../utils/formatPrice";
+import { cn } from "../utils/cn";
 
 // ========================================
 // Constants
@@ -36,6 +37,9 @@ interface SuggestedProduct {
   name: string;
   image: string;
   price: number;
+  discounted_price: number | null;
+  /** Why the basket is being offered this — a random product is not a reason. */
+  reason: string;
 }
 
 interface CartDrawerProps {
@@ -46,12 +50,14 @@ interface CartDrawerProps {
 // ========================================
 // Helper: تبدیل محصول API به فرمت پیشنهادی
 // ========================================
-function convertToSuggestion(apiProduct: ProductList): SuggestedProduct {
+function convertToSuggestion(apiProduct: ProductList, reason: string): SuggestedProduct {
   return {
     id: apiProduct.id,
     name: apiProduct.title,
     image: apiProduct.image_url || '/images/hero-farm.jpg',
     price: apiProduct.price,
+    discounted_price: apiProduct.discounted_price ?? null,
+    reason,
   };
 }
 
@@ -63,6 +69,12 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
   // and returns focus to the cart button when it closes.
   const drawerRef = useFocusTrap<HTMLElement>(isOpen, { onEscape: onClose });
   const [suggestion, setSuggestion] = useState<SuggestedProduct | null>(null);
+  /*
+    Which row is waiting on the server. A quantity tap that changes the total
+    somewhere off-screen reads as a dead button, so the row itself carries the
+    wait instead of a toast the shopper has to look for.
+  */
+  const [busyItem, setBusyItem] = useState<number | null>(null);
   const navigate = useNavigate();
 
   // دریافت توابع و state از cartStore
@@ -72,20 +84,37 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
   // ========================================
   // لود سبد خرید و محصول پیشنهادی هنگام باز شدن
   // ========================================
-  // ========================================
-  // لود یک محصول پیشنهادی تصادفی
-  // ========================================
+  /*
+    The one extra item the basket offers, chosen for a reason the shopper can
+    see — a discounted product, or the best-selling one — and never something
+    already in the basket. A random catalogue row is noise that also costs a
+    request, so if nothing matches, no offer is shown at all.
+  */
   const loadSuggestion = useCallback(async () => {
-    try {
-      const response = await productsApi.getAll({ page: 1 });
-      const products = response.data.results;
-      if (products.length > 0) {
-        const randomProduct = products[Math.floor(Math.random() * products.length)];
-        if (randomProduct) setSuggestion(convertToSuggestion(randomProduct));
+    const inCart = new Set(
+      (useCartStore.getState().cart?.items ?? [])
+        .map((item) => item.product?.id)
+        .filter((id): id is number => typeof id === 'number'),
+    );
+    const attempts = [
+      { params: { page: 1, page_size: 12, has_discount: true }, reason: 'هم‌اکنون تخفیف دارد' },
+      { params: { page: 1, page_size: 12, ordering: '-sales_count' }, reason: 'پرفروش‌ترین محصول' },
+    ];
+    for (const attempt of attempts) {
+      try {
+        const response = await productsApi.getAll(attempt.params);
+        const found = response.data.results.find(
+          (product) => product.available && !inCart.has(product.id),
+        );
+        if (found) {
+          setSuggestion(convertToSuggestion(found, attempt.reason));
+          return;
+        }
+      } catch (error) {
+        console.error('Failed to load suggestion:', error);
       }
-    } catch (error) {
-      console.error('Failed to load suggestion:', error);
     }
+    setSuggestion(null);
   }, []);
 
   useEffect(() => {
@@ -117,7 +146,12 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
   // Handlers
   // ========================================
   async function handleUpdateQty(itemId: number, newQty: number) {
-    await updateQuantity(itemId, newQty);
+    setBusyItem(itemId);
+    try {
+      await updateQuantity(itemId, newQty);
+    } finally {
+      setBusyItem(null);
+    }
   }
 
   /**
@@ -135,7 +169,12 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
   }
 
   async function handleRemove(itemId: number) {
-    await removeFromCart(itemId);
+    setBusyItem(itemId);
+    try {
+      await removeFromCart(itemId);
+    } finally {
+      setBusyItem(null);
+    }
   }
 
   async function handleAddToCart(productId: number) {
@@ -280,103 +319,154 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                   </motion.button>
                 </motion.div>
               ) : (
-                <ul className="space-y-3">
+                <ul className="space-y-2.5">
                   <AnimatePresence mode="popLayout" initial={false}>
-                    {items.map((item) => (
-                      <motion.li
-                        key={item.id}
-                        layout
-                        initial={{ opacity: 0, x: 50, scale: 0.9 }}
-                        animate={{ opacity: 1, x: 0, scale: 1 }}
-                        exit={{ opacity: 0, x: -100, scale: 0.8, transition: { duration: 0.25 } }}
-                        transition={{ type: "spring", stiffness: 250, damping: 24 }}
-                        className="group relative flex items-center gap-3 overflow-hidden rounded-2xl border border-slate-100 bg-gradient-to-br from-white to-slate-50 p-3 shadow-sm dark:border-emerald-800 dark:from-emerald-900 dark:to-emerald-950"
-                      >
-                        {/* Item image: product photo or listing photo */}
-                        <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-white shadow-inner">
-                          <img
-                            src={
-                              item.kind === 'listing'
-                                ? item.listing?.image_url || '/images/hero-farm.jpg'
-                                : item.product?.image_url || item.product?.image || '/images/hero-farm.jpg'
-                            }
-                            alt={item.title}
-                            className="h-full w-full object-cover"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = '/images/hero-farm.jpg';
-                            }}
-                          />
-                        </div>
+                    {items.map((item) => {
+                      const { min, max } = quantityBounds(item);
+                      const unit = item.kind === 'listing' ? item.listing?.unit ?? '' : '';
+                      const isListing = item.kind === 'listing';
+                      const soldOut = !item.is_in_stock;
+                      const scarce =
+                        !soldOut && item.available_quantity > 0 && item.available_quantity <= 5;
+                      // A unit price is only worth printing when the line total
+                      // could not be guessed from it — i.e. more than one item.
+                      const showUnitPrice = item.quantity > 1 && item.unit_price > 0;
 
-                        {/* Item info */}
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold text-slate-700 dark:text-white">
-                            {item.title}
-                          </p>
-                          <div className="mb-2 flex flex-wrap items-center gap-1.5 text-fluid-2xs text-slate-400">
-                            {item.kind === 'listing' ? (
-                              <>
-                                <span className="rounded-full bg-lime-100 px-2 py-0.5 font-bold text-emerald-700 dark:bg-emerald-800 dark:text-lime-200">
-                                  غرفه
-                                </span>
-                                <span className="truncate">{item.listing?.storefront_name}</span>
-                                {item.min_order_quantity > 1 && (
-                                  <span>· حداقل {item.min_order_quantity} {item.listing?.unit}</span>
-                                )}
-                              </>
-                            ) : (
-                              <span>{item.product?.category as string}</span>
+                      return (
+                        <motion.li
+                          key={item.id}
+                          layout
+                          initial={{ opacity: 0, x: 24, scale: 0.97 }}
+                          animate={{ opacity: 1, x: 0, scale: 1 }}
+                          exit={{ opacity: 0, x: -100, scale: 0.85, transition: { duration: 0.2 } }}
+                          transition={{ type: "spring", stiffness: 260, damping: 26 }}
+                          className={cn(
+                            "relative overflow-hidden rounded-2xl border bg-white p-3 ps-3.5 shadow-sm transition-colors dark:bg-emerald-900/40",
+                            isListing
+                              ? "border-lime-200/80 dark:border-emerald-800"
+                              : "border-slate-200/80 dark:border-emerald-800",
+                            soldOut && "border-rose-200 bg-rose-50/40 dark:border-rose-900/60 dark:bg-rose-950/20",
+                            busyItem === item.id && "opacity-65",
+                          )}
+                        >
+                          {/*
+                            Who is selling it, told by colour before it is told by
+                            words: a آگهی comes from a غرفه and the seller answers
+                            for it, a catalogue item is the platform's own.
+                          */}
+                          <span
+                            aria-hidden="true"
+                            className={cn(
+                              "absolute inset-y-0 start-0 w-1",
+                              isListing ? "bg-lime-400" : "bg-emerald-500/70",
                             )}
+                          />
+
+                          <div className="flex items-start gap-3">
+                            <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-slate-50 ring-1 ring-slate-100 dark:bg-emerald-950 dark:ring-emerald-800">
+                              <img
+                                src={
+                                  isListing
+                                    ? item.listing?.image_url || '/images/hero-farm.jpg'
+                                    : item.product?.image_url || item.product?.image || '/images/hero-farm.jpg'
+                                }
+                                alt={item.title}
+                                loading="lazy"
+                                className="h-full w-full object-cover"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = '/images/hero-farm.jpg';
+                                }}
+                              />
+                            </div>
+
+                            <div className="min-w-0 flex-1">
+                              <p className="line-clamp-2 text-sm font-bold leading-5 text-slate-800 dark:text-white">
+                                {item.title}
+                              </p>
+                              <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-fluid-2xs text-slate-400 dark:text-emerald-200/70">
+                                {isListing ? (
+                                  <>
+                                    <span className="rounded-full bg-lime-100 px-2 py-0.5 font-bold text-emerald-700 dark:bg-emerald-800 dark:text-lime-200">
+                                      غرفه
+                                    </span>
+                                    <span className="truncate">{item.listing?.storefront_name}</span>
+                                  </>
+                                ) : (
+                                  <span className="rounded-full bg-slate-100 px-2 py-0.5 font-bold text-slate-500 dark:bg-emerald-800/70 dark:text-emerald-100">
+                                    {item.product?.category as string}
+                                  </span>
+                                )}
+                                {unit && <span>هر {unit}</span>}
+                                {showUnitPrice && (
+                                  <span className="font-semibold text-slate-500 dark:text-emerald-200">
+                                    · {formatPrice(item.unit_price)}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => void handleRemove(item.id)}
+                              aria-label={`حذف ${item.title} از سبد`}
+                              className="-me-1 -mt-1 flex h-9 shrink-0 items-center gap-1 rounded-xl px-2 text-fluid-2xs font-bold text-rose-400 transition hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40"
+                            >
+                              <Trash2 size={15} />
+                              <span className="hidden sm:inline">حذف</span>
+                            </button>
                           </div>
 
-                          {/* Quantity Controls */}
-                          <div className="flex items-center justify-between">
+                          {/* Quantity and the line total, on one rail. */}
+                          <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-dashed border-slate-200 pt-2.5 dark:border-emerald-800">
                             <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white shadow-sm dark:border-emerald-700 dark:bg-emerald-900">
                               <motion.button
-                                whileTap={{ scale: 0.85 }}
-                                disabled={item.quantity >= quantityBounds(item).max}
+                                whileTap={{ scale: 0.88 }}
+                                type="button"
+                                disabled={busyItem === item.id || item.quantity >= max}
                                 aria-label={`افزایش تعداد ${item.title}`}
-                                onClick={() =>
-                                  handleUpdateQty(
-                                    item.id,
-                                    Math.min(item.quantity + 1, quantityBounds(item).max),
-                                  )
-                                }
-                                className="flex h-8 w-8 items-center justify-center rounded-e-lg text-emerald-600 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40 dark:text-lime-300 dark:hover:bg-emerald-800"
+                                onClick={() => void handleUpdateQty(item.id, Math.min(item.quantity + 1, max))}
+                                className="flex h-9 w-9 items-center justify-center rounded-s-xl text-emerald-600 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-35 dark:text-lime-300 dark:hover:bg-emerald-800"
                               >
-                                <Plus size={14} />
+                                <Plus size={15} />
                               </motion.button>
-                              <motion.span
-                                key={item.quantity}
-                                initial={{ scale: 0.8 }}
-                                animate={{ scale: 1 }}
-                                className="w-6 text-center text-sm font-bold text-slate-700 dark:text-white"
+                              <span
+                                className="min-w-11 px-1 text-center text-sm font-extrabold tabular-nums text-slate-800 dark:text-white"
+                                aria-live="polite"
                               >
-                                {item.quantity}
-                              </motion.span>
+                                {item.quantity.toLocaleString('fa-IR')}
+                                {unit && <span className="ms-1 text-fluid-2xs font-bold text-slate-400">{unit}</span>}
+                              </span>
                               <motion.button
-                                whileTap={{ scale: 0.85 }}
-                                disabled={item.quantity <= quantityBounds(item).min}
+                                whileTap={{ scale: 0.88 }}
+                                type="button"
+                                disabled={busyItem === item.id || item.quantity <= min}
                                 aria-label={`کاهش تعداد ${item.title}`}
-                                onClick={() =>
-                                  handleUpdateQty(
-                                    item.id,
-                                    Math.max(quantityBounds(item).min, item.quantity - 1),
-                                  )
-                                }
-                                className="flex h-8 w-8 items-center justify-center rounded-s-lg text-slate-500 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 dark:text-emerald-400 dark:hover:bg-emerald-800"
+                                onClick={() => void handleUpdateQty(item.id, Math.max(min, item.quantity - 1))}
+                                className="flex h-9 w-9 items-center justify-center rounded-e-xl text-slate-500 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-35 dark:text-emerald-400 dark:hover:bg-emerald-800"
                               >
-                                <Minus size={14} />
+                                <Minus size={15} />
                               </motion.button>
                             </div>
-                            <span className="text-sm font-bold text-emerald-600 dark:text-lime-300">
+                            <span className="text-sm font-extrabold text-emerald-700 dark:text-lime-300">
                               {formatPrice(item.total_price)}
                             </span>
                           </div>
 
-                          {/* Row-level problems stay visible in the cart rather
-                              than vanishing with a toast. */}
-                          {(itemErrors[item.id] || !item.is_in_stock) && (
+                          {/* Stock and seller rules, said once and where they apply. */}
+                          {min > 1 && item.quantity < min && (
+                            <p className="mt-2 flex items-start gap-1 rounded-lg bg-amber-50 px-2 py-1 text-fluid-2xs font-semibold text-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
+                              <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+                              <span>
+                                حداقل سفارش این غرفه {min.toLocaleString('fa-IR')} {unit || 'عدد'} است.
+                              </span>
+                            </p>
+                          )}
+                          {scarce && (
+                            <p className="mt-2 text-fluid-2xs font-bold text-amber-600 dark:text-amber-300">
+                              فقط {Math.min(item.available_quantity, max).toLocaleString('fa-IR')} {unit || 'عدد'} باقی مانده است.
+                            </p>
+                          )}
+                          {(itemErrors[item.id] || soldOut) && (
                             <p
                               role="alert"
                               className="mt-2 flex items-start gap-1 rounded-lg bg-rose-50 px-2 py-1 text-fluid-xs font-semibold text-rose-600 dark:bg-rose-950/40 dark:text-rose-300"
@@ -384,23 +474,15 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                               <AlertTriangle size={12} className="mt-0.5 shrink-0" />
                               <span>
                                 {itemErrors[item.id] ??
-                                  `موجودی کافی نیست؛ حداکثر ${item.available_quantity} عدد قابل سفارش است.`}
+                                  (item.available_quantity > 0
+                                    ? `موجودی کافی نیست؛ حداکثر ${item.available_quantity.toLocaleString('fa-IR')} قابل سفارش است.`
+                                    : 'این مورد دیگر موجود نیست.')}
                               </span>
                             </p>
                           )}
-                        </div>
-
-                        {/* Remove Button */}
-                        <motion.button
-                          whileHover={{ scale: 1.15, rotate: 10 }}
-                          whileTap={{ scale: 0.85 }}
-                          onClick={() => handleRemove(item.id)}
-                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-rose-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40"
-                        >
-                          <Trash2 size={16} />
-                        </motion.button>
-                      </motion.li>
-                    ))}
+                        </motion.li>
+                      );
+                    })}
                   </AnimatePresence>
 
                   {/* ======================================== */}
@@ -425,18 +507,37 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="mb-0.5 flex items-center gap-1 text-fluid-2xs font-bold text-emerald-600 dark:text-lime-300">
-                          <Gift size={11} /> شاید به این هم نیاز داشته باشید
+                          <Gift size={11} /> {suggestion.reason}
                         </p>
                         <p className="truncate text-xs font-semibold text-slate-600 dark:text-emerald-50">
                           {suggestion.name}
                         </p>
+                        <p className="mt-0.5 flex items-baseline gap-1.5 text-fluid-2xs">
+                          <span className="font-extrabold text-emerald-700 dark:text-lime-300">
+                            {formatPrice(suggestion.discounted_price ?? suggestion.price)}
+                          </span>
+                          {suggestion.discounted_price !== null && suggestion.discounted_price < suggestion.price && (
+                            <span className="text-slate-400 line-through">{formatPrice(suggestion.price)}</span>
+                          )}
+                        </p>
                       </div>
-                      <button
-                        onClick={() => handleAddToCart(suggestion.id)}
-                        className="shrink-0 rounded-lg bg-white px-2.5 py-1.5 text-fluid-2xs font-bold text-emerald-600 shadow ring-1 ring-emerald-200 dark:bg-emerald-900 dark:text-lime-300 dark:ring-emerald-700"
-                      >
-                        افزودن
-                      </button>
+                      <div className="flex shrink-0 flex-col items-end gap-1">
+                        <button
+                          type="button"
+                          onClick={() => void handleAddToCart(suggestion.id)}
+                          className="rounded-lg bg-white px-2.5 py-1.5 text-fluid-2xs font-bold text-emerald-600 shadow ring-1 ring-emerald-200 transition hover:bg-emerald-50 dark:bg-emerald-900 dark:text-lime-300 dark:ring-emerald-700 dark:hover:bg-emerald-800"
+                        >
+                          افزودن
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSuggestion(null)}
+                          aria-label="بستن این پیشنهاد"
+                          className="flex h-6 w-6 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white/70 hover:text-slate-600 dark:hover:bg-emerald-800"
+                        >
+                          <X size={13} />
+                        </button>
+                      </div>
                     </motion.div>
                   )}
                 </ul>
