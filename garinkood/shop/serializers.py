@@ -19,9 +19,21 @@ from .models import (
     Shipment, ShipmentTrackingEvent, WebPushSubscription,
     ProductAttribute, ListingAttribute, SiteArticle, Service, SitePage, SitePageBlock,
     TeamMember, BrandPartner, SiteContact, NewsletterSubscriber, PRODUCT_ATTRIBUTE_TEMPLATE,
+    DeskAgent, DeskSettings, QuickReply, ConversationRating,
 )
+from .desk import agent_payload, desk_channel
 from .phone_numbers import normalize_iranian_mobile
 from .slugs import slugify_fa, unique_storefront_slug
+
+
+def desk_agent_of(sender, channel: str):
+    """The published profile of whoever answered a desk message.
+
+    One message per reply must not mean one query per reply, so this reads the
+    ``desk_profiles`` prefetch the thread querysets add and only falls back to a
+    lookup when nothing was prefetched.
+    """
+    return DeskAgent.for_user(sender, desk_channel(channel))
 
 
 # ========================================
@@ -1185,8 +1197,12 @@ class StorefrontPostSerializer(serializers.ModelSerializer):
 class StorefrontMessageSerializer(serializers.ModelSerializer):
     sender_name = serializers.SerializerMethodField()
     sender_avatar_url = serializers.SerializerMethodField()
+    sender_role_label = serializers.SerializerMethodField()
     is_mine = serializers.SerializerMethodField()
     listing = serializers.SerializerMethodField()
+    land = serializers.SerializerMethodField()
+    link = serializers.SerializerMethodField()
+    is_system = serializers.BooleanField(read_only=True)
     attachment_url = serializers.SerializerMethodField()
     reply_to = serializers.SerializerMethodField()
     is_edited = serializers.BooleanField(read_only=True)
@@ -1197,15 +1213,18 @@ class StorefrontMessageSerializer(serializers.ModelSerializer):
     class Meta:
         model = StorefrontMessage
         fields = [
-            'id', 'conversation', 'sender', 'sender_name', 'sender_avatar_url', 'is_mine', 'body',
-            'listing', 'attachment', 'attachment_url', 'attachment_type', 'attachment_duration',
+            'id', 'conversation', 'sender', 'sender_name', 'sender_avatar_url', 'sender_role_label',
+            'is_mine', 'is_system', 'body',
+            'listing', 'land', 'link',
+            'attachment', 'attachment_url', 'attachment_type', 'attachment_duration',
             'reply_to', 'is_edited', 'edited_at', 'is_deleted', 'deleted_at',
             'can_edit', 'can_delete', 'is_read', 'created_at',
         ]
         read_only_fields = [
-            'id', 'conversation', 'sender', 'sender_name', 'sender_avatar_url', 'is_mine',
-            'attachment_url', 'reply_to', 'is_edited', 'edited_at', 'is_deleted', 'deleted_at',
-            'can_edit', 'can_delete', 'is_read', 'created_at',
+            'id', 'conversation', 'sender', 'sender_name', 'sender_avatar_url', 'sender_role_label',
+            'is_system', 'attachment_url', 'reply_to', 'is_edited', 'edited_at', 'is_deleted',
+            'deleted_at', 'can_edit', 'can_delete', 'is_read', 'created_at',
+            'link', 'land',
         ]
 
     def get_reply_to(self, obj):
@@ -1236,38 +1255,101 @@ class StorefrontMessageSerializer(serializers.ModelSerializer):
         return bool(self.get_is_mine(obj) and not obj.is_deleted)
 
     def get_sender_name(self, obj):
-        """Who is speaking — by role, not by username, for service channels.
+        """Who is speaking, named as the reader can act on it.
 
-        In a support or consulting thread the operator answers on behalf of the
-        platform. Showing a staff member's personal username there would leak
-        an identity the reader did not ask for and make replies from different
-        operators look like different people.
+        A platform notice («گفتگو بسته شد») has no author and says so. In a
+        storefront thread the answer comes from the shop, so the shop is named.
+        In a support or consulting thread the reader asked to know *which*
+        operator they are talking to — a desk with several people is only
+        trustworthy if the name and photo change when the person changes, and
+        the name printed is the one the admin publishes (``DeskAgent``), never a
+        private username.
         """
         conversation = obj.conversation
+        if obj.sender_id is None:
+            return 'گرین کود'
         if obj.sender_id != conversation.customer_id:
             if conversation.channel == StorefrontConversation.CHANNEL_STOREFRONT:
                 if conversation.storefront_id:
                     return conversation.storefront.name
             else:
+                agent = desk_agent_of(obj.sender, conversation.channel)
+                if agent is not None:
+                    return agent.display_label
                 return conversation.get_channel_display()
         return obj.sender.get_full_name() or obj.sender.username
 
     def get_sender_avatar_url(self, obj):
         conversation = obj.conversation
+        if obj.sender_id is None:
+            return ''
         if (
             obj.sender_id != conversation.customer_id
             and conversation.channel == StorefrontConversation.CHANNEL_STOREFRONT
             and conversation.storefront_id
         ):
             return conversation.storefront.avatar_url
+        if obj.sender_id != conversation.customer_id and desk_channel(conversation.channel):
+            agent = desk_agent_of(obj.sender, conversation.channel)
+            if agent is not None:
+                return agent.photo_url
         account = getattr(obj.sender, 'account', None)
         return account.avatar_url if account else ''
+
+    def get_sender_role_label(self, obj) -> str:
+        """«مشاور کشاورزی» under the name, so the title travels with the reply."""
+        if obj.sender_id is None:
+            return 'اعلان سیستم'
+        conversation = obj.conversation
+        if obj.sender_id != conversation.customer_id and desk_channel(conversation.channel):
+            agent = desk_agent_of(obj.sender, conversation.channel)
+            if agent is not None:
+                return agent.title or agent.get_role_display()
+            return conversation.get_channel_display()
+        return ''
+
+    def get_land(self, obj):
+        """The land case file a farmer shared, in the shape a consultant reads.
+
+        Emitted inline rather than as a link because the answer usually needs the
+        soil and irrigation facts, and making the operator click away from the
+        chat to remember them is how a consultation takes three days.
+        """
+        if obj.land_id is None:
+            return None
+        land = obj.land
+        return {
+            'id': land.id,
+            'name': land.name,
+            'land_type': land.land_type,
+            'land_type_label': land.get_land_type_display(),
+            'area_label': land.area_label,
+            'crop_type': land.crop_type,
+            'crop_variety': land.crop_variety,
+            'province': land.province,
+            'city': land.city,
+            'soil_type_label': land.get_soil_type_display(),
+            'irrigation_type_label': land.get_irrigation_type_display(),
+            'planting_date': land.planting_date.isoformat() if land.planting_date else '',
+            'notes': land.notes,
+            'event_count': land.calendar_events.count(),
+            'owner_name': land.owner.get_full_name() or land.owner.username,
+        }
+
+    def get_link(self, obj):
+        """A button inside the bubble: the post, product or desk thread this
+        notice is about. Empty for ordinary messages."""
+        if not obj.link_url:
+            return None
+        return {'kind': obj.link_kind, 'label': obj.link_label or 'مشاهده', 'url': obj.link_url}
 
     def get_attachment_url(self, obj):
         return obj.attachment_url
 
     def get_is_mine(self, obj) -> bool:
         request = self.context.get('request')
+        if obj.sender_id is None:
+            return False
         return bool(request and request.user.is_authenticated and obj.sender_id == request.user.id)
 
     def get_listing(self, obj):
@@ -1298,14 +1380,21 @@ class StorefrontConversationSerializer(serializers.ModelSerializer):
     counterpart_name = serializers.SerializerMethodField()
     counterpart_avatar_url = serializers.SerializerMethodField()
     channel_label = serializers.CharField(source='get_channel_display', read_only=True)
+    status_label = serializers.CharField(source='get_status_display', read_only=True)
     last_message = serializers.SerializerMethodField()
     unread_count = serializers.SerializerMethodField()
+    agent = serializers.SerializerMethodField()
+    last_agent = serializers.SerializerMethodField()
+    assigned_to_me = serializers.SerializerMethodField()
+    survey = serializers.SerializerMethodField()
 
     class Meta:
         model = StorefrontConversation
         fields = [
             'id', 'channel', 'channel_label', 'subject', 'storefront',
             'counterpart_name', 'counterpart_avatar_url', 'last_message', 'unread_count',
+            'status', 'status_label', 'closed_at',
+            'agent', 'last_agent', 'assigned_to_me', 'survey',
             'created_at', 'updated_at',
         ]
         read_only_fields = fields
@@ -1353,6 +1442,122 @@ class StorefrontConversationSerializer(serializers.ModelSerializer):
     def get_unread_count(self, obj):
         request = self.context.get('request')
         return obj.unread_count_for(request.user) if request else 0
+
+    def _sender_of_last_agent_reply(self, obj):
+        """The user who wrote the newest desk-side message, if any.
+
+        The thread carries one ``agent`` for assignment, but a queue is shared:
+        when a second operator replies, the reader must see *that* person. The
+        inbox querysets prefetch the message list newest-first, so this is free
+        there and falls back to one query on a single-thread response.
+        """
+        prefetched = getattr(obj, '_prefetched_objects_cache', None) or {}
+        if 'messages' in prefetched:
+            for message in obj.messages.all():
+                if message.sender_id and message.sender_id != obj.customer_id:
+                    return message.sender
+            return None
+        latest = obj.latest_agent_message()
+        return latest.sender if latest else None
+
+    def get_agent(self, obj):
+        if obj.agent_id is None:
+            return None
+        agent = DeskAgent.for_user(obj.agent, desk_channel(obj.channel))
+        if agent is None:
+            return None
+        return agent_payload(agent, DeskSettings.load(), timezone.localtime())
+
+    def get_last_agent(self, obj):
+        sender = self._sender_of_last_agent_reply(obj)
+        if sender is None or (obj.agent_id and sender.id == obj.agent_id):
+            return None
+        agent = DeskAgent.for_user(sender, desk_channel(obj.channel))
+        if agent is None:
+            return None
+        return agent_payload(agent, DeskSettings.load(), timezone.localtime())
+
+    def get_assigned_to_me(self, obj) -> bool:
+        request = self.context.get('request')
+        return bool(request and obj.agent_id and request.user.id == obj.agent_id)
+
+    def get_survey(self, obj) -> dict:
+        """Whether the satisfaction card should appear for this thread.
+
+        ``rating_total`` is annotated on the inbox queryset; single-thread
+        responses do the one extra count.
+        """
+        total = getattr(obj, 'rating_total', None)
+        has_rating = bool(total) if total is not None else obj.ratings.exists()
+        closed = obj.status == StorefrontConversation.STATUS_CLOSED
+        return {
+            'closed': closed,
+            'closed_at': obj.closed_at.isoformat() if obj.closed_at else None,
+            'has_rating': has_rating,
+            'can_rate': closed and not has_rating,
+        }
+
+
+class ConversationRatingSerializer(serializers.ModelSerializer):
+    """The survey a user answers once a desk thread is closed.
+
+    Deliberately not public: the user's rating of how the desk performed is a
+    management signal (it is averaged per operator in the panel), not a star row
+    on a stranger's profile.
+    """
+
+    rater_name = serializers.SerializerMethodField()
+    agent_name = serializers.SerializerMethodField()
+    conversation_info = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ConversationRating
+        fields = [
+            'id', 'conversation', 'conversation_info', 'rater', 'rater_name', 'agent', 'agent_name',
+            'score', 'solved', 'comment', 'created_at',
+        ]
+        read_only_fields = ['id', 'conversation', 'rater', 'agent', 'created_at']
+        extra_kwargs = {'comment': {'required': False, 'allow_blank': True}}
+
+    def get_rater_name(self, obj) -> str:
+        return obj.rater.get_full_name() or obj.rater.username
+
+    def get_agent_name(self, obj) -> str:
+        return obj.agent.display_label if obj.agent else ''
+
+    def get_conversation_info(self, obj) -> dict:
+        conversation = obj.conversation
+        return {
+            'id': conversation.id,
+            'channel': conversation.channel,
+            'channel_label': conversation.channel_label,
+            'customer': conversation.customer.get_full_name() or conversation.customer.username,
+        }
+
+    def validate(self, attrs):
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        conversation = attrs.get('conversation') or getattr(self.instance, 'conversation', None)
+        if conversation is None:
+            raise serializers.ValidationError({'conversation': 'گفتگو مشخص نیست.'})
+        if user is not None:
+            # Only the farmer on the other side of a desk thread rates the desk —
+            # an operator scoring themselves would defeat the number entirely.
+            if user.id != conversation.customer_id:
+                raise serializers.ValidationError(
+                    {'detail': 'only the customer of a thread can rate the desk.'}
+                )
+            if ConversationRating.objects.filter(conversation=conversation, rater=user).exists():
+                raise serializers.ValidationError(
+                    {'detail': 'شما پیش‌تر به این گفتگو امتیاز داده‌اید.'}
+                )
+        if conversation.status != StorefrontConversation.STATUS_CLOSED:
+            raise serializers.ValidationError(
+                {'detail': 'نظرسنجی پس از بسته شدن گفتگو باز می‌شود.'}
+            )
+        if user is not None and conversation.agent_id:
+            attrs['agent'] = DeskAgent.for_user(conversation.agent, desk_channel(conversation.channel))
+        return attrs
 
 
 class FarmLandSerializer(serializers.ModelSerializer):

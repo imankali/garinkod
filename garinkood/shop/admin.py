@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.contrib import admin, messages
 from django.db import transaction
+from django.db.models import Count, Q
 from django.utils import timezone
 from import_export.admin import ExportMixin, ImportExportMixin
 from simple_history.admin import SimpleHistoryAdmin
@@ -18,6 +19,8 @@ from .models import (
     Shipment, ShipmentTrackingEvent,
     ProductAttribute, ListingAttribute, SiteArticle, Service, SitePage, SitePageBlock,
     TeamMember, BrandPartner, SiteContact, NewsletterSubscriber, PRODUCT_ATTRIBUTE_TEMPLATE,
+    StorefrontConversation, StorefrontMessage, DeskSettings, DeskAgent, QuickReply,
+    ConversationRating,
 )
 from .resources import OrderResource, ProductResource
 from .rewards import mark_order_paid_and_reward
@@ -758,3 +761,180 @@ class AdminNewsletterSubscriber(ExportMixin, admin.ModelAdmin):
         # Subscribers must opt in through the site form; a manually added row
         # would be an unsubscribed-for contact.
         return False
+
+
+# --- Service desks: hours, operators, canned replies and the survey ---
+@admin.register(DeskSettings)
+class AdminDeskSettings(admin.ModelAdmin):
+    """The two desks' working hours and canned replies, edited in one place.
+
+    A singleton like ``SiteContact``: there is one support desk and one
+    consulting desk per platform, and a second row would mean two answers to
+    «ساعت کاری پشتیبانی چند است؟».
+    """
+
+    list_display = ('support_hours', 'consulting_hours', 'presence_minutes', 'updated_at')
+    readonly_fields = ('support_hours_preview', 'consulting_hours_preview', 'updated_at')
+    fieldsets = (
+        ('ساعت کاری (به وقت ایران)', {
+            'fields': (
+                'work_days', 'support_start', 'support_end',
+                'consulting_start', 'consulting_end',
+                'support_hours_preview', 'consulting_hours_preview',
+            ),
+            'description': (
+                'خارج از این بازه، پیام کاربر در صف می‌ماند و پیام آماده‌ی «الان '
+                'ساعت کاری نیست» برایش ارسال می‌شود.'
+            ),
+        }),
+        ('حالت آنلاین و پیام پایان کار', {
+            'fields': ('presence_minutes', 'out_of_hours_note'),
+            'description': (
+                '«آنلاین» از فعالیت واقعی میز حساب می‌شود: هر بازکردن صندوق یا '
+                'گفتگو در این پنجره زمانی کارشناس را آنلاین نشان می‌دهد.'
+            ),
+        }),
+    )
+
+    @admin.display(description='ساعت کاری پشتیبانی (پیش‌نمایش)')
+    def support_hours_preview(self, obj) -> str:
+        return obj.hours_label('support')
+
+    @admin.display(description='ساعت کاری مشاوره (پیش‌نمایش)')
+    def consulting_hours_preview(self, obj) -> str:
+        return obj.hours_label('consulting')
+
+    @admin.display(description='پشتیبانی')
+    def support_hours(self, obj) -> str:
+        return obj.hours_label('support')
+
+    @admin.display(description='مشاوره')
+    def consulting_hours(self, obj) -> str:
+        return obj.hours_label('consulting')
+
+    def has_add_permission(self, request):
+        return not DeskSettings.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(DeskAgent)
+class AdminDeskAgent(admin.ModelAdmin):
+    list_display = (
+        'display_name', 'user', 'role', 'is_active', 'duty_now', 'last_seen_at',
+        'rating_average', 'rating_count', 'open_threads',
+    )
+    list_filter = ('role', 'is_active')
+    search_fields = ('display_name', 'title', 'specialties', 'user__username', 'user__first_name')
+    readonly_fields = ('last_seen_at', 'rating_average', 'rating_count', 'created_at', 'updated_at')
+    autocomplete_fields = ('user',)
+    ordering = ('role', 'order', 'display_name')
+    fieldsets = (
+        ('هویت نمایشی (همان چیزی که کاربر در چت می‌بیند)', {
+            'fields': ('user', 'role', 'display_name', 'title', 'photo', 'bio', 'specialties'),
+            'description': (
+                'نام و تصویر اینجا در سربرگ گفتگو و زیر هر پیام نمایش داده می‌شود؛ '
+                'نام کاربری هرگز به کاربر نشان داده نمی‌شود.'
+            ),
+        }),
+        ('توزیع کار', {
+            'fields': ('shift_start', 'shift_end', 'max_open_threads', 'order', 'is_active'),
+        }),
+        ('وضعیت (فقط‌خواندنی)', {
+            'fields': ('last_seen_at', 'rating_average', 'rating_count'),
+        }),
+    )
+
+    @admin.display(boolean=True, description='آنلاین')
+    def duty_now(self, obj) -> bool:
+        return obj.is_present()
+
+    @admin.display(description='گفتگوی باز')
+    def open_threads(self, obj) -> int:
+        # Counted in the queryset so a desk with a dozen operators is one query;
+        # the conversation list is what assign_thread() reads when it hands out
+        # the next thread, so it has to agree with this number exactly.
+        return getattr(obj, '_open', None) if getattr(obj, '_open', None) is not None else obj.open_threads().count()
+
+    def get_queryset(self, request):
+        return (
+            super().get_queryset(request)
+            .select_related('user')
+            .annotate(_open=Count('user__handled_conversations', filter=Q(
+                user__handled_conversations__status=StorefrontConversation.STATUS_OPEN,
+            )))
+        )
+
+
+@admin.register(QuickReply)
+class AdminQuickReply(admin.ModelAdmin):
+    list_display = ('label', 'audience', 'channel', 'is_first_message_only', 'order', 'is_active')
+    list_filter = ('audience', 'channel', 'is_active', 'is_first_message_only')
+    list_editable = ('order', 'is_active')
+    search_fields = ('label', 'text')
+    ordering = ('audience', 'channel', 'order', 'id')
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        if not change:
+            messages.success(
+                request,
+                'پیام آماده ذخیره شد؛ در گفتگوهای همان میز بلافاصله قابل انتخاب است.',
+            )
+
+
+@admin.register(ConversationRating)
+class AdminConversationRating(admin.ModelAdmin):
+    """Satisfaction results, for the desk's managers only.
+
+    Not exposed on any public page: an operator's average is a management
+    signal, not a star row next to a stranger's name.
+    """
+
+    list_display = ('created_at', 'score', 'solved', 'conversation', 'agent', 'rater')
+    list_filter = ('score', 'solved', 'conversation__channel', 'agent')
+    search_fields = ('comment', 'rater__username', 'agent__display_name')
+    readonly_fields = [field.name for field in ConversationRating._meta.get_fields()]
+    date_hierarchy = 'created_at'
+    ordering = ('-created_at',)
+
+    def has_add_permission(self, request):
+        # Ratings are written by the survey form, which also stamps the agent
+        # and posts the notice into the thread.
+        return False
+
+
+class StorefrontMessageInline(admin.TabularInline):
+    model = StorefrontMessage
+    extra = 0
+    fields = ('created_at', 'sender', 'body', 'land', 'link_label', 'is_read', 'deleted_at')
+    readonly_fields = fields
+    can_delete = False
+
+    def has_add_permission(self, request, obj):
+        return False
+
+
+@admin.register(StorefrontConversation)
+class AdminStorefrontConversation(admin.ModelAdmin):
+    """Read-only view of the inbox, for when a farmer reports a conversation.
+
+    Answers are written in the site's own desk UI; editing a message from the
+    admin panel would let a line appear that the other party never saw.
+    """
+
+    list_display = ('id', 'customer', 'channel', 'subject', 'status', 'agent', 'updated_at')
+    list_filter = ('channel', 'status', 'agent')
+    search_fields = ('customer__username', 'customer__first_name', 'subject')
+    readonly_fields = (
+        'customer', 'channel', 'storefront', 'subject', 'agent', 'status',
+        'closed_at', 'closed_by', 'created_at', 'updated_at',
+    )
+    inlines = [StorefrontMessageInline]
+    date_hierarchy = 'updated_at'
+    ordering = ('-updated_at',)
+
+    def has_add_permission(self, request):
+        return False
+

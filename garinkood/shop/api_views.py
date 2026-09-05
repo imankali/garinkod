@@ -441,7 +441,12 @@ class CommentViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         user = self.request.user if self.request.user.is_authenticated else None
-        serializer.save(user=user, active=True)
+        comment = serializer.save(user=user, active=True)
+        # A reply to someone's review or question is sent to the unified inbox,
+        # exactly as a reply under a storefront post is. Without this the answer
+        # to a farmer's question sits on a product page they may never reopen.
+        if comment.parent_id:
+            notify_comment_reply(comment)
 
     @action(detail=False, methods=['get'])
     def by_product(self, request):

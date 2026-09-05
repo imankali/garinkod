@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from . import api_views, marketplace_views, reference_views, farm_views, content_views
+from . import api_views, marketplace_views, reference_views, farm_views, content_views, desk_views
 from .messaging.webhooks import whatsapp_webhook
 
 # ساخت Router
@@ -93,6 +93,28 @@ urlpatterns = [
         'marketplace/conversations/farmer/<int:user_id>/',
         marketplace_views.start_farmer_conversation,
         name='api_start_farmer_conversation',
+    ),
+
+    # Service desks: duty windows, presence, canned replies, closing, survey.
+    # The farmer's chat and the operator's queue read the same object, so the
+    # «کی آنلاین است / ساعت کاری» sentence can never disagree between them.
+    path('desk/state/', desk_views.desk_state, name='api_desk_state'),
+    path('desk/queue/', desk_views.desk_queue, name='api_desk_queue'),
+    path('desk/ratings/', desk_views.desk_ratings, name='api_desk_ratings'),
+    path(
+        'desk/conversations/<int:conversation_id>/close/',
+        desk_views.close_conversation,
+        name='api_desk_close_conversation',
+    ),
+    path(
+        'desk/conversations/<int:conversation_id>/rate/',
+        desk_views.rate_conversation,
+        name='api_desk_rate_conversation',
+    ),
+    path(
+        'desk/conversations/<int:conversation_id>/handoff/',
+        desk_views.handoff_thread,
+        name='api_desk_handoff',
     ),
 
     # Farm profile: lands, calendars and consultation
