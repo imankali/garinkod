@@ -52,6 +52,7 @@ cp .env.example .env
 python manage.py migrate
 python manage.py seed_locations
 python manage.py seed_agri_inputs
+python manage.py seed_site_content     # خدمات، صفحات اطلاعاتی و (با --with-landing) صفحه فرود نمونه
 python manage.py bootstrap_management_roles
 python manage.py createsuperuser
 python manage.py runserver 0.0.0.0:8000

@@ -7,7 +7,7 @@ from uuid import UUID
 
 from .schema import documented_api
 from django.conf import settings
-from django.db.models import Count, Exists, F, OuterRef, Prefetch, Q, Sum
+from django.db.models import Avg, Count, Exists, F, Max, OuterRef, Prefetch, Q, Sum
 from rest_framework import mixins, viewsets, permissions, status
 from rest_framework.decorators import action, api_view, permission_classes, throttle_classes
 from rest_framework.response import Response
@@ -51,6 +51,7 @@ from .serializers import (
     LocationSerializer, AgriInputSerializer, StorefrontHighlightSerializer,
     StorefrontPostCommentSerializer, WebPushSubscriptionSerializer,
     ShipmentTrackingEventSerializer, ShipmentTrackingEventCreateSerializer,
+    rating_breakdown,
 )
 from .management_roles import ROLE_PERMISSIONS
 from .payments import (
@@ -326,8 +327,11 @@ class ProductViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Product.objects.filter(status='published').select_related('category', 'subcategory')
     filter_backends = [DjangoFilterBackend, ResilientProductSearchFilter, OrderingFilter]
     filterset_class = ProductFilter
-    search_fields = ['title', 'description']
-    ordering_fields = ['price', 'publish', 'created', 'sales_count', 'discount_percent']
+    search_fields = ['title', 'description', 'brand', 'sku']
+    ordering_fields = [
+        'price', 'publish', 'created', 'sales_count', 'discount_percent',
+        'avg_rating', 'reviews_count',
+    ]
     ordering = ['-publish']
     lookup_field = 'slug'
     throttle_classes = [SearchRateThrottle]
@@ -336,21 +340,70 @@ class ProductViewSet(viewsets.ReadOnlyModelViewSet):
     # it do that without paging through the default twelve at a time.
     pagination_class = ClientConfigurablePagination
 
+    def get_queryset(self):
+        # Star ratings are the one piece of social proof a shopper sorts by, so
+        # they are aggregated here rather than fetched per card. Only approved,
+        # top-level reviews with a score count; a question is not a rating.
+        review_rows = Q(comments__active=True, comments__parent__isnull=True, comments__rating__isnull=False)
+        queryset = (
+            super()
+            .get_queryset()
+            .annotate(
+                avg_rating=Avg('comments__rating', filter=review_rows),
+                reviews_count=Count('comments', filter=review_rows, distinct=True),
+            )
+        )
+        if self.action == 'retrieve':
+            # The detail page renders the spec table; prefetch it instead of
+            # issuing one query per attribute row.
+            queryset = queryset.prefetch_related('attributes')
+        return queryset
+
     def get_serializer_class(self):
         if self.action == 'list':
             return ProductListSerializer
         return ProductSerializer
 
+    @action(detail=False, methods=['get'], url_path='facets')
+    def facets(self, request):
+        """Facet values (brands, package sizes, price ceiling) for the shop UI.
+
+        Distinct values come from the published catalogue only, so a filter
+        chip can never promise a result set that is empty because it is made of
+        drafts.
+        """
+        published = Product.objects.filter(status='published')
+        brands = list(
+            published.exclude(brand='')
+            .values('brand')
+            .annotate(total=Count('id'))
+            .order_by('-total', 'brand')[:60]
+        )
+        packages = list(
+            published.exclude(package_weight='')
+            .values('package_weight')
+            .annotate(total=Count('id'))
+            .order_by('package_weight')[:40]
+        )
+        price_bound = published.aggregate(high=Max('price'))['high'] or 0
+        return Response({
+            'brands': [{'value': row['brand'], 'count': row['total']} for row in brands],
+            'package_weights': [{'value': row['package_weight'], 'count': row['total']} for row in packages],
+            'max_price': int(price_bound),
+        })
+
     @action(detail=False, methods=['get'])
     def featured(self, request):
-        featured_products = self.queryset.filter(is_featured=True)[:8]
+        featured_products = self.get_queryset().filter(is_featured=True)[:8]
         serializer = ProductListSerializer(featured_products, many=True)
         return Response(serializer.data)
 
     @action(detail=True, methods=['get'])
     def similar(self, request, slug=None):
         product = self.get_object()
-        similar = self.queryset.exclude(id=product.id)
+        # Rating annotations come from get_queryset, so the "similar" cards can
+        # be sorted by score and still show their stars.
+        similar = self.get_queryset().exclude(id=product.id)
         if product.category_id:
             similar = similar.filter(category_id=product.category_id)
         serializer = ProductListSerializer(similar[:4], many=True)
@@ -360,7 +413,7 @@ class ProductViewSet(viewsets.ReadOnlyModelViewSet):
     def by_category(self, request):
         category_slug = request.query_params.get('category', None)
         if category_slug:
-            products = self.queryset.filter(category__slug=category_slug)
+            products = self.get_queryset().filter(category__slug=category_slug)
             serializer = ProductListSerializer(products, many=True)
             return Response(serializer.data)
         return Response({'error': 'Category slug is required'}, status=400)
@@ -373,6 +426,18 @@ class CommentViewSet(viewsets.ModelViewSet):
     queryset = Comment.objects.filter(active=True, parent=None)
     serializer_class = CommentSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    # A review is user-generated content and must be moderated like the rest.
+    http_method_names = ['get', 'post', 'head', 'options']
+
+    def get_queryset(self):
+        # ``is_verified_purchase`` would otherwise cost one query per review;
+        # Exists() resolves it inside the list query.
+        bought = OrderItem.objects.filter(
+            order__user=OuterRef('user'),
+            product=OuterRef('product'),
+            order__payment_status='paid',
+        )
+        return super().get_queryset().annotate(verified_purchase=Exists(bought))
 
     def perform_create(self, serializer):
         user = self.request.user if self.request.user.is_authenticated else None
@@ -387,6 +452,20 @@ class CommentViewSet(viewsets.ModelViewSet):
             serializer = self.get_serializer(comments, many=True)
             return Response(serializer.data)
         return Response({'error': 'Product slug is required'}, status=400)
+
+    @action(detail=False, methods=['get'])
+    def rating_summary(self, request):
+        """Average score, review count and star histogram for one product."""
+        product_slug = request.query_params.get('product', None)
+        if not product_slug:
+            return Response({'error': 'Product slug is required'}, status=400)
+        product = get_object_or_404(Product, slug=product_slug)
+        average, count, distribution = rating_breakdown(product)
+        return Response({
+            'average': round(float(average), 2) if average else 0,
+            'reviews_count': count,
+            'distribution': distribution,
+        })
 
 
 # ========================================
@@ -464,6 +543,16 @@ class CartViewSet(viewsets.ViewSet):
         product = get_object_or_404(Product, id=product_id, status='published')
         if not product.is_in_stock:
             return Response({'error': 'این محصول موجود نیست'}, status=status.HTTP_400_BAD_REQUEST)
+        if product.price_on_request:
+            # Quote-only lines (bulk/contract pricing) never enter a cart, so a
+            # placeholder price can never be charged to a buyer.
+            return Response(
+                {
+                    'error': 'قیمت این کالا فقط با تماس کارشناس اعلام می‌شود؛ برای ثبت سفارش تماس بگیرید.',
+                    'price_on_request': True,
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
 
         max_qty = min(10, product.stock)
         quantity = min(quantity, max_qty)
@@ -722,6 +811,17 @@ def checkout(request):
             missing_or_unavailable = []
             for item in product_items:
                 product = locked_products.get(item.product_id)
+                if product and product.price_on_request:
+                    # A quote-only line can still be in a cart from before the
+                    # catalogue change; it must never be charged at checkout.
+                    return Response(
+                        {
+                            'error': (
+                                f'قیمت «{product.title}» با تماس اعلام می‌شود و آنلاین قابل پرداخت نیست.'
+                            )
+                        },
+                        status=status.HTTP_409_CONFLICT,
+                    )
                 if not product or product.status != 'published' or not product.available or product.stock < item.quantity:
                     missing_or_unavailable.append(item.product.title)
             for item in listing_items:
@@ -1010,7 +1110,8 @@ class MarketplaceListingViewSet(viewsets.ModelViewSet):
             ),
         )
         base = MarketplaceListing.objects.prefetch_related(
-            Prefetch('storefront', queryset=annotated_storefronts)
+            Prefetch('storefront', queryset=annotated_storefronts),
+            'attributes',
         )
         if self.action in {'list', 'retrieve'}:
             queryset = base.filter(status='published')

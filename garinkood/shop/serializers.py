@@ -1,5 +1,6 @@
 import hashlib
 
+from django.db.models import Count, Exists, OuterRef, Q
 from rest_framework import serializers
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -16,6 +17,8 @@ from .models import (
     StorefrontPostLike, StorefrontPostComment, StorefrontStoryView,
     FarmLand, FarmCalendarEvent, FarmConsultationRequest, AdminAuditLog,
     Shipment, ShipmentTrackingEvent, WebPushSubscription,
+    ProductAttribute, ListingAttribute, SiteArticle, Service, SitePage, SitePageBlock,
+    TeamMember, BrandPartner, SiteContact, NewsletterSubscriber, PRODUCT_ATTRIBUTE_TEMPLATE,
 )
 from .phone_numbers import normalize_iranian_mobile
 from .slugs import slugify_fa, unique_storefront_slug
@@ -75,6 +78,35 @@ class EquipmentDetailSerializer(serializers.ModelSerializer):
 # ========================================
 # Product Serializer
 # ========================================
+class FilledRowListSerializer(serializers.ListSerializer):
+    """Drop spec rows whose value is still blank.
+
+    The admin action seeds the standard labels before anyone has typed a value.
+    Filtering here (rather than with ``.exclude()``) keeps the prefetched cache
+    intact, so a list of products pays one query in total instead of one per
+    row.
+    """
+
+    def to_representation(self, data):
+        if hasattr(data, 'all'):
+            data = [row for row in data.all() if row.value]
+        return super().to_representation(data)
+
+
+class ProductAttributeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProductAttribute
+        fields = ['id', 'label', 'value', 'order']
+        list_serializer_class = FilledRowListSerializer
+
+
+class ListingAttributeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ListingAttribute
+        fields = ['id', 'label', 'value', 'order']
+        list_serializer_class = FilledRowListSerializer
+
+
 class ProductSerializer(serializers.ModelSerializer):
     category = CategorySerializer(read_only=True)
     subcategory = SubCategorySerializer(read_only=True)
@@ -86,8 +118,10 @@ class ProductSerializer(serializers.ModelSerializer):
     pesticide_detail = PesticideDetailSerializer(read_only=True)
     seed_detail = SeedDetailSerializer(read_only=True)
     equipment_detail = EquipmentDetailSerializer(read_only=True)
+    attributes = ProductAttributeSerializer(many=True, read_only=True)
 
     discounted_price = serializers.SerializerMethodField()
+    rating_summary = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
@@ -96,10 +130,11 @@ class ProductSerializer(serializers.ModelSerializer):
             'description', 'publish', 'created', 'updated', 'status',
             'price', 'stock', 'available', 'is_featured', 'image', 'image_url',
             'is_in_stock', 'discount_percent', 'sales_count', 'discounted_price',
-            'brand', 'sku', 'gtin', 'seo_title', 'seo_description',
+            'brand', 'sku', 'gtin', 'package_weight', 'price_on_request',
+            'seo_title', 'seo_description',
             'shipping_weight_grams', 'shipping_length_cm', 'shipping_width_cm',
             'shipping_height_cm', 'fertilizer_detail', 'pesticide_detail',
-            'seed_detail', 'equipment_detail'
+            'seed_detail', 'equipment_detail', 'attributes', 'rating_summary'
         ]
         read_only_fields = ['created', 'updated']
 
@@ -112,6 +147,38 @@ class ProductSerializer(serializers.ModelSerializer):
     def get_is_in_stock(self, obj) -> bool:
         return obj.is_in_stock
 
+    def get_rating_summary(self, obj) -> dict:
+        """Average score, review count and star distribution.
+
+        The viewset annotates list/detail querysets; the fallback keeps the
+        serializer usable from any other call site (admin exports, tests).
+        """
+        average = getattr(obj, 'avg_rating', None)
+        count = getattr(obj, 'reviews_count', None)
+        distribution = getattr(obj, 'rating_distribution', None)
+        if average is None or count is None or distribution is None:
+            average, count, distribution = rating_breakdown(obj)
+        return {
+            'average': round(float(average), 2) if average else 0,
+            'reviews_count': int(count or 0),
+            'distribution': distribution,
+        }
+
+
+def rating_breakdown(product) -> tuple[float | None, int, dict[str, int]]:
+    """Average/star histogram over a product's approved top-level reviews."""
+    reviews = product.comments.filter(active=True, parent__isnull=True, rating__isnull=False)
+    count = reviews.count()
+    if not count:
+        return None, 0, {'1': 0, '2': 0, '3': 0, '4': 0, '5': 0}
+    buckets = reviews.values('rating').annotate(total=Count('rating')).order_by()
+    distribution = {str(star): 0 for star in range(1, 6)}
+    total = 0
+    for row in buckets:
+        distribution[str(row['rating'])] = row['total']
+        total += row['rating'] * row['total']
+    return total / count, count, distribution
+
 
 class ProductListSerializer(serializers.ModelSerializer):
     """Serializer سبک‌تر برای لیست محصولات"""
@@ -120,6 +187,8 @@ class ProductListSerializer(serializers.ModelSerializer):
     is_in_stock = serializers.SerializerMethodField()
 
     discounted_price = serializers.SerializerMethodField()
+    avg_rating = serializers.SerializerMethodField()
+    reviews_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
@@ -127,6 +196,7 @@ class ProductListSerializer(serializers.ModelSerializer):
             'id', 'title', 'slug', 'category', 'price', 'stock',
             'available', 'is_featured', 'image', 'image_url', 'is_in_stock',
             'discount_percent', 'sales_count', 'discounted_price', 'brand', 'sku',
+            'package_weight', 'price_on_request', 'avg_rating', 'reviews_count',
         ]
 
     def get_image_url(self, obj) -> str:
@@ -138,18 +208,26 @@ class ProductListSerializer(serializers.ModelSerializer):
     def get_discounted_price(self, obj) -> int:
         return obj.discounted_price
 
+    def get_avg_rating(self, obj) -> float:
+        value = getattr(obj, 'avg_rating', None)
+        return round(float(value), 2) if value else 0
+
+    def get_reviews_count(self, obj) -> int:
+        return int(getattr(obj, 'reviews_count', 0) or 0)
+
 
 # ========================================
 # Comment Serializer
 # ========================================
 class CommentSerializer(serializers.ModelSerializer):
     replies = serializers.SerializerMethodField()
+    is_verified_purchase = serializers.SerializerMethodField()
 
     class Meta:
         model = Comment
         fields = [
-            'id', 'product', 'name', 'email', 'body', 'image', 'sticker', 'parent',
-            'created', 'updated', 'active', 'replies'
+            'id', 'product', 'name', 'email', 'body', 'image', 'sticker', 'rating',
+            'parent', 'created', 'updated', 'active', 'replies', 'is_verified_purchase',
         ]
         read_only_fields = ['created', 'updated', 'active']
 
@@ -157,6 +235,22 @@ class CommentSerializer(serializers.ModelSerializer):
         if image and image.size > settings.VISUAL_SEARCH_MAX_UPLOAD_BYTES:
             raise serializers.ValidationError('حجم تصویر نظر از حد مجاز بیشتر است.')
         return image
+
+    def validate_rating(self, rating):
+        # Only a real review may be scored; a reply to a question is not one.
+        if rating and self.initial_data.get('parent'):
+            raise serializers.ValidationError('پاسخ‌ها امتیاز ندارند؛ امتیاز فقط برای دیدگاه ثبت می‌شود.')
+        return rating
+
+    def get_is_verified_purchase(self, obj) -> bool:
+        annotated = getattr(obj, 'verified_purchase', None)
+        if annotated is not None:
+            return bool(annotated)
+        if not obj.user_id:
+            return False
+        return obj.user.orders.filter(
+            items__product_id=obj.product_id, payment_status='paid'
+        ).exists()
 
     def get_replies(self, obj) -> list[dict]:
         replies = obj.replies.filter(active=True)
@@ -685,6 +779,9 @@ class MarketplaceListingSerializer(serializers.ModelSerializer):
     is_purchasable = serializers.BooleanField(read_only=True)
     minimum_order = serializers.IntegerField(read_only=True)
     discounted_price = serializers.SerializerMethodField()
+    # Sellers may attach the same structured spec table the catalogue uses; it is
+    # optional, and writing it replaces the whole set in one call.
+    attributes = ListingAttributeSerializer(many=True, required=False)
 
     class Meta:
         model = MarketplaceListing
@@ -693,7 +790,7 @@ class MarketplaceListingSerializer(serializers.ModelSerializer):
             'price', 'unit', 'quantity_available', 'min_order_quantity', 'minimum_order',
             'harvest_date', 'image', 'image_url', 'status', 'status_label',
             'is_purchasable', 'discount_percent', 'sales_count', 'discounted_price',
-            'rejection_reason', 'reviewed_at',
+            'rejection_reason', 'reviewed_at', 'attributes',
             'created_at', 'updated_at'
         ]
         read_only_fields = [
@@ -715,6 +812,48 @@ class MarketplaceListingSerializer(serializers.ModelSerializer):
         if value <= 0:
             raise serializers.ValidationError('حداقل سفارش باید بزرگ‌تر از صفر باشد.')
         return value
+
+    def validate_attributes(self, value):
+        if len(value) > 40:
+            raise serializers.ValidationError('حداکثر ۴۰ ویژگی برای هر آگهی ثبت می‌شود.')
+        return value
+
+    def _write_attributes(self, instance) -> None:
+        if 'attributes' not in self.validated_data:
+            return
+        rows = self.validated_data['attributes']
+        instance.attributes.all().delete()
+        ListingAttribute.objects.bulk_create(
+            [
+                ListingAttribute(
+                    listing=instance,
+                    label=row['label'][:80],
+                    value=row['value'][:300],
+                    order=index,
+                )
+                for index, row in enumerate(rows)
+            ]
+        )
+
+    def create(self, validated_data):
+        rows = validated_data.pop('attributes', None)
+        instance = super().create(validated_data)
+        if rows:
+            ListingAttribute.objects.bulk_create(
+                [
+                    ListingAttribute(
+                        listing=instance, label=row['label'][:80], value=row['value'][:300], order=index
+                    )
+                    for index, row in enumerate(rows)
+                ]
+            )
+        return instance
+
+    def update(self, instance, validated_data):
+        validated_data.pop('attributes', None)
+        instance = super().update(instance, validated_data)
+        self._write_attributes(instance)
+        return instance
 
     def validate(self, attrs):
         """The minimum order can never exceed what is actually on offer."""
@@ -1309,3 +1448,278 @@ class AdminAuditLogSerializer(serializers.ModelSerializer):
         model = AdminAuditLog
         fields = ['id', 'actor_username', 'action', 'target_type', 'target_id', 'summary', 'metadata', 'created_at']
         read_only_fields = fields
+
+
+# ========================================
+# Site content: blog, growing guides, services, landing pages, trust pages
+# ========================================
+class SiteArticleListSerializer(serializers.ModelSerializer):
+    """Card shape for /blog and the home-page magazine block."""
+
+    author_name = serializers.SerializerMethodField()
+    cover_url = serializers.SerializerMethodField()
+    kind_label = serializers.CharField(source='get_kind_display', read_only=True)
+    products_count = serializers.IntegerField(source='products.count', read_only=True)
+
+    class Meta:
+        model = SiteArticle
+        fields = [
+            'id', 'title', 'slug', 'kind', 'kind_label', 'excerpt', 'crop', 'cover', 'cover_url',
+            'author_name', 'published_at', 'updated_at', 'reading_minutes', 'views',
+            'is_featured', 'products_count', 'seo_title', 'seo_description',
+        ]
+
+    def get_author_name(self, obj) -> str:
+        if obj.author:
+            full = f'{obj.author.first_name} {obj.author.last_name}'.strip()
+            return full or obj.author.username
+        return 'تیم گرین کود'
+
+    def get_cover_url(self, obj) -> str:
+        return obj.cover_url
+
+
+class SiteArticleSerializer(serializers.ModelSerializer):
+    """Detail shape: full body plus the products and listings it recommends."""
+
+    author_name = serializers.SerializerMethodField()
+    cover_url = serializers.SerializerMethodField()
+    kind_label = serializers.CharField(source='get_kind_display', read_only=True)
+    products = ProductListSerializer(many=True, read_only=True)
+    listings = serializers.SerializerMethodField()
+    related_articles = SiteArticleListSerializer(many=True, read_only=True)
+    headings = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SiteArticle
+        fields = [
+            'id', 'title', 'slug', 'kind', 'kind_label', 'excerpt', 'body', 'crop',
+            'cover', 'cover_url', 'author', 'author_name', 'published_at', 'updated_at',
+            'reading_minutes', 'views', 'products', 'listings', 'related_articles',
+            'headings', 'seo_title', 'seo_description',
+        ]
+
+    def get_author_name(self, obj) -> str:
+        if obj.author:
+            full = f'{obj.author.first_name} {obj.author.last_name}'.strip()
+            return full or obj.author.username
+        return 'تیم گرین کود'
+
+    def get_cover_url(self, obj) -> str:
+        return obj.cover_url
+
+    def get_listings(self, obj) -> list[dict]:
+        return [
+            {
+                'id': listing.id,
+                'title': listing.title,
+                'slug': listing.slug,
+                'crop_name': listing.crop_name,
+                'price': listing.price,
+                'unit': listing.unit,
+                'image_url': listing.image_url,
+                'storefront_name': listing.storefront.name,
+                'storefront_slug': listing.storefront.slug,
+            }
+            for listing in obj.listings.select_related('storefront').filter(status='published')
+        ]
+
+    def get_headings(self, obj) -> list[dict]:
+        """Table of contents derived from the article body.
+
+        Headings are marked in the source with a leading "## " so the reader can
+        build an index without parsing HTML on the server.
+        """
+        headings = []
+        for line in (obj.body or '').splitlines():
+            stripped = line.strip()
+            if stripped.startswith('## '):
+                text = stripped[3:].strip()
+                headings.append({'title': text, 'anchor': article_anchor(text)})
+        return headings
+
+
+def article_anchor(text: str) -> str:
+    """A stable, RTL-safe DOM id for a Persian heading."""
+    from .slugs import slugify_fa
+
+    slug = slugify_fa(text)
+    return slug or f'h{abs(hash(text)) % 100000}'
+
+
+class ServiceSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+    highlights = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Service
+        fields = [
+            'id', 'title', 'slug', 'code', 'summary', 'body', 'highlights', 'icon',
+            'image', 'image_url', 'price_note', 'order', 'seo_title', 'seo_description',
+        ]
+
+    def get_image_url(self, obj) -> str:
+        return obj.image_url
+
+    def get_highlights(self, obj) -> list[str]:
+        return obj.highlight_list
+
+
+class SitePageBlockSerializer(serializers.ModelSerializer):
+    block_type_label = serializers.CharField(source='get_block_type_display', read_only=True)
+    image_url = serializers.SerializerMethodField()
+    video_url = serializers.SerializerMethodField()
+    rows = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SitePageBlock
+        fields = [
+            'id', 'block_type', 'block_type_label', 'title', 'text', 'rows', 'image',
+            'image_url', 'video', 'video_url', 'link', 'data', 'position',
+        ]
+
+    def get_image_url(self, obj) -> str:
+        return obj.image_url
+
+    def get_video_url(self, obj) -> str:
+        return obj.video_url
+
+    def get_rows(self, obj) -> list[list[str]]:
+        return obj.table_rows
+
+
+class SitePageSerializer(serializers.ModelSerializer):
+    blocks = SitePageBlockSerializer(many=True, read_only=True)
+    hero_image_url = serializers.SerializerMethodField()
+    kind_label = serializers.CharField(source='get_kind_display', read_only=True)
+    product = serializers.SerializerMethodField()
+    updated_by = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SitePage
+        fields = [
+            'id', 'title', 'slug', 'kind', 'kind_label', 'hero_text', 'hero_image',
+            'hero_image_url', 'badge', 'product', 'cta_label', 'cta_url', 'blocks',
+            'published_at', 'updated_at', 'updated_by', 'seo_title', 'seo_description',
+        ]
+
+    def get_hero_image_url(self, obj) -> str:
+        return obj.hero_image_url
+
+    def get_updated_by(self, obj) -> str:
+        return 'تیم گرین کود'
+
+    def get_product(self, obj) -> dict | None:
+        if not obj.product_id:
+            return None
+        product = obj.product
+        return {
+            'id': product.id,
+            'title': product.title,
+            'slug': product.slug,
+            'price': product.price,
+            'discounted_price': product.discounted_price,
+            'image_url': product.image_url,
+            'is_in_stock': product.is_in_stock,
+            'price_on_request': product.price_on_request,
+        }
+
+
+class TeamMemberSerializer(serializers.ModelSerializer):
+    photo_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TeamMember
+        fields = ['id', 'name', 'role', 'bio', 'photo', 'photo_url', 'order']
+
+    def get_photo_url(self, obj) -> str:
+        return obj.photo_url
+
+
+class BrandPartnerSerializer(serializers.ModelSerializer):
+    logo_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = BrandPartner
+        fields = ['id', 'name', 'logo', 'logo_url', 'website', 'description', 'since_year', 'order']
+
+    def get_logo_url(self, obj) -> str:
+        return obj.logo_url
+
+
+class SiteContactSerializer(serializers.ModelSerializer):
+    phones = serializers.SerializerMethodField()
+    emails = serializers.SerializerMethodField()
+    expert_photo_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SiteContact
+        fields = [
+            'address', 'provinces_note', 'phones', 'emails', 'working_hours',
+            'whatsapp_number', 'telegram_url', 'instagram_url', 'eitaa_url',
+            'map_lat', 'map_lng', 'map_note', 'expert_name', 'expert_role',
+            'expert_photo', 'expert_photo_url', 'expert_note', 'updated_at',
+        ]
+
+    def get_phones(self, obj) -> list[str]:
+        return obj.phone_list
+
+    def get_emails(self, obj) -> list[str]:
+        return obj.email_list
+
+    def get_expert_photo_url(self, obj) -> str:
+        return obj.expert_photo_url
+
+
+class NewsletterSubscribeSerializer(serializers.ModelSerializer):
+    """Public opt-in. Either channel is enough; a topic list is optional."""
+
+    # Declared explicitly so DRF does not attach its UniqueValidator: a repeat
+    # subscription must re-activate the existing row instead of erroring.
+    email = serializers.EmailField(required=False, allow_blank=True)
+    mobile = serializers.CharField(required=False, allow_blank=True, max_length=15)
+
+    class Meta:
+        model = NewsletterSubscriber
+        fields = ['id', 'email', 'mobile', 'topics', 'source', 'is_active', 'subscribed_at']
+        read_only_fields = ['id', 'is_active', 'subscribed_at']
+
+    def validate_mobile(self, value):
+        # An empty field means "no SMS channel", not a malformed number.
+        if not value:
+            return ''
+        try:
+            return normalize_iranian_mobile(value)
+        except ValueError as exc:
+            raise serializers.ValidationError(str(exc)) from exc
+
+    def validate(self, attrs):
+        email = (attrs.get('email') or '').strip()
+        mobile = (attrs.get('mobile') or '').strip()
+        if not email and not mobile:
+            raise serializers.ValidationError('برای عضویت، ایمیل یا شماره موبایل را وارد کنید.')
+        if mobile:
+            attrs['mobile'] = mobile
+        attrs['email'] = email
+        # Re-subscribing an existing address is idempotent, not a duplicate error.
+        existing = None
+        if email:
+            existing = NewsletterSubscriber.objects.filter(email=email).first()
+        if existing is None and mobile:
+            existing = NewsletterSubscriber.objects.filter(mobile=mobile).first()
+        if existing is not None:
+            attrs['_existing_id'] = existing.id
+        return attrs
+
+    def create(self, validated_data):
+        existing_id = validated_data.pop('_existing_id', None)
+        if existing_id:
+            existing = NewsletterSubscriber.objects.get(pk=existing_id)
+            for field, value in validated_data.items():
+                if value:
+                    setattr(existing, field, value)
+            existing.is_active = True
+            existing.unsubscribed_at = None
+            existing.save()
+            return existing
+        return super().create(validated_data)

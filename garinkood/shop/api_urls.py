@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from . import api_views, marketplace_views, reference_views, farm_views
+from . import api_views, marketplace_views, reference_views, farm_views, content_views
 from .messaging.webhooks import whatsapp_webhook
 
 # ساخت Router
@@ -14,6 +14,12 @@ router.register(r'marketplace/posts', api_views.StorefrontPostViewSet, basename=
 router.register(r'marketplace/post-comments', api_views.StorefrontPostCommentViewSet, basename='marketplace-post-comment')
 router.register(r'marketplace/storefronts', marketplace_views.StorefrontDirectoryViewSet, basename='storefront-directory')
 router.register(r'marketplace/highlights', marketplace_views.StorefrontHighlightViewSet, basename='storefront-highlight')
+# Site content: the blog/growing guides, admin pages and the service catalogue.
+# Services live under ``services/catalog`` so the existing POST
+# ``services/requests`` route keeps resolving to the request form.
+router.register(r'articles', content_views.SiteArticleViewSet, basename='article')
+router.register(r'pages', content_views.SitePageViewSet, basename='site-page')
+router.register(r'services/catalog', content_views.ServiceViewSet, basename='service')
 
 urlpatterns = [
     # API Routes (از Router)
@@ -105,6 +111,13 @@ urlpatterns = [
     path('farm/consulting/lands/<int:land_id>/events/', farm_views.consulting_land_event, name='api_consulting_land_event'),
     path('marketplace/finance/', api_views.storefront_finance, name='api_storefront_finance'),
     path('marketplace/finance/export/', api_views.storefront_finance_export, name='api_storefront_finance_export'),
+    # Editorial/landing content, contact channels and the newsletter
+    path('site/contact/', content_views.site_contact, name='api_site_contact'),
+    path('site/about/', content_views.site_about, name='api_site_about'),
+    path('guides/index/', content_views.growing_index, name='api_growing_index'),
+    path('newsletter/subscribe/', content_views.newsletter_subscribe, name='api_newsletter_subscribe'),
+    path('newsletter/unsubscribe/', content_views.newsletter_unsubscribe, name='api_newsletter_unsubscribe'),
+
     path('features/', api_views.feature_flags_view, name='api_feature_flags'),
     path('shipping/quote/', api_views.shipping_quote_view, name='api_shipping_quote'),
     path('payments/options/', api_views.payment_options_view, name='api_payment_options'),

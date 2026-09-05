@@ -261,6 +261,9 @@ SPECTACULAR_SETTINGS = {
     # lifecycle a stable client-facing component name instead of a hash.
     "ENUM_NAME_OVERRIDES": {
         "ShipmentStatusEnum": "shop.models.Shipment.STATUS_CHOICES",
+        # Articles and geography both name their choice field ``kind``.
+        "ArticleKindEnum": "shop.models.SiteArticle.KIND_CHOICES",
+        "LocationKindEnum": "shop.models.Location.KIND_CHOICES",
     },
 }
 

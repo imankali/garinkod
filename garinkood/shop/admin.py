@@ -16,6 +16,8 @@ from .models import (
     AdminAuditLog, OneTimePassword, NotificationTemplate,
     NotificationRecipient, NotificationDelivery, WebPushSubscription,
     Shipment, ShipmentTrackingEvent,
+    ProductAttribute, ListingAttribute, SiteArticle, Service, SitePage, SitePageBlock,
+    TeamMember, BrandPartner, SiteContact, NewsletterSubscriber, PRODUCT_ATTRIBUTE_TEMPLATE,
 )
 from .resources import OrderResource, ProductResource
 from .rewards import mark_order_paid_and_reward
@@ -48,6 +50,35 @@ class EquipmentDetailInline(admin.StackedInline):
     extra = 1
     verbose_name = "مشخصات ابزار"
     verbose_name_plural = "مشخصات ابزار"
+
+
+class ProductAttributeInline(admin.TabularInline):
+    """The ordered «ویژگی‌ها» table shown on the product page."""
+
+    model = ProductAttribute
+    extra = 0
+    min_num = 0
+    verbose_name = 'ویژگی'
+    verbose_name_plural = 'ویژگی‌های فنی محصول'
+    fields = ('order', 'label', 'value')
+
+
+class ListingAttributeInline(admin.TabularInline):
+    """Sellers get the same spec table for an advertisement."""
+
+    model = ListingAttribute
+    extra = 0
+    verbose_name = 'ویژگی'
+    verbose_name_plural = 'ویژگی‌های آگهی'
+    fields = ('order', 'label', 'value')
+
+
+class SitePageBlockInline(admin.StackedInline):
+    model = SitePageBlock
+    extra = 0
+    verbose_name = 'بلوک صفحه'
+    verbose_name_plural = 'بلوک‌های صفحه'
+    prepopulated_fields = {}
 
 
 class OrderItemInline(admin.TabularInline):
@@ -133,11 +164,12 @@ class AdminProduct(ImportExportMixin, SimpleHistoryAdmin):
     readonly_fields = ('created', 'updated',)
     show_full_result_count = False
     save_as = True
-    actions = [make_published, make_draft]
+    actions = [make_published, make_draft, 'add_standard_attribute_rows']
 
+    inlines = [ProductAttributeInline]
     fieldsets = (
         ('اطلاعات اصلی', {'fields': ('title', 'slug', 'author', 'status')}),
-        ('دسته‌بندی و قیمت', {'fields': ('category', 'subcategory', 'price', 'stock', 'available', 'is_featured', 'discount_percent')}),
+        ('دسته‌بندی و قیمت', {'fields': ('category', 'subcategory', 'price', 'stock', 'available', 'is_featured', 'discount_percent', 'package_weight', 'price_on_request')}),
         ('محتوا', {'fields': ('description', 'image', 'brand', 'sku', 'gtin')}),
         ('سئو', {'fields': ('seo_title', 'seo_description'), 'classes': ('collapse',)}),
         ('ارسال', {'fields': ('shipping_weight_grams', 'shipping_length_cm', 'shipping_width_cm', 'shipping_height_cm'), 'classes': ('collapse',)}),
@@ -150,17 +182,61 @@ class AdminProduct(ImportExportMixin, SimpleHistoryAdmin):
         super().save_model(request, obj, form, change)
 
     def get_inline_instances(self, request, obj=None):
-        if not obj:
-            return super().get_inline_instances(request)
-        if obj.category and obj.category.slug == "fertilizer":
-            return [FertilizerDetailInline(self.model, self.admin_site)]
-        if obj.category and obj.category.slug == "pesticide":
-            return [PesticideDetailInline(self.model, self.admin_site)]
-        if obj.category and obj.category.slug == "seed":
-            return [SeedDetailInline(self.model, self.admin_site)]
-        if obj.category and obj.category.slug == "equipment":
-            return [EquipmentDetailInline(self.model, self.admin_site)]
-        return []
+        """Category detail tables are mutually exclusive; specs always show.
+
+        ``ProductAdmin`` used to return *only* the category-specific inline,
+        which hid the specification rows on every product that had a detail
+        table. The attribute inline is therefore appended instead of replaced.
+        """
+        inlines = list(super().get_inline_instances(request, obj))
+        if obj is not None:
+            detail_inline = None
+            category_slug = obj.category.slug if obj.category else ''
+            if category_slug == 'fertilizer':
+                detail_inline = FertilizerDetailInline
+            elif category_slug == 'pesticide':
+                detail_inline = PesticideDetailInline
+            elif category_slug == 'seed':
+                detail_inline = SeedDetailInline
+            elif category_slug == 'equipment':
+                detail_inline = EquipmentDetailInline
+            if detail_inline is not None:
+                inlines = [
+                    inline for inline in inlines
+                    if not isinstance(inline, (FertilizerDetailInline, PesticideDetailInline, SeedDetailInline, EquipmentDetailInline))
+                ]
+                inlines.append(detail_inline(self.model, self.admin_site))
+        return inlines
+
+    @admin.action(description='افزودن جدول ۱۸ ویژگی استاندارد (فقط عناوین خالی)')
+    def add_standard_attribute_rows(self, request, queryset):
+        """Seed the spec sheet skeleton so a manager only fills in values.
+
+        Existing labels are skipped, which keeps the action repeatable on a
+        product that is already half-filled.
+        """
+        created = 0
+        for product in queryset:
+            taken = set(product.attributes.values_list('label', flat=True))
+            rows = [
+                ProductAttribute(
+                    product=product,
+                    label=label,
+                    value='',
+                    order=index,
+                )
+                for index, label in enumerate(PRODUCT_ATTRIBUTE_TEMPLATE)
+                if label not in taken
+            ]
+            # A value is optional in the admin workflow, so blank rows would be
+            # rejected by the field's blank=False default; keep them out of the
+            # table until they carry a value.
+            ProductAttribute.objects.bulk_create(rows)
+            created += len(rows)
+        self.message_user(
+            request,
+            f'{created} ردیف ویژگی اضافه شد. مقدار هر ردیف را وارد و ذخیره کنید.',
+        )
 
 
 # --- Admin UserAccount ---
@@ -176,9 +252,14 @@ class AdminUserAccount(admin.ModelAdmin):
 # --- Admin Comment ---
 @admin.register(Comment)
 class AdminComment(admin.ModelAdmin):
-    list_display = ('name', 'product', 'created', 'active', 'email')
-    list_filter = ('active', 'created', 'updated')
+    list_display = ('name', 'product', 'rating', 'created', 'active', 'email')
+    list_filter = ('active', 'rating', 'created', 'updated')
     list_editable = ('active',)
+    fieldsets = (
+        ('دیدگاه', {'fields': ('product', 'user', 'name', 'email', 'body', 'rating')}),
+        ('رسانه و پاسخ', {'fields': ('image', 'sticker', 'parent')}),
+        ('وضعیت', {'fields': ('active', 'created', 'updated')}),
+    )
     search_fields = ('name', 'email', 'body', 'product__title')
     actions = [approve_comments, disapprove_comments]
     date_hierarchy = 'created'
@@ -279,6 +360,7 @@ class AdminStorefront(admin.ModelAdmin):
 
 @admin.register(MarketplaceListing)
 class AdminMarketplaceListing(admin.ModelAdmin):
+    inlines = [ListingAttributeInline]
     list_display = ('title', 'storefront', 'crop_name', 'price', 'unit', 'quantity_available', 'status', 'created_at')
     list_filter = ('status', 'harvest_date', 'created_at')
     search_fields = ('title', 'slug', 'crop_name', 'storefront__name')
@@ -562,3 +644,117 @@ class AdminFarmConsultationRequest(admin.ModelAdmin):
     list_filter = ('subject', 'status', 'created_at')
     search_fields = ('farmer__username', 'land__name', 'message', 'reply')
     readonly_fields = ('created_at', 'updated_at')
+
+
+# --- Site content: blog, guides, services, pages, trust and newsletter ---
+def publish_articles(modeladmin, request, queryset):
+    updated = 0
+    for article in queryset:
+        article.is_published = True
+        article.save(update_fields=['is_published', 'published_at'])
+        updated += 1
+    modeladmin.message_user(request, f'{updated} مقاله منتشر شد.')
+
+
+def unpublish_articles(modeladmin, request, queryset):
+    updated = queryset.update(is_published=False)
+    modeladmin.message_user(request, f'{updated} مقاله از انتشار خارج شد.')
+
+
+@admin.register(SiteArticle)
+class AdminSiteArticle(SimpleHistoryAdmin):
+    list_display = ('title', 'kind', 'crop', 'is_published', 'published_at', 'views', 'author')
+    list_filter = ('kind', 'is_published', 'is_featured', 'published_at')
+    search_fields = ('title', 'excerpt', 'body', 'crop')
+    prepopulated_fields = {'slug': ('title',)}
+    list_editable = ('is_published',)
+    filter_horizontal = ('products', 'listings', 'related_articles')
+    readonly_fields = ('views', 'created_at', 'updated_at')
+    ordering = ('-published_at',)
+    actions = [publish_articles, unpublish_articles]
+    fieldsets = (
+        ('محتوا', {'fields': ('title', 'slug', 'kind', 'excerpt', 'body', 'cover', 'crop', 'author')}),
+        ('اتصالات', {'fields': ('products', 'listings', 'related_articles')}),
+        ('انتشار و سئو', {'fields': ('is_published', 'published_at', 'is_featured', 'seo_title', 'seo_description', 'reading_minutes')}),
+        ('آمار', {'fields': ('views', 'created_at', 'updated_at')}),
+    )
+
+    def save_model(self, request, obj, form, change):
+        if not change and not obj.author_id:
+            obj.author = request.user
+        super().save_model(request, obj, form, change)
+
+
+@admin.register(Service)
+class AdminService(admin.ModelAdmin):
+    list_display = ('title', 'code', 'order', 'is_active', 'price_note')
+    list_filter = ('is_active', 'code')
+    search_fields = ('title', 'summary', 'body')
+    prepopulated_fields = {'slug': ('title',)}
+    list_editable = ('is_active', 'order')
+    ordering = ('order', 'title')
+
+
+class SitePageBlocksForm(admin.TabularInline):
+    """Tabular so a whole landing page can be edited on one screen."""
+
+    model = SitePageBlock
+    extra = 0
+    verbose_name = 'بلوک'
+    verbose_name_plural = 'بلوک‌های صفحه'
+
+
+@admin.register(SitePage)
+class AdminSitePage(SimpleHistoryAdmin):
+    list_display = ('title', 'slug', 'kind', 'published', 'product', 'updated_at')
+    list_filter = ('kind', 'published')
+    search_fields = ('title', 'slug', 'hero_text')
+    prepopulated_fields = {'slug': ('title',)}
+    list_editable = ('published',)
+    inlines = [SitePageBlocksForm]
+    readonly_fields = ('published_at', 'updated_at')
+
+
+@admin.register(TeamMember)
+class AdminTeamMember(admin.ModelAdmin):
+    list_display = ('name', 'role', 'order', 'is_active')
+    list_filter = ('is_active',)
+    search_fields = ('name', 'role', 'bio')
+    list_editable = ('is_active', 'order')
+    ordering = ('order', 'name')
+
+
+@admin.register(BrandPartner)
+class AdminBrandPartner(admin.ModelAdmin):
+    list_display = ('name', 'since_year', 'order', 'is_active')
+    list_filter = ('is_active',)
+    search_fields = ('name', 'description')
+    list_editable = ('is_active', 'order')
+    ordering = ('order', 'name')
+
+
+@admin.register(SiteContact)
+class AdminSiteContact(admin.ModelAdmin):
+    list_display = ('address', 'working_hours', 'updated_at')
+
+    def has_add_permission(self, request):
+        # A singleton row: the admin edits it through the changelist link.
+        return not SiteContact.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(NewsletterSubscriber)
+class AdminNewsletterSubscriber(ExportMixin, admin.ModelAdmin):
+    list_display = ('email', 'mobile', 'topics', 'source', 'is_active', 'subscribed_at')
+    list_filter = ('is_active', 'source', 'subscribed_at')
+    search_fields = ('email', 'mobile', 'topics')
+    list_editable = ('is_active',)
+    readonly_fields = ('subscribed_at', 'unsubscribed_at')
+    ordering = ('-subscribed_at',)
+
+    def has_add_permission(self, request):
+        # Subscribers must opt in through the site form; a manually added row
+        # would be an unsubscribed-for contact.
+        return False
