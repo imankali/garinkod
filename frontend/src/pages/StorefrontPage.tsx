@@ -36,6 +36,7 @@ import { formatPrice } from '../utils/formatPrice';
 import { cn } from '../utils/cn';
 import ListingComposer from '../components/storefront/ListingComposer';
 import ListingDetailModal from '../components/storefront/ListingDetailModal';
+import PostCard from '../components/social/PostCard';
 import type { MarketplaceListing, StorefrontPost, StorefrontProfile } from '../types';
 
 /**
@@ -75,6 +76,15 @@ export default function StorefrontPage() {
   // all land on the same product.
   const [searchParams, setSearchParams] = useSearchParams();
   const openListingSlug = searchParams.get('listing');
+  /*
+    `?tab=posts&post=<id>&comment=<id>` is the address a comment-reply
+    notification links to: the post whose comment was answered, with that
+    comment's thread open and the reader's own line in view. A notification that
+    only says «یکی پاسخ داد» and then drops you at the top of a shop page makes
+    the reader do the search the platform could have done.
+  */
+  const deepLinkPost = searchParams.get('post') ? Number(searchParams.get('post')) : null;
+  const deepLinkComment = searchParams.get('comment') ? Number(searchParams.get('comment')) : null;
   const openListing = useCallback(
     (listingSlug: string | null) => {
       setSearchParams(
@@ -92,7 +102,9 @@ export default function StorefrontPage() {
   const [profile, setProfile] = useState<StorefrontProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
-  const [tab, setTab] = useState<TabKey>('listings');
+  const [tab, setTab] = useState<TabKey>(() =>
+    new URLSearchParams(window.location.search).get('tab') === 'posts' ? 'posts' : 'listings',
+  );
   const [followBusy, setFollowBusy] = useState(false);
   const [viewer, setViewer] = useState<{ posts: ViewableStory[]; index: number } | null>(null);
   const [unread, setUnread] = useState(0);
@@ -130,6 +142,20 @@ export default function StorefrontPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  /*
+    The deep-linked post is scrolled to as soon as it is on the page; PostCard
+    then opens its comment thread and flashes the line the reply answered. It
+    waits on the loaded content rather than on a timeout, because the feed is
+    what decides whether that node exists yet.
+  */
+  useEffect(() => {
+    if (!deepLinkPost || !profile) return;
+    const node = document.getElementById(`post-${deepLinkPost}`);
+    if (!node) return;
+    node.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [deepLinkPost, profile]);
+
 
   // Owners see a live unread badge for the storefront inbox.
   // Live content search inside this storefront.
@@ -282,6 +308,7 @@ export default function StorefrontPage() {
   }
 
   const { storefront, listings, posts, stories, highlights, counts } = profile;
+
   const isOwner = storefront.is_owner;
   const siteUrl = (import.meta.env.VITE_SITE_URL || window.location.origin).replace(/\/$/, '');
   const storefrontUrl = `${siteUrl}/storefronts/${encodeURIComponent(storefront.slug)}`;
@@ -553,8 +580,20 @@ export default function StorefrontPage() {
                       >
                         {post.post_type === 'story' ? t('storefront.tab.stories') : t('storefront.tab.posts')}
                       </span>
-                      <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-2 text-start text-fluid-2xs font-bold text-white line-clamp-1">
-                        {post.caption}
+                      <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-2 text-start text-fluid-2xs font-bold text-white">
+                        <span className="line-clamp-1">{post.caption}</span>
+                        {/* Counts even in a result tile: the number is the reason
+                            a seller reads a post's performance at all. */}
+                        <span className="mt-0.5 flex items-center gap-2 text-[10px] font-bold text-white/85">
+                          <span className="flex items-center gap-0.5">
+                            <Heart size={9} aria-hidden="true" />
+                            {post.like_count.toLocaleString('fa-IR')}
+                          </span>
+                          <span className="flex items-center gap-0.5">
+                            <MessageCircle size={9} aria-hidden="true" />
+                            {post.comment_count.toLocaleString('fa-IR')}
+                          </span>
+                        </span>
                       </span>
                     </button>
                   </li>
@@ -739,33 +778,26 @@ export default function StorefrontPage() {
           {posts.length === 0 ? (
             <EmptyState text="هنوز پستی منتشر نشده است." />
           ) : (
-            <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {posts.map((post, index) => (
-                <li key={post.id} className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setViewer({ posts, index })}
-                    className="group relative block aspect-square w-full overflow-hidden rounded-xl"
-                  >
-                    <img
-                      src={post.image_url}
-                      alt={post.caption.slice(0, 60)}
-                      loading="lazy"
-                      className="h-full w-full object-cover transition group-hover:scale-105"
-                    />
-                    {isOwner && post.status !== 'published' && (
-                      <span className="absolute start-1.5 top-1.5 rounded-full bg-amber-500 px-2 py-0.5 text-fluid-2xs font-bold text-white">
-                        {post.status_label}
-                      </span>
-                    )}
-                  </button>
-                  {isOwner && (
-                    <OwnerContentActions
-                      onEdit={() => setPostEditor(post)}
-                      onDelete={() => void deletePost(post)}
-                      label={post.caption.slice(0, 30) || 'پست'}
-                    />
-                  )}
+            /*
+              A feed of full post cards, the same component بازار کشاورزان uses,
+              rather than a wall of thumbnails: on a storefront page the reader
+              wants the caption, the like count and the comment thread, and a grid
+              of squares shows none of them. Stories keep their own viewer.
+            */
+            <ul className="mx-auto grid max-w-xl gap-5">
+              {posts.map((post) => (
+                <li key={post.id} id={`post-${post.id}`}>
+                  <PostCard
+                    post={post}
+                    openComments={deepLinkPost === post.id}
+                    highlightCommentId={deepLinkPost === post.id ? deepLinkComment ?? undefined : undefined}
+                    {...(isOwner
+                      ? {
+                          onEdit: (target: StorefrontPost) => setPostEditor(target),
+                          onDelete: (target: StorefrontPost) => void deletePost(target),
+                        }
+                      : {})}
+                  />
                 </li>
               ))}
             </ul>

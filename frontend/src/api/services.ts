@@ -32,6 +32,9 @@ import type {
   Wallet,
   StorefrontPost,
   StorefrontPostComment,
+  DeskState,
+  DeskRatingReport,
+  ServiceConversationResponse,
   ManagementDashboard,
   ManagementStaffMember,
   ManagementAuditLog,
@@ -560,9 +563,13 @@ export const messagesApi = {
       params: channel ? { channel } : undefined,
     }),
 
-  /** Open (or fetch) the caller's thread with a service desk. */
+  /**
+   * Open (or fetch) the caller's thread with a service desk. The response also
+   * carries the desk's state (hours, who is online, canned replies), because a
+   * chat window without that context is just a void you type into.
+   */
   openServiceConversation: (channel: Exclude<MessageChannel, 'storefront'>) =>
-    apiClient.post<StorefrontConversation>(`/marketplace/conversations/service/${channel}/`),
+    apiClient.post<ServiceConversationResponse>(`/marketplace/conversations/service/${channel}/`),
 
   /** A consultant starts the consulting thread with one farmer. */
   openFarmerConversation: (userId: number) =>
@@ -586,12 +593,14 @@ export const messagesApi = {
       { params: { page } },
     ),
 
-  /** Send a message: text, a listing card, and/or one media attachment. */
+  /** Send a message: text, a listing or land card, and/or one media attachment. */
   send: (
     conversationId: number,
     data: {
       body?: string;
       listing?: number;
+      /** A land case file, shared with the desk that is advising on it. */
+      land?: number | null;
       attachment?: Blob | null;
       attachmentName?: string;
       attachmentDuration?: number;
@@ -604,6 +613,7 @@ export const messagesApi = {
       return apiClient.post<StorefrontMessage>(url, {
         body: data.body,
         listing: data.listing,
+        land: data.land ?? undefined,
         reply_to: data.replyTo ?? undefined,
       });
     }
@@ -612,6 +622,7 @@ export const messagesApi = {
     const formData = new FormData();
     if (data.body) formData.append('body', data.body);
     if (data.listing) formData.append('listing', String(data.listing));
+    if (data.land) formData.append('land', String(data.land));
     if (data.replyTo) formData.append('reply_to', String(data.replyTo));
     formData.append('attachment', data.attachment, data.attachmentName || 'attachment');
     if (data.attachmentDuration !== undefined) {
@@ -619,6 +630,29 @@ export const messagesApi = {
     }
     return apiClient.post<StorefrontMessage>(url, formData);
   },
+
+  /** End a thread (or reopen it). Either side may do it; closing opens the survey. */
+  close: (
+    conversationId: number,
+    data: { note?: string; reopen?: boolean } = {},
+  ) =>
+    apiClient.post<StorefrontConversation>(`/desk/conversations/${conversationId}/close/`, data),
+
+  /** The satisfaction survey, once per closed thread, from the customer only. */
+  rate: (
+    conversationId: number,
+    data: { score: number; solved?: boolean | null; comment?: string },
+  ) => apiClient.post(`/desk/conversations/${conversationId}/rate/`, data),
+
+  /** An operator moving a question to the other desk, with the context attached. */
+  handoff: (
+    conversationId: number,
+    data: { target: 'consulting' | 'support'; note?: string; include_context?: boolean },
+  ) =>
+    apiClient.post<{ message: StorefrontMessage; target_conversation_id: number }>(
+      `/desk/conversations/${conversationId}/handoff/`,
+      data,
+    ),
 
   /** Change the text of one of the caller's own messages. */
   edit: (conversationId: number, messageId: number, body: string) =>
@@ -632,6 +666,33 @@ export const messagesApi = {
     apiClient.delete<StorefrontMessage>(
       `/marketplace/conversations/${conversationId}/messages/${messageId}/`,
     ),
+};
+
+// ========================================
+// Service desks: hours, presence, canned replies, satisfaction
+// ========================================
+
+export const deskApi = {
+  /**
+   * Who is on duty, when the desk answers and which canned lines to offer.
+   * Public, because the hours are the first thing a farmer checks before
+   * writing — the roster of names and the replies need a session.
+   */
+  state: (channel: DeskState['channel']) =>
+    apiClient.get<DeskState>('/desk/state/', { params: { channel } }),
+
+  /** The staff view of one desk: open, unassigned, or assigned to me. */
+  queue: (params: { channel?: string; assigned_to?: 'me' | 'unassigned' } = {}) =>
+    apiClient.get<{
+      count: number;
+      results: StorefrontConversation[];
+      unassigned: number;
+      open: number;
+    }>('/desk/queue/', { params }),
+
+  /** Satisfaction numbers, for the desk's managers only. */
+  ratings: (params: { channel?: string; agent?: number; days?: number } = {}) =>
+    apiClient.get<DeskRatingReport>('/desk/ratings/', { params }),
 };
 
 // ========================================

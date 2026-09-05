@@ -6,7 +6,7 @@
 
 import { create } from 'zustand';
 
-import type { AttachedListing, MessageChannel } from '../types';
+import type { AttachedListing, FarmLand, MessageChannel } from '../types';
 
 interface OpenDirectOptions {
   /** Open an existing conversation's thread. */
@@ -20,6 +20,12 @@ interface OpenDirectOptions {
   serviceChannel?: Exclude<MessageChannel, 'storefront'> | null;
   /** A listing to attach to the next message (send-product-to-DM). */
   listing?: AttachedListing | null;
+  /**
+   * A land case file to attach to the next message. Set when the farmer picks
+   * one of their approved lands, or right after they create one from inside the
+   * chat, so the file is in the composer before they have to look for it.
+   */
+  land?: FarmLand | null;
 }
 
 interface DirectState {
@@ -28,6 +34,7 @@ interface DirectState {
   storefrontSlug: string | null;
   serviceChannel: Exclude<MessageChannel, 'storefront'> | null;
   attachedListing: AttachedListing | null;
+  attachedLand: FarmLand | null;
   /** The drawer can start on the conversation list instead of a thread. */
   view: 'list' | 'thread';
   unreadTotal: number;
@@ -38,6 +45,7 @@ interface DirectState {
   closeDirect: () => void;
   setConversationId: (id: number | null) => void;
   attachListing: (listing: AttachedListing | null) => void;
+  attachLand: (land: FarmLand | null) => void;
   setUnreadTotal: (count: number) => void;
 }
 
@@ -47,6 +55,7 @@ export const useDirectStore = create<DirectState>((set) => ({
   storefrontSlug: null,
   serviceChannel: null,
   attachedListing: null,
+  attachedLand: null,
   view: 'list',
   unreadTotal: 0,
 
@@ -57,6 +66,7 @@ export const useDirectStore = create<DirectState>((set) => ({
       storefrontSlug: options.storefrontSlug ?? null,
       serviceChannel: options.serviceChannel ?? null,
       attachedListing: options.listing ?? null,
+      attachedLand: options.land ?? null,
       view:
         options.conversationId || options.storefrontSlug || options.serviceChannel
           ? 'thread'
@@ -70,6 +80,7 @@ export const useDirectStore = create<DirectState>((set) => ({
       storefrontSlug: null,
       serviceChannel: null,
       attachedListing: null,
+      attachedLand: null,
     }),
 
   openList: () =>
@@ -78,6 +89,7 @@ export const useDirectStore = create<DirectState>((set) => ({
       storefrontSlug: null,
       serviceChannel: null,
       attachedListing: null,
+      attachedLand: null,
       view: 'list',
     }),
 
@@ -85,6 +97,8 @@ export const useDirectStore = create<DirectState>((set) => ({
     set({ conversationId: id, storefrontSlug: null, serviceChannel: null }),
 
   attachListing: (listing) => set({ attachedListing: listing }),
+
+  attachLand: (land) => set({ attachedLand: land }),
 
   setUnreadTotal: (count) => set({ unreadTotal: count }),
 }));

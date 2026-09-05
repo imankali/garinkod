@@ -260,10 +260,13 @@ def post_notice(conversation: StorefrontConversation, body: str) -> StorefrontMe
 
 
 def announce_out_of_hours(conversation: StorefrontConversation) -> StorefrontMessage | None:
-    """Tell a farmer the desk is closed, once per burst of their messages.
+    """Tell a farmer the desk is closed — once, until somebody actually answers.
 
-    Without the "once" guard every new message would add another notice to the
-    thread and the operator would read a wall of boilerplate.
+    A farmer who writes three lines in a row while the desk is shut has said one
+    thing three times; stamping «ساعت کاری نیست» after each one is noise for the
+    operator and an argument with the reader. The promise resets when the desk
+    replies, so a follow-up days later, after the answer stopped coming, does
+    get told again.
     """
     role = desk_channel(conversation.channel)
     if role is None:
@@ -273,14 +276,10 @@ def announce_out_of_hours(conversation: StorefrontConversation) -> StorefrontMes
         return None
 
     last_notice = conversation.messages.filter(is_notice=True).order_by('-created_at').first()
-    last_question = conversation.messages.filter(
-        sender_id=conversation.customer_id, is_notice=False,
-    ).order_by('-created_at').first()
-    if last_question is None:
-        return None
-    # One notice per burst: if the desk already told this farmer it is closed
-    # after their latest message, saying it again is noise, not information.
-    if last_notice is not None and last_notice.created_at > last_question.created_at:
+    last_answer = conversation.messages.exclude(sender_id=conversation.customer_id).exclude(
+        sender=None,
+    ).filter(is_notice=False).order_by('-created_at').first()
+    if last_notice is not None and (last_answer is None or last_notice.created_at > last_answer.created_at):
         return None
 
     opening = next_open_moment(conversation.channel, settings_row)

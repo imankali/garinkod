@@ -5,12 +5,13 @@
 // are two stacked views, on desktop a two-pane layout.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { MessageCircle } from 'lucide-react';
 
 import { messagesApi } from '../api/services';
 import ChannelChips, { type ChannelFilter } from '../components/direct/ChannelChips';
 import ConversationRow from '../components/direct/ConversationRow';
+import DeskEntries from '../components/direct/DeskEntries';
 import DirectThread from '../components/direct/DirectThread';
 import { useAuthStore } from '../store/authStore';
 import { useTranslation } from '../i18n';
@@ -19,6 +20,7 @@ import type { MessageChannel, StorefrontConversation } from '../types';
 export default function Messages() {
   const { t } = useTranslation();
   const { isAuthenticated, isSessionChecked } = useAuthStore();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [conversations, setConversations] = useState<StorefrontConversation[]>([]);
   const [channels, setChannels] = useState<{ value: MessageChannel; label: string }[]>([]);
   const [unreadByChannel, setUnreadByChannel] = useState<Partial<Record<MessageChannel, number>>>({});
@@ -57,6 +59,35 @@ export default function Messages() {
     setLoading(false);
     return undefined;
   }, [isAuthenticated, isSessionChecked, load]);
+
+  /*
+    A link that says «ادامه گفتگو در مشاوره کشاورزی» — written by the support desk
+    when a question turns out to need an agronomist — has to land the farmer in
+    that thread, not at the top of the inbox with a hint to look for it. Same for
+    the menu's «مشاوره کشاورزی» entry. The parameter is removed afterwards so a
+    refresh does not yank them back out of whatever they opened next.
+  */
+  const requestedChannel = searchParams.get('channel');
+  useEffect(() => {
+    if (!isAuthenticated || !isSessionChecked) return;
+    if (requestedChannel !== 'consulting' && requestedChannel !== 'support') return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const response = await messagesApi.openServiceConversation(requestedChannel);
+        if (cancelled) return;
+        setActiveId(response.data.id);
+        setFilter('all');
+      } catch {
+        // The inbox is still there; the deep link simply did nothing extra.
+      } finally {
+        if (!cancelled) setSearchParams({}, { replace: true });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, isSessionChecked, requestedChannel, setSearchParams]);
 
   const visibleConversations = useMemo(
     () =>
@@ -128,8 +159,19 @@ export default function Messages() {
           )}
 
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3">
+            {/*
+              The two desks first: entering the messenger should look like the
+              messenger the request describes — a chat with a consultant and a
+              chat with support — and only then the shop conversations.
+            */}
+            <DeskEntries
+              conversations={conversations}
+              onOpen={setActiveId}
+              className="mb-3"
+            />
+
             {visibleConversations.length === 0 ? (
-              <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
+              <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
                 <MessageCircle size={32} className="text-emerald-300" />
                 <p className="max-w-60 text-xs leading-6 text-slate-500 dark:text-emerald-200">
                   {t('direct.empty')}

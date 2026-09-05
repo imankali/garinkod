@@ -12,6 +12,8 @@ import {
   BadgePercent,
   BookOpen,
   Building2,
+  Leaf,
+  MapPinned,
   Calculator,
   ClipboardList,
   Gift,
@@ -180,6 +182,34 @@ export const ACCOUNT_ITEMS: NavItem[] = [
   },
 ];
 
+/**
+ * The farmer's own land record, and the desk that advises on it.
+ *
+ * Both existed in the app but only behind other screens — زمین‌ها inside the
+ * profile's farm tab and the consultation inside the messenger — which is how a
+ * farmer ends up calling instead of using a feature they already have. The
+ * consultation entry opens (or creates) the chat with the consultants, carrying
+ * the land dossier with it.
+ */
+export const FARM_ITEMS: NavItem[] = [
+  {
+    id: 'lands',
+    label: 'زمین‌ها',
+    description: 'پرونده زمین، مساحت، خاک و تقویم کار',
+    to: '/profile?tab=farm',
+    icon: MapPinned,
+    requiresAuth: true,
+  },
+  {
+    id: 'consulting',
+    label: 'مشاوره کشاورزی',
+    description: 'گفتگو با کارشناس، با امکان فرستادن پرونده زمین',
+    to: '/messages?channel=consulting',
+    icon: Leaf,
+    requiresAuth: true,
+  },
+];
+
 /** Seller tools — level 2 and above. */
 export const SELLER_ITEMS: NavItem[] = [
   {
@@ -301,6 +331,7 @@ export const NAV_SECTIONS: NavSection[] = [
   { id: 'shop', title: 'فروشگاه', items: SHOP_ITEMS },
   { id: 'knowledge', title: 'بلاگ و راهنما', items: KNOWLEDGE_ITEMS },
   { id: 'account', title: 'حساب کاربری', items: ACCOUNT_ITEMS },
+  { id: 'farm', title: 'مزرعه من', items: FARM_ITEMS },
   { id: 'seller', title: 'فروشندگان', items: SELLER_ITEMS },
   { id: 'support', title: 'راهنما و پشتیبانی', items: SUPPORT_ITEMS },
   { id: 'staff', title: 'مدیریت', items: STAFF_ITEMS },

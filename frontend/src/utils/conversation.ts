@@ -5,7 +5,7 @@
 // used to reach into `conversation.storefront` directly, which broke as soon
 // as threads could also come from support, consulting or comment replies.
 
-import type { MessageChannel, StorefrontConversation } from '../types';
+import type { DeskAgentPublic, MessageChannel, StorefrontConversation } from '../types';
 
 export interface ConversationIdentity {
   /** Display name of the other party. */
@@ -17,6 +17,12 @@ export interface ConversationIdentity {
   channel: MessageChannel;
   /** Link to the counterpart's page, when one exists. */
   href?: string;
+  /**
+   * A desk operator's published profile, when the thread has been answered by
+   * one. The desk name stays visible as the channel badge; this is the person,
+   * so a hand-over inside the same thread is visible instead of mysterious.
+   */
+  agent?: DeskAgentPublic | null;
 }
 
 /** Tailwind classes per channel, so a source is recognisable at a glance. */
@@ -42,11 +48,16 @@ export function conversationIdentity(
     };
   }
 
+  // Whoever wrote the newest reply is who the reader is talking to right now,
+  // which is not necessarily the operator the queue assigned the thread to.
+  const agent = conversation.last_agent || conversation.agent || null;
+
   return {
-    title: conversation.counterpart_name || channelLabel,
-    avatarUrl: conversation.counterpart_avatar_url || '',
+    title: agent?.name || conversation.counterpart_name || channelLabel,
+    avatarUrl: agent?.photo_url || conversation.counterpart_avatar_url || '',
     channelLabel,
     channel: conversation.channel,
+    agent,
   };
 }
 
@@ -59,6 +70,7 @@ export function conversationPreview(
   if (!message) return fallback;
   if (message.is_deleted) return '🚫 پیام حذف شد';
   if (message.body) return message.body;
+  if (message.land) return `🌱 پرونده زمین: ${message.land.name}`;
   if (message.attachment_type === 'image') return '🖼 تصویر';
   if (message.attachment_type === 'video') return '🎬 ویدیو';
   if (message.attachment_type === 'audio') return '🎤 پیام صوتی';

@@ -34,11 +34,21 @@ export default function PostCard({
   post,
   onEdit,
   onDelete,
+  openComments = false,
+  highlightCommentId,
 }: {
   post: StorefrontPost;
   /** Owner affordances; omitted where the feed does not manage content. */
   onEdit?: (post: StorefrontPost) => void;
   onDelete?: (post: StorefrontPost) => void;
+  /**
+   * Open the comment thread on mount. A storefront's own «پست‌ها» grid and a
+   * notification link («یکی به دیدگاه شما پاسخ داد») both need it: the reader
+   * arrived for the conversation, not for the picture.
+   */
+  openComments?: boolean;
+  /** Flash one comment, so an answer to *your* line is findable in a thread. */
+  highlightCommentId?: number;
 }) {
   const { isAuthenticated } = useAuthStore();
   const openDirect = useDirectStore((state) => state.openDirect);
@@ -53,7 +63,9 @@ export default function PostCard({
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [flashed, setFlashed] = useState<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const openedFromLink = useRef(false);
 
   // Keep local state in step when the parent refetches the feed.
   useEffect(() => {
@@ -74,6 +86,26 @@ export default function PostCard({
       setLoadingComments(false);
     }
   }, [post.id]);
+
+  // Arriving from a comment reply must not leave the reader clicking around: the
+  // thread is opened for them, and the answered comment is flashed once the list
+  // has actually arrived (this effect runs again when it does).
+  useEffect(() => {
+    if (!openComments || openedFromLink.current) return;
+    openedFromLink.current = true;
+    setShowComments(true);
+    if (comments === null) void loadComments();
+  }, [openComments, comments, loadComments]);
+
+  useEffect(() => {
+    if (!highlightCommentId || comments === null) return undefined;
+    const node = document.getElementById(`post-comment-${highlightCommentId}`);
+    if (!node) return undefined;
+    node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setFlashed(highlightCommentId);
+    const timer = window.setTimeout(() => setFlashed(null), 2200);
+    return () => window.clearTimeout(timer);
+  }, [comments, highlightCommentId]);
 
   async function toggleLike() {
     if (!isAuthenticated) {
@@ -264,11 +296,21 @@ export default function PostCard({
       </div>
 
       <div className="px-4 pb-3">
-        {likeCount > 0 && (
-          <p className="text-fluid-xs font-extrabold text-slate-800 dark:text-white">
+        {/*
+          The counts are stated even when they are zero. A feed that hides a
+          number at zero teaches people that «no number» might mean «many», and a
+          seller deciding whether to post again wants the honest figure either way.
+        */}
+        <p className="flex items-center gap-3 text-fluid-xs font-extrabold text-slate-800 dark:text-white">
+          <span className="flex items-center gap-1">
+            <Heart size={13} className={cn(isLiked ? 'text-rose-500' : 'text-slate-400')} aria-hidden="true" />
             {likeCount.toLocaleString('fa-IR')} پسند
-          </p>
-        )}
+          </span>
+          <span className="flex items-center gap-1">
+            <MessageCircle size={13} className="text-slate-400" aria-hidden="true" />
+            {commentCount.toLocaleString('fa-IR')} دیدگاه
+          </span>
+        </p>
 
         {post.caption && (
           <p className="mt-1 text-fluid-sm leading-6 text-slate-700 dark:text-emerald-50">
@@ -308,6 +350,7 @@ export default function PostCard({
                   <CommentRow
                     key={comment.id}
                     comment={comment}
+                    highlighted={flashed === comment.id}
                     onReply={(target) => {
                       setReplyTo(target);
                       inputRef.current?.focus();
@@ -367,14 +410,23 @@ function CommentRow({
   comment,
   onReply,
   onDelete,
+  highlighted = false,
 }: {
   comment: StorefrontPostComment;
   onReply: (comment: StorefrontPostComment) => void;
   onDelete: (comment: StorefrontPostComment) => void;
+  /** The comment a notification was about — briefly ringed so it is findable. */
+  highlighted?: boolean;
 }) {
   return (
-    <li>
-      <div className="flex items-start gap-2">
+    <li
+      id={`post-comment-${comment.id}`}
+      className={cn(
+        'rounded-xl transition-colors duration-500',
+        highlighted && 'bg-amber-50 ring-2 ring-amber-300 dark:bg-amber-950/40',
+      )}
+    >
+      <div className="flex items-start gap-2 rounded-xl px-1 py-0.5">
         <span className="mt-0.5 block h-7 w-7 shrink-0 overflow-hidden rounded-full bg-emerald-100 dark:bg-emerald-900">
           {comment.author_avatar_url ? (
             <img src={comment.author_avatar_url} alt="" className="h-full w-full object-cover" />

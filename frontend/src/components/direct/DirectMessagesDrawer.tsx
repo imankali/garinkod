@@ -18,6 +18,7 @@ import { useTranslation } from '../../i18n';
 import type { MessageChannel, StorefrontConversation } from '../../types';
 import ChannelChips, { type ChannelFilter } from './ChannelChips';
 import ConversationRow from './ConversationRow';
+import DeskEntries from './DeskEntries';
 import DirectThread from './DirectThread';
 
 const LIST_POLL_MS = 6000;
@@ -208,6 +209,15 @@ export default function DirectMessagesDrawer() {
                 )}
 
                 <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3">
+                  {/* The two desks, ahead of the shop threads, in the drawer too:
+                      «پیام‌رسان» has to read as a chat with a consultant and with
+                      support even for an account that has never messaged anyone. */}
+                  <DeskEntries
+                    conversations={conversations}
+                    onOpen={(id) => setConversationId(id)}
+                    className="mb-3"
+                  />
+
                   {loading || busy ? (
                     <p className="py-10 text-center text-xs text-slate-400">{t('common.loading')}</p>
                   ) : visibleConversations.length === 0 ? (

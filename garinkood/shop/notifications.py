@@ -107,7 +107,7 @@ def comment_target(comment):
     product = getattr(comment, 'product', None)
     if product is not None:
         return (
-            f'نظر «{product.name}»',
+            f'نظر «{product.title}»',
             'product',
             f'/products/{product.slug}?comment={parent_id}',
         )

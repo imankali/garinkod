@@ -1,5 +1,5 @@
-import { FormEvent, useMemo, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
 import {
@@ -49,6 +49,16 @@ const TABS: Array<{ id: Tab; label: string; icon: typeof Beaker }> = [
 
 export default function ProductPage() {
   const { slug = "" } = useParams();
+  /*
+    `?comment=<id>` is where an inbox notification about an answered review or
+    question points. The reader came for one line in a long thread, so the
+    reviews tab opens itself, that comment is scrolled to and flashed, and the
+    parameter is then dropped so navigating away and back does not replay it.
+  */
+  const [searchParams, setSearchParams] = useSearchParams();
+  const linkedComment = searchParams.get("comment") ? Number(searchParams.get("comment")) : null;
+  const [flashedComment, setFlashedComment] = useState<number | null>(null);
+  const linkedHandled = useRef(false);
   const addToCart = useCartStore((state) => state.addToCart);
   const { user, isAuthenticated } = useAuthStore();
   const openAuthModal = useAuthModalStore((state) => state.openAuthModal);
@@ -60,7 +70,7 @@ export default function ProductPage() {
   const [commentImage, setCommentImage] = useState<File | null>(null);
   const [replyTo, setReplyTo] = useState<Comment | null>(null);
   const [starFilter, setStarFilter] = useState<number | null>(null);
-  const [tab, setTab] = useState<Tab>("description");
+  const [tab, setTab] = useState<Tab>(() => (linkedComment ? "reviews" : "description"));
   const imageRef = useRef<HTMLInputElement>(null);
 
   const { data: product, isLoading, isError } = useQuery({
@@ -122,6 +132,17 @@ export default function ProductPage() {
   });
 
   const summary = product?.rating_summary;
+  useEffect(() => {
+    if (!linkedComment || comments.length === 0 || linkedHandled.current) return;
+    const node = document.getElementById(`comment-${linkedComment}`);
+    if (!node) return;
+    linkedHandled.current = true;
+    node.scrollIntoView({ behavior: "smooth", block: "center" });
+    setFlashedComment(linkedComment);
+    setSearchParams({}, { replace: true });
+    window.setTimeout(() => setFlashedComment(null), 2200);
+  }, [comments, linkedComment, setSearchParams]);
+
   const reviews = useMemo(() => comments.filter((comment) => !comment.parent && comment.rating), [comments]);
   const visibleReviews = useMemo(
     () => (starFilter ? reviews.filter((review) => review.rating === starFilter) : reviews),
@@ -455,7 +476,14 @@ export default function ProductPage() {
                       نمایش دیدگاه‌های {starFilter.toLocaleString('fa-IR')} ستاره · حذف فیلتر
                     </button>
                   )}
-                  {visibleReviews.map((comment) => <CommentCard key={comment.id} comment={comment} onReply={setReplyTo} />)}
+                  {visibleReviews.map((comment) => (
+                  <CommentCard
+                    key={comment.id}
+                    comment={comment}
+                    onReply={setReplyTo}
+                    highlighted={flashedComment === comment.id}
+                  />
+                ))}
                 </div>
               )}
               {questions.length > 0 && (
@@ -465,12 +493,26 @@ export default function ProductPage() {
                     پرسش‌های بی‌پاسخ مانده و پاسخ غرفه
                   </h3>
                   <div className="mt-3 space-y-3">
-                    {questions.map((comment) => <CommentCard key={comment.id} comment={comment} onReply={setReplyTo} />)}
+                    {questions.map((comment) => (
+                      <CommentCard
+                        key={comment.id}
+                        comment={comment}
+                        onReply={setReplyTo}
+                        highlighted={flashedComment === comment.id}
+                      />
+                    ))}
                   </div>
                 </section>
               )}
               {reviews.length === 0 && questions.length === 0 && comments.length > 0 && (
-                comments.map((comment) => <CommentCard key={comment.id} comment={comment} onReply={setReplyTo} />)
+                comments.map((comment) => (
+                  <CommentCard
+                    key={comment.id}
+                    comment={comment}
+                    onReply={setReplyTo}
+                    highlighted={flashedComment === comment.id}
+                  />
+                ))
               )}
             </div>
           </section>
@@ -534,7 +576,7 @@ export default function ProductPage() {
   </main></>;
 }
 
-function CommentCard({ comment, onReply, nested = false }: { comment: Comment; onReply: (comment: Comment) => void; nested?: boolean }) { return <article className={cn("rounded-2xl border border-slate-100 bg-white p-4 shadow-sm dark:border-emerald-900 dark:bg-emerald-950", nested && "ms-6 mt-3")}>
+function CommentCard({ comment, onReply, nested = false, highlighted = false }: { comment: Comment; onReply: (comment: Comment) => void; nested?: boolean; /** The comment an inbox notification was about. */ highlighted?: boolean }) { return <article id={`comment-${comment.id}`} className={cn("scroll-mt-28 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-colors duration-500 dark:border-emerald-900 dark:bg-emerald-950", nested && "ms-6 mt-3", highlighted && "border-amber-300 ring-2 ring-amber-300 dark:border-amber-500")}>
   <div className="flex items-start justify-between gap-3">
     <div className="min-w-0">
       <div className="flex flex-wrap items-center gap-2">
