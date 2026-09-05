@@ -171,6 +171,16 @@ export function HandoffButton({
   const [withContext, setWithContext] = useState(true);
   const [busy, setBusy] = useState(false);
 
+  /*
+    The ready sentence is shown in the box rather than hidden in a placeholder:
+    what the farmer reads is exactly what the operator saw before sending, and
+    editing it is one keystroke instead of writing a message from scratch.
+  */
+  const readyNote =
+    target === 'consulting'
+      ? 'این مورد به بررسی تخصصی زمین و کشت نیاز دارد؛ از لینک پایین گفتگو را با کارشناس کشاورزی ادامه دهید تا همین جزئیات را هم ببیند.'
+      : 'پاسخ این مورد از حیطه مشاوره خارج است؛ از لینک پایین آن را با پشتیبانی ادامه دهید تا سریع‌تر نتیجه شود.';
+
   async function submit() {
     setBusy(true);
     try {
@@ -193,7 +203,10 @@ export function HandoffButton({
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          setNote((current) => current.trim() || readyNote);
+          setOpen(true);
+        }}
         className={cn(
           'flex min-h-9 items-center justify-center gap-1.5 rounded-xl px-2.5 text-fluid-2xs font-extrabold text-slate-500',
           'transition hover:bg-sky-50 hover:text-sky-700 dark:text-emerald-200 dark:hover:bg-sky-950/40 dark:hover:text-sky-200',
@@ -232,13 +245,22 @@ export function HandoffButton({
             onChange={(event) => setNote(event.target.value)}
             rows={3}
             maxLength={500}
-            placeholder={`این مورد تخصصی است؛ در ${targetLabel} پاسخ می‌گیرید.`}
+            placeholder={readyNote}
             className={cn(
               'mt-1.5 w-full resize-none rounded-xl border border-emerald-200 bg-white px-3 py-2 text-fluid-xs leading-6',
               'outline-none transition focus-visible:ring-2 focus-visible:ring-emerald-500',
               'dark:border-emerald-700 dark:bg-emerald-900 dark:text-white',
             )}
           />
+          {note.trim() !== readyNote && (
+            <button
+              type="button"
+              onClick={() => setNote(readyNote)}
+              className="mt-1 text-fluid-2xs font-bold text-sky-600 hover:underline dark:text-sky-300"
+            >
+              بازگردانی پیام آماده
+            </button>
+          )}
         </label>
         <label className="mt-3 flex min-h-11 items-center gap-2 rounded-xl bg-slate-50 px-3 text-fluid-2xs font-bold text-slate-600 dark:bg-emerald-900/40 dark:text-emerald-100">
           <input
