@@ -88,6 +88,13 @@ export interface Product {
   shipping_length_cm: number;
   shipping_width_cm: number;
   shipping_height_cm: number;
+  /** Package size as the supplier publishes it («۲۵ کیلوگرم»، «۱ تن»). */
+  package_weight?: string;
+  /** Quote-only line: the shop shows «تماس بگیرید» instead of a price. */
+  price_on_request?: boolean;
+  /** Structured specification table, detail endpoint only. */
+  attributes?: ProductAttribute[];
+  rating_summary?: RatingSummary;
 
   // ✅ فیلدهای detail (اختیاری - فقط در detail endpoint برمی‌گردند)
   fertilizer_detail?: FertilizerDetail;
@@ -117,6 +124,210 @@ export interface ProductList {
   discounted_price: number;
   brand: string;
   sku: string;
+  package_weight?: string;
+  price_on_request?: boolean;
+  /** Aggregate of approved 1-5 star reviews, computed on the server. */
+  avg_rating?: number;
+  reviews_count?: number;
+}
+
+// ========================================
+// Spec sheets, ratings and site content
+// ========================================
+
+/** One label/value row of the «ویژگی‌ها» table on a product or آگهی. */
+export interface ProductAttribute {
+  id?: number;
+  label: string;
+  value: string;
+  order?: number;
+}
+
+export interface RatingSummary {
+  average: number;
+  reviews_count: number;
+  /** Star bucket -> how many reviews gave that score. */
+  distribution: Record<'1' | '2' | '3' | '4' | '5', number>;
+}
+
+export interface ProductFacets {
+  brands: Array<{ value: string; count: number }>;
+  package_weights: Array<{ value: string; count: number }>;
+  max_price: number;
+}
+
+export type ArticleKind = 'article' | 'guide';
+
+export interface SiteArticleCard {
+  id: number;
+  title: string;
+  slug: string;
+  kind: ArticleKind;
+  kind_label: string;
+  excerpt: string;
+  crop: string;
+  cover: string | null;
+  cover_url: string;
+  author_name: string;
+  published_at: string | null;
+  updated_at: string;
+  reading_minutes: number;
+  views: number;
+  is_featured: boolean;
+  products_count: number;
+  seo_title: string;
+  seo_description: string;
+}
+
+export interface SiteArticleDetail extends Omit<SiteArticleCard, 'products_count'> {
+  body: string;
+  author: number | null;
+  products: ProductList[];
+  listings: Array<{
+    id: number;
+    title: string;
+    slug: string;
+    crop_name: string;
+    price: number;
+    unit: string;
+    image_url: string;
+    storefront_name: string;
+    storefront_slug: string;
+  }>;
+  related_articles: SiteArticleCard[];
+  headings: Array<{ title: string; anchor: string }>;
+}
+
+export interface FarmService {
+  id: number;
+  title: string;
+  slug: string;
+  code: string;
+  summary: string;
+  body: string;
+  highlights: string[];
+  icon: string;
+  image: string | null;
+  image_url: string;
+  price_note: string;
+  order: number;
+  seo_title: string;
+  seo_description: string;
+}
+
+export type SitePageBlockType =
+  | 'heading'
+  | 'text'
+  | 'bullets'
+  | 'image'
+  | 'spec_table'
+  | 'price_table'
+  | 'video'
+  | 'products'
+  | 'articles'
+  | 'cta'
+  | 'quote';
+
+export interface SitePageBlock {
+  id: number;
+  block_type: SitePageBlockType;
+  block_type_label: string;
+  title: string;
+  text: string;
+  rows: string[][];
+  image: string | null;
+  image_url: string;
+  video: string | null;
+  video_url: string;
+  link: string;
+  data: Record<string, unknown>;
+  position: number;
+}
+
+export interface SitePage {
+  id: number;
+  title: string;
+  slug: string;
+  kind: 'page' | 'landing';
+  kind_label: string;
+  hero_text: string;
+  hero_image: string | null;
+  hero_image_url: string;
+  badge: string;
+  product: {
+    id: number;
+    title: string;
+    slug: string;
+    price: number;
+    discounted_price: number;
+    image_url: string;
+    is_in_stock: boolean;
+    price_on_request: boolean;
+  } | null;
+  cta_label: string;
+  cta_url: string;
+  blocks: SitePageBlock[];
+  published_at: string | null;
+  updated_at: string;
+  updated_by: string;
+  seo_title: string;
+  seo_description: string;
+}
+
+export interface TeamMember {
+  id: number;
+  name: string;
+  role: string;
+  bio: string;
+  photo: string | null;
+  photo_url: string;
+  order: number;
+}
+
+export interface BrandPartner {
+  id: number;
+  name: string;
+  logo: string | null;
+  logo_url: string;
+  website: string;
+  description: string;
+  since_year: number | null;
+  order: number;
+}
+
+export interface SiteContactInfo {
+  address: string;
+  provinces_note: string;
+  phones: string[];
+  emails: string[];
+  working_hours: string;
+  whatsapp_number: string;
+  telegram_url: string;
+  instagram_url: string;
+  eitaa_url: string;
+  map_lat: number | string | null;
+  map_lng: number | string | null;
+  map_note: string;
+  expert_name: string;
+  expert_role: string;
+  expert_photo: string | null;
+  expert_photo_url: string;
+  expert_note: string;
+  updated_at: string;
+}
+
+export interface AboutResponse {
+  team: TeamMember[];
+  brands: BrandPartner[];
+  stats: {
+    products: number;
+    storefronts: number;
+    listings: number;
+    articles: number;
+    orders: number;
+    provinces: number;
+  };
+  contact: SiteContactInfo;
 }
 
 // ========================================
@@ -153,6 +364,14 @@ export interface MockProduct {
   warnings: string[];
   compatibleWith: string[];
   brochureAvailable: boolean;
+  /**
+   * Catalogue additions that a card or the quick-view needs: the real star
+   * average (0 until a review is approved), the spec table and the quote-only
+   * flag that replaces the price with «تماس بگیرید».
+   */
+  attributes?: ProductAttribute[];
+  priceOnRequest?: boolean;
+  packageWeight?: string;
 }
 
 // ========================================
@@ -253,6 +472,10 @@ export interface Comment {
   body: string;
   image: string | null;
   sticker: string;
+  /** 1..5 star score of a review; null on a question or an answer. */
+  rating: number | null;
+  /** The reviewer has a paid order containing this product. */
+  is_verified_purchase?: boolean;
   parent: number | null;
   created: string;
   updated: string;
@@ -649,6 +872,8 @@ export interface MarketplaceListing {
   discounted_price: number;
   rejection_reason: string;
   reviewed_at: string | null;
+  /** Optional spec rows the seller can publish with the آگهی. */
+  attributes?: ProductAttribute[];
   created_at: string;
   updated_at: string;
 }
@@ -976,6 +1201,9 @@ export interface ProductQueryParams {
   has_discount?: boolean;
   min_price?: number;
   max_price?: number;
+  brand?: string;
+  package_weight?: string;
+  price_on_request?: boolean;
 }
 export interface ManagementMetric {
   paid_revenue: number | null;

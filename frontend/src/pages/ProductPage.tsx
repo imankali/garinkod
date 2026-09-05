@@ -1,29 +1,66 @@
-import { FormEvent, useRef, useState } from "react";
+import { FormEvent, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
-import { ArrowRight, ImagePlus, MessageCircle, PackageCheck, PackageX, Send, Share2, ShoppingCart, X } from "lucide-react";
+import {
+  ArrowRight,
+  BadgeCheck,
+  Beaker,
+  ImagePlus,
+  MessageCircle,
+  PackageCheck,
+  PackageX,
+  Ruler,
+  Send,
+  ShieldCheck,
+  ShoppingCart,
+  Sparkles,
+  Star,
+  Weight,
+  X,
+} from "lucide-react";
 import toast from "react-hot-toast";
 
-import { commentsApi, productsApi } from "../api/services";
+import { articlesApi, commentsApi, productsApi } from "../api/services";
+import { parseApiError } from "../api/errors";
+import ConsultCard from "../components/product/ConsultCard";
+import ArticleCard from "../components/article/ArticleCard";
+import SharePanel from "../components/SharePanel";
+import SpecTable from "../components/SpecTable";
+import { RatingBars, StarPicker, StarRow } from "../components/StarRating";
 import { useAuthStore } from "../store/authStore";
+import { useAuthModalStore } from "../store/authModalStore";
 import { useCartStore } from "../store/cartStore";
+import { useSiteContact, whatsappHref } from "../hooks/useSiteContact";
 import type { Comment, ProductList } from "../types";
 import { formatPrice } from "../utils/formatPrice";
-import { copyText } from "../utils/copyText";
+import { cn } from "../utils/cn";
 
 const FALLBACK_IMAGE = "/images/hero-farm.jpg";
 const STICKERS = ["🌱", "🌾", "👍", "⭐", "💚", "👏"];
+
+type Tab = "description" | "specs" | "reviews";
+
+const TABS: Array<{ id: Tab; label: string; icon: typeof Beaker }> = [
+  { id: "description", label: "توضیحات", icon: Beaker },
+  { id: "specs", label: "ویژگی‌ها", icon: BadgeCheck },
+  { id: "reviews", label: "دیدگاه‌ها", icon: MessageCircle },
+];
 
 export default function ProductPage() {
   const { slug = "" } = useParams();
   const addToCart = useCartStore((state) => state.addToCart);
   const { user, isAuthenticated } = useAuthStore();
+  const openAuthModal = useAuthModalStore((state) => state.openAuthModal);
+  const queryClient = useQueryClient();
+  const { whatsappDigits, primaryPhone } = useSiteContact();
   const [commentBody, setCommentBody] = useState("");
+  const [rating, setRating] = useState(0);
   const [sticker, setSticker] = useState("");
   const [commentImage, setCommentImage] = useState<File | null>(null);
   const [replyTo, setReplyTo] = useState<Comment | null>(null);
-  const [submittingComment, setSubmittingComment] = useState(false);
+  const [starFilter, setStarFilter] = useState<number | null>(null);
+  const [tab, setTab] = useState<Tab>("description");
   const imageRef = useRef<HTMLInputElement>(null);
 
   const { data: product, isLoading, isError } = useQuery({
@@ -32,7 +69,7 @@ export default function ProductPage() {
     enabled: Boolean(slug),
     staleTime: 5 * 60 * 1000,
   });
-  const { data: comments = [], refetch: refetchComments } = useQuery({
+  const { data: comments = [], isFetching: commentsFetching } = useQuery({
     queryKey: ["product-comments", slug],
     queryFn: async () => (await commentsApi.getByProduct(slug)).data,
     enabled: Boolean(slug),
@@ -44,30 +81,19 @@ export default function ProductPage() {
     enabled: Boolean(slug),
     staleTime: 5 * 60 * 1000,
   });
+  // The guides written for this product's crop — the "راهنمای کشت گل کلم" idea,
+  // reached from the product instead of only from the blog.
+  const { data: guides = [] } = useQuery({
+    queryKey: ["product-articles", slug, product?.id],
+    queryFn: async () => (await articlesApi.getAll({ product: product?.id, limit: 3 })).data,
+    enabled: Boolean(product?.id),
+    staleTime: 10 * 60 * 1000,
+  });
 
-  async function share() {
-    const url = window.location.href;
-    try {
-      if (navigator.share && product) {
-        await navigator.share({ title: product.title, text: product.description.slice(0, 120), url });
-      } else {
-        await copyText(url);
-        toast.success("لینک محصول کپی شد.");
-      }
-    } catch {
-      // User cancellation should not be treated as an error.
-    }
-  }
-
-  async function submitComment(event: FormEvent) {
-    event.preventDefault();
-    if (!isAuthenticated || !product || (!commentBody.trim() && !sticker && !commentImage)) {
-      if (!isAuthenticated) toast.error("برای ثبت نظر یا پاسخ ابتدا وارد حساب کاربری شوید.");
-      return;
-    }
-    setSubmittingComment(true);
-    try {
-      await commentsApi.create({
+  const reviewSubmit = useMutation({
+    mutationFn: async () => {
+      if (!product) throw new Error("no product");
+      return commentsApi.create({
         product: product.id,
         name: [user?.first_name, user?.last_name].filter(Boolean).join(" ") || user?.username || "کاربر",
         email: user?.email || "",
@@ -75,18 +101,46 @@ export default function ProductPage() {
         parent: replyTo?.id || null,
         sticker,
         image: commentImage,
+        rating: rating || null,
       });
+    },
+    onSuccess: async () => {
       setCommentBody("");
       setSticker("");
+      setRating(0);
       setCommentImage(null);
       setReplyTo(null);
-      await refetchComments();
-      toast.success("نظر شما ثبت شد.");
-    } catch {
-      // API client displays the detailed failure.
-    } finally {
-      setSubmittingComment(false);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["product-comments", slug] }),
+        queryClient.invalidateQueries({ queryKey: ["product", slug] }),
+      ]);
+      toast.success("دیدگاه شما ثبت شد و پس از تأیید نمایش داده می‌شود.");
+    },
+    onError: (error) => {
+      toast.error(parseApiError(error).message || "ثبت دیدگاه انجام نشد.");
+    },
+  });
+
+  const summary = product?.rating_summary;
+  const reviews = useMemo(() => comments.filter((comment) => !comment.parent && comment.rating), [comments]);
+  const visibleReviews = useMemo(
+    () => (starFilter ? reviews.filter((review) => review.rating === starFilter) : reviews),
+    [reviews, starFilter],
+  );
+  const questions = useMemo(() => comments.filter((comment) => !comment.parent && !comment.rating), [comments]);
+  const specRows = product?.attributes || [];
+
+  async function submitComment(event: FormEvent) {
+    event.preventDefault();
+    if (!isAuthenticated) {
+      openAuthModal({ reason: "برای ثبت دیدگاه یا پرسش وارد حساب خود شوید." });
+      return;
     }
+    if (!commentBody.trim() && !sticker && !commentImage) {
+      toast.error("متن دیدگاه را بنویسید.");
+      return;
+    }
+    await reviewSubmit.mutateAsync();
   }
 
   if (isLoading) return <div className="mx-auto flex min-h-[50vh] max-w-7xl items-center justify-center px-4 text-slate-500">در حال بارگذاری محصول...</div>;
@@ -102,6 +156,10 @@ export default function ProductPage() {
   const gtinProperty = product.gtin && [8, 12, 13, 14].includes(product.gtin.length)
     ? { [`gtin${product.gtin.length}`]: product.gtin }
     : {};
+  const priceOnRequest = Boolean(product.price_on_request);
+  const whatsappDraft = whatsappDigits
+    ? whatsappHref(whatsappDigits, `سلام، درباره «${product.title}» و قیمت عمده سؤال دارم: ${productUrl}`)
+    : '';
   const structuredData = {
     '@context': 'https://schema.org',
     '@graph': [
@@ -122,12 +180,36 @@ export default function ProductPage() {
           // Schema.org expects ISO 4217. Stored/displayed values are تومان,
           // therefore the structured IRR amount is explicitly multiplied by 10.
           priceCurrency: 'IRR',
-          price: product.price * 10,
-          availability: product.is_in_stock
-            ? 'https://schema.org/InStock'
-            : 'https://schema.org/OutOfStock',
-          itemCondition: 'https://schema.org/NewCondition',
+          ...(priceOnRequest
+            ? { priceSpecification: { '@type': 'PriceSpecification', price: undefined, priceCurrency: 'IRR' }, availability: 'https://schema.org/InStock' }
+            : {
+                price: product.price * 10,
+                availability: product.is_in_stock
+                  ? 'https://schema.org/InStock'
+                  : 'https://schema.org/OutOfStock',
+                itemCondition: 'https://schema.org/NewCondition',
+              }),
         },
+        // Only publish an aggregate the platform actually has: a product with no
+        // scored review must not advertise empty stars to Google.
+        ...(summary && summary.reviews_count > 0
+          ? {
+              aggregateRating: {
+                '@type': 'AggregateRating',
+                ratingValue: summary.average,
+                reviewCount: summary.reviews_count,
+                bestRating: 5,
+                worstRating: 1,
+              },
+              review: visibleReviews.slice(0, 3).map((review) => ({
+                '@type': 'Review',
+                reviewRating: { '@type': 'Rating', ratingValue: review.rating, bestRating: 5, worstRating: 1 },
+                author: { '@type': 'Person', name: review.name },
+                reviewBody: review.body.slice(0, 500),
+                datePublished: review.created.slice(0, 10),
+              })),
+            }
+          : {}),
       },
       {
         '@type': 'BreadcrumbList',
@@ -139,6 +221,13 @@ export default function ProductPage() {
       },
     ],
   };
+  const facts = [
+    product.brand ? { icon: ShieldCheck, label: 'برند', value: product.brand } : null,
+    product.package_weight ? { icon: Weight, label: 'بسته‌بندی', value: product.package_weight } : null,
+    product.sku ? { icon: BadgeCheck, label: 'شناسه کالا', value: product.sku } : null,
+    product.shipping_weight_grams ? { icon: Ruler, label: 'وزن ارسال', value: `${(product.shipping_weight_grams / 1000).toLocaleString('fa-IR')} کیلوگرم` } : null,
+  ].filter(Boolean) as Array<{ icon: typeof Beaker; label: string; value: string }>;
+
   return <><Helmet>
     <title>{seoTitle}</title>
     <meta name="description" content={seoDescription} />
@@ -148,16 +237,323 @@ export default function ProductPage() {
     <meta property="og:description" content={seoDescription} />
     <meta property="og:url" content={productUrl} />
     <meta property="og:image" content={imageUrl} />
-    <meta property="product:price:amount" content={String(product.price * 10)} />
+    {!priceOnRequest && <meta property="product:price:amount" content={String(product.price * 10)} />}
     <meta property="product:price:currency" content="IRR" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={seoTitle} />
     <meta name="twitter:description" content={seoDescription} />
     <meta name="twitter:image" content={imageUrl} />
     <script type="application/ld+json">{JSON.stringify(structuredData)}</script>
-  </Helmet><main className="mx-auto max-w-7xl px-[var(--page-gutter)] py-8 md:py-12"><Link to="/" className="mb-7 inline-flex items-center gap-2 text-sm font-semibold text-emerald-700 hover:text-emerald-900 dark:text-lime-300" aria-label="بازگشت به محصولات"><ArrowRight size={18} /> بازگشت به محصولات</Link><article className="grid gap-8 rounded-3xl border border-slate-100 bg-white p-5 shadow-sm md:grid-cols-2 md:p-8 dark:border-emerald-900 dark:bg-emerald-950"><div className="overflow-hidden rounded-2xl bg-emerald-50 dark:bg-emerald-900/30"><img src={image} alt={product.title} className="aspect-square h-full w-full object-cover" onError={(event) => { event.currentTarget.src = FALLBACK_IMAGE; }} /></div><div className="flex flex-col">{category && <p className="mb-2 text-sm font-bold text-emerald-700 dark:text-lime-300">{category}</p>}<div className="flex items-start justify-between gap-4"><h1 className="text-2xl font-extrabold leading-10 text-slate-800 md:text-3xl dark:text-white">{product.title}</h1><button onClick={share} className="rounded-xl border border-emerald-200 p-2 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-lime-300" aria-label="اشتراک‌گذاری محصول"><Share2 size={19} /></button></div><p className="mt-5 whitespace-pre-line leading-8 text-slate-600 dark:text-emerald-100">{product.description}</p><div className="mt-6 flex items-center gap-2 text-sm font-semibold">{product.is_in_stock ? <><PackageCheck size={18} className="text-emerald-600" /><span className="text-emerald-700 dark:text-lime-300">موجود در انبار</span></> : <><PackageX size={18} className="text-rose-500" /><span className="text-rose-600">ناموجود</span></>}</div><div className="mt-auto border-t border-slate-100 pt-6 dark:border-emerald-900"><p className="text-2xl font-extrabold text-slate-800 dark:text-white">{formatPrice(product.price)}</p><button type="button" onClick={() => addToCart(product.id)} disabled={!product.is_in_stock} className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-l from-emerald-600 to-lime-500 px-5 py-3 text-sm font-bold text-white shadow-md transition hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-40"><ShoppingCart size={18} />{product.is_in_stock ? "افزودن به سبد خرید" : "ناموجود"}</button></div></div></article><section className="mt-9"><div className="flex items-center gap-2"><MessageCircle className="text-emerald-600" /><h2 className="text-2xl font-extrabold text-slate-800 dark:text-white">پرسش‌ها و تجربه خریداران</h2></div><form onSubmit={submitComment} className="mt-5 rounded-3xl border border-slate-100 bg-white p-5 shadow-sm dark:border-emerald-900 dark:bg-emerald-950">{replyTo && <div className="mb-3 flex items-center justify-between rounded-xl bg-emerald-50 p-3 text-xs text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-100"><span>در پاسخ به {replyTo.name}</span><button type="button" onClick={() => setReplyTo(null)} aria-label="لغو پاسخ"><X size={15} /></button></div>}<textarea value={commentBody} onChange={(event) => setCommentBody(event.target.value)} rows={3} placeholder={isAuthenticated ? "تجربه یا پرسش خود را بنویسید..." : "برای ثبت نظر وارد حساب کاربری شوید"} className="w-full rounded-xl border border-slate-200 bg-white p-3 text-sm outline-none focus:border-emerald-500 dark:border-emerald-700 dark:bg-emerald-900" /><div className="mt-3 flex flex-wrap items-center gap-2">{STICKERS.map((item) => <button key={item} type="button" onClick={() => setSticker(sticker === item ? "" : item)} className={`rounded-lg px-2 py-1 text-lg ${sticker === item ? "bg-emerald-100 ring-1 ring-emerald-400 dark:bg-emerald-900" : "bg-slate-50 dark:bg-emerald-900/40"}`}>{item}</button>)}<input ref={imageRef} type="file"
-        aria-label="انتخاب تصویر برای جستجوی تصویری" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => setCommentImage(event.target.files?.[0] || null)} /><button type="button" onClick={() => imageRef.current?.click()} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 dark:border-emerald-700 dark:text-emerald-100"><ImagePlus size={15} />{commentImage ? commentImage.name : "افزودن عکس"}</button><button disabled={submittingComment || !isAuthenticated} className="ms-auto inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"><Send size={16} />{submittingComment ? "در حال ثبت..." : "ثبت نظر"}</button></div></form><div className="mt-5 space-y-4">{comments.length ? comments.map((comment) => <CommentCard key={comment.id} comment={comment} onReply={setReplyTo} />) : <p className="rounded-2xl bg-slate-50 p-5 text-sm text-slate-500 dark:bg-emerald-900/40 dark:text-emerald-200">هنوز نظری ثبت نشده است. اولین تجربه خرید را بنویسید.</p>}</div></section>{similar.length > 0 && <section className="mt-10"><h2 className="text-2xl font-extrabold text-slate-800 dark:text-white">محصولات مشابه</h2><div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{similar.map((item) => <SimilarCard key={item.id} product={item} />)}</div></section>}</main></>;
+  </Helmet><main className="mx-auto max-w-7xl px-[var(--page-gutter)] py-8 md:py-12">
+    <Link to="/products" className="mb-7 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-emerald-700 hover:text-emerald-900 dark:text-lime-300" aria-label="بازگشت به محصولات"><ArrowRight size={18} /> بازگشت به محصولات</Link>
+
+    <div className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <article className="grid gap-8 rounded-3xl border border-slate-100 bg-white p-5 shadow-sm md:grid-cols-2 md:p-8 dark:border-emerald-900 dark:bg-emerald-950">
+        <div className="overflow-hidden rounded-2xl bg-emerald-50 dark:bg-emerald-900/30"><img src={image} alt={product.title} className="aspect-square h-full w-full object-cover" onError={(event) => { event.currentTarget.src = FALLBACK_IMAGE; }} /></div>
+        <div className="flex flex-col">{category && <p className="mb-2 text-sm font-bold text-emerald-700 dark:text-lime-300">{category}</p>}
+          <div className="flex items-start justify-between gap-4">
+            <h1 className="text-2xl font-extrabold leading-10 text-slate-800 md:text-3xl dark:text-white">{product.title}</h1>
+          </div>
+
+          {/* Rating line: stars, average and a jump to the reviews tab. */}
+          <button
+            type="button"
+            onClick={() => { setTab('reviews'); document.getElementById('product-tabs')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
+            className="mt-2.5 inline-flex items-center gap-2 self-start rounded-lg px-1 py-0.5 text-start transition hover:bg-emerald-50 dark:hover:bg-emerald-900/50"
+          >
+            <StarRow value={summary?.average || 0} size={15} />
+            <span className="text-fluid-2xs text-slate-500 dark:text-emerald-300">
+              {summary && summary.reviews_count
+                ? `${summary.average.toLocaleString('fa-IR', { maximumFractionDigits: 1 })} از ۵ · ${summary.reviews_count.toLocaleString('fa-IR')} دیدگاه`
+                : 'هنوز دیدگاه امتیازدار ندارد'}
+            </span>
+          </button>
+
+          {facts.length > 0 && (
+            <ul className="mt-4 flex flex-wrap gap-2">
+              {facts.map((fact) => (
+                <li key={fact.label} className="inline-flex items-center gap-1.5 rounded-xl bg-slate-50 px-2.5 py-1.5 text-fluid-2xs font-bold text-slate-600 dark:bg-emerald-900/50 dark:text-emerald-100">
+                  <fact.icon size={13} className="text-emerald-600 dark:text-lime-300" />
+                  {fact.label}: <span className="text-slate-800 dark:text-white">{fact.value}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <p className="mt-5 whitespace-pre-line leading-8 text-slate-600 dark:text-emerald-100">{product.description}</p>
+          <div className="mt-6 flex items-center gap-2 text-sm font-semibold">{product.is_in_stock ? <><PackageCheck size={18} className="text-emerald-600" /><span className="text-emerald-700 dark:text-lime-300">موجود در انبار</span></> : <><PackageX size={18} className="text-rose-500" /><span className="text-rose-600">ناموجود</span></>}</div>
+
+          {product.price_on_request && (
+            <p className="mt-4 rounded-2xl bg-amber-50 p-3.5 text-fluid-xs leading-7 text-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+              این کالا به‌صورت عمده و با استعلام قیمت فروخته می‌شود؛ رقم درج‌شده در سایت مبنای فروش نیست. برای قیمت روز، حداقل سفارش و زمان تحویل تماس بگیرید.
+            </p>
+          )}
+
+          <div className="mt-auto border-t border-slate-100 pt-6 dark:border-emerald-900">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <p className="text-2xl font-extrabold text-slate-800 dark:text-white">
+                {priceOnRequest ? 'تماس بگیرید' : formatPrice(product.price)}
+                {!priceOnRequest && product.discount_percent > 0 && (
+                  <span className="ms-2 text-sm font-bold text-slate-400 line-through">{formatPrice(product.price)}</span>
+                )}
+              </p>
+              {product.discount_percent > 0 && !priceOnRequest && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-1 text-fluid-2xs font-bold text-rose-700 dark:bg-rose-950 dark:text-rose-200">
+                  <Sparkles size={12} />
+                  {product.discount_percent.toLocaleString('fa-IR')}٪ تخفیف
+                </span>
+              )}
+            </div>
+            {!priceOnRequest && product.discount_percent > 0 && (
+              <p className="mt-1.5 text-fluid-sm font-extrabold text-emerald-700 dark:text-lime-300">{formatPrice(product.discounted_price)} تومان</p>
+            )}
+
+            {priceOnRequest ? (
+              <div className="mt-5 flex flex-wrap gap-2">
+                {whatsappDraft && (
+                  <a href={whatsappDraft} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-l from-emerald-600 to-lime-500 px-5 text-sm font-bold text-white shadow-md">
+                    <Send size={18} />
+                    استعلام قیمت در واتساپ
+                  </a>
+                )}
+                {primaryPhone && (
+                  <a href={`tel:${primaryPhone.replace(/[^\d+]/g, '')}`} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-emerald-300 px-5 text-sm font-bold text-emerald-700 dark:border-emerald-700 dark:text-lime-300" dir="ltr">
+                    <MessageCircle size={18} />
+                    تماس
+                  </a>
+                )}
+              </div>
+            ) : (
+              <button type="button" onClick={() => void addToCart(product.id)} disabled={!product.is_in_stock} className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-l from-emerald-600 to-lime-500 px-5 py-3 text-sm font-bold text-white shadow-md transition hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-40"><ShoppingCart size={18} />{product.is_in_stock ? "افزودن به سبد خرید" : "ناموجود"}</button>
+            )}
+            <div className="mt-3 flex items-center justify-between gap-2">
+              <SharePanel url={productUrl} title={product.title} text={seoDescription} />
+              <Link to="/support" className="text-fluid-2xs font-bold text-emerald-700 underline dark:text-lime-300">گزارش خطای قیمت یا موجودی</Link>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <aside className="space-y-4">
+        <ConsultCard productTitle={product.title} productUrl={productUrl} />
+        {product.stock > 0 && product.stock <= 5 && (
+          <p className="rounded-2xl bg-rose-50 px-4 py-3 text-fluid-xs font-bold text-rose-700 dark:bg-rose-950/50 dark:text-rose-200">
+            تنها {product.stock.toLocaleString('fa-IR')} عدد در انبار باقی مانده است.
+          </p>
+        )}
+        {product.sales_count > 0 && (
+          <p className="rounded-2xl border border-slate-100 bg-white px-4 py-3 text-fluid-xs text-slate-500 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
+            <strong className="text-slate-800 dark:text-white">{product.sales_count.toLocaleString('fa-IR')}</strong> خرید از زمان انتشار این کالا.
+          </p>
+        )}
+      </aside>
+    </div>
+
+    {/* Tabs: توضیحات / ویژگی‌ها / دیدگاه‌ها */}
+    <div id="product-tabs" className="mt-9 scroll-mt-24">
+      <div className="flex gap-1 overflow-x-auto rounded-2xl bg-slate-100 p-1 dark:bg-emerald-900/60" role="tablist" aria-label="بخش‌های محصول">
+        {TABS.map((item) => {
+          const count = item.id === 'reviews' ? comments.length : item.id === 'specs' ? specRows.length : 0;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              role="tab"
+              aria-selected={tab === item.id}
+              onClick={() => setTab(item.id)}
+              className={cn(
+                'flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl px-4 text-fluid-xs font-bold transition',
+                tab === item.id
+                  ? 'bg-white text-emerald-700 shadow-sm dark:bg-emerald-950 dark:text-lime-300'
+                  : 'text-slate-500 dark:text-emerald-300',
+              )}
+            >
+              <item.icon size={15} />
+              {item.label}
+              {count > 0 && <span className="rounded-full bg-emerald-100 px-1.5 text-fluid-2xs text-emerald-700 dark:bg-emerald-800 dark:text-lime-200">{count.toLocaleString('fa-IR')}</span>}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mt-4">
+        {tab === 'specs' && (
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+            {specRows.length ? (
+              <SpecTable rows={specRows} title="جدول ویژگی‌های کالا" columns={2} />
+            ) : (
+              <p className="rounded-3xl border border-dashed border-emerald-200 bg-white/60 p-6 text-fluid-sm text-slate-500 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200">
+                جدول مشخصات این کالا هنوز کامل نشده است. اگر برگه اطلاعات (تایت‌شیت) یا برچسب محصول را دارید، برای پشتیبانی بفرستید تا منتشر شود.
+              </p>
+            )}
+            <div className="rounded-3xl border border-slate-100 bg-white p-5 dark:border-emerald-900 dark:bg-emerald-950">
+              <h3 className="text-fluid-sm font-extrabold text-slate-800 dark:text-white">راهنمای مصرف</h3>
+              <p className="mt-2 text-fluid-xs leading-7 text-slate-500 dark:text-emerald-200">
+                دوز و روش مصرف را با «ماشین‌حساب دوز» و بر پایه مساحت زمین خودتان حساب کنید؛ اعداد این صفحه جای برچسب رسمی محصول را نمی‌گیرد.
+              </p>
+              <Link to="/agri-calculator" className="mt-3 inline-flex min-h-10 items-center rounded-xl bg-emerald-600 px-3 text-fluid-2xs font-bold text-white">ماشین‌حساب دوز</Link>
+            </div>
+          </div>
+        )}
+
+        {tab === 'reviews' && (
+          <section className="grid gap-5 lg:grid-cols-[300px_minmax(0,1fr)]">
+            <div className="space-y-4">
+              <div className="rounded-3xl border border-slate-100 bg-white p-5 dark:border-emerald-900 dark:bg-emerald-950">
+                <p className="text-fluid-2xs font-bold text-slate-500 dark:text-emerald-300">میانگین امتیاز</p>
+                <p className="mt-1 flex items-baseline gap-2">
+                  <span className="text-3xl font-extrabold text-slate-800 dark:text-white">{summary?.average ? summary.average.toLocaleString('fa-IR', { maximumFractionDigits: 1 }) : '—'}</span>
+                  <span className="text-fluid-2xs text-slate-400">از ۵</span>
+                </p>
+                <StarRow value={summary?.average || 0} size={16} className="mt-1.5" />
+                <p className="mt-2 text-fluid-2xs text-slate-500 dark:text-emerald-300">
+                  {(summary?.reviews_count || 0).toLocaleString('fa-IR')} دیدگاه ثبت‌شده
+                  {questions.length > 0 && ` · ${questions.length.toLocaleString('fa-IR')} پرسش`}
+                </p>
+                {summary && summary.reviews_count > 0 && (
+                  <div className="mt-4">
+                    <RatingBars
+                      distribution={summary.distribution}
+                      total={summary.reviews_count}
+                      activeBucket={starFilter}
+                      onSelect={(star) => setStarFilter((current) => (current === star ? null : star))}
+                    />
+                  </div>
+                )}
+              </div>
+
+              <form className="space-y-3 rounded-3xl border border-slate-100 bg-white p-5 shadow-sm dark:border-emerald-900 dark:bg-emerald-950" onSubmit={submitComment}>
+                <h3 className="text-fluid-sm font-extrabold text-slate-800 dark:text-white">{replyTo ? 'پاسخ به دیدگاه' : 'ثبت دیدگاه'}</h3>
+                {replyTo && (
+                  <div className="flex items-center justify-between rounded-xl bg-emerald-50 p-2.5 text-fluid-2xs text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-100">
+                    <span className="truncate">در پاسخ به {replyTo.name}</span>
+                    <button type="button" onClick={() => setReplyTo(null)} aria-label="لغو پاسخ"><X size={15} /></button>
+                  </div>
+                )}
+                {!replyTo && (
+                  <div className="rounded-xl bg-slate-50 p-2.5 dark:bg-emerald-900/40">
+                    <p className="mb-1 text-fluid-2xs font-bold text-slate-500 dark:text-emerald-300">امتیاز شما به کیفیت و بسته‌بندی</p>
+                    <StarPicker value={rating} onChange={setRating} disabled={!isAuthenticated} />
+                  </div>
+                )}
+                <textarea value={commentBody} onChange={(event) => setCommentBody(event.target.value)} rows={4} placeholder={isAuthenticated ? "تجربه خرید، نحوه بسته‌بندی و نتیجه در مزرعه را بنویسید..." : "برای ثبت نظر یا پاسخ ابتدا وارد حساب کاربری شوید"} className="w-full rounded-xl border border-slate-200 bg-white p-3 text-sm outline-none focus:border-emerald-500 dark:border-emerald-700 dark:bg-emerald-900" />
+                <div className="flex flex-wrap items-center gap-2">{STICKERS.map((item) => <button key={item} type="button" onClick={() => setSticker(sticker === item ? "" : item)} className={cn("rounded-lg px-2 py-1 text-lg", sticker === item ? "bg-emerald-100 ring-1 ring-emerald-400 dark:bg-emerald-900" : "bg-slate-50 dark:bg-emerald-900/40")}>{item}</button>)}
+                  <input ref={imageRef} type="file" aria-label="افزودن تصویر به دیدگاه" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => setCommentImage(event.target.files?.[0] || null)} />
+                  <button type="button" onClick={() => imageRef.current?.click()} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 dark:border-emerald-700 dark:text-emerald-100"><ImagePlus size={15} />{commentImage ? commentImage.name : "افزودن عکس"}</button>
+                  <button disabled={reviewSubmit.isPending} className="ms-auto inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"><Send size={16} />{reviewSubmit.isPending ? "در حال ثبت..." : "ثبت نظر"}</button>
+                </div>
+              </form>
+            </div>
+
+            <div className="space-y-4">
+              {commentsFetching && !comments.length && <p className="text-fluid-sm text-slate-400">در حال بارگذاری دیدگاه‌ها...</p>}
+              {!comments.length && <p className="rounded-2xl bg-slate-50 p-5 text-sm text-slate-500 dark:bg-emerald-900/40 dark:text-emerald-200">هنوز نظری ثبت نشده است. اولین تجربه خرید را بنویسید.</p>}
+              {visibleReviews.length > 0 && (
+                <div className="space-y-3">
+                  {starFilter && (
+                    <button type="button" onClick={() => setStarFilter(null)} className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-amber-50 px-3 text-fluid-2xs font-bold text-amber-700 dark:bg-amber-950/50 dark:text-amber-200">
+                      نمایش دیدگاه‌های {starFilter.toLocaleString('fa-IR')} ستاره · حذف فیلتر
+                    </button>
+                  )}
+                  {visibleReviews.map((comment) => <CommentCard key={comment.id} comment={comment} onReply={setReplyTo} />)}
+                </div>
+              )}
+              {questions.length > 0 && (
+                <section className="rounded-3xl border border-slate-100 bg-white p-5 dark:border-emerald-900 dark:bg-emerald-950">
+                  <h3 className="flex items-center gap-2 text-fluid-sm font-extrabold text-slate-800 dark:text-white">
+                    <MessageCircle size={16} className="text-emerald-600 dark:text-lime-300" />
+                    پرسش‌های بی‌پاسخ مانده و پاسخ غرفه
+                  </h3>
+                  <div className="mt-3 space-y-3">
+                    {questions.map((comment) => <CommentCard key={comment.id} comment={comment} onReply={setReplyTo} />)}
+                  </div>
+                </section>
+              )}
+              {reviews.length === 0 && questions.length === 0 && comments.length > 0 && (
+                comments.map((comment) => <CommentCard key={comment.id} comment={comment} onReply={setReplyTo} />)
+              )}
+            </div>
+          </section>
+        )}
+
+        {tab === 'description' && (
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="space-y-4">
+              <div className="prose-emerald rounded-3xl border border-slate-100 bg-white p-5 text-fluid-sm leading-8 text-slate-600 shadow-sm sm:p-6 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-100">
+                {product.description}
+              </div>
+              {guides.length > 0 && (
+                <section>
+                  <h3 className="text-fluid-lg font-extrabold text-slate-800 dark:text-white">راهنمای کشت مرتبط با این کالا</h3>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    {guides.map((article) => <ArticleCard key={article.id} article={article} />)}
+                  </div>
+                </section>
+              )}
+            </div>
+            <div className="space-y-4">
+              {specRows.length > 0 && (
+                <div className="rounded-3xl border border-slate-100 bg-white p-5 dark:border-emerald-900 dark:bg-emerald-950">
+                  <h3 className="text-fluid-sm font-extrabold text-slate-800 dark:text-white">خلاصه مشخصات</h3>
+                  <ul className="mt-3 space-y-2">
+                    {specRows.slice(0, 6).map((row) => (
+                      <li key={row.label} className="flex items-baseline justify-between gap-3 border-b border-dashed border-slate-100 pb-2 text-fluid-xs last:border-0 dark:border-emerald-900">
+                        <span className="text-slate-500 dark:text-emerald-300">{row.label}</span>
+                        <span className="font-bold text-slate-800 dark:text-white">{row.value}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  {specRows.length > 6 && (
+                    <button type="button" onClick={() => setTab('specs')} className="mt-3 inline-flex min-h-9 items-center rounded-lg bg-emerald-50 px-3 text-fluid-2xs font-bold text-emerald-700 dark:bg-emerald-900/60 dark:text-lime-300">
+                      مشاهده جدول کامل ({specRows.length.toLocaleString('fa-IR')} ویژگی)
+                    </button>
+                  )}
+                </div>
+              )}
+              {summary && summary.reviews_count > 0 && (
+                <div className="rounded-3xl bg-emerald-50 p-5 dark:bg-emerald-900/40">
+                  <p className="flex items-center gap-1.5 text-fluid-sm font-extrabold text-emerald-800 dark:text-lime-300">
+                    <Star size={15} fill="currentColor" />
+                    تجربه خریداران
+                  </p>
+                  <p className="mt-2 text-fluid-xs leading-7 text-slate-600 dark:text-emerald-100">
+                    میانگین {summary.average.toLocaleString('fa-IR', { maximumFractionDigits: 1 })} از ۵ بر پایه {summary.reviews_count.toLocaleString('fa-IR')} دیدگاه تأییدشده.
+                  </p>
+                  <button type="button" onClick={() => setTab('reviews')} className="mt-3 inline-flex min-h-9 items-center rounded-lg bg-white px-3 text-fluid-2xs font-bold text-emerald-700 dark:bg-emerald-950 dark:text-lime-300">
+                    خواندن دیدگاه‌ها
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+
+    {similar.length > 0 && <section className="mt-10"><h2 className="text-2xl font-extrabold text-slate-800 dark:text-white">محصولات مشابه</h2><div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{similar.map((item) => <SimilarCard key={item.id} product={item} />)}</div></section>}
+  </main></>;
 }
 
-function CommentCard({ comment, onReply, nested = false }: { comment: Comment; onReply: (comment: Comment) => void; nested?: boolean }) { return <article className={`rounded-2xl border border-slate-100 bg-white p-4 shadow-sm dark:border-emerald-900 dark:bg-emerald-950 ${nested ? "ms-6 mt-3" : ""}`}><div className="flex items-center justify-between gap-3"><strong className="text-sm text-slate-800 dark:text-white">{comment.name}</strong><time className="text-xs text-slate-400">{new Date(comment.created).toLocaleDateString("fa-IR")}</time></div><p className="mt-3 whitespace-pre-line text-sm leading-7 text-slate-600 dark:text-emerald-100">{comment.sticker && <span className="me-1 text-lg">{comment.sticker}</span>}{comment.body}</p>{comment.image && <img src={comment.image} alt="تصویر ارسالی کاربر" className="mt-3 max-h-72 rounded-xl object-cover" />}<button onClick={() => onReply(comment)} className="mt-3 text-xs font-bold text-emerald-700 hover:underline dark:text-lime-300">پاسخ دادن</button>{comment.replies?.map((reply) => <CommentCard key={reply.id} comment={reply} onReply={onReply} nested />)}</article>; }
-function SimilarCard({ product }: { product: ProductList }) { return <Link to={`/products/${product.slug}`} className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-md dark:border-emerald-900 dark:bg-emerald-950"><img src={product.image_url || FALLBACK_IMAGE} alt={product.title} className="h-36 w-full object-cover" /><div className="p-3"><p className="line-clamp-2 text-sm font-bold text-slate-800 dark:text-white">{product.title}</p><p className="mt-2 text-sm font-extrabold text-emerald-700 dark:text-lime-300">{formatPrice(product.price)}</p></div></Link>; }
+function CommentCard({ comment, onReply, nested = false }: { comment: Comment; onReply: (comment: Comment) => void; nested?: boolean }) { return <article className={cn("rounded-2xl border border-slate-100 bg-white p-4 shadow-sm dark:border-emerald-900 dark:bg-emerald-950", nested && "ms-6 mt-3")}>
+  <div className="flex items-start justify-between gap-3">
+    <div className="min-w-0">
+      <div className="flex flex-wrap items-center gap-2">
+        <strong className="text-fluid-sm text-slate-800 dark:text-white">{comment.name}</strong>
+        {comment.is_verified_purchase && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-fluid-2xs font-bold text-emerald-700 dark:bg-emerald-900 dark:text-lime-300">
+            <BadgeCheck size={12} />
+            خرید قطعی
+          </span>
+        )}
+      </div>
+      {comment.rating ? <StarRow value={comment.rating} size={13} className="mt-1" /> : <span className="text-fluid-2xs text-slate-400">پرسش</span>}
+    </div>
+    <time className="shrink-0 text-fluid-2xs text-slate-400">{new Date(comment.created).toLocaleDateString("fa-IR")}</time>
+  </div>
+  <p className="mt-3 whitespace-pre-line text-fluid-sm leading-7 text-slate-600 dark:text-emerald-100">{comment.sticker && <span className="me-1 text-lg">{comment.sticker}</span>}{comment.body}</p>
+  {comment.image && <img src={comment.image} alt="تصویر ارسالی کاربر" className="mt-3 max-h-72 rounded-xl object-cover" />}
+  <button onClick={() => onReply(comment)} className="mt-3 text-fluid-2xs font-bold text-emerald-700 hover:underline dark:text-lime-300">پاسخ دادن</button>
+  {comment.replies?.map((reply) => <CommentCard key={reply.id} comment={reply} onReply={onReply} nested />)}
+</article>; }
+
+function SimilarCard({ product }: { product: ProductList }) { return <Link to={`/products/${product.slug}`} className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-md dark:border-emerald-900 dark:bg-emerald-950"><img src={product.image_url || FALLBACK_IMAGE} alt={product.title} className="h-36 w-full object-cover" /><div className="p-3"><p className="line-clamp-2 text-fluid-sm font-bold text-slate-800 dark:text-white">{product.title}</p>{typeof product.avg_rating === 'number' && product.avg_rating > 0 && <StarRow value={product.avg_rating} size={12} className="mt-1.5" count={product.reviews_count || 0} />}<p className="mt-2 text-fluid-sm font-extrabold text-emerald-700 dark:text-lime-300">{product.price_on_request ? 'تماس بگیرید' : formatPrice(product.price)}</p></div></Link>; }

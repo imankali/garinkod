@@ -11,6 +11,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft,
@@ -18,6 +19,7 @@ import {
   ChevronRight,
   Flame,
   Sparkles,
+  Star,
   TrendingUp,
   type LucideIcon,
 } from 'lucide-react';
@@ -31,6 +33,23 @@ import { useTranslation } from '../i18n';
 import type { Category, MockProduct, ProductList } from '../types';
 import { convertToMockProduct } from '../utils/convertProduct';
 import { cn } from '../utils/cn';
+
+/** Sort chips — every value is a real `ordering_fields` entry on the API. */
+const SORTS: Array<{ value: string; label: string }> = [
+  { value: '', label: 'پیشنهاد ما' },
+  { value: '-sales_count', label: 'پرفروش‌ترین' },
+  { value: '-avg_rating', label: 'بیشترین امتیاز' },
+  { value: '-publish', label: 'جدیدترین' },
+  { value: 'price', label: 'ارزان‌ترین' },
+  { value: '-price', label: 'گران‌ترین' },
+];
+
+/** Catalogue flags a buyer toggles before looking at brands. */
+const TOGGLES: Array<{ key: string; label: string }> = [
+  { key: 'in_stock', label: 'فقط موجود' },
+  { key: 'has_discount', label: 'فقط تخفیف‌دار' },
+  { key: 'price_on_request', label: 'قیمت استعلامی (عمده)' },
+];
 
 const PAGE_SIZE = 12;
 /** Each curated row shows five products, per the brief. */
@@ -84,6 +103,13 @@ export default function Shop() {
   /** A deep link into one collection shows only that collection, expanded. */
   const collection = searchParams.get('collection') || '';
   const page = Math.max(Number(searchParams.get('page')) || 1, 1);
+  // Facet state lives in the URL, so a filtered catalogue can be shared or
+  // bookmarked («کود آلمان، بسته ۲۵ کیلویی») exactly like a category link.
+  const ordering = searchParams.get('ordering') || '';
+  const brand = searchParams.get('brand') || '';
+  const weight = searchParams.get('package_weight') || '';
+  const activeToggles = TOGGLES.map((item) => item.key).filter((key) => searchParams.get(key) === '1');
+  const filtersActive = Boolean(ordering || brand || weight || activeToggles.length);
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<MockProduct[]>([]);
@@ -104,7 +130,13 @@ export default function Shop() {
       .catch(() => setCategories([]));
   }, []);
 
-  const queryKey = [category, featured, page, collection];
+  const { data: facets } = useQuery({
+    queryKey: ['product-facets'],
+    queryFn: async () => (await productsApi.getFacets()).data,
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const queryKey = [category, featured, page, collection, ordering, brand, weight, ...activeToggles];
 
   useEffect(() => {
     let cancelled = false;
@@ -113,6 +145,12 @@ export default function Shop() {
     const params: Record<string, unknown> = { page, page_size: PAGE_SIZE };
     if (category) params.category = category;
     if (featured) params.is_featured = true;
+    if (ordering) params.ordering = ordering;
+    if (brand) params.brand = brand;
+    if (weight) params.package_weight = weight;
+    activeToggles.forEach((key) => {
+      params[key] = true;
+    });
     if (activeCollection) Object.assign(params, activeCollection.params);
 
     productsApi
@@ -201,6 +239,79 @@ export default function Shop() {
               />
             ))}
           </div>
+
+          {/* Sort + brand + package-size facets */}
+          <div className="mt-4 space-y-3">
+            <div className="no-scrollbar flex items-center gap-2 overflow-x-auto pb-1">
+              <span className="shrink-0 text-fluid-2xs font-bold text-slate-400">مرتب‌سازی:</span>
+              {SORTS.map((item) => (
+                <CategoryChip
+                  key={item.label}
+                  active={ordering === item.value}
+                  label={item.label}
+                  onClick={() => updateParams({ ordering: item.value || undefined, page: undefined })}
+                />
+              ))}
+            </div>
+
+            {(facets?.brands.length || 0) > 1 && (
+              <div className="no-scrollbar flex items-center gap-2 overflow-x-auto pb-1">
+                <span className="shrink-0 text-fluid-2xs font-bold text-slate-400">برند:</span>
+                <CategoryChip
+                  active={!brand}
+                  label={t('common.all')}
+                  onClick={() => updateParams({ brand: undefined, page: undefined })}
+                />
+                {facets?.brands.slice(0, 14).map((item) => (
+                  <CategoryChip
+                    key={item.value}
+                    active={brand === item.value}
+                    label={item.value}
+                    count={item.count}
+                    onClick={() => updateParams({ brand: brand === item.value ? undefined : item.value, page: undefined })}
+                  />
+                ))}
+              </div>
+            )}
+
+            {(facets?.package_weights.length || 0) > 1 && (
+              <div className="no-scrollbar flex items-center gap-2 overflow-x-auto pb-1">
+                <span className="shrink-0 text-fluid-2xs font-bold text-slate-400">بسته‌بندی:</span>
+                {facets?.package_weights.map((item) => (
+                  <CategoryChip
+                    key={item.value}
+                    active={weight === item.value}
+                    label={item.value}
+                    count={item.count}
+                    onClick={() => updateParams({ package_weight: weight === item.value ? undefined : item.value, page: undefined })}
+                  />
+                ))}
+              </div>
+            )}
+
+            <div className="no-scrollbar flex flex-wrap items-center gap-2">
+              {TOGGLES.map((item) => (
+                <CategoryChip
+                  key={item.key}
+                  active={activeToggles.includes(item.key)}
+                  label={item.label}
+                  onClick={() =>
+                    updateParams({ [item.key]: activeToggles.includes(item.key) ? undefined : '1', page: undefined })
+                  }
+                />
+              ))}
+              {filtersActive && (
+                <button
+                  type="button"
+                  onClick={() => updateParams({ ordering: undefined, brand: undefined, package_weight: undefined, page: undefined, ...Object.fromEntries(activeToggles.map((key) => [key, undefined])) })}
+                  className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-fluid-2xs font-bold text-rose-600 transition hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-950/40"
+                >
+                  <Star size={13} />
+                  حذف فیلترها
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </section>
 
@@ -210,7 +321,7 @@ export default function Shop() {
         while a category filter is applied, where the visitor has already
         narrowed the catalogue and expects one list, not four.
       */}
-      {!activeCollection && !category && !featured && (
+      {!activeCollection && !category && !featured && !filtersActive && (
         <div className="mx-auto max-w-7xl space-y-8 px-[var(--page-gutter)] pt-8">
           {CURATED_SECTIONS.map((section) => (
             <CuratedRow

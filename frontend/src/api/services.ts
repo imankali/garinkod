@@ -53,6 +53,14 @@ import type {
   ConsultantFarmerSummary,
   ConsultantFarmerDossier,
   UserAccount,
+  ProductFacets,
+  RatingSummary,
+  SiteArticleCard,
+  SiteArticleDetail,
+  FarmService,
+  SitePage,
+  AboutResponse,
+  SiteContactInfo,
 } from '../types';
 
 // ========================================
@@ -96,6 +104,14 @@ export const productsApi = {
       params: { category: categorySlug },
     });
   },
+
+  /**
+   * Facet values (brand, package size, price ceiling) for the shop filters.
+   * GET /api/products/facets/
+   */
+  getFacets: () => {
+    return apiClient.get<ProductFacets>('/products/facets/');
+  },
 };
 
 // ========================================
@@ -135,7 +151,17 @@ export const commentsApi = {
    * ثبت نظر جدید
    * POST /api/comments/
    */
-  create: (data: { product: number; name: string; email?: string; body: string; parent?: number | null; sticker?: string; image?: File | null }) => {
+  create: (data: {
+    product: number;
+    name: string;
+    email?: string;
+    body: string;
+    parent?: number | null;
+    sticker?: string;
+    image?: File | null;
+    /** 1..5 star score. Omitted for a question, which must not be averaged. */
+    rating?: number | null;
+  }) => {
     if (data.image) {
       const formData = new FormData();
       formData.append('product', String(data.product));
@@ -144,6 +170,7 @@ export const commentsApi = {
       if (data.email) formData.append('email', data.email);
       if (data.parent) formData.append('parent', String(data.parent));
       if (data.sticker) formData.append('sticker', data.sticker);
+      if (data.rating) formData.append('rating', String(data.rating));
       formData.append('image', data.image);
       return apiClient.post<Comment>('/comments/', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
     }
@@ -156,6 +183,13 @@ export const commentsApi = {
    */
   getByProduct: (productSlug: string) => {
     return apiClient.get<Comment[]>('/comments/by_product/', {
+      params: { product: productSlug },
+    });
+  },
+
+  /** Average score, review count and star histogram. GET /api/comments/rating_summary/ */
+  getRatingSummary: (productSlug: string) => {
+    return apiClient.get<RatingSummary>('/comments/rating_summary/', {
       params: { product: productSlug },
     });
   },
@@ -816,4 +850,95 @@ export const avatarApi = {
     });
   },
   remove: () => apiClient.delete<UserAccount>('/profile/avatar/'),
+};
+
+
+// ========================================
+// Site content: blog, growing guides, services, landing pages
+// ========================================
+export interface ArticleQuery {
+  kind?: 'article' | 'guide';
+  crop?: string;
+  search?: string;
+  featured?: boolean;
+  product?: string | number;
+  limit?: number;
+}
+
+export const articlesApi = {
+  /** GET /api/articles/ — published site articles and growing guides. */
+  getAll: (params?: ArticleQuery) => {
+    return apiClient.get<SiteArticleCard[]>('/articles/', { params });
+  },
+
+  /** GET /api/articles/{slug}/ — full body, TOC headings, related products. */
+  getBySlug: (slug: string) => {
+    return apiClient.get<SiteArticleDetail>(`/articles/${slug}/`);
+  },
+
+  /** GET /api/articles/guides/ — growing guides only. */
+  getGuides: () => {
+    return apiClient.get<SiteArticleCard[]>('/articles/guides/');
+  },
+
+  /** Crops that already have a guide. */
+  getCrops: () => {
+    return apiClient.get<Array<{ crop: string; article_count: number }>>('/articles/crops/');
+  },
+
+  getRelated: (slug: string) => {
+    return apiClient.get<SiteArticleCard[]>(`/articles/${slug}/related/`);
+  },
+};
+
+export const farmServicesApi = {
+  /** GET /api/services/catalog/ */
+  getAll: () => {
+    return apiClient.get<FarmService[]>('/services/catalog/');
+  },
+
+  /** GET /api/services/catalog/{slug}/ */
+  getBySlug: (slug: string) => {
+    return apiClient.get<FarmService>(`/services/catalog/${slug}/`);
+  },
+};
+
+export const sitePagesApi = {
+  /** GET /api/pages/ — admin-editable info pages and product landings. */
+  getAll: (params?: { kind?: 'page' | 'landing' }) => {
+    return apiClient.get<SitePage[]>('/pages/', { params });
+  },
+
+  getBySlug: (slug: string) => {
+    return apiClient.get<SitePage>(`/pages/${slug}/`);
+  },
+};
+
+export const siteInfoApi = {
+  /** Company contact channels, maintained in the admin. */
+  getContact: () => {
+    return apiClient.get<SiteContactInfo>('/site/contact/');
+  },
+
+  /** Team, represented brands and counters taken from real rows. */
+  getAbout: () => {
+    return apiClient.get<AboutResponse>('/site/about/');
+  },
+
+  /** What the site can already advise on, per crop. */
+  getGrowingIndex: () => {
+    return apiClient.get<{
+      categories: Array<{ name: string; slug: string; product_count: number; guide_count: number }>;
+      crops: Array<{ crop: string; guide_count: number }>;
+    }>('/guides/index/');
+  },
+};
+
+export const newsletterApi = {
+  subscribe: (data: { email?: string; mobile?: string; topics?: string; source?: string }) => {
+    return apiClient.post<{ subscribed: boolean; message: string }>('/newsletter/subscribe/', data);
+  },
+  unsubscribe: (data: { email?: string; mobile?: string }) => {
+    return apiClient.post<{ unsubscribed: boolean; count: number }>('/newsletter/unsubscribe/', data);
+  },
 };

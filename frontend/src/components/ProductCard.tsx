@@ -175,11 +175,21 @@ export default function ProductCard({
           </div>
         )}
 
-        {/* Price */}
-        <div className="mb-3 flex items-baseline gap-2">
-          <span className="text-sm font-bold text-slate-800 dark:text-white">{formatPrice(product.price)}</span>
-          {product.oldPrice && (
-            <span className="text-xs text-slate-400 line-through">{formatPrice(product.oldPrice)}</span>
+        {/* Price — a quote-only line (bulk stock, price moves weekly) shows
+            «تماس بگیرید» instead of a stale number the shop cannot honour. */}
+        <div className="mb-3 flex flex-wrap items-baseline gap-2">
+          {product.priceOnRequest ? (
+            <>
+              <span className="text-sm font-bold text-slate-800 dark:text-white">تماس بگیرید</span>
+              <span className="text-fluid-2xs text-slate-400">قیمت استعلامی</span>
+            </>
+          ) : (
+            <>
+              <span className="text-sm font-bold text-slate-800 dark:text-white">{formatPrice(product.price)}</span>
+              {product.oldPrice && (
+                <span className="text-xs text-slate-400 line-through">{formatPrice(product.oldPrice)}</span>
+              )}
+            </>
           )}
         </div>
 
