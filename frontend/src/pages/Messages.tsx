@@ -99,7 +99,7 @@ export default function Messages() {
 
   if (!isSessionChecked || loading) {
     return (
-      <main className="flex min-h-[55vh] items-center justify-center">
+      <main className="flex min-h-[55dvh] items-center justify-center">
         <p className="text-sm text-slate-500 dark:text-emerald-200">{t('common.loading')}</p>
       </main>
     );
@@ -107,7 +107,7 @@ export default function Messages() {
 
   if (!isAuthenticated) {
     return (
-      <main className="mx-auto flex min-h-[55vh] max-w-md flex-col items-center justify-center px-4 text-center">
+      <main className="mx-auto flex min-h-[55dvh] max-w-md flex-col items-center justify-center px-4 text-center">
         <MessageCircle size={40} className="text-emerald-500" />
         <h1 className="mt-4 text-xl font-extrabold text-slate-800 dark:text-white">{t('direct.title')}</h1>
         <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-emerald-200">

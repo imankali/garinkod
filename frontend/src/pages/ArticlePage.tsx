@@ -77,7 +77,7 @@ export default function ArticlePage() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center">
+      <div className="flex min-h-[50dvh] items-center justify-center">
         <div className="h-12 w-12 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" />
       </div>
     );
@@ -90,7 +90,7 @@ export default function ArticlePage() {
           <title>مطلب پیدا نشد | گرین کود</title>
           <meta name="robots" content="noindex,nofollow" />
         </Helmet>
-        <div className="mx-auto flex min-h-[50vh] max-w-3xl flex-col items-center justify-center px-4 text-center">
+        <div className="mx-auto flex min-h-[50dvh] max-w-3xl flex-col items-center justify-center px-4 text-center">
           <h1 className="text-2xl font-extrabold text-slate-800 dark:text-white">این مطلب پیدا نشد</h1>
           <p className="mt-3 text-fluid-sm text-slate-500 dark:text-emerald-200">
             ممکن است بازنویسی شده یا هنوز منتشر نشده باشد.

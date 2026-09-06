@@ -75,7 +75,7 @@ export default function ShopQueueGate({ children }: { children: React.ReactNode 
   return (
     <div
       dir="rtl"
-      className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#052e22] via-emerald-900 to-lime-600 p-4"
+      className="flex min-h-dvh items-center justify-center bg-gradient-to-br from-[#052e22] via-emerald-900 to-lime-600 p-4"
     >
       <div className="w-full max-w-xl rounded-[28px] bg-white/95 p-7 text-center shadow-2xl dark:bg-emerald-950/95">
         <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3.5 py-1.5 text-xs font-bold text-emerald-700 dark:bg-emerald-900/60 dark:text-lime-200">

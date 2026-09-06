@@ -943,7 +943,7 @@ function OwnerEditor({
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: 40, opacity: 0 }}
               onSubmit={save}
-              className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-emerald-100 bg-white p-5 shadow-2xl dark:border-emerald-800 dark:bg-emerald-950 sm:p-6"
+              className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-3xl border border-emerald-100 bg-white p-5 shadow-2xl dark:border-emerald-800 dark:bg-emerald-950 sm:p-6"
             >
               <div className="flex items-center justify-between gap-2">
                 <h2 className="text-lg font-extrabold text-slate-800 dark:text-white">
@@ -1116,7 +1116,7 @@ function OwnerComposer({ onPublished }: { onPublished: () => void | Promise<void
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: 40, opacity: 0 }}
               onSubmit={publish}
-              className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-3xl border border-emerald-100 bg-white p-5 shadow-2xl dark:border-emerald-800 dark:bg-emerald-950"
+              className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-3xl border border-emerald-100 bg-white p-5 shadow-2xl dark:border-emerald-800 dark:bg-emerald-950"
             >
               <div className="flex items-center justify-between gap-2">
                 <h2 className="text-lg font-extrabold text-slate-800 dark:text-white">
@@ -1296,7 +1296,7 @@ function PostEditor({
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 40, opacity: 0 }}
             onSubmit={save}
-            className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-3xl border border-emerald-100 bg-white p-5 shadow-2xl dark:border-emerald-800 dark:bg-emerald-950"
+            className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-3xl border border-emerald-100 bg-white p-5 shadow-2xl dark:border-emerald-800 dark:bg-emerald-950"
           >
             <div className="flex items-center justify-between gap-2">
               <h2 className="text-lg font-extrabold text-slate-800 dark:text-white">
@@ -1440,7 +1440,7 @@ function StoryViewer({
           alt={current.caption || 'استوری'}
           width={400}
           height={600}
-          className="max-h-[75vh] w-full rounded-2xl object-contain"
+          className="max-h-[75dvh] w-full rounded-2xl object-contain"
         />
         {current.caption && (
           <figcaption className="mt-3 text-center text-sm text-white/90">{current.caption}</figcaption>

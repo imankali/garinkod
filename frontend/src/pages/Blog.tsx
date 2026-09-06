@@ -189,7 +189,7 @@ export default function Blog({ fixedKind }: { fixedKind?: 'guide' | 'article' })
       {/* Grid */}
       <section className="mt-7" aria-live="polite">
         {isFetching && !articles.length ? (
-          <div className="flex min-h-[30vh] items-center justify-center">
+          <div className="flex min-h-[30dvh] items-center justify-center">
             <div className="h-10 w-10 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" />
           </div>
         ) : articles.length ? (

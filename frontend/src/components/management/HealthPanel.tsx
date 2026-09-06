@@ -154,8 +154,8 @@ export default function HealthPanel() {
             <Fact label="از" value={stamp(data.uptime.started_at)} />
             <Fact label="فایل" value={data.database.file || '—'} />
           </dl>
-          {data.uptime.note ? <p className="mt-3 text-[11px] text-slate-400">{data.uptime.note}</p> : null}
-          <p className="mt-3 text-[11px] leading-6 text-slate-400">
+          {data.uptime.note ? <p className="mt-3 text-fluid-2xs text-slate-400">{data.uptime.note}</p> : null}
+          <p className="mt-3 text-fluid-2xs leading-6 text-slate-400">
             پردازنده گرافیکی برای دیدن وضعیت سرور نمایش داده می‌شود، نه در محاسبهٔ سقف: بار یک فروشگاه نهاده از
             حافظه، دیتابیس و CPU می‌آید، نه از رندر. اگر روزی بار GPU-محوری (مثلاً تحلیل تصویر آفت) روی این
             سرور بیاید، وزنش باید جدا و آگاهانه اضافه شود.
@@ -318,7 +318,7 @@ function PresenceRows({ rows, staff, windowMinutes }: { rows: OpsPresenceRow[]; 
           </tbody>
         </table>
       </div>
-      <p className="mt-3 text-[11px] leading-6 text-slate-400">
+      <p className="mt-3 text-fluid-2xs leading-6 text-slate-400">
         نشانهٔ هر کاربر تا هشت رقم آخرش نمایش داده می‌شود؛ کلید کامل در هیچ پاسخ این سایت نمی‌آید.
       </p>
     </section>
@@ -355,7 +355,7 @@ function SampleStrip({ samples }: { samples: OpsSample[] }) {
           );
         })}
       </div>
-      <p className="mt-3 text-[11px] text-slate-400">
+      <p className="mt-3 text-fluid-2xs text-slate-400">
         ارتفاع هر ستون نسبت به بیشینهٔ همین بازه است؛ عدد دقیق روی ستون با نگه‌داشتن نشانگر دیده می‌شود.
       </p>
     </section>
@@ -497,16 +497,16 @@ function LogRow({ row, onAct }: { row: OpsLogRow; onAct: (row: OpsLogRow, action
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${tone}`}>{row.level_label}</span>
-            <span className="text-[11px] text-slate-500 dark:text-emerald-200">{row.source}</span>
+            <span className={`rounded-full px-2.5 py-1 text-fluid-2xs font-bold ${tone}`}>{row.level_label}</span>
+            <span className="text-fluid-2xs text-slate-500 dark:text-emerald-200">{row.source}</span>
             {row.count > 1 && (
-              <span className="rounded-full bg-emerald-600 px-2.5 py-0.5 text-[11px] font-bold text-white">{fa(row.count)} بار</span>
+              <span className="rounded-full bg-emerald-600 px-2.5 py-0.5 text-fluid-2xs font-bold text-white">{fa(row.count)} بار</span>
             )}
-            {!row.is_open && <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-lime-200"><Check size={12} /> برطرف‌شده</span>}
+            {!row.is_open && <span className="inline-flex items-center gap-1 text-fluid-2xs font-bold text-emerald-700 dark:text-lime-200"><Check size={12} /> برطرف‌شده</span>}
           </div>
           <p className="mt-2 break-words text-sm font-bold text-slate-800 dark:text-white">{row.title}</p>
           {row.message ? <p className="mt-1 break-words text-xs leading-6 text-slate-600 dark:text-emerald-100" dir="auto">{row.message}</p> : null}
-          <p className="mt-2 text-[11px] text-slate-400">
+          <p className="mt-2 text-fluid-2xs text-slate-400">
             {row.method} <span dir="ltr">{row.path}</span> {row.status_code ? `· ${fa(row.status_code)}` : ''} · نخست {stamp(row.first_at)} · آخرین {clock(row.last_at)}
             {row.user ? ` · کاربر: ${row.user}` : ''}
           </p>
@@ -532,7 +532,7 @@ function LogRow({ row, onAct }: { row: OpsLogRow; onAct: (row: OpsLogRow, action
             )}
           </div>
           {!row.is_open && (row.resolved_by || row.note) && (
-            <p className="max-w-[190px] text-end text-[11px] leading-5 text-slate-500 dark:text-emerald-200">
+            <p className="max-w-[190px] text-end text-fluid-2xs leading-5 text-slate-500 dark:text-emerald-200">
               {row.resolved_by ? `${row.resolved_by} · ` : ''}
               {row.resolved_at ? stamp(row.resolved_at) : ''}
               {row.note ? ` — ${row.note}` : ''}
@@ -542,7 +542,7 @@ function LogRow({ row, onAct }: { row: OpsLogRow; onAct: (row: OpsLogRow, action
       </div>
       {row.context && Object.keys(row.context as object).length > 0 ? (
         <details className="mt-3">
-          <summary className="cursor-pointer text-[11px] font-bold text-slate-500 dark:text-emerald-200">بافت درخواست (پاک‌سازی‌شده)</summary>
+          <summary className="cursor-pointer text-fluid-2xs font-bold text-slate-500 dark:text-emerald-200">بافت درخواست (پاک‌سازی‌شده)</summary>
           <pre dir="ltr" className="mt-2 max-h-56 overflow-auto rounded-xl bg-slate-900/90 p-3 text-left text-[10px] leading-5 text-emerald-100">
             {typeof row.context === 'string' ? row.context : JSON.stringify(row.context, null, 2)}
           </pre>
@@ -567,7 +567,7 @@ function Stat({ label, value, hint, tone }: { label: string; value: string; hint
     <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-emerald-900 dark:bg-emerald-950">
       <p className={`text-2xl font-extrabold ${tones[tone]}`}>{value}</p>
       <p className="mt-1 text-xs font-bold text-slate-600 dark:text-emerald-100">{label}</p>
-      {hint ? <p className="mt-1 text-[11px] text-slate-400">{hint}</p> : null}
+      {hint ? <p className="mt-1 text-fluid-2xs text-slate-400">{hint}</p> : null}
     </article>
   );
 }
@@ -575,7 +575,7 @@ function Stat({ label, value, hint, tone }: { label: string; value: string; hint
 function Fact({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl bg-slate-50 px-3 py-2.5 dark:bg-emerald-900/40">
-      <dt className="text-[11px] text-slate-500 dark:text-emerald-200">{label}</dt>
+      <dt className="text-fluid-2xs text-slate-500 dark:text-emerald-200">{label}</dt>
       <dd className="mt-0.5 truncate text-sm font-bold text-slate-800 dark:text-white" title={value}>{value}</dd>
     </div>
   );

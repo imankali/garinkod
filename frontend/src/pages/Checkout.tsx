@@ -251,7 +251,7 @@ export default function Checkout() {
 
   if (!isLoading && !cart?.items.length) {
     return (
-      <main className="mx-auto min-h-[55vh] max-w-3xl px-[var(--page-gutter)] py-8 md:py-12">
+      <main className="mx-auto min-h-[55dvh] max-w-3xl px-[var(--page-gutter)] py-8 md:py-12">
         <PurchaseSteps currentStep="cart" />
         <section className="flex flex-col items-center justify-center py-12 text-center">
           <ClipboardCheck size={50} className="text-emerald-500" />

@@ -125,7 +125,7 @@ export default function ProductDetailModal({
             aria-modal="true"
             aria-label={product?.name ?? "جزئیات محصول"}
             tabIndex={-1}
-            className="fixed inset-x-4 top-1/2 z-[90] mx-auto max-h-[90vh] max-w-3xl -translate-y-1/2 overflow-y-auto rounded-3xl bg-white shadow-2xl outline-none md:inset-x-auto"
+            className="fixed inset-x-4 top-1/2 z-[90] mx-auto max-h-[90dvh] max-w-3xl -translate-y-1/2 overflow-y-auto rounded-3xl bg-white shadow-2xl outline-none md:inset-x-auto"
           >
             {/* Close Button */}
             <motion.button

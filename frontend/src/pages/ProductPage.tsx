@@ -173,8 +173,8 @@ export default function ProductPage() {
     await reviewSubmit.mutateAsync();
   }
 
-  if (isLoading) return <div className="mx-auto flex min-h-[50vh] max-w-7xl items-center justify-center px-4 text-slate-500">در حال بارگذاری محصول...</div>;
-  if (isError || !product) return <><Helmet><title>محصول پیدا نشد | گرین کود</title><meta name="robots" content="noindex,nofollow" /></Helmet><div className="mx-auto flex min-h-[50vh] max-w-7xl flex-col items-center justify-center px-4 text-center"><h1 className="text-2xl font-extrabold text-slate-800 dark:text-white">محصول مورد نظر یافت نشد</h1><Link to="/" className="mt-5 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white">بازگشت به فروشگاه</Link></div></>;
+  if (isLoading) return <div className="mx-auto flex min-h-[50dvh] max-w-7xl items-center justify-center px-4 text-slate-500">در حال بارگذاری محصول...</div>;
+  if (isError || !product) return <><Helmet><title>محصول پیدا نشد | گرین کود</title><meta name="robots" content="noindex,nofollow" /></Helmet><div className="mx-auto flex min-h-[50dvh] max-w-7xl flex-col items-center justify-center px-4 text-center"><h1 className="text-2xl font-extrabold text-slate-800 dark:text-white">محصول مورد نظر یافت نشد</h1><Link to="/" className="mt-5 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white">بازگشت به فروشگاه</Link></div></>;
 
   const category = typeof product.category === "string" ? product.category : product.category?.name;
   const image = product.image_url || FALLBACK_IMAGE;

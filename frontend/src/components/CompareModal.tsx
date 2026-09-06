@@ -120,7 +120,7 @@ export default function CompareModal({ isOpen, items, onClose, onAddToCart }: Co
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.92, y: 30 }}
             transition={{ type: "spring", damping: 26, stiffness: 280 }}
-            className="fixed inset-x-4 top-1/2 z-[90] mx-auto max-h-[85vh] max-w-4xl -translate-y-1/2 overflow-y-auto rounded-3xl bg-white shadow-2xl dark:bg-emerald-950"
+            className="fixed inset-x-4 top-1/2 z-[90] mx-auto max-h-[85dvh] max-w-4xl -translate-y-1/2 overflow-y-auto rounded-3xl bg-white shadow-2xl dark:bg-emerald-950"
             ref={panelRef}
             tabIndex={-1}
             role="dialog"

@@ -118,7 +118,7 @@ export default function ListingComposer({
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 40, opacity: 0 }}
             onSubmit={submit}
-            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-emerald-100 bg-white p-5 shadow-2xl dark:border-emerald-800 dark:bg-emerald-950 sm:p-6"
+            className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-3xl border border-emerald-100 bg-white p-5 shadow-2xl dark:border-emerald-800 dark:bg-emerald-950 sm:p-6"
           >
             <div className="flex items-center justify-between gap-2">
               <h2 className="text-lg font-extrabold text-slate-800 dark:text-white">

@@ -116,7 +116,7 @@ export default function StoryViewer({
         <img
           src={current.image_url}
           alt={current.caption || 'استوری'}
-          className="max-h-[75vh] w-full rounded-2xl object-contain"
+          className="max-h-[75dvh] w-full rounded-2xl object-contain"
         />
         {current.caption && (
           <figcaption className="mt-3 text-center text-sm text-white/90">{current.caption}</figcaption>

@@ -87,7 +87,9 @@ body {
   padding: 0;
   min-height: 100vh;
   min-height: 100dvh; /* ✅ Dynamic viewport height برای موبایل */
-  overflow-x: hidden; /* ✅ فقط horizontal scroll را مخفی کن */
+  /* سرریز افقی را `clip` روی html و body می‌گیرد (پایین همین فایل). `hidden`
+     اینجا body را به یک ظرف اسکرول تبدیل می‌کرد و هر `position: sticky` داخلش را
+     بی‌اثر می‌کرد؛ `clip` ظرف اسکرول نمی‌سازد و همان کار را می‌کند. */
 }
 
 .dark body {

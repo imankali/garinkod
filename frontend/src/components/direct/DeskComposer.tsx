@@ -72,7 +72,7 @@ export default function DeskComposer({
             <Zap size={11} className="shrink-0 text-emerald-500" aria-hidden="true" />
             <span className="min-w-0 flex-1 text-start">
               {label}
-              <span className="ms-1 rounded-full bg-emerald-100 px-1.5 py-px text-[0.625rem] font-bold text-emerald-700 dark:bg-emerald-800/60 dark:text-emerald-100">
+              <span className="ms-1 rounded-full bg-emerald-100 px-1.5 py-px text-fluid-2xs font-bold text-emerald-700 dark:bg-emerald-800/60 dark:text-emerald-100">
                 {replies.length.toLocaleString('fa-IR')}
               </span>
             </span>

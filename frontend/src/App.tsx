@@ -103,7 +103,7 @@ const HAS_CROP_TAGS = false;
 // ========================================
 function LoadingSpinner() {
   return (
-    <div className="flex min-h-[50vh] items-center justify-center py-12">
+    <div className="flex min-h-[50dvh] items-center justify-center py-12">
       <div className="h-12 w-12 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent"></div>
     </div>
   );
@@ -237,9 +237,11 @@ export default function App() {
     <BrowserRouter>
       <RouteSeo />
       <PrivacyAnalytics />
-      {/* ✅ div اصلی با min-h-screen و w-full */}
+      {/* ریشهٔ برنامه: بدون `overflow-x` — همان یک کلاس، کل هدر و پنل‌های sticky
+          را بی‌اثر می‌کرد، چون یک ظرف اسکرول جدید می‌ساخت. سرریز افقی را
+          `overflow-x: clip` روی html/body نگه می‌دارد (index.css). */}
       <div
-        className={`min-h-screen w-full overflow-x-hidden ${isDark ? 'dark' : ''}`}
+        className={`min-h-dvh w-full ${isDark ? 'dark' : ''}`}
         dir={dir}
       >
         {/* ======================================== */}
@@ -493,7 +495,7 @@ export default function App() {
               <Route
                 path="*"
                 element={
-                  <div className="flex min-h-[70vh] items-center justify-center px-4">
+                  <div className="flex min-h-[70dvh] items-center justify-center px-4">
                     <div className="text-center">
                       <div className="text-6xl mb-4">404</div>
                       <p className="text-lg font-bold text-slate-700 dark:text-white">

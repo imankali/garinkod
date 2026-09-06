@@ -44,7 +44,7 @@ export default function SitePageView({ kind }: { kind: 'page' | 'landing' }) {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center">
+      <div className="flex min-h-[50dvh] items-center justify-center">
         <div className="h-12 w-12 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" />
       </div>
     );
@@ -57,7 +57,7 @@ export default function SitePageView({ kind }: { kind: 'page' | 'landing' }) {
           <title>صفحه پیدا نشد | گرین کود</title>
           <meta name="robots" content="noindex,nofollow" />
         </Helmet>
-        <div className="mx-auto flex min-h-[50vh] max-w-3xl flex-col items-center justify-center px-4 text-center">
+        <div className="mx-auto flex min-h-[50dvh] max-w-3xl flex-col items-center justify-center px-4 text-center">
           <h1 className="text-2xl font-extrabold text-slate-800 dark:text-white">این صفحه در دسترس نیست</h1>
           <p className="mt-3 text-fluid-sm text-slate-500 dark:text-emerald-200">
             ممکن است منتشر نشده یا جابه‌جا شده باشد.
@@ -313,7 +313,10 @@ function Block({ block }: { block: SitePageBlock }) {
               {block.title}
             </h2>
           )}
-          <table className="w-full text-fluid-sm">
+          {/* A table that does not fit is scrolled, never clipped: `overflow-hidden`
+              on the card would otherwise cut the last column off the page. */}
+          <div className="overflow-x-auto overscroll-contain">
+          <table className="w-full min-w-[30rem] text-fluid-sm">
             <tbody>
               {rows.map((row, index) => (
                 <tr
@@ -341,6 +344,7 @@ function Block({ block }: { block: SitePageBlock }) {
               ))}
             </tbody>
           </table>
+          </div>
           {block.text && <p className="border-t border-slate-100 px-5 py-3 text-fluid-2xs text-slate-400 dark:border-emerald-900">{block.text}</p>}
         </section>
       );

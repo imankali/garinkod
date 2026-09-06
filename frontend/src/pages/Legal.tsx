@@ -115,7 +115,7 @@ export default function Legal() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center">
+      <div className="flex min-h-[50dvh] items-center justify-center">
         <div className="h-12 w-12 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" />
       </div>
     );
@@ -128,7 +128,7 @@ export default function Legal() {
           <title>سند حقوقی پیدا نشد | گرین کود</title>
           <meta name="robots" content="noindex,nofollow" />
         </Helmet>
-        <div className="page-shell flex min-h-[50vh] flex-col items-center justify-center py-16 text-center">
+        <div className="page-shell flex min-h-[50dvh] flex-col items-center justify-center py-16 text-center">
           <h1 className="text-fluid-xl font-extrabold text-slate-800 dark:text-white">این سند در دسترس نیست</h1>
           <p className="mt-3 max-w-md text-fluid-sm leading-7 text-slate-500 dark:text-emerald-200">
             ممکن است جابه‌جا شده باشد. از فهرست اسناد حقوقی می‌توانید سند درست را پیدا کنید.

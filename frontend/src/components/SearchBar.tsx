@@ -417,7 +417,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.98 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
-            className="absolute start-0 top-[calc(100%+10px)] z-50 max-h-[70vh] w-full overflow-y-auto overscroll-contain rounded-2xl shadow-2xl shadow-emerald-900/10"
+            className="absolute start-0 top-[calc(100%+10px)] z-50 max-h-[70dvh] w-full overflow-y-auto overscroll-contain rounded-2xl shadow-2xl shadow-emerald-900/10"
           >
             <div className="rounded-2xl border border-emerald-100 bg-white/95 p-3 backdrop-blur-xl dark:border-emerald-800 dark:bg-emerald-950/95">
               <div className="mb-3 flex items-center justify-between">
@@ -511,7 +511,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.98 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
-            className="absolute start-0 top-[calc(100%+10px)] z-50 max-h-[70vh] w-full overflow-y-auto rounded-2xl border border-emerald-100 bg-white/95 p-3 shadow-2xl shadow-emerald-900/10 backdrop-blur-xl dark:border-emerald-800 dark:bg-emerald-950/95"
+            className="absolute start-0 top-[calc(100%+10px)] z-50 max-h-[70dvh] w-full overflow-y-auto rounded-2xl border border-emerald-100 bg-white/95 p-3 shadow-2xl shadow-emerald-900/10 backdrop-blur-xl dark:border-emerald-800 dark:bg-emerald-950/95"
           >
             {/* Voice Search Listening Indicator */}
             {isListening && (
@@ -693,7 +693,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-3xl border border-emerald-100 bg-white p-5 shadow-2xl dark:border-emerald-900 dark:bg-emerald-950 sm:p-6"
+              className="max-h-[90dvh] w-full max-w-xl overflow-y-auto rounded-3xl border border-emerald-100 bg-white p-5 shadow-2xl dark:border-emerald-900 dark:bg-emerald-950 sm:p-6"
             >
               <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-emerald-900">
                 <div className="flex items-center gap-2">

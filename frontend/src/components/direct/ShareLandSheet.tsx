@@ -139,7 +139,7 @@ export default function ShareLandSheet({
           )
         ) : (
           <div className="space-y-3">
-            <ul className="max-h-[52vh] space-y-2 overflow-y-auto overscroll-contain px-0.5">
+            <ul className="max-h-[52dvh] space-y-2 overflow-y-auto overscroll-contain px-0.5">
               {lands.map((land) => (
                 <li key={land.id}>
                   <button

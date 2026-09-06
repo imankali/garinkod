@@ -240,7 +240,7 @@ export default function Shop() {
       : t('shop.allProducts');
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-emerald-50/60 via-white to-white pb-10 dark:from-emerald-950/40 dark:via-[#052e22] dark:to-emerald-950">
+    <main className="min-h-dvh bg-gradient-to-b from-emerald-50/60 via-white to-white pb-10 dark:from-emerald-950/40 dark:via-[#052e22] dark:to-emerald-950">
       {/* Page header */}
       <section className="border-b border-emerald-100 bg-white/70 py-6 dark:border-emerald-900/50 dark:bg-emerald-950/40 md:py-10">
         <div className="mx-auto max-w-7xl px-[var(--page-gutter)]">
@@ -350,7 +350,7 @@ export default function Shop() {
                   }
                 />
               ))}
-              <span className="shrink-0 pr-2 text-fluid-2xs font-bold text-slate-400">نمایش:</span>
+              <span className="shrink-0 pe-2 text-fluid-2xs font-bold text-slate-400">نمایش:</span>
               {PAGE_SIZES.map((size) => (
                 <CategoryChip
                   key={size}
@@ -438,7 +438,7 @@ export default function Shop() {
         </div>
 
         {loading ? (
-          <div className="flex min-h-[40vh] items-center justify-center">
+          <div className="flex min-h-[40dvh] items-center justify-center">
             <div className="h-10 w-10 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" />
           </div>
         ) : products.length === 0 ? (

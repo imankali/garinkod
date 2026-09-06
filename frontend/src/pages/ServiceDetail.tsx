@@ -57,7 +57,7 @@ export default function ServiceDetail() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center">
+      <div className="flex min-h-[50dvh] items-center justify-center">
         <div className="h-12 w-12 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" />
       </div>
     );
@@ -65,7 +65,7 @@ export default function ServiceDetail() {
 
   if (isError || !service) {
     return (
-      <div className="mx-auto flex min-h-[50vh] max-w-3xl flex-col items-center justify-center px-4 text-center">
+      <div className="mx-auto flex min-h-[50dvh] max-w-3xl flex-col items-center justify-center px-4 text-center">
         <h1 className="text-2xl font-extrabold text-slate-800 dark:text-white">این خدمت پیدا نشد</h1>
         <Link to="/services" className="mt-5 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white">
           فهرست خدمات

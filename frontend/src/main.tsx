@@ -103,7 +103,7 @@ class ErrorBoundary extends (await import("react")).Component<
     if (this.state.hasError) {
       const detail = this.state.error?.message ? String(this.state.error.message).slice(0, 300) : '';
       return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-lime-50 p-4" dir="rtl">
+        <div className="min-h-dvh flex items-center justify-center bg-gradient-to-br from-emerald-50 to-lime-50 p-4" dir="rtl">
           <div className="max-w-md text-center bg-white rounded-3xl p-8 shadow-2xl">
             <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-2xl font-black text-emerald-700">!</div>
             <h1 className="text-xl font-bold text-slate-800 mb-2">همین لحظه صفحهٔ سایت از کار افتاد</h1>
