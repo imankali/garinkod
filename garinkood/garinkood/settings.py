@@ -316,6 +316,22 @@ if not DEBUG:
     SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
+# A sandbox preview is opened inside an iframe of another site, and a SameSite=Lax
+# cookie is simply not sent from such a frame: the login answers «welcome» and the
+# very next request is a stranger again, which looks exactly like a wrong password.
+# This flag is how that case is served — the cookies become SameSite=None; Secure,
+# which the preview's own HTTPS satisfies. It is a development switch: in production
+# the shop keeps Lax, because widening cookie scope for no user benefit is a CSRF
+# surface nobody needs. See shop.W110.
+PREVIEW_IFRAME_COOKIES = config("GK_PREVIEW_IFRAME_COOKIES", default=False, cast=bool)
+if PREVIEW_IFRAME_COOKIES:
+    AUTH_COOKIE_SAMESITE = "None"
+    AUTH_COOKIE_SECURE = True
+    SESSION_COOKIE_SAMESITE = "None"
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SAMESITE = "None"
+    CSRF_COOKIE_SECURE = True
+
 # Structured logging. Throttle events go to their own logger so a monitoring
 # system can alert on a spike of blocked requests (a sign of either an attack
 # or a limit set too tight) without wading through request noise.

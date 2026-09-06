@@ -251,3 +251,30 @@ memory facts, whether one `source` in the log is dominating (one bad view is
 cheaper to fix than a bigger server), and only then the plan's size. Presence
 and sample tables prune themselves — a day of samples and two days of beats is
 kept — so the feature that watches the disk cannot become the thing that fills it.
+
+## 13. Signing in from an embedded preview
+
+A development preview is usually shown inside an iframe of another host. That host is a
+third-party context for the browser, and a `SameSite=Lax` cookie is never sent from one —
+the shop answers the login with a session cookie, the browser keeps it to itself, and the
+next request is a stranger again. The visitor sees «خطا» and is thrown back to the door;
+five attempts in five seconds, each with a brand-new session row in `django_session`, and
+no error anywhere in the log. Nothing is broken, which is exactly what makes this hard to
+spot.
+
+Three things cover it:
+
+- **`GK_PREVIEW_IFRAME_COOKIES=1`** (settings: `PREVIEW_IFRAME_COOKIES`) moves the auth,
+  session and CSRF cookies to `SameSite=None; Secure`, which an iframe can carry. It is a
+  local switch: production keeps `Lax`, because widening cookie scope for nobody's benefit
+  is a CSRF surface. Requires the preview to be served over HTTPS, as the sandbox's is.
+- **`shop.W110`** warns at `manage.py check` if the flag is on while `DEBUG` is off — the
+  misconfiguration is reported where it is set, not after the outage it prevents.
+- **`CookieJarNotice`** in the SPA verifies a sign-in actually stuck: after every password,
+  OTP and registration success the store probes `/api/auth/session/` once, and if the
+  session is anonymous it clears the half-logged state, keeps the visitor on the form, and
+  says what to do (open the preview in its own tab, unblock third-party cookies for the
+  address, leave strict private mode) instead of looping.
+
+The workaround that needs no flag is the one to reach for first: open the preview in its own
+browser tab, where the cookie is first-party and the flow is exactly the one the tests cover.

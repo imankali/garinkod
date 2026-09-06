@@ -33,6 +33,7 @@ import FeaturedStorefronts from "./components/home/FeaturedStorefronts";
 import DirectMessagesDrawer from "./components/direct/DirectMessagesDrawer";
 import RouteSeo from "./components/RouteSeo";
 import LoginModal from "./components/LoginModal";
+import CookieJarNotice from "./components/CookieJarNotice";
 import PrivacyAnalytics from "./components/PrivacyAnalytics";
 
 // ========================================
@@ -586,6 +587,11 @@ export default function App() {
         {/* Sign-in dialog used by every gated action (reviews, consult) */}
         {/* ======================================== */}
         <LoginModal />
+
+        {/* ======================================== */}
+        {/* A sign-in the browser cannot keep is explained, never looped */}
+        {/* ======================================== */}
+        <CookieJarNotice />
       </div>
     </BrowserRouter>
   );

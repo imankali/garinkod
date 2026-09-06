@@ -51,6 +51,14 @@ interface AuthState {
   clearAuth: () => void;
   uploadAvatar: (file: File) => Promise<void>;
   removeAvatar: () => Promise<void>;
+  /**
+   * True when the server accepted the credentials but the browser will not keep
+   * the session cookie. The login forms then show what to do about it instead of
+   * letting the visitor spin.
+   */
+  cookieBlocked: boolean;
+  recheckCookieJar: () => Promise<boolean>;
+  dismissCookieNotice: () => void;
 }
 
 const signedOutState = {
@@ -59,13 +67,34 @@ const signedOutState = {
   isAuthenticated: false,
 };
 
-export const useAuthStore = create<AuthState>((set) => ({
+/**
+ * Does the browser actually keep what the shop just gave it?
+ *
+ * A cookie-less follow-up makes a correct password look broken: the server says
+ * «welcome», the next request is a stranger, and the visitor is back at the door.
+ * It happens when the site is opened inside an iframe of another origin (the usual
+ * sandbox preview), with third-party cookies blocked, and in some private-browsing
+ * modes. One cheap probe after each sign-in turns that loop into a sentence.
+ */
+async function sessionSurvivesTheBrowser(): Promise<boolean> {
+  try {
+    const response = await authApi.session();
+    return Boolean(response.data?.user);
+  } catch {
+    return false;
+  }
+}
+
+export const useAuthStore = create<AuthState>((set, get) => ({
   ...signedOutState,
   isLoading: false,
   isSessionChecked: false,
+  cookieBlocked: false,
 
   initializeSession: async () => {
-    set({ isLoading: true });
+    // Every page load is a fresh chance: the visitor may have opened the site in
+    // its own tab or allowed cookies since the last attempt.
+    set({ isLoading: true, cookieBlocked: false });
     try {
       const response = await authApi.session();
       set({
@@ -84,7 +113,12 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true });
     try {
       const response = await authApi.login(username, password);
-      set({ user: response.data.user, account: response.data.account, isAuthenticated: true, isLoading: false, isSessionChecked: true });
+      if (!(await sessionSurvivesTheBrowser())) {
+        set({ ...signedOutState, cookieBlocked: true, isLoading: false, isSessionChecked: true });
+        toast.error('رمز درست بود، اما مرورگر کوکی نشست را نگه نداشت.');
+        return;
+      }
+      set({ user: response.data.user, account: response.data.account, isAuthenticated: true, isLoading: false, isSessionChecked: true, cookieBlocked: false });
       toast.success('ورود با موفقیت انجام شد');
     } catch (error) {
       const parsed = parseApiError(error);
@@ -114,12 +148,19 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true });
     try {
       const response = await authApi.verifyOtp(data);
+      const kept = await sessionSurvivesTheBrowser();
+      if (!kept) {
+        set({ ...signedOutState, cookieBlocked: true, isLoading: false, isSessionChecked: true });
+        toast.error('کد درست بود، اما مرورگر کوکی نشست را نگه نداشت.');
+        return;
+      }
       set({
         user: response.data.user,
         account: response.data.account,
         isAuthenticated: true,
         isLoading: false,
         isSessionChecked: true,
+        cookieBlocked: false,
       });
       toast.success(response.data.created ? 'حساب شما ساخته شد؛ خوش آمدید' : 'ورود با موفقیت انجام شد');
     } catch (error) {
@@ -132,7 +173,12 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true });
     try {
       const response = await authApi.register(data);
-      set({ user: response.data.user, account: response.data.account, isAuthenticated: true, isLoading: false, isSessionChecked: true });
+      if (!(await sessionSurvivesTheBrowser())) {
+        set({ ...signedOutState, cookieBlocked: true, isLoading: false, isSessionChecked: true });
+        toast.error('حساب ساخته شد، اما مرورگر کوکی نشست را نگه نداشت.');
+        return;
+      }
+      set({ user: response.data.user, account: response.data.account, isAuthenticated: true, isLoading: false, isSessionChecked: true, cookieBlocked: false });
       toast.success('ثبت‌نام با موفقیت انجام شد');
     } catch (error) {
       const parsed = parseApiError(error);
@@ -146,13 +192,22 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
 
+  recheckCookieJar: async () => {
+    const kept = await sessionSurvivesTheBrowser();
+    set({ cookieBlocked: !kept });
+    if (kept) await get().initializeSession();
+    return kept;
+  },
+
+  dismissCookieNotice: () => set({ cookieBlocked: false }),
+
   logout: async () => {
     try {
       await authApi.logout();
     } catch {
       // Clear local state even if the server-side session already expired.
     } finally {
-      set({ ...signedOutState, isSessionChecked: true });
+      set({ ...signedOutState, isSessionChecked: true, cookieBlocked: false });
       toast.success('خروج با موفقیت انجام شد');
     }
   },

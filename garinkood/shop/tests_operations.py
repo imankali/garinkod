@@ -12,12 +12,14 @@ the measurement is mocked at the /proc boundary and the arithmetic is checked by
 import json
 from datetime import timedelta
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 from . import capacity
+from .checks import integration_configuration_check
 from .admission import ADMISSION_QUERY_PATH, REFRESH_SECONDS
 from .models import (
     CapacitySettings, Order, PlatformFeedback, PresenceBeat, Product, QueueTicket,
@@ -787,3 +789,54 @@ class AdminOpsScreensTests(TestCase):
         self.assertIsNone(row.resolved_at)
         self.assertIsNone(row.resolved_by)
 
+class PreviewCookieFlagTests(TestCase):
+    """The switch that lets a preview inside an iframe keep its session.
+
+    A preview served from another origin is a third-party context, and a
+    SameSite=Lax cookie is simply never sent from one: the shop accepts the
+    password, the next request is a stranger again, and the visitor reads that as a
+    wrong password. The flag is how that case is served, and the deployment check is
+    what keeps it out of production.
+    """
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='preview-guest', password='Str0ngPassw0rd!'
+        )
+
+    def test_the_warning_is_raised_outside_debug(self):
+        with override_settings(PREVIEW_IFRAME_COOKIES=True, DEBUG=False):
+            ids = [item.id for item in integration_configuration_check(None)]
+        self.assertIn('shop.W110', ids)
+
+    def test_debug_is_quiet_about_the_flag(self):
+        with override_settings(PREVIEW_IFRAME_COOKIES=True, DEBUG=True):
+            ids = [item.id for item in integration_configuration_check(None)]
+        self.assertNotIn('shop.W110', ids)
+
+    def test_the_login_response_carries_whatever_the_settings_say(self):
+        """Guards the wiring: the cookie reads settings, never a hard-coded value.
+
+        A response builder that ignores AUTH_COOKIE_SAMESITE would make the flag a
+        lie — the preview would keep looping while the check said everything was
+        configured.
+        """
+        with override_settings(
+            DEBUG=True,
+            PREVIEW_IFRAME_COOKIES=True,
+            AUTH_COOKIE_SAMESITE='None',
+            AUTH_COOKIE_SECURE=True,
+            SESSION_COOKIE_SAMESITE='None',
+            SESSION_COOKIE_SECURE=True,
+        ):
+            response = self.client.post(
+                '/api/auth/login/',
+                {'username': 'preview-guest', 'password': 'Str0ngPassw0rd!'},
+                content_type='application/json',
+            )
+        self.assertEqual(response.status_code, 200, response.content[:400])
+        for name in (settings.AUTH_COOKIE_NAME, 'sessionid'):
+            with self.subTest(cookie=name):
+                morsel = response.cookies[name]
+                self.assertEqual(morsel['samesite'], 'None')
+                self.assertTrue(morsel['secure'])
