@@ -91,6 +91,16 @@ export default function ConversationRow({
           >
             {identity.channelLabel}
           </span>
+          {/*
+            Two states a desk thread can be in that change what the reader should
+            do next: it was ended (so writing again reopens it), or it ended and
+            the survey is still unanswered (so the desk's performance is rated).
+          */}
+          {conversation.status === 'closed' && (
+            <span className="inline-flex shrink-0 items-center rounded-full bg-slate-100 px-1.5 py-0.5 text-fluid-2xs font-bold text-slate-600 dark:bg-emerald-900 dark:text-emerald-200">
+              {conversation.survey.can_rate ? 'نظرخواهی' : 'بسته شده'}
+            </span>
+          )}
           <span
             className={cn(
               'truncate text-fluid-xs',

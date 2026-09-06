@@ -2,6 +2,14 @@
 
 import apiClient from './client';
 import type {
+  BuyerExperiencesResponse,
+  CatalogIndex,
+  CatalogKind,
+  CatalogLanding,
+  LegalDocument,
+  LegalIndex,
+  LevelRank,
+  SitePolicies,
   Product,
   ProductList,
   Category,
@@ -32,6 +40,9 @@ import type {
   Wallet,
   StorefrontPost,
   StorefrontPostComment,
+  DeskState,
+  DeskRatingReport,
+  ServiceConversationResponse,
   ManagementDashboard,
   ManagementStaffMember,
   ManagementAuditLog,
@@ -53,6 +64,14 @@ import type {
   ConsultantFarmerSummary,
   ConsultantFarmerDossier,
   UserAccount,
+  ProductFacets,
+  RatingSummary,
+  SiteArticleCard,
+  SiteArticleDetail,
+  FarmService,
+  SitePage,
+  AboutResponse,
+  SiteContactInfo, LevelsSnapshot,
 } from '../types';
 
 // ========================================
@@ -96,6 +115,14 @@ export const productsApi = {
       params: { category: categorySlug },
     });
   },
+
+  /**
+   * Facet values (brand, package size, price ceiling) for the shop filters.
+   * GET /api/products/facets/
+   */
+  getFacets: () => {
+    return apiClient.get<ProductFacets>('/products/facets/');
+  },
 };
 
 // ========================================
@@ -124,6 +151,21 @@ export const categoriesApi = {
 // ========================================
 export const commentsApi = {
   /**
+   * «مفید بود» را روشن/خاموش می‌کند.
+   * POST /api/comments/{id}/helpful/
+   */
+  toggleHelpful: (id: number) => {
+    return apiClient.post<{ voted: boolean; helpful_count: number }>(`/comments/${id}/helpful/`);
+  },
+
+  /**
+   * یک دیدگاه را برای بررسی به میز پشتیبانی می‌فرستد؛ منتشرشده را پنهان نمی‌کند.
+   * POST /api/comments/{id}/report/
+   */
+  report: (id: number, reason?: string) => {
+    return apiClient.post<{ reported: boolean }>(`/comments/${id}/report/`, { reason: reason || '' });
+  },
+  /**
    * دریافت لیست نظرات
    * GET /api/comments/
    */
@@ -135,7 +177,17 @@ export const commentsApi = {
    * ثبت نظر جدید
    * POST /api/comments/
    */
-  create: (data: { product: number; name: string; email?: string; body: string; parent?: number | null; sticker?: string; image?: File | null }) => {
+  create: (data: {
+    product: number;
+    name: string;
+    email?: string;
+    body: string;
+    parent?: number | null;
+    sticker?: string;
+    image?: File | null;
+    /** 1..5 star score. Omitted for a question, which must not be averaged. */
+    rating?: number | null;
+  }) => {
     if (data.image) {
       const formData = new FormData();
       formData.append('product', String(data.product));
@@ -144,6 +196,7 @@ export const commentsApi = {
       if (data.email) formData.append('email', data.email);
       if (data.parent) formData.append('parent', String(data.parent));
       if (data.sticker) formData.append('sticker', data.sticker);
+      if (data.rating) formData.append('rating', String(data.rating));
       formData.append('image', data.image);
       return apiClient.post<Comment>('/comments/', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
     }
@@ -156,6 +209,13 @@ export const commentsApi = {
    */
   getByProduct: (productSlug: string) => {
     return apiClient.get<Comment[]>('/comments/by_product/', {
+      params: { product: productSlug },
+    });
+  },
+
+  /** Average score, review count and star histogram. GET /api/comments/rating_summary/ */
+  getRatingSummary: (productSlug: string) => {
+    return apiClient.get<RatingSummary>('/comments/rating_summary/', {
       params: { product: productSlug },
     });
   },
@@ -177,8 +237,13 @@ export const cartApi = {
    * افزودن محصول به سبد خرید
    * POST /api/cart/add/
    */
-  add: (productId: number, quantity: number = 1) => {
-    return apiClient.post<Cart>('/cart/add/', { product_id: productId, quantity });
+  add: (productId: number, quantity: number = 1, packageId?: number | null) => {
+    return apiClient.post<Cart>('/cart/add/', {
+      product_id: productId,
+      quantity,
+      // Which bag was picked, when the product sells in more than one.
+      ...(packageId ? { package_id: packageId } : {}),
+    });
   },
 
   /**
@@ -519,6 +584,20 @@ export const rewardsApi = {
 // ========================================
 // Direct messages (DM) between buyers and storefronts
 // ========================================
+// Levels (نردبان دسترسی)
+// ========================================
+/**
+ * The access ladder: every rank, what it unlocks, and where the viewer stands.
+ *
+ * The UI mirrors the eight numbers in `types/index.ts` for gating, but the
+ * wording and the matrix are read from here so a description can never claim a
+ * permission the server would refuse.
+ */
+export const levelsApi = {
+  snapshot: () => apiClient.get<LevelsSnapshot>('/levels/'),
+};
+
+// ========================================
 export const messagesApi = {
   /** The caller's whole inbox, optionally narrowed to one channel. */
   conversations: (channel?: MessageChannel) =>
@@ -526,9 +605,13 @@ export const messagesApi = {
       params: channel ? { channel } : undefined,
     }),
 
-  /** Open (or fetch) the caller's thread with a service desk. */
+  /**
+   * Open (or fetch) the caller's thread with a service desk. The response also
+   * carries the desk's state (hours, who is online, canned replies), because a
+   * chat window without that context is just a void you type into.
+   */
   openServiceConversation: (channel: Exclude<MessageChannel, 'storefront'>) =>
-    apiClient.post<StorefrontConversation>(`/marketplace/conversations/service/${channel}/`),
+    apiClient.post<ServiceConversationResponse>(`/marketplace/conversations/service/${channel}/`),
 
   /** A consultant starts the consulting thread with one farmer. */
   openFarmerConversation: (userId: number) =>
@@ -552,12 +635,14 @@ export const messagesApi = {
       { params: { page } },
     ),
 
-  /** Send a message: text, a listing card, and/or one media attachment. */
+  /** Send a message: text, a listing or land card, and/or one media attachment. */
   send: (
     conversationId: number,
     data: {
       body?: string;
       listing?: number;
+      /** A land case file, shared with the desk that is advising on it. */
+      land?: number | null;
       attachment?: Blob | null;
       attachmentName?: string;
       attachmentDuration?: number;
@@ -570,6 +655,7 @@ export const messagesApi = {
       return apiClient.post<StorefrontMessage>(url, {
         body: data.body,
         listing: data.listing,
+        land: data.land ?? undefined,
         reply_to: data.replyTo ?? undefined,
       });
     }
@@ -578,6 +664,7 @@ export const messagesApi = {
     const formData = new FormData();
     if (data.body) formData.append('body', data.body);
     if (data.listing) formData.append('listing', String(data.listing));
+    if (data.land) formData.append('land', String(data.land));
     if (data.replyTo) formData.append('reply_to', String(data.replyTo));
     formData.append('attachment', data.attachment, data.attachmentName || 'attachment');
     if (data.attachmentDuration !== undefined) {
@@ -585,6 +672,29 @@ export const messagesApi = {
     }
     return apiClient.post<StorefrontMessage>(url, formData);
   },
+
+  /** End a thread (or reopen it). Either side may do it; closing opens the survey. */
+  close: (
+    conversationId: number,
+    data: { note?: string; reopen?: boolean } = {},
+  ) =>
+    apiClient.post<StorefrontConversation>(`/desk/conversations/${conversationId}/close/`, data),
+
+  /** The satisfaction survey, once per closed thread, from the customer only. */
+  rate: (
+    conversationId: number,
+    data: { score: number; solved?: boolean | null; comment?: string },
+  ) => apiClient.post(`/desk/conversations/${conversationId}/rate/`, data),
+
+  /** An operator moving a question to the other desk, with the context attached. */
+  handoff: (
+    conversationId: number,
+    data: { target: 'consulting' | 'support'; note?: string; include_context?: boolean },
+  ) =>
+    apiClient.post<{ message: StorefrontMessage; target_conversation_id: number }>(
+      `/desk/conversations/${conversationId}/handoff/`,
+      data,
+    ),
 
   /** Change the text of one of the caller's own messages. */
   edit: (conversationId: number, messageId: number, body: string) =>
@@ -598,6 +708,33 @@ export const messagesApi = {
     apiClient.delete<StorefrontMessage>(
       `/marketplace/conversations/${conversationId}/messages/${messageId}/`,
     ),
+};
+
+// ========================================
+// Service desks: hours, presence, canned replies, satisfaction
+// ========================================
+
+export const deskApi = {
+  /**
+   * Who is on duty, when the desk answers and which canned lines to offer.
+   * Public, because the hours are the first thing a farmer checks before
+   * writing — the roster of names and the replies need a session.
+   */
+  state: (channel: DeskState['channel']) =>
+    apiClient.get<DeskState>('/desk/state/', { params: { channel } }),
+
+  /** The staff view of one desk: open, unassigned, or assigned to me. */
+  queue: (params: { channel?: string; assigned_to?: 'me' | 'unassigned' } = {}) =>
+    apiClient.get<{
+      count: number;
+      results: StorefrontConversation[];
+      unassigned: number;
+      open: number;
+    }>('/desk/queue/', { params }),
+
+  /** Satisfaction numbers, for the desk's managers only. */
+  ratings: (params: { channel?: string; agent?: number; days?: number } = {}) =>
+    apiClient.get<DeskRatingReport>('/desk/ratings/', { params }),
 };
 
 // ========================================
@@ -759,7 +896,16 @@ export const managementApi = {
       total_pages: number;
       results: ModerationQueueRow[];
     }>('/management/moderation/queue/', { params }),
-  users: (params?: { search?: string; level?: string; page?: number; page_size?: number }) =>
+  users: (params?: {
+    search?: string;
+    level?: string;
+    /** «who is in the shop right now» — presence rows, not a guess. */
+    online?: 1;
+    /** The opposite question: people with an account who have not come lately. */
+    inactive?: 1;
+    page?: number;
+    page_size?: number;
+  }) =>
     apiClient.get<{
       count: number;
       page: number;
@@ -767,6 +913,9 @@ export const managementApi = {
       total_pages: number;
       levels: { value: number; label: string }[];
       results: ManagedUser[];
+      presence_window_minutes?: number;
+      /** The ladder with what each step unlocks, so the console explains itself. */
+      ladder?: LevelRank[];
     }>('/management/users/', { params }),
   updateUser: (username: string, data: { level?: number; is_active?: boolean }) =>
     apiClient.patch<{ username: string; level: number; is_active: boolean; is_staff: boolean }>(
@@ -802,7 +951,155 @@ export interface ManagedUser {
   is_superuser: boolean;
   groups: string[];
   date_joined: string;
+  /** Only sent by the management directory; the health panel is what reads them. */
+  orders?: number;
+  reviews?: number;
+  online?: boolean;
+  last_seen_at?: string | null;
+  requests_in_window?: number;
+  current_path?: string;
 }
+
+// ========================================
+// Operations: measured capacity, the waiting room and the system log
+// ========================================
+
+export interface OpsMeasurements {
+  cpu_count: number | null;
+  load_1m: number | null;
+  load_5m: number | null;
+  memory_total_mb: number | null;
+  memory_available_mb: number | null;
+  container_limit_mb: number | null;
+  disk_free_mb: number | null;
+  gpu: string;
+}
+
+export interface OpsSample {
+  at: string;
+  online: number;
+  online_users: number;
+  online_guests: number;
+  waiting: number;
+  capacity: number;
+  basis: string;
+  load_1m: number | null;
+  memory_available_mb: number | null;
+  disk_free_mb: number | null;
+}
+
+export interface OpsPresenceRow {
+  identity: string;
+  kind: string;
+  kind_label: string;
+  path: string;
+  requests: number;
+  last_seen_at: string;
+  who: string;
+  is_staff: boolean;
+}
+
+export interface OpsHealth {
+  capacity: number;
+  capacity_basis: string;
+  strategy: string;
+  strategy_label: string;
+  inside_now: number;
+  online_users: number;
+  online_guests: number;
+  waiting_now: number;
+  spare_places: number;
+  utilisation_percent: number;
+  activity_window_minutes: number;
+  measured_at: string;
+  measurements: OpsMeasurements;
+  uptime: { process_seconds: number; label: string; started_at: string; note: string };
+  database: { vendor: string; label: string; file: string };
+  queue: {
+    enabled: boolean;
+    max_minutes: number;
+    waiting: number;
+    admitted_recently: number;
+    next_positions: Array<{ position: number; path: string; waiting_minutes: number }>;
+  };
+  presence: {
+    window_minutes: number;
+    since: string;
+    staff: number;
+    recent: OpsPresenceRow[];
+  };
+  signals: {
+    users_total: number;
+    users_active: number;
+    products_published: number;
+    orders_today: number;
+    orders_24h: number;
+    reviews_today: number;
+    open_logs: number;
+    errors_24h: number;
+  };
+  samples: OpsSample[];
+}
+
+export interface OpsLogRow {
+  id: number;
+  level: string;
+  level_label: string;
+  source: string;
+  title: string;
+  message: string;
+  path: string;
+  method: string;
+  status_code: number | null;
+  count: number;
+  first_at: string;
+  last_at: string;
+  user: string;
+  is_open: boolean;
+  resolved_at: string | null;
+  resolved_by: string;
+  note: string;
+  context: Record<string, unknown> | string;
+}
+
+export interface OpsLogPage {
+  count: number;
+  page: number;
+  pages: number;
+  summary: {
+    error_24h: number;
+    warning_24h: number;
+    notice_24h: number;
+    open: number;
+    occurrences_open: number;
+  };
+  sources: Array<{ source: string; groups: number; occurrences: number }>;
+  results: OpsLogRow[];
+}
+
+/** The waiting room, as the app sees it. */
+export interface AdmissionAnswer {
+  state: 'inside' | 'waiting';
+  position: number;
+  waiting_minutes: number;
+  refresh_seconds: number;
+  capacity: number;
+  capacity_basis: string;
+  /** The ceiling the operator promised: nobody waits longer than this. */
+  max_wait_minutes: number;
+  inside_now: number;
+  waiting_now: number;
+  message: string;
+}
+
+export const opsApi = {
+  health: () => apiClient.get<OpsHealth>('/ops/health/'),
+  logs: (params?: { level?: string; source?: string; search?: string; hours?: number; open?: 1; page?: number; page_size?: number }) =>
+    apiClient.get<OpsLogPage>('/ops/logs/', { params }),
+  resolveLog: (id: number, note?: string, action: 'resolve' | 'reopen' = 'resolve') =>
+    apiClient.post<OpsLogRow>(`/ops/logs/${id}/resolve/`, { note: note ?? '', action }),
+  admission: () => apiClient.get<AdmissionAnswer>('/ops/admission/'),
+};
 
 // ========================================
 // Profile avatar
@@ -816,4 +1113,142 @@ export const avatarApi = {
     });
   },
   remove: () => apiClient.delete<UserAccount>('/profile/avatar/'),
+};
+
+
+// ========================================
+// Site content: blog, growing guides, services, landing pages
+// ========================================
+export interface ArticleQuery {
+  kind?: 'article' | 'guide';
+  crop?: string;
+  search?: string;
+  featured?: boolean;
+  product?: string | number;
+  limit?: number;
+}
+
+export const articlesApi = {
+  /** GET /api/articles/ — published site articles and growing guides. */
+  getAll: (params?: ArticleQuery) => {
+    return apiClient.get<SiteArticleCard[]>('/articles/', { params });
+  },
+
+  /** GET /api/articles/{slug}/ — full body, TOC headings, related products. */
+  getBySlug: (slug: string) => {
+    return apiClient.get<SiteArticleDetail>(`/articles/${slug}/`);
+  },
+
+  /** GET /api/articles/guides/ — growing guides only. */
+  getGuides: () => {
+    return apiClient.get<SiteArticleCard[]>('/articles/guides/');
+  },
+
+  /** Crops that already have a guide. */
+  getCrops: () => {
+    return apiClient.get<Array<{ crop: string; article_count: number }>>('/articles/crops/');
+  },
+
+  getRelated: (slug: string) => {
+    return apiClient.get<SiteArticleCard[]>(`/articles/${slug}/related/`);
+  },
+};
+
+export const farmServicesApi = {
+  /** GET /api/services/catalog/ */
+  getAll: () => {
+    return apiClient.get<FarmService[]>('/services/catalog/');
+  },
+
+  /** GET /api/services/catalog/{slug}/ */
+  getBySlug: (slug: string) => {
+    return apiClient.get<FarmService>(`/services/catalog/${slug}/`);
+  },
+};
+
+export const sitePagesApi = {
+  /** GET /api/pages/ — admin-editable info pages and product landings. */
+  getAll: (params?: { kind?: 'page' | 'landing' }) => {
+    return apiClient.get<SitePage[]>('/pages/', { params });
+  },
+
+  getBySlug: (slug: string) => {
+    return apiClient.get<SitePage>(`/pages/${slug}/`);
+  },
+};
+
+export const catalogApi = {
+  /**
+   * GET /api/catalog/index/ — every addressable landing page in one read,
+   * used by the footer, the shop's «همه دسته‌ها» panel and the sitemap editor.
+   */
+  index: () => {
+    return apiClient.get<CatalogIndex>('/catalog/index/');
+  },
+
+  /**
+   * GET /api/catalog/landing/<kind>/<slug>/ — one category, subcategory, brand
+   * or tag page: its intro text, its children, and the filter its grid must use.
+   */
+  landing: (kind: CatalogKind, slug: string) => {
+    return apiClient.get<CatalogLanding>(`/catalog/landing/${kind}/${encodeURIComponent(slug)}/`);
+  },
+};
+
+export const testimonialsApi = {
+  /** GET /api/testimonials/ — real reviews, editor-pinned when there are any. */
+  list: () => {
+    return apiClient.get<BuyerExperiencesResponse>('/testimonials/');
+  },
+};
+
+export const policiesApi = {
+  /**
+   * GET /api/site/policies/ — the return window and the express option as the
+   * operator configured them. An unset window means the site states no number.
+   */
+  get: () => {
+    return apiClient.get<SitePolicies>('/site/policies/');
+  },
+};
+
+export const legalApi = {
+  /** GET /api/legal/ — the hub: every document, its summary and the text version. */
+  index: () => {
+    return apiClient.get<LegalIndex>('/legal/');
+  },
+
+  /** GET /api/legal/<slug>/ — one document, admin text or shipped wording. */
+  document: (slug: string) => {
+    return apiClient.get<LegalDocument>(`/legal/${slug}/`);
+  },
+};
+
+export const siteInfoApi = {
+  /** Company contact channels, maintained in the admin. */
+  getContact: () => {
+    return apiClient.get<SiteContactInfo>('/site/contact/');
+  },
+
+  /** Team, represented brands and counters taken from real rows. */
+  getAbout: () => {
+    return apiClient.get<AboutResponse>('/site/about/');
+  },
+
+  /** What the site can already advise on, per crop. */
+  getGrowingIndex: () => {
+    return apiClient.get<{
+      categories: Array<{ name: string; slug: string; product_count: number; guide_count: number }>;
+      crops: Array<{ crop: string; guide_count: number }>;
+    }>('/guides/index/');
+  },
+};
+
+export const newsletterApi = {
+  subscribe: (data: { email?: string; mobile?: string; topics?: string; source?: string }) => {
+    return apiClient.post<{ subscribed: boolean; message: string }>('/newsletter/subscribe/', data);
+  },
+  unsubscribe: (data: { email?: string; mobile?: string }) => {
+    return apiClient.post<{ unsubscribed: boolean; count: number }>('/newsletter/unsubscribe/', data);
+  },
 };

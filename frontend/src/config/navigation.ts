@@ -10,7 +10,11 @@
 
 import {
   BadgePercent,
+  BookOpen,
+  MessageSquareQuote,
   Building2,
+  Leaf,
+  MapPinned,
   Calculator,
   ClipboardList,
   Gift,
@@ -21,14 +25,19 @@ import {
   LayoutGrid,
   LifeBuoy,
   type LucideIcon,
+  Mail,
   MessageCircle,
+  Newspaper,
   Package,
+  PhoneCall,
   Camera,
   ShieldCheck,
+  Scale,
   Sprout,
   Store,
   Tractor,
   UserRound,
+  Users,
 } from 'lucide-react';
 
 import { USER_LEVEL, type UserLevel } from '../types';
@@ -175,6 +184,34 @@ export const ACCOUNT_ITEMS: NavItem[] = [
   },
 ];
 
+/**
+ * The farmer's own land record, and the desk that advises on it.
+ *
+ * Both existed in the app but only behind other screens — زمین‌ها inside the
+ * profile's farm tab and the consultation inside the messenger — which is how a
+ * farmer ends up calling instead of using a feature they already have. The
+ * consultation entry opens (or creates) the chat with the consultants, carrying
+ * the land dossier with it.
+ */
+export const FARM_ITEMS: NavItem[] = [
+  {
+    id: 'lands',
+    label: 'زمین‌ها',
+    description: 'پرونده زمین، مساحت، خاک و تقویم کار',
+    to: '/profile?tab=farm',
+    icon: MapPinned,
+    requiresAuth: true,
+  },
+  {
+    id: 'consulting',
+    label: 'مشاوره کشاورزی',
+    description: 'گفتگو با کارشناس، با امکان فرستادن پرونده زمین',
+    to: '/messages?channel=consulting',
+    icon: Leaf,
+    requiresAuth: true,
+  },
+];
+
 /** Seller tools — level 2 and above. */
 export const SELLER_ITEMS: NavItem[] = [
   {
@@ -247,9 +284,84 @@ export const SUPPORT_ITEMS: NavItem[] = [
   },
 ];
 
+/**
+ * Knowledge and trust pages.
+ *
+ * These are the pages a wholesale buyer reads before transferring money — the
+ * growing guide for the crop they are about to plant, the team behind the
+ * shipment and the number to call when a carton arrives damaged.
+ */
+export const KNOWLEDGE_ITEMS: NavItem[] = [
+  {
+    id: 'blog',
+    label: 'بلاگ گرین کود',
+    description: 'مقاله تخصصی، اخبار قیمت و گزارش بازار نهاده',
+    to: '/blog',
+    icon: Newspaper,
+  },
+  {
+    id: 'guides',
+    label: 'راهنمای کشت گیاهان',
+    description: 'از آماده‌سازی بستر تا برداشت، برای هر محصول',
+    to: '/guides',
+    icon: BookOpen,
+  },
+  {
+    id: 'about',
+    label: 'درباره گرین کود',
+    description: 'تیم، برندها و قراداد ما با کشاورز',
+    to: '/about',
+    icon: Users,
+  },
+  {
+    id: 'brands',
+    label: 'برندها و گروه‌های کالا',
+    description: 'صفحه هر برند، دسته و برچسب با همان قیمت‌های فهرست',
+    to: '/brands',
+    icon: Building2,
+  },
+  {
+    id: 'faq',
+    label: 'سؤالات متداول',
+    description: 'خرید مهمان، ارسال، پرداخت ناموفق و بازگشت کالا',
+    to: '/faq',
+    icon: BookOpen,
+  },
+  {
+    id: 'customers',
+    label: 'تجربه خرید مشتریان',
+    description: 'دیدگاه‌های منتشرشده خریداران، با تصویر و امتیاز',
+    to: '/customers',
+    icon: MessageSquareQuote,
+  },
+  {
+    id: 'legal',
+    label: 'قوانین و حریم خصوصی',
+    description: 'بازگشت کالا، ارسال، ضمانت، غرفه‌داری و شکایات',
+    to: '/legal',
+    icon: Scale,
+  },
+  {
+    id: 'contact',
+    label: 'تماس با ما',
+    description: 'شماره‌ها، نشانی، ساعات کاری و پیام‌رسان‌ها',
+    to: '/contact',
+    icon: PhoneCall,
+  },
+  {
+    id: 'newsletter',
+    label: 'خبرنامه هفتگی',
+    description: 'قیمت نهاده، موجودی تازه و راهنمای فصل',
+    to: '/newsletter',
+    icon: Mail,
+  },
+];
+
 export const NAV_SECTIONS: NavSection[] = [
   { id: 'shop', title: 'فروشگاه', items: SHOP_ITEMS },
+  { id: 'knowledge', title: 'بلاگ و راهنما', items: KNOWLEDGE_ITEMS },
   { id: 'account', title: 'حساب کاربری', items: ACCOUNT_ITEMS },
+  { id: 'farm', title: 'مزرعه من', items: FARM_ITEMS },
   { id: 'seller', title: 'فروشندگان', items: SELLER_ITEMS },
   { id: 'support', title: 'راهنما و پشتیبانی', items: SUPPORT_ITEMS },
   { id: 'staff', title: 'مدیریت', items: STAFF_ITEMS },

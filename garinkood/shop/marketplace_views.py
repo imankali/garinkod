@@ -23,11 +23,13 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 
 from .models import (
-    MarketplaceListing, Storefront, StorefrontConversation, StorefrontFollow,
+    FarmLand, MarketplaceListing, Storefront, StorefrontConversation, StorefrontFollow,
     StorefrontHighlight, StorefrontHighlightItem, StorefrontMessage, StorefrontPost,
     StorefrontPostComment, StorefrontPostLike, StorefrontStoryView,
 )
 from .attachments import validate_message_attachment
+from . import desk
+from .levels import may_contact_desk
 from .notifications import get_or_create_service_thread
 from .permissions import IsStorefrontOwnerOrReadOnly
 from .serializers import (
@@ -36,7 +38,7 @@ from .serializers import (
     StorefrontPostCommentSerializer, StorefrontPostSerializer, StorefrontSerializer,
 )
 from .slugs import slugify_fa
-from .throttling import SearchRateThrottle
+from .throttling import InboxRateThrottle, SearchRateThrottle
 
 User = get_user_model()
 
@@ -408,7 +410,8 @@ def _participant_conversations(user):
             queryset=StorefrontMessage.objects.order_by('-created_at').select_related(
                 'sender', 'sender__account', 'listing', 'listing__storefront',
                 'conversation', 'conversation__storefront', 'reply_to', 'reply_to__sender',
-            ),
+                'land',
+            ).prefetch_related('sender__desk_profiles'),
         ))
         .order_by('-updated_at')
         .distinct()
@@ -418,6 +421,7 @@ def _participant_conversations(user):
 @documented_api
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
+@throttle_classes([InboxRateThrottle])
 def my_conversations(request):
     """The caller's whole inbox, across every channel.
 
@@ -425,7 +429,10 @@ def my_conversations(request):
     what the inbox filter chips ("پشتیبانی", "غرفه‌ها", …) use.
     """
     context = {'request': request}
-    conversations = _participant_conversations(request.user)
+    # Opening the inbox is also how the desk learns that an operator is at their
+    # desk right now; the page polls it, so no extra heartbeat is needed.
+    desk.touch_presence(request.user)
+    conversations = _participant_conversations(request.user).annotate(rating_total=Count('ratings'))
 
     channel = (request.query_params.get('channel') or '').strip()
     valid_channels = {value for value, _label in StorefrontConversation.CHANNEL_CHOICES}
@@ -460,6 +467,19 @@ def my_conversations(request):
     })
 
 
+def _staff_exits(channel: str) -> list[dict[str, str]]:
+    """The doors a staff member should use instead of the customer queue.
+
+    A refusal that only says "no" sends a person hunting. These are the places
+    where the same thing actually gets handled: the queue they already staff,
+    and the internal feedback line that the support group reads.
+    """
+    exits = [{'label': 'بازخورد و انتقاد داخلی', 'url': '/support'}]
+    if desk.desk_channel(channel):
+        exits.insert(0, {'label': 'صف میز خدمات', 'url': '/messages'})
+    return exits
+
+
 @documented_api
 @api_view(['GET', 'POST'])
 @permission_classes([permissions.IsAuthenticated])
@@ -478,9 +498,32 @@ def service_conversation(request, channel):
     if channel not in allowed:
         return Response({'error': 'کانال پیام نامعتبر است.'}, status=status.HTTP_400_BAD_REQUEST)
 
+    staff_of_desk = desk.is_operator_for(request.user, channel)
+    contact_allowed, contact_reason = may_contact_desk(
+        request.user, channel, staff_of_desk=staff_of_desk,
+    )
+    if not contact_allowed:
+        return Response(
+            {
+                'error': contact_reason,
+                'code': 'staff_not_a_desk_customer',
+                'channel': channel,
+                'alt': _staff_exits(channel),
+            },
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
     conversation = get_or_create_service_thread(request.user, channel)
+    if request.method == 'POST':
+        # The thread is placed with whoever has the least work right now; every
+        # operator of the desk can still see and answer it.
+        desk.assign_thread(conversation)
+    else:
+        desk.touch_presence(request.user)
+    payload = StorefrontConversationSerializer(conversation, context={'request': request}).data
+    payload['desk'] = desk.desk_state(channel, user=request.user)
     return Response(
-        StorefrontConversationSerializer(conversation, context={'request': request}).data,
+        payload,
         status=status.HTTP_201_CREATED if request.method == 'POST' else status.HTTP_200_OK,
     )
 
@@ -502,6 +545,9 @@ def start_farmer_conversation(request, user_id):
     conversation = get_or_create_service_thread(
         farmer, StorefrontConversation.CHANNEL_CONSULTING, agent=request.user
     )
+    # Opening a thread from the farmer dossier proves the consultant is at their
+    # desk, which is what the farmer's «آنلاین است» indicator is built from.
+    desk.touch_presence(request.user)
     return Response(
         StorefrontConversationSerializer(conversation, context={'request': request}).data,
         status=status.HTTP_201_CREATED,
@@ -568,16 +614,43 @@ def conversation_messages(request, conversation_id):
     if not conversation.is_participant(request.user):
         return Response({'error': 'شما عضو این گفتگو نیستید.'}, status=status.HTTP_403_FORBIDDEN)
 
+    # Answering other people's tickets is the job; writing into a service thread
+    # *as its customer* is not, and a promoted account keeps its old thread.
+    if (
+        request.method == 'POST'
+        and desk.desk_channel(conversation.channel)
+        and conversation.customer_id == request.user.id
+    ):
+        contact_allowed, contact_reason = may_contact_desk(
+            request.user,
+            conversation.channel,
+            staff_of_desk=desk.is_operator_for(request.user, conversation.channel),
+        )
+        if not contact_allowed:
+            return Response(
+                {
+                    'error': contact_reason,
+                    'code': 'staff_not_a_desk_customer',
+                    'channel': conversation.channel,
+                    'alt': _staff_exits(conversation.channel),
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
     if request.method == 'GET':
         messages = conversation.messages.select_related(
             'sender', 'sender__account', 'listing', 'listing__storefront',
             'conversation', 'conversation__storefront',
             'reply_to', 'reply_to__sender', 'reply_to__listing',
-        ).order_by('created_at')
-        # Fetching a thread means the viewer has seen it.
+            'land', 'land__owner',
+        ).prefetch_related('sender__desk_profiles').order_by('created_at')
+        # Fetching a thread means the viewer has seen it: this is also what turns
+        # the sender's green «sendane» tick into a read one.
         StorefrontMessage.objects.filter(conversation=conversation, is_read=False).exclude(
             sender=request.user
         ).update(is_read=True)
+        # For an operator, opening a thread is proof they are at their desk.
+        desk.touch_presence(request.user)
         paginator = MessagePagination()
         page = paginator.paginate_queryset(messages, request)
         context = {'request': request}
@@ -615,9 +688,27 @@ def conversation_messages(request, conversation_id):
             except (TypeError, ValueError):
                 attachment_duration = None
 
-    if not body and listing is None and attachment is None:
+    # A land case file travels with the message that shares it. It is validated
+    # against the thread's owner rather than trusted from the client, otherwise a
+    # caller could enumerate other farmers' fields through the message endpoint.
+    land = None
+    raw_land = request.data.get('land') or request.data.get('land_id')
+    if raw_land not in (None, ''):
+        if conversation.channel not in desk.DESK_CHANNELS:
+            return Response(
+                {'error': 'پرونده زمین فقط در گفتگوی میز خدمت ارسال می‌شود.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        land = FarmLand.objects.filter(pk=raw_land, owner_id=conversation.customer_id).first()
+        if land is None:
+            return Response(
+                {'error': 'این پرونده زمین به این گفتگو مربوط نیست.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    if not body and listing is None and attachment is None and land is None:
         return Response(
-            {'error': 'متن پیام، پیوست یا محصول الزامی است.'},
+            {'error': 'متن پیام، پیوست، محصول یا پرونده زمین الزامی است.'},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
@@ -639,20 +730,43 @@ def conversation_messages(request, conversation_id):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+    is_customer = request.user.id == conversation.customer_id
     message = StorefrontMessage.objects.create(
         conversation=conversation, sender=request.user,
-        body=body[:2000], listing=listing,
+        body=body[:2000], listing=listing, land=land,
         attachment=attachment, attachment_type=attachment_type,
         attachment_duration=attachment_duration,
         reply_to=reply_to,
     )
-    # A staff reply claims an unassigned service thread, so the farmer sees a
-    # consistent counterpart and other operators know it is being handled.
-    if (
+    # Only an operator puts a button inside a bubble. Those links are the
+    # platform's own sentences — «ادامه گفتگو در میز مشاوره», «پاسخ را در پست
+    # ببینید» — and letting either side inject an arbitrary URL into a chat that
+    # a farmer trusts as support would be a phishing field waiting to be used.
+    if not is_customer:
+        link_url = str(request.data.get('link_url') or '').strip()
+        if link_url.startswith('/') or link_url.startswith(('http://', 'https://')):
+            message.link_url = link_url[:500]
+            message.link_label = (str(request.data.get('link_label') or '').strip() or 'مشاهده')[:80]
+            message.link_kind = (str(request.data.get('link_kind') or '').strip() or 'link')[:20]
+            message.save(update_fields=['link_url', 'link_label', 'link_kind'])
+
+    if is_customer and conversation.channel in desk.DESK_CHANNELS:
+        # A new question on a finished thread is an open thread again, and the
+        # first unassigned message is placed with whoever has the least work.
+        if conversation.is_closed:
+            conversation.reopen(by=request.user)
+        if conversation.agent_id is None:
+            desk.assign_thread(conversation)
+        if not conversation.is_open_now():
+            desk.announce_out_of_hours(conversation)
+        conversation.save(update_fields=['updated_at'])
+    elif (
         conversation.channel != StorefrontConversation.CHANNEL_STOREFRONT
         and conversation.agent_id is None
-        and request.user.id != conversation.customer_id
+        and not is_customer
     ):
+        # A staff reply claims an unassigned service thread, so the farmer sees a
+        # consistent counterpart and other operators know it is being handled.
         conversation.agent = request.user
         conversation.save(update_fields=['agent', 'updated_at'])
     else:

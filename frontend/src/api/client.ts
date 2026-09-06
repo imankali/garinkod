@@ -3,7 +3,9 @@
 import axios, { AxiosError, AxiosInstance } from 'axios';
 import toast from 'react-hot-toast';
 
+import { markWaiting } from './admission';
 import { parseApiError } from './errors';
+import { PRESENTED_TOKEN_PARAM, readPreviewToken } from './previewSession';
 
 // Relative URL: the Vite proxy (dev) and the reverse proxy (production) both
 // forward /api to Django, so the same build works on localhost, a phone on the
@@ -32,11 +34,25 @@ apiClient.interceptors.request.use((config) => {
   if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
     delete config.headers['Content-Type'];
   }
+  // Only ever set in a preview whose browser refuses cookies (see previewSession.ts);
+  // on the real shop there is no token here, so requests stay cookie-only.
+  const previewToken = readPreviewToken();
+  if (previewToken) {
+    config.headers.Authorization = `Token ${previewToken}`;
+    // A preview proxy may drop that header on its way through and the frame is left
+    // anonymous again; the address is the one thing it has to pass along. The API reads
+    // it only while the preview switch is on under DEBUG, so this is inert in production.
+    const params = config.params as Record<string, unknown> | undefined;
+    if (!params || params.constructor === Object) {
+      config.params = { [PRESENTED_TOKEN_PARAM]: previewToken, ...(params ?? {}) };
+    }
+  }
   return config;
 });
 
 // Browser authentication is cookie-based. The HttpOnly token is never exposed
-// to JavaScript; service integrations can still use Authorization headers.
+// to JavaScript; service integrations can still use Authorization headers, and the
+// preview fallback above is the only place where the browser itself uses one.
 
 /**
  * Endpoints whose failures a caller always renders itself.
@@ -81,6 +97,13 @@ apiClient.interceptors.response.use(
           window.location.href = '/login';
         }
       }
+    } else if (parsed.code === 'shop_overloaded') {
+      // The shop is holding its own door because it is busy, which is not an
+      // error to shout about: the waiting screen says it better, in full
+      // sentences, with the place in line. Silence the toast either way.
+      const queue = (error.response?.data as { queue?: unknown } | undefined)?.queue;
+      markWaiting(queue);
+      (error as { __handled?: boolean }).__handled = true;
     } else if (parsed.code === 'throttled') {
       const now = Date.now();
       if (!silent && now - lastThrottleToastAt > 3000) {

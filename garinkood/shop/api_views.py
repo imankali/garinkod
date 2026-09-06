@@ -1,5 +1,6 @@
 from contextlib import nullcontext
 from decimal import Decimal, InvalidOperation
+import hashlib
 from datetime import timedelta
 from secrets import token_urlsafe
 from threading import Lock
@@ -7,13 +8,13 @@ from uuid import UUID
 
 from .schema import documented_api
 from django.conf import settings
-from django.db.models import Count, Exists, F, OuterRef, Prefetch, Q, Sum
+from django.db.models import Avg, Count, Exists, F, Max, OuterRef, Prefetch, Q, Sum
 from rest_framework import mixins, viewsets, permissions, status
 from rest_framework.decorators import action, api_view, permission_classes, throttle_classes
 from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.models import Group, User
+from django.contrib.auth.models import Group, Permission, User
 from django.db import IntegrityError, connection, transaction
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
@@ -30,6 +31,8 @@ from .filters import ProductFilter
 from .search import ResilientProductSearchFilter
 from .models import (
     Category, Product, Comment, UserAccount, Cart, CartItem, Order, OrderItem,
+    ProductPackage, ProductImage, Tag, CommentVote, ReturnPolicySettings,
+    CapacitySettings, PresenceBeat,
     ServiceRequest, ProcurementRequest, Storefront, MarketplaceListing,
     PaymentAttempt, AffiliateProfile, AffiliateConversion, FinancialLedgerEntry,
     PlatformFeedback, StorefrontComplaint, VisualSearchRequest, Coupon, Wallet,
@@ -51,6 +54,7 @@ from .serializers import (
     LocationSerializer, AgriInputSerializer, StorefrontHighlightSerializer,
     StorefrontPostCommentSerializer, WebPushSubscriptionSerializer,
     ShipmentTrackingEventSerializer, ShipmentTrackingEventCreateSerializer,
+    rating_breakdown,
 )
 from .management_roles import ROLE_PERMISSIONS
 from .payments import (
@@ -64,7 +68,11 @@ from .payments import (
 )
 from .rewards import mark_order_paid_and_reward
 from .settlements import record_marketplace_sale, reverse_marketplace_sale, restore_listing_quantities
-from .shipping import create_initial_shipment, quote_shipping, record_tracking_event
+from .shipping import (
+    ShippingServiceUnavailable, create_initial_shipment, record_tracking_event,
+    select_shipping_quote, shipping_options,
+)
+from . import legal
 from .notifications import notify_comment_reply
 from .messaging.outbox import enqueue_order_event
 from .messaging.otp import (
@@ -76,6 +84,16 @@ from .messaging.otp import (
     issue_login_otp,
     otp_public_payload,
     verify_login_otp,
+)
+from .levels import (
+    CAPABILITIES,
+    MAXIMUM_LEVEL,
+    MINIMUM_LEVEL,
+    capabilities_for,
+    is_staff_level,
+    level_for,
+    matrix as level_matrix,
+    next_step,
 )
 from .permissions import IsModerator, IsAdminLevel, IsOwnerLevel
 from .phone_numbers import normalize_iranian_mobile
@@ -114,6 +132,14 @@ def _set_auth_cookie(response, token):
         samesite=settings.AUTH_COOKIE_SAMESITE,
         path='/',
     )
+    # A hardened preview can refuse to store any third-party cookie, and then no
+    # SameSite value helps. Where the preview switch is on under DEBUG, the same
+    # credential is also handed to the page, so it can be kept in that frame's own
+    # storage and sent as an Authorization header. Production never takes this
+    # branch: there the token exists only as an HttpOnly cookie.
+    if getattr(settings, 'PREVIEW_IFRAME_COOKIES', False) and settings.DEBUG:
+        if isinstance(response.data, dict):
+            response.data['preview_token'] = token.key
     return response
 
 
@@ -326,8 +352,11 @@ class ProductViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Product.objects.filter(status='published').select_related('category', 'subcategory')
     filter_backends = [DjangoFilterBackend, ResilientProductSearchFilter, OrderingFilter]
     filterset_class = ProductFilter
-    search_fields = ['title', 'description']
-    ordering_fields = ['price', 'publish', 'created', 'sales_count', 'discount_percent']
+    search_fields = ['title', 'description', 'brand', 'sku']
+    ordering_fields = [
+        'price', 'publish', 'created', 'sales_count', 'discount_percent',
+        'avg_rating', 'reviews_count', 'views',
+    ]
     ordering = ['-publish']
     lookup_field = 'slug'
     throttle_classes = [SearchRateThrottle]
@@ -336,21 +365,86 @@ class ProductViewSet(viewsets.ReadOnlyModelViewSet):
     # it do that without paging through the default twelve at a time.
     pagination_class = ClientConfigurablePagination
 
+    def get_queryset(self):
+        # Star ratings are the one piece of social proof a shopper sorts by, so
+        # they are aggregated here rather than fetched per card. Only approved,
+        # top-level reviews with a score count; a question is not a rating.
+        review_rows = Q(comments__active=True, comments__parent__isnull=True, comments__rating__isnull=False)
+        queryset = (
+            super()
+            .get_queryset()
+            .annotate(
+                avg_rating=Avg('comments__rating', filter=review_rows),
+                reviews_count=Count('comments', filter=review_rows, distinct=True),
+            )
+        )
+        if self.action == 'retrieve':
+            # The detail page renders the spec table, the gallery and the package
+            # picker; prefetch all three instead of one query per row.
+            queryset = queryset.prefetch_related(
+                Prefetch('images', queryset=ProductImage.objects.only('image', 'caption', 'order')),
+                'packages', 'tags', 'attributes',
+            )
+        return queryset
+
     def get_serializer_class(self):
         if self.action == 'list':
             return ProductListSerializer
         return ProductSerializer
 
+    def get_object(self):
+        """Count a product-page view on the way to serving it.
+
+        One UPDATE instead of a read-modify-write: «پربازدیدترین» has to be a
+        ranking that follows traffic, not an exact meter, so a lost update on a
+        counter is not worth locking the catalogue row.
+        """
+        instance = super().get_object()
+        if self.action == 'retrieve':
+            Product.objects.filter(pk=instance.pk).update(views=F('views') + 1)
+            instance.views += 1
+        return instance
+
+    @action(detail=False, methods=['get'], url_path='facets')
+    def facets(self, request):
+        """Facet values (brands, package sizes, price ceiling) for the shop UI.
+
+        Distinct values come from the published catalogue only, so a filter
+        chip can never promise a result set that is empty because it is made of
+        drafts.
+        """
+        published = Product.objects.filter(status='published')
+        brands = list(
+            published.exclude(brand='')
+            .values('brand')
+            .annotate(total=Count('id'))
+            .order_by('-total', 'brand')[:60]
+        )
+        packages = list(
+            published.exclude(package_weight='')
+            .values('package_weight')
+            .annotate(total=Count('id'))
+            .order_by('package_weight')[:40]
+        )
+        price_bound = published.aggregate(high=Max('price'))['high'] or 0
+        return Response({
+            'brands': [{'value': row['brand'], 'count': row['total']} for row in brands],
+            'package_weights': [{'value': row['package_weight'], 'count': row['total']} for row in packages],
+            'max_price': int(price_bound),
+        })
+
     @action(detail=False, methods=['get'])
     def featured(self, request):
-        featured_products = self.queryset.filter(is_featured=True)[:8]
+        featured_products = self.get_queryset().filter(is_featured=True)[:8]
         serializer = ProductListSerializer(featured_products, many=True)
         return Response(serializer.data)
 
     @action(detail=True, methods=['get'])
     def similar(self, request, slug=None):
         product = self.get_object()
-        similar = self.queryset.exclude(id=product.id)
+        # Rating annotations come from get_queryset, so the "similar" cards can
+        # be sorted by score and still show their stars.
+        similar = self.get_queryset().exclude(id=product.id)
         if product.category_id:
             similar = similar.filter(category_id=product.category_id)
         serializer = ProductListSerializer(similar[:4], many=True)
@@ -360,7 +454,7 @@ class ProductViewSet(viewsets.ReadOnlyModelViewSet):
     def by_category(self, request):
         category_slug = request.query_params.get('category', None)
         if category_slug:
-            products = self.queryset.filter(category__slug=category_slug)
+            products = self.get_queryset().filter(category__slug=category_slug)
             serializer = ProductListSerializer(products, many=True)
             return Response(serializer.data)
         return Response({'error': 'Category slug is required'}, status=400)
@@ -373,10 +467,27 @@ class CommentViewSet(viewsets.ModelViewSet):
     queryset = Comment.objects.filter(active=True, parent=None)
     serializer_class = CommentSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    # A review is user-generated content and must be moderated like the rest.
+    http_method_names = ['get', 'post', 'head', 'options']
+
+    def get_queryset(self):
+        # ``is_verified_purchase`` would otherwise cost one query per review;
+        # Exists() resolves it inside the list query.
+        bought = OrderItem.objects.filter(
+            order__user=OuterRef('user'),
+            product=OuterRef('product'),
+            order__payment_status='paid',
+        )
+        return super().get_queryset().annotate(verified_purchase=Exists(bought))
 
     def perform_create(self, serializer):
         user = self.request.user if self.request.user.is_authenticated else None
-        serializer.save(user=user, active=True)
+        comment = serializer.save(user=user, active=True)
+        # A reply to someone's review or question is sent to the unified inbox,
+        # exactly as a reply under a storefront post is. Without this the answer
+        # to a farmer's question sits on a product page they may never reopen.
+        if comment.parent_id:
+            notify_comment_reply(comment)
 
     @action(detail=False, methods=['get'])
     def by_product(self, request):
@@ -387,6 +498,84 @@ class CommentViewSet(viewsets.ModelViewSet):
             serializer = self.get_serializer(comments, many=True)
             return Response(serializer.data)
         return Response({'error': 'Product slug is required'}, status=400)
+
+    @staticmethod
+    def _visitor_key(request) -> str:
+        """A stable, non-reversible identity for a guest's vote.
+
+        Anonymous reviews are read by far more people than write them, so voting
+        has to work without an account — but it must not be free for a bot to
+        refresh a page and inflate a review either.
+        """
+        if request.user.is_authenticated:
+            return ''
+        seed = f"{request.session.session_key or ''}|{request.META.get('REMOTE_ADDR', '')}"
+        return hashlib.sha256(seed.encode('utf-8')).hexdigest()[:64]
+
+    @action(detail=True, methods=['post'], permission_classes=[permissions.AllowAny],
+            throttle_classes=[FeedbackRateThrottle])
+    def helpful(self, request, pk=None):
+        """Toggle «مفید بود» on a review.
+
+        The tally is recomputed from the rows rather than trusted from the
+        request, so a client cannot post a score of its own.
+        """
+        comment = self.get_object()
+        user = request.user if request.user.is_authenticated else None
+        votes = CommentVote.objects.filter(comment=comment)
+        if user:
+            votes = votes.filter(user=user)
+        else:
+            votes = votes.filter(user__isnull=True, visitor_key=self._visitor_key(request))
+        existing = votes.first()
+        if existing:
+            existing.delete()
+        else:
+            CommentVote.objects.create(comment=comment, user=user, visitor_key=self._visitor_key(request))
+        total = CommentVote.objects.filter(comment=comment).count()
+        Comment.objects.filter(pk=comment.pk).update(helpful_count=total)
+        return Response({'voted': existing is None, 'helpful_count': total})
+
+    @action(detail=True, methods=['post'], permission_classes=[permissions.AllowAny],
+            throttle_classes=[FeedbackRateThrottle])
+    def report(self, request, pk=None):
+        """Flag a review for a human to look at.
+
+        Nothing is hidden on the spot: the flag marks it and a row lands in the
+        feedback inbox staff already read, which is the difference between a
+        report and a mute button.
+        """
+        comment = self.get_object()
+        reason = str(request.data.get('reason', '')).strip()[:1000]
+        comment.is_reported = True
+        comment.save(update_fields=['is_reported', 'updated'])
+        PlatformFeedback.objects.create(
+            user=request.user if request.user.is_authenticated else None,
+            name=getattr(request.user, 'get_full_name', lambda: '')() or '',
+            kind='other',
+            subject=f"گزارش دیدگاه روی «{comment.product.title}»",
+            message=(
+                f"دیدگاه شماره {comment.pk} از «{comment.name}» گزارش شده است.\n"
+                f"نشانی دیدگاه: /products/{comment.product.slug}\n\n"
+                f"متن دیدگاه:\n{comment.body[:1200]}\n\n"
+                + (f"دلیل گزارش: {reason}" if reason else 'دلیلی ثبت نشده است.')
+            ),
+        )
+        return Response({'reported': True})
+
+    @action(detail=False, methods=['get'])
+    def rating_summary(self, request):
+        """Average score, review count and star histogram for one product."""
+        product_slug = request.query_params.get('product', None)
+        if not product_slug:
+            return Response({'error': 'Product slug is required'}, status=400)
+        product = get_object_or_404(Product, slug=product_slug)
+        average, count, distribution = rating_breakdown(product)
+        return Response({
+            'average': round(float(average), 2) if average else 0,
+            'reviews_count': count,
+            'distribution': distribution,
+        })
 
 
 # ========================================
@@ -465,7 +654,48 @@ class CartViewSet(viewsets.ViewSet):
         if not product.is_in_stock:
             return Response({'error': 'این محصول موجود نیست'}, status=status.HTTP_400_BAD_REQUEST)
 
-        max_qty = min(10, product.stock)
+        # An optional packaging: the price, the stock and the minimum order all
+        # follow the bag that was picked, not the product row.
+        package = None
+        package_id = request.data.get('package_id')
+        if package_id not in (None, ''):
+            try:
+                package = ProductPackage.objects.filter(pk=int(package_id), product=product).first()
+            except (TypeError, ValueError):
+                return Response(
+                    {'error': 'شناسه بسته‌بندی نامعتبر است.'}, status=status.HTTP_400_BAD_REQUEST
+                )
+            if package is None:
+                return Response(
+                    {'error': 'این بسته‌بندی به این کالا مرتبط نیست.'}, status=status.HTTP_400_BAD_REQUEST
+                )
+        else:
+            package = product.default_package
+
+        limit = package.effective_stock if package else product.stock
+        minimum = package.min_order_quantity if package else product.min_order_quantity
+        if minimum > 1 and quantity < minimum:
+            return Response(
+                {
+                    'error': f'حداقل سفارش این کالا {minimum} عدد است.',
+                    'fields': {'quantity': [f'حداقل سفارش {minimum} عدد است.']},
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if limit < 1:
+            return Response({'error': 'از این بسته‌بندی موجود نیست'}, status=status.HTTP_400_BAD_REQUEST)
+        if product.price_on_request:
+            # Quote-only lines (bulk/contract pricing) never enter a cart, so a
+            # placeholder price can never be charged to a buyer.
+            return Response(
+                {
+                    'error': 'قیمت این کالا فقط با تماس کارشناس اعلام می‌شود؛ برای ثبت سفارش تماس بگیرید.',
+                    'price_on_request': True,
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        max_qty = min(10, limit)
         quantity = min(quantity, max_qty)
 
         # Locking the cart item makes repeated clicks and concurrent requests
@@ -475,13 +705,15 @@ class CartViewSet(viewsets.ViewSet):
             with transaction.atomic():
                 cart = self._get_or_create_cart(request)
                 cart_item = CartItem.objects.select_for_update().filter(
-                    cart=cart, product=product
+                    cart=cart, product=product, product_package=package
                 ).first()
                 if cart_item:
                     cart_item.quantity = min(cart_item.quantity + quantity, max_qty)
                     cart_item.save(update_fields=['quantity'])
                 else:
-                    CartItem.objects.create(cart=cart, product=product, quantity=quantity)
+                    CartItem.objects.create(
+                        cart=cart, product=product, product_package=package, quantity=quantity
+                    )
 
         serializer = CartSerializer(cart, context={'request': request})
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -656,14 +888,13 @@ def shipping_quote_view(request):
     cart = _checkout_cart(request)
     items = list(cart.items.select_related('product', 'listing'))
     subtotal = sum(item.total_price for item in items)
-    weight_grams = sum(
-        (item.product.shipping_weight_grams if item.product_id else 0) * item.quantity
-        for item in items
-    )
-    quote = quote_shipping(
-        subtotal=subtotal, province=province, city=city, weight_grams=weight_grams
-    )
-    return Response({'quotes': [quote.as_dict()], 'authoritative_at_checkout': True})
+    weight_grams = sum(item.shipping_weight_grams * item.quantity for item in items)
+    quotes = shipping_options(subtotal=subtotal, province=province, city=city, weight_grams=weight_grams)
+    return Response({
+        'quotes': [quote.as_dict() for quote in quotes],
+        'authoritative_at_checkout': True,
+        'note': 'مبلغ نهایی در لحظه ثبت سفارش دوباره محاسبه می‌شود.',
+    })
 
 
 @documented_api
@@ -709,6 +940,13 @@ def checkout(request):
                 product.id: product
                 for product in Product.objects.select_for_update().filter(id__in=product_ids).order_by('id')
             }
+            package_ids = [item.product_package_id for item in product_items if item.product_package_id]
+            locked_packages = {
+                package.id: package
+                for package in ProductPackage.objects.select_for_update().filter(
+                    id__in=package_ids
+                ).order_by('id')
+            }
             listing_ids = [item.listing_id for item in listing_items]
             locked_listings = {
                 listing.id: listing
@@ -722,6 +960,20 @@ def checkout(request):
             missing_or_unavailable = []
             for item in product_items:
                 product = locked_products.get(item.product_id)
+                if product and product.price_on_request:
+                    # A quote-only line can still be in a cart from before the
+                    # catalogue change; it must never be charged at checkout.
+                    return Response(
+                        {
+                            'error': (
+                                f'قیمت «{product.title}» با تماس اعلام می‌شود و آنلاین قابل پرداخت نیست.'
+                            )
+                        },
+                        status=status.HTTP_409_CONFLICT,
+                    )
+                package = locked_packages.get(item.product_package_id) if item.product_package_id else None
+                if package is not None and (not package.is_in_stock or package.effective_stock < item.quantity):
+                    missing_or_unavailable.append(f'{product.title} — {package.label}')
                 if not product or product.status != 'published' or not product.available or product.stock < item.quantity:
                     missing_or_unavailable.append(item.product.title)
             for item in listing_items:
@@ -764,11 +1016,15 @@ def checkout(request):
                     )
                 except ValueError as error:
                     return Response({'error': str(error)}, status=status.HTTP_400_BAD_REQUEST)
-            shipping_quote = quote_shipping(
-                subtotal=subtotal - discount_amount,
-                province=details['province'],
-                city=details['city'],
-            )
+            try:
+                shipping_quote = select_shipping_quote(
+                    subtotal=subtotal - discount_amount,
+                    province=details['province'],
+                    city=details['city'],
+                    service=details.get('shipping_service') or 'standard',
+                )
+            except ShippingServiceUnavailable as error:
+                return Response({'error': str(error)}, status=status.HTTP_400_BAD_REQUEST)
             shipping_price = shipping_quote.amount
             affiliate_code = details.get('affiliate_code', '').strip().upper()
             affiliate = None
@@ -799,6 +1055,11 @@ def checkout(request):
                 affiliate_code=affiliate_code,
                 payment_status='unpaid',
                 status='awaiting_review',
+                # The acceptance is recorded here rather than trusted from the
+                # request: the version is computed from the text the server is
+                # actually serving right now.
+                terms_accepted_at=timezone.now(),
+                legal_version=legal.legal_version(),
             )
 
             if coupon:
@@ -808,17 +1069,24 @@ def checkout(request):
             order_items = []
             for item in product_items:
                 product = locked_products[item.product_id]
+                package = locked_packages.get(item.product_package_id) if item.product_package_id else None
                 product.stock -= item.quantity
                 if product.stock == 0:
                     product.available = False
                 product.save(update_fields=['stock', 'available', 'updated'])
+                if package is not None and package.stock is not None:
+                    # Only a package with its own declared stock is decremented;
+                    # one that inherits the product total must not double-count.
+                    package.stock = max(package.stock - item.quantity, 0)
+                    package.save(update_fields=['stock'])
                 order_items.append(OrderItem(
                     order=order,
                     product=product,
                     kind='product',
                     product_title=product.title,
                     product_slug=product.slug,
-                    unit_price=product.price,
+                    package_label=item.package_label,
+                    unit_price=item.unit_price,
                     quantity=item.quantity,
                 ))
 
@@ -1010,7 +1278,8 @@ class MarketplaceListingViewSet(viewsets.ModelViewSet):
             ),
         )
         base = MarketplaceListing.objects.prefetch_related(
-            Prefetch('storefront', queryset=annotated_storefronts)
+            Prefetch('storefront', queryset=annotated_storefronts),
+            'attributes',
         )
         if self.action in {'list', 'retrieve'}:
             queryset = base.filter(status='published')
@@ -1938,6 +2207,7 @@ def management_dashboard(request):
             ).data if _can_manage(request.user, 'view_storefrontpost') else [],
         },
         'viewer_level': account_level(request.user),
+        'viewer_capabilities': capabilities_for(request.user),
         'alerts': [
             {'type': 'complaint', 'count': open_complaints, 'label': 'شکایت باز'},
             {'type': 'posts', 'count': pending_posts, 'label': 'پست/استوری در انتظار بررسی'},
@@ -1945,6 +2215,75 @@ def management_dashboard(request):
             {'type': 'stock', 'count': low_stock, 'label': 'محصول با موجودی کم'},
         ],
     })
+
+
+@documented_api
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def access_levels(request):
+    """The access ladder, what each step unlocks, and where the viewer stands.
+
+    One endpoint so the profile chip, the support page's refusal and the
+    management console all read the same numbers instead of each keeping a copy
+    that can go stale. Public by design: the ladder itself is not a secret, and
+    a person deciding whether to verify their phone should be able to read what
+    it buys them.
+    """
+    viewer = request.user if getattr(request.user, 'is_authenticated', False) else None
+    rank = None
+    level = level_for(viewer) if viewer is not None else 0
+    if viewer is not None:
+        from .levels import rank_for
+
+        row = rank_for(level)
+        if row is not None:
+            rank = {'value': row.value, 'label': row.label, 'short_label': row.short, 'promise': row.promise}
+    return Response({
+        'ladder': level_matrix(),
+        'capabilities': {
+            key: {'label': label, 'minimum_level': floor}
+            for key, (label, floor) in CAPABILITIES.items()
+        },
+        'level_range': {'min': MINIMUM_LEVEL, 'max': MAXIMUM_LEVEL},
+        'viewer_level': level,
+        'viewer_rank': rank,
+        'viewer_is_staff': bool(viewer is not None and (is_staff_level(level) or viewer.is_superuser)),
+        'viewer_capabilities': capabilities_for(viewer) if viewer is not None else {},
+        'next_step': next_step(viewer) if viewer is not None else None,
+    })
+
+
+#: The two permissions the service queues are gated on. Granting the desk-agent
+#: rank means granting exactly these — not a group, which would also decide
+#: *what else* this person may change. The scope stays the operator's own call
+#: in the staff screen; the rank only opens the queue it promises.
+DESK_QUEUE_PERMISSIONS = (
+    'view_platformfeedback',
+    'view_farmconsultationrequest',
+)
+
+
+def _sync_desk_permissions(member, level: int) -> None:
+    """Give a desk agent their queue, and take it back when they leave the post."""
+    from .models import UserAccount
+
+    should_have = level >= UserAccount.LEVEL_DESK_AGENT
+    permissions = Permission.objects.filter(
+        codename__in=DESK_QUEUE_PERMISSIONS, content_type__app_label='shop',
+    )
+    held = set(member.user_permissions.values_list('codename', flat=True))
+    for permission in permissions:
+        if should_have and permission.codename not in held:
+            member.user_permissions.add(permission)
+        elif not should_have and permission.codename in held:
+            member.user_permissions.remove(permission)
+
+
+def _level_range_message() -> str:
+    """«بین ۱ تا ۸» derived from the ladder, so it cannot go stale on a new step."""
+    from .persian import fa_digits
+
+    return f'سطح باید عددی بین {fa_digits(str(MINIMUM_LEVEL))} تا {fa_digits(str(MAXIMUM_LEVEL))} باشد.'
 
 
 @documented_api
@@ -2326,15 +2665,37 @@ def management_users(request):
         if level_filter.isdigit():
             queryset = queryset.filter(account__level=int(level_filter))
 
+        # «کی همین حالا داخل سایت است» از همان جدول حضور خوانده می‌شود که میانه‌ی
+        # درخواست‌های واقعی نوشته‌اش می‌کند؛ نه از یک دکمه‌ی «online» در مرورگر.
+        capacity = CapacitySettings.load()
+        since = timezone.now() - timedelta(minutes=max(1, capacity.activity_window_minutes))
+        present = PresenceBeat.objects.filter(last_seen_at__gte=since, kind=PresenceBeat.KIND_USER)
+        if request.query_params.get('online') in ('1', 'true'):
+            queryset = queryset.filter(pk__in=present.values_list('user_id', flat=True))
+        if request.query_params.get('inactive') in ('1', 'true'):
+            queryset = queryset.filter(is_active=False)
+
         total = queryset.count()
         start = (page - 1) * page_size
         members = queryset[start:start + page_size]
+        ids = [member.pk for member in members]
+        beats = {beat.user_id: beat for beat in present.filter(user_id__in=ids)}
+        orders = dict(
+            Order.objects.filter(user_id__in=ids).values('user').annotate(total=Count('id'))
+            .values_list('user', 'total')
+        )
+        reviews = dict(
+            Comment.objects.filter(user_id__in=ids, parent__isnull=True).values('user').annotate(total=Count('id'))
+            .values_list('user', 'total')
+        )
         return Response({
             'count': total,
             'page': page,
             'page_size': page_size,
             'total_pages': (total + page_size - 1) // page_size or 1,
+            'presence_window_minutes': capacity.activity_window_minutes,
             'levels': [{'value': value, 'label': label} for value, label in UserAccount.LEVEL_CHOICES],
+            'ladder': level_matrix(),
             'results': [
                 {
                     'id': member.id,
@@ -2348,6 +2709,12 @@ def management_users(request):
                     'is_superuser': member.is_superuser,
                     'groups': list(member.groups.values_list('name', flat=True)),
                     'date_joined': member.date_joined,
+                    'orders': orders.get(member.pk, 0),
+                    'reviews': reviews.get(member.pk, 0),
+                    'online': member.pk in beats,
+                    'last_seen_at': beats[member.pk].last_seen_at if member.pk in beats else None,
+                    'requests_in_window': beats[member.pk].requests if member.pk in beats else 0,
+                    'current_path': beats[member.pk].path if member.pk in beats else '',
                 }
                 for member in members
             ],
@@ -2374,12 +2741,12 @@ def management_users(request):
             new_level = int(new_level)
         except (TypeError, ValueError):
             return Response(
-                {'error': 'سطح دسترسی نامعتبر است.', 'fields': {'level': ['سطح باید عددی بین ۱ تا ۵ باشد.']}},
+                {'error': 'سطح دسترسی نامعتبر است.', 'fields': {'level': [_level_range_message()]}},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         if new_level not in dict(UserAccount.LEVEL_CHOICES):
             return Response(
-                {'error': 'سطح دسترسی نامعتبر است.', 'fields': {'level': ['سطح باید عددی بین ۱ تا ۵ باشد.']}},
+                {'error': 'سطح دسترسی نامعتبر است.', 'fields': {'level': [_level_range_message()]}},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         if new_level >= UserAccount.LEVEL_OWNER and actor_level < UserAccount.LEVEL_OWNER:
@@ -2403,6 +2770,7 @@ def management_users(request):
             if new_level >= UserAccount.LEVEL_OWNER:
                 member.is_superuser = True
             member.save(update_fields=['is_staff', 'is_superuser'])
+            _sync_desk_permissions(member, new_level)
         _audit(request.user, 'user_level_changed', member, f'سطح {member.username} به {new_level} تغییر کرد.', {'level': new_level})
 
     if 'is_active' in request.data:

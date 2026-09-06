@@ -33,7 +33,7 @@ export default function RequireLevel({ level, children, redirectTo = '/' }: Requ
 
   if (!isSessionChecked) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center" role="status" aria-live="polite">
+      <div className="flex min-h-[50dvh] items-center justify-center" role="status" aria-live="polite">
         <span className="text-sm font-semibold text-slate-500 dark:text-emerald-200">
           در حال بررسی دسترسی…
         </span>

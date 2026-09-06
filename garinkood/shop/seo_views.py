@@ -3,12 +3,18 @@
 from xml.sax.saxutils import escape
 
 from django.conf import settings
+from django.db.models import Avg, Count, Q
 from django.http import HttpResponse, JsonResponse
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_GET
 
-from .models import Category, Product, Storefront
+from . import legal
+from .models import Category, Product, Service, SiteArticle, SitePage, Storefront, SubCategory, Tag
+
+# Only approved, top-level reviews that carry a score are quotable; a question
+# without a rating must not inflate the published aggregate.
+COMMENT_REVIEW_FILTER = Q(comments__active=True, comments__parent__isnull=True, comments__rating__isnull=False)
 
 
 def _absolute(path: str) -> str:
@@ -41,20 +47,65 @@ def sitemap_xml(_request):
         (_absolute("/products"), today, "daily"),
         (_absolute("/marketplace"), today, "daily"),
         (_absolute("/storefronts"), today, "daily"),
+        (_absolute("/blog"), today, "weekly"),
+        (_absolute("/guides"), today, "weekly"),
         (_absolute("/services"), today, "monthly"),
+        (_absolute("/about"), today, "monthly"),
+        (_absolute("/contact"), today, "monthly"),
         (_absolute("/farmer-sell"), today, "monthly"),
         (_absolute("/support"), today, "monthly"),
-        (_absolute("/privacy"), today, "yearly"),
-        (_absolute("/terms"), today, "yearly"),
-        (_absolute("/returns"), today, "yearly"),
+        # The legal hub and its documents, at their canonical addresses. The older
+        # /privacy, /terms and /returns routes render the same text and declare
+        # /legal/<slug> as canonical, so a crawler is never asked to choose.
+        (_absolute("/legal"), today, "yearly"),
+        *[(f"{_absolute('/legal')}/{doc.slug}", today, "yearly") for doc in legal.documents()],
     ]
 
+    # Category, subcategory, brand and tag pages are indexable addresses of their
+    # own now, so the sitemap lists those rather than a filtered query string —
+    # and a brand page only appears if products actually carry it.
+    entries.append((_absolute("/faq"), today, "monthly"))
+    entries.append((_absolute("/customers"), today, "weekly"))
+
     for category in Category.objects.all().only("slug"):
-        entries.append((_absolute(f"/products?category={category.slug}"), "", "weekly"))
+        entries.append((_absolute(f"/c/{category.slug}"), "", "weekly"))
+    for subcategory in SubCategory.objects.all().only("slug"):
+        entries.append((_absolute(f"/sc/{subcategory.slug}"), "", "weekly"))
+    for row in (
+        Product.objects.filter(status="published")
+        .exclude(brand_slug="")
+        .values("brand_slug")
+        .annotate(total=Count("id"))
+        .order_by("-total")[:120]
+    ):
+        entries.append((_absolute(f"/brand/{row['brand_slug']}"), "", "weekly"))
+    for tag in Tag.objects.all().only("slug"):
+        entries.append((_absolute(f"/tag/{tag.slug}"), "", "weekly"))
 
     for product in Product.objects.filter(status="published").only("slug", "updated"):
         entries.append(
             (_absolute(f"/products/{product.slug}"), product.updated.date().isoformat(), "weekly")
+        )
+
+    for article in SiteArticle.objects.filter(is_published=True).only("slug", "updated_at"):
+        entries.append(
+            (
+                _absolute(article.get_absolute_url()),
+                article.updated_at.date().isoformat(),
+                "monthly",
+            )
+        )
+
+    for service in Service.objects.filter(is_active=True).only("slug"):
+        entries.append((_absolute(f"/services/{service.slug}"), "", "monthly"))
+
+    for page in SitePage.objects.filter(published=True).only("slug", "updated_at"):
+        entries.append(
+            (
+                _absolute(page.get_absolute_url()),
+                page.updated_at.date().isoformat(),
+                "monthly",
+            )
         )
 
     for storefront in Storefront.objects.filter(is_active=True).only("slug", "updated_at"):
@@ -98,10 +149,13 @@ def llms_txt(_request):
         "",
         "## Verified public resources",
         f"- Product catalogue: {_absolute('/products')}",
+        f"- Growing guides: {_absolute('/guides')}",
+        f"- Articles: {_absolute('/blog')}",
         f"- Agricultural services: {_absolute('/services')}",
         f"- Farmer sourcing requests: {_absolute('/farmer-sell')}",
         f"- Moderated farmers marketplace: {_absolute('/marketplace')}",
         f"- Support and feedback: {_absolute('/support')}",
+        f"- Legal documents (terms, privacy, returns, shipping, warranty, marketplace rules, loyalty, complaints): {_absolute('/legal')}",
         f"- Machine-readable catalogue facts: {_absolute('/ai-facts.json')}",
         f"- XML sitemap: {_absolute('/sitemap.xml')}",
         "",
@@ -120,9 +174,15 @@ def llms_txt(_request):
 @require_GET
 def ai_facts_json(_request):
     """Public, bounded facts for search/answer engines and integrations."""
-    products = Product.objects.filter(status='published').select_related('category').only(
-        'title', 'slug', 'price', 'stock', 'available', 'updated', 'category__name'
-    )[:100]
+    products = (
+        Product.objects.filter(status='published')
+        .select_related('category')
+        .annotate(
+            avg_rating=Avg('comments__rating', filter=COMMENT_REVIEW_FILTER),
+            reviews_count=Count('comments', filter=COMMENT_REVIEW_FILTER, distinct=True),
+        )
+        .only('title', 'slug', 'price', 'stock', 'available', 'updated', 'category__name')[:100]
+    )
     payload = {
         'name': 'GarinKood',
         'canonical_url': _absolute('/'),
@@ -142,9 +202,13 @@ def ai_facts_json(_request):
                 'name': product.title,
                 'url': _absolute(f'/products/{product.slug}'),
                 'category': product.category.name if product.category else None,
-                'price': product.price,
+                # A quote-only line has no publishable price.
+                'price': None if product.price_on_request else product.price,
                 'price_currency': 'IRT',
                 'in_stock': product.is_in_stock,
+                'price_on_request': product.price_on_request,
+                'average_rating': round(float(product.avg_rating), 2) if product.avg_rating else None,
+                'review_count': product.reviews_count or 0,
                 'updated_at': product.updated.isoformat(),
             }
             for product in products

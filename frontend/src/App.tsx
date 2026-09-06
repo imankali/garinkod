@@ -19,6 +19,7 @@ import WishlistModal from "./components/WishlistModal";
 import CompareBar from "./components/CompareBar";
 import CompareModal from "./components/CompareModal";
 import CategorySections from "./components/home/CategorySections";
+import ContentRails from "./components/home/ContentRails";
 import WeatherWidget from "./components/WeatherWidget";
 import InstallmentBanner from "./components/InstallmentBanner";
 import FlyToCart, { type FlyingItem } from "./components/FlyToCart";
@@ -31,6 +32,8 @@ import CategoryGrid from "./components/home/CategoryGrid";
 import FeaturedStorefronts from "./components/home/FeaturedStorefronts";
 import DirectMessagesDrawer from "./components/direct/DirectMessagesDrawer";
 import RouteSeo from "./components/RouteSeo";
+import LoginModal from "./components/LoginModal";
+import CookieJarNotice from "./components/CookieJarNotice";
 import PrivacyAnalytics from "./components/PrivacyAnalytics";
 
 // ========================================
@@ -56,6 +59,18 @@ const Shop = lazy(() => import("./pages/Shop"));
 const Messages = lazy(() => import("./pages/Messages"));
 const Farmers = lazy(() => import("./pages/Farmers"));
 const Legal = lazy(() => import("./pages/Legal"));
+const LegalHub = lazy(() => import("./pages/LegalHub"));
+const CatalogLanding = lazy(() => import("./pages/CatalogLanding"));
+const Brands = lazy(() => import("./pages/Brands"));
+const Faq = lazy(() => import("./pages/Faq"));
+const Customers = lazy(() => import("./pages/Customers"));
+const Blog = lazy(() => import("./pages/Blog"));
+const ArticlePage = lazy(() => import("./pages/ArticlePage"));
+const About = lazy(() => import("./pages/About"));
+const Contact = lazy(() => import("./pages/Contact"));
+const Newsletter = lazy(() => import("./pages/Newsletter"));
+const ServiceDetail = lazy(() => import("./pages/ServiceDetail"));
+const SitePageView = lazy(() => import("./pages/SitePageView"));
 
 // ========================================
 // Stores
@@ -88,7 +103,7 @@ const HAS_CROP_TAGS = false;
 // ========================================
 function LoadingSpinner() {
   return (
-    <div className="flex min-h-[50vh] items-center justify-center py-12">
+    <div className="flex min-h-[50dvh] items-center justify-center py-12">
       <div className="h-12 w-12 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent"></div>
     </div>
   );
@@ -222,9 +237,11 @@ export default function App() {
     <BrowserRouter>
       <RouteSeo />
       <PrivacyAnalytics />
-      {/* ✅ div اصلی با min-h-screen و w-full */}
+      {/* ریشهٔ برنامه: بدون `overflow-x` — همان یک کلاس، کل هدر و پنل‌های sticky
+          را بی‌اثر می‌کرد، چون یک ظرف اسکرول جدید می‌ساخت. سرریز افقی را
+          `overflow-x: clip` روی html/body نگه می‌دارد (index.css). */}
       <div
-        className={`min-h-screen w-full overflow-x-hidden ${isDark ? 'dark' : ''}`}
+        className={`min-h-dvh w-full ${isDark ? 'dark' : ''}`}
         dir={dir}
       >
         {/* ======================================== */}
@@ -342,6 +359,21 @@ export default function App() {
                       onToggleCompare={handleToggleCompare}
                     />
 
+                    {/*
+                      Freshness rails (new stock, live discounts, best rated) and
+                      the magazine block: what a returning buyer checks before
+                      they look at a department again.
+                    */}
+                    <ContentRails
+                      wishlistIds={wishlistIds}
+                      compareIds={compareIds}
+                      compareDisabled={compareItems.length >= 3}
+                      onToggleWishlist={handleToggleWishlist}
+                      onAddToCart={(product, event) => handleAddToCart(product, 1, event)}
+                      onQuickView={setSelectedProduct}
+                      onToggleCompare={handleToggleCompare}
+                    />
+
                     {/* AgriCalculator */}
                     <AgriCalculator onAddToCart={handleAddToCart} />
                   </>
@@ -358,9 +390,41 @@ export default function App() {
               <Route path="/checkout" element={<Checkout />} />
               <Route path="/orders" element={<Orders />} />
               <Route path="/services" element={<Services />} />
+              <Route path="/services/:slug" element={<ServiceDetail />} />
+
+              {/* ======================================== */}
+              {/* Content marketing: blog, per-crop guides, editable pages */}
+              {/* ======================================== */}
+              <Route path="/blog" element={<Blog />} />
+              <Route path="/blog/:slug" element={<ArticlePage />} />
+              <Route path="/guides" element={<Blog />} />
+              <Route path="/guides/:slug" element={<ArticlePage />} />
+              <Route path="/about" element={<About />} />
+              <Route path="/contact" element={<Contact />} />
+              <Route path="/newsletter" element={<Newsletter />} />
+              {/* Pages and campaign landings the team builds in the admin. */}
+              <Route path="/page/:slug" element={<SitePageView kind="page" />} />
+              <Route path="/offer/:slug" element={<SitePageView kind="landing" />} />
               <Route path="/farmer-sell" element={<FarmerSell />} />
               <Route path="/marketplace" element={<Marketplace />} />
               <Route path="/support" element={<Support />} />
+              {/* Legal documents. /legal is the hub and /legal/<slug> the canonical
+                  address of each document; the three older routes stay alive
+                  because they are printed in e-mails and saved in bookmarks, and
+                  render the same component (which declares the canonical URL). */}
+              {/* Catalogue landing pages: one component for the four kinds of
+                  addressable group, so a category, a subcategory, a brand and a
+                  tag all behave the same and all take their product grid from the
+                  filters the server returned for that page. */}
+              <Route path="/c/:slug" element={<CatalogLanding kind="category" />} />
+              <Route path="/sc/:slug" element={<CatalogLanding kind="subcategory" />} />
+              <Route path="/brand/:slug" element={<CatalogLanding kind="brand" />} />
+              <Route path="/brands" element={<Brands />} />
+              <Route path="/tag/:slug" element={<CatalogLanding kind="tag" />} />
+              <Route path="/faq" element={<Faq />} />
+              <Route path="/customers" element={<Customers />} />
+              <Route path="/legal" element={<LegalHub />} />
+              <Route path="/legal/:slug" element={<Legal />} />
               <Route path="/privacy" element={<Legal />} />
               <Route path="/terms" element={<Legal />} />
               <Route path="/returns" element={<Legal />} />
@@ -431,7 +495,7 @@ export default function App() {
               <Route
                 path="*"
                 element={
-                  <div className="flex min-h-[70vh] items-center justify-center px-4">
+                  <div className="flex min-h-[70dvh] items-center justify-center px-4">
                     <div className="text-center">
                       <div className="text-6xl mb-4">404</div>
                       <p className="text-lg font-bold text-slate-700 dark:text-white">
@@ -520,6 +584,16 @@ export default function App() {
         {/* Consultation Button */}
         {/* ======================================== */}
         <GlobalMessengerButton />
+
+        {/* ======================================== */}
+        {/* Sign-in dialog used by every gated action (reviews, consult) */}
+        {/* ======================================== */}
+        <LoginModal />
+
+        {/* ======================================== */}
+        {/* A sign-in the browser cannot keep is explained, never looped */}
+        {/* ======================================== */}
+        <CookieJarNotice />
       </div>
     </BrowserRouter>
   );

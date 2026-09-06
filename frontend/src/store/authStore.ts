@@ -2,13 +2,17 @@ import { create } from 'zustand';
 import toast from 'react-hot-toast';
 
 import { authApi, avatarApi } from '../api/services';
+import { clearPreviewToken, writePreviewToken } from '../api/previewSession';
 import { parseApiError } from '../api/errors';
 import {
   USER_LEVEL,
   type OtpRequestResponse,
   type User,
   type UserAccount,
+  type UserCapability,
+  type UserCapabilities,
   type UserLevel,
+  STAFF_LEVEL_FLOOR,
 } from '../types';
 
 interface AuthState {
@@ -51,6 +55,14 @@ interface AuthState {
   clearAuth: () => void;
   uploadAvatar: (file: File) => Promise<void>;
   removeAvatar: () => Promise<void>;
+  /**
+   * True when the server accepted the credentials but the browser will not keep
+   * the session cookie. The login forms then show what to do about it instead of
+   * letting the visitor spin.
+   */
+  cookieBlocked: boolean;
+  recheckCookieJar: () => Promise<boolean>;
+  dismissCookieNotice: () => void;
 }
 
 const signedOutState = {
@@ -59,13 +71,55 @@ const signedOutState = {
   isAuthenticated: false,
 };
 
-export const useAuthStore = create<AuthState>((set) => ({
+/**
+ * Does the browser actually keep what the shop just gave it?
+ *
+ * A cookie-less follow-up makes a correct password look broken: the server says
+ * «welcome», the next request is a stranger, and the visitor is back at the door.
+ * It happens when the site is opened inside an iframe of another origin (the usual
+ * sandbox preview), with third-party cookies blocked, and in some private-browsing
+ * modes. One cheap probe after each sign-in turns that loop into a sentence.
+ */
+async function sessionSurvivesTheBrowser(): Promise<boolean> {
+  try {
+    const response = await authApi.session();
+    return Boolean(response.data?.user);
+  } catch {
+    return false;
+  }
+}
+
+/** Said whenever the session survives only because the preview kept a token. */
+const PREVIEW_KEEP_NOTICE =
+  'ورود انجام شد؛ این قاب کوکی نگه نمی‌دارد، پس نشست در حافظه همین مرورگر ماند.';
+
+/**
+ * The one turn-around for a preview that refuses cookies.
+ *
+ * If the browser kept the session, nothing more is needed. If it did not, and the
+ * shop is running with the preview switch on, the response carried the credential to
+ * the page itself: keep it here, where a frame is allowed to store its own things,
+ * and ask again. The second probe is the last one — after that the visitor is told
+ * what to change rather than left to repeat a correct password.
+ */
+async function keepSessionIfPossible(data?: { preview_token?: string }): Promise<'cookie' | 'token' | null> {
+  if (await sessionSurvivesTheBrowser()) return 'cookie';
+  const token = data?.preview_token;
+  if (!token) return null;
+  writePreviewToken(token);
+  return (await sessionSurvivesTheBrowser()) ? 'token' : null;
+}
+
+export const useAuthStore = create<AuthState>((set, get) => ({
   ...signedOutState,
   isLoading: false,
   isSessionChecked: false,
+  cookieBlocked: false,
 
   initializeSession: async () => {
-    set({ isLoading: true });
+    // Every page load is a fresh chance: the visitor may have opened the site in
+    // its own tab or allowed cookies since the last attempt.
+    set({ isLoading: true, cookieBlocked: false });
     try {
       const response = await authApi.session();
       set({
@@ -84,8 +138,14 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true });
     try {
       const response = await authApi.login(username, password);
-      set({ user: response.data.user, account: response.data.account, isAuthenticated: true, isLoading: false, isSessionChecked: true });
-      toast.success('ورود با موفقیت انجام شد');
+      const kept = await keepSessionIfPossible(response.data);
+      if (!kept) {
+        set({ ...signedOutState, cookieBlocked: true, isLoading: false, isSessionChecked: true });
+        toast.error('رمز درست بود، اما این قاب مرورگر نشست را نگه نمی‌دارد.');
+        return;
+      }
+      set({ user: response.data.user, account: response.data.account, isAuthenticated: true, isLoading: false, isSessionChecked: true, cookieBlocked: false });
+      toast.success(kept === 'token' ? PREVIEW_KEEP_NOTICE : 'ورود با موفقیت انجام شد');
     } catch (error) {
       const parsed = parseApiError(error);
       // The login endpoint is silent in the interceptor, so the message is
@@ -114,14 +174,28 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true });
     try {
       const response = await authApi.verifyOtp(data);
+      const kept = await keepSessionIfPossible(response.data);
+      if (!kept) {
+        set({ ...signedOutState, cookieBlocked: true, isLoading: false, isSessionChecked: true });
+        toast.error('کد درست بود، اما این قاب مرورگر نشست را نگه نمی‌دارد.');
+        return;
+      }
+      // (the notice text below replaces the usual greeting on the fallback path)
       set({
         user: response.data.user,
         account: response.data.account,
         isAuthenticated: true,
         isLoading: false,
         isSessionChecked: true,
+        cookieBlocked: false,
       });
-      toast.success(response.data.created ? 'حساب شما ساخته شد؛ خوش آمدید' : 'ورود با موفقیت انجام شد');
+      toast.success(
+        kept === 'token'
+          ? PREVIEW_KEEP_NOTICE
+          : response.data.created
+            ? 'حساب شما ساخته شد؛ خوش آمدید'
+            : 'ورود با موفقیت انجام شد',
+      );
     } catch (error) {
       set({ isLoading: false, isSessionChecked: true });
       throw error;
@@ -132,8 +206,14 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true });
     try {
       const response = await authApi.register(data);
-      set({ user: response.data.user, account: response.data.account, isAuthenticated: true, isLoading: false, isSessionChecked: true });
-      toast.success('ثبت‌نام با موفقیت انجام شد');
+      const kept = await keepSessionIfPossible(response.data);
+      if (!kept) {
+        set({ ...signedOutState, cookieBlocked: true, isLoading: false, isSessionChecked: true });
+        toast.error('حساب ساخته شد، اما این قاب مرورگر نشست را نگه نمی‌دارد.');
+        return;
+      }
+      set({ user: response.data.user, account: response.data.account, isAuthenticated: true, isLoading: false, isSessionChecked: true, cookieBlocked: false });
+      toast.success(kept === 'token' ? PREVIEW_KEEP_NOTICE : 'ثبت‌نام با موفقیت انجام شد');
     } catch (error) {
       const parsed = parseApiError(error);
       // Field errors are rendered by the register form itself; only a
@@ -146,13 +226,23 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
 
+  recheckCookieJar: async () => {
+    const kept = await sessionSurvivesTheBrowser();
+    set({ cookieBlocked: !kept });
+    if (kept) await get().initializeSession();
+    return kept;
+  },
+
+  dismissCookieNotice: () => set({ cookieBlocked: false }),
+
   logout: async () => {
+    clearPreviewToken();
     try {
       await authApi.logout();
     } catch {
       // Clear local state even if the server-side session already expired.
     } finally {
-      set({ ...signedOutState, isSessionChecked: true });
+      set({ ...signedOutState, isSessionChecked: true, cookieBlocked: false });
       toast.success('خروج با موفقیت انجام شد');
     }
   },
@@ -229,4 +319,29 @@ export function useUserLevel(): UserLevel | 0 {
 
 export function useHasLevel(required: UserLevel): boolean {
   return useUserLevel() >= required;
+}
+
+/**
+ * What the signed-in account may do, as the server said it.
+ *
+ * `undefined` while the session has not resolved yet — a component must not
+ * read that as "no" and hide a control, so it should fall back to a level
+ * check while `isSessionChecked` is false.
+ */
+export function useCapabilities(): UserCapabilities | undefined {
+  const { isAuthenticated, account } = useAuthStore();
+  if (!isAuthenticated) return {};
+  return account?.capabilities;
+}
+
+/** A single capability, defaulting to `fallback` while the session loads. */
+export function useCan(capability: UserCapability, fallback = true): boolean {
+  const capabilities = useCapabilities();
+  if (!capabilities || capabilities[capability] === undefined) return fallback;
+  return Boolean(capabilities[capability]);
+}
+
+/** Whether this person is on the platform's payroll (rank 5 and up). */
+export function useIsStaffMember(): boolean {
+  return useHasLevel(STAFF_LEVEL_FLOOR);
 }

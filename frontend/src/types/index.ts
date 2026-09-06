@@ -88,6 +88,32 @@ export interface Product {
   shipping_length_cm: number;
   shipping_width_cm: number;
   shipping_height_cm: number;
+  /** Package size as the supplier publishes it («۲۵ کیلوگرم»، «۱ تن»). */
+  package_weight?: string;
+  /** Quote-only line: the shop shows «تماس بگیرید» instead of a price. */
+  price_on_request?: boolean;
+  /** Structured specification table, detail endpoint only. */
+  attributes?: ProductAttribute[];
+  rating_summary?: RatingSummary;
+  /** Batch dates the supplier declares; null means "not stated", never "old". */
+  production_date?: string | null;
+  expiry_date?: string | null;
+  expiry_days_left?: number | null;
+  is_expiring_soon?: boolean;
+  /** Smallest quantity this line sells in (a bag, not a single kilo). */
+  min_order_quantity?: number;
+  /** «زیر ۵۰ کیلو از کیسه پر می‌شود» — the bulk rule for this product. */
+  bulk_note?: string;
+  /** Aparat/YouTube link, shown as a click-to-play card. */
+  video_url?: string;
+  views?: number;
+  /** Address of the brand page; matched by slug so a rename cannot break it. */
+  brand_slug?: string;
+  tags?: TagRef[];
+  /** Cover first, then the admin gallery. */
+  gallery?: GalleryShot[];
+  /** Purchasable packagings; one implicit row when none are declared. */
+  packages?: ProductPackage[];
 
   // ✅ فیلدهای detail (اختیاری - فقط در detail endpoint برمی‌گردند)
   fertilizer_detail?: FertilizerDetail;
@@ -117,6 +143,346 @@ export interface ProductList {
   discounted_price: number;
   brand: string;
   sku: string;
+  package_weight?: string;
+  price_on_request?: boolean;
+  /** Aggregate of approved 1-5 star reviews, computed on the server. */
+  avg_rating?: number;
+  reviews_count?: number;
+  /** Second photo, for the hover swap; empty when the product has no gallery. */
+  image_alt_url?: string;
+  is_expiring_soon?: boolean;
+  views?: number;
+  brand_slug?: string;
+  tags?: TagRef[];
+}
+
+/** A cross-category label («کود محلول‌پاشی»). */
+export interface TagRef {
+  id: number;
+  name: string;
+  slug: string;
+  description?: string;
+  product_count?: number;
+}
+
+export interface GalleryShot {
+  url: string;
+  caption: string;
+}
+
+/** One purchasable packaging, priced and stocked on its own. */
+export interface ProductPackage {
+  id: number | null;
+  label: string;
+  weight_kg: number | null;
+  price: number | null;
+  effective_price: number;
+  discounted_price: number;
+  stock: number | null;
+  effective_stock: number;
+  min_order_quantity: number;
+  bulk_note: string;
+  production_date: string | null;
+  expiry_date: string | null;
+  expiry_days_left: number | null;
+  is_in_stock: boolean;
+  price_per_kg: number | null;
+  is_default: boolean;
+}
+
+// ========================================
+// Catalogue landing pages (category / subcategory / brand / tag)
+// ========================================
+
+export type CatalogKind = 'category' | 'subcategory' | 'brand' | 'tag';
+
+export interface CatalogCard {
+  kind: CatalogKind;
+  title: string;
+  slug: string;
+  image_url: string;
+  description: string;
+  count: number;
+  url: string;
+}
+
+export interface CatalogLanding {
+  kind: CatalogKind;
+  title: string;
+  slug: string;
+  description: string;
+  image_url: string;
+  seo_title: string;
+  seo_description: string;
+  breadcrumb: Array<{ title: string; url: string }>;
+  /** Exactly what to send to the product list so the grid matches the page. */
+  filters: Record<string, string>;
+  children: CatalogCard[];
+  siblings: CatalogCard[];
+  count: number;
+  avg_rating: number;
+  facets: {
+    brands: Array<{ name: string; slug: string; count: number }>;
+    packages: Array<{ label: string; count: number }>;
+    price: { min: number; max: number; average: number };
+    has_expiring_soon: boolean;
+  };
+  articles: Array<{
+    title: string;
+    slug: string;
+    kind: string;
+    excerpt: string;
+    reading_minutes: number;
+  }>;
+  partner?: { website: string; since_year: number | null } | null;
+}
+
+export interface CatalogIndex {
+  categories: CatalogCard[];
+  tags: CatalogCard[];
+  brands: CatalogCard[];
+}
+
+/** A review picked (or simply rated) for «تجربه خرید مشتریان». */
+export interface BuyerExperience {
+  id: number;
+  name: string;
+  body: string;
+  rating: number | null;
+  sticker: string;
+  image_url: string;
+  created: string;
+  helpful_count: number;
+  verified_purchase: boolean;
+  product: { title: string; slug: string; brand: string; image_url: string; url: string };
+}
+
+export interface BuyerExperiencesResponse {
+  /** curated = editor-pinned, verified = paid buyers, open = best-rated reviews. */
+  mode: 'curated' | 'verified' | 'open';
+  total: number;
+  items: BuyerExperience[];
+}
+
+/** What the operator declared about returns and express delivery. */
+export interface SitePolicies {
+  return_window_days: number | null;
+  return_window_label: string;
+  return_conditions: string;
+  express_shipping: { enabled: boolean; fee: number };
+  updated_at: string;
+}
+
+// ========================================
+// Spec sheets, ratings and site content
+// ========================================
+
+/** One label/value row of the «ویژگی‌ها» table on a product or آگهی. */
+export interface ProductAttribute {
+  id?: number;
+  label: string;
+  value: string;
+  order?: number;
+}
+
+export interface RatingSummary {
+  average: number;
+  reviews_count: number;
+  /** Star bucket -> how many reviews gave that score. */
+  distribution: Record<'1' | '2' | '3' | '4' | '5', number>;
+}
+
+export interface ProductFacets {
+  brands: Array<{ value: string; count: number }>;
+  package_weights: Array<{ value: string; count: number }>;
+  max_price: number;
+}
+
+export type ArticleKind = 'article' | 'guide';
+
+export interface SiteArticleCard {
+  id: number;
+  title: string;
+  slug: string;
+  kind: ArticleKind;
+  kind_label: string;
+  excerpt: string;
+  crop: string;
+  cover: string | null;
+  cover_url: string;
+  author_name: string;
+  published_at: string | null;
+  updated_at: string;
+  reading_minutes: number;
+  views: number;
+  is_featured: boolean;
+  products_count: number;
+  seo_title: string;
+  seo_description: string;
+}
+
+export interface SiteArticleDetail extends Omit<SiteArticleCard, 'products_count'> {
+  body: string;
+  author: number | null;
+  products: ProductList[];
+  listings: Array<{
+    id: number;
+    title: string;
+    slug: string;
+    crop_name: string;
+    price: number;
+    unit: string;
+    image_url: string;
+    storefront_name: string;
+    storefront_slug: string;
+  }>;
+  related_articles: SiteArticleCard[];
+  headings: Array<{ title: string; anchor: string }>;
+}
+
+export interface FarmService {
+  id: number;
+  title: string;
+  slug: string;
+  code: string;
+  summary: string;
+  body: string;
+  highlights: string[];
+  icon: string;
+  image: string | null;
+  image_url: string;
+  price_note: string;
+  order: number;
+  seo_title: string;
+  seo_description: string;
+}
+
+export type SitePageBlockType =
+  | 'heading'
+  | 'text'
+  | 'bullets'
+  | 'image'
+  | 'spec_table'
+  | 'price_table'
+  | 'video'
+  | 'products'
+  | 'articles'
+  | 'cta'
+  | 'quote'
+  /** Question/answer rows, rendered as an accordion with FAQPage schema. */
+  | 'faq';
+
+/** The shop's own return window / express option, read from the admin record. */
+export interface LegalPolicy {
+  return_window_days: number | null;
+  return_window_label: string;
+  return_conditions: string;
+  express_shipping: { enabled: boolean; fee: number };
+  updated_at: string;
+}
+
+export interface SitePageBlock {
+  id: number;
+  block_type: SitePageBlockType;
+  block_type_label: string;
+  title: string;
+  text: string;
+  rows: string[][];
+  image: string | null;
+  image_url: string;
+  video: string | null;
+  video_url: string;
+  link: string;
+  data: Record<string, unknown>;
+  position: number;
+}
+
+export interface SitePage {
+  id: number;
+  title: string;
+  slug: string;
+  kind: 'page' | 'landing';
+  kind_label: string;
+  hero_text: string;
+  hero_image: string | null;
+  hero_image_url: string;
+  badge: string;
+  product: {
+    id: number;
+    title: string;
+    slug: string;
+    price: number;
+    discounted_price: number;
+    image_url: string;
+    is_in_stock: boolean;
+    price_on_request: boolean;
+  } | null;
+  cta_label: string;
+  cta_url: string;
+  blocks: SitePageBlock[];
+  published_at: string | null;
+  updated_at: string;
+  updated_by: string;
+  seo_title: string;
+  seo_description: string;
+}
+
+export interface TeamMember {
+  id: number;
+  name: string;
+  role: string;
+  bio: string;
+  photo: string | null;
+  photo_url: string;
+  order: number;
+}
+
+export interface BrandPartner {
+  id: number;
+  name: string;
+  /** The brand page of the catalogue; a partner without products still has one. */
+  slug: string;
+  logo: string | null;
+  logo_url: string;
+  website: string;
+  description: string;
+  since_year: number | null;
+  order: number;
+}
+
+export interface SiteContactInfo {
+  address: string;
+  provinces_note: string;
+  phones: string[];
+  emails: string[];
+  working_hours: string;
+  whatsapp_number: string;
+  telegram_url: string;
+  instagram_url: string;
+  eitaa_url: string;
+  map_lat: number | string | null;
+  map_lng: number | string | null;
+  map_note: string;
+  expert_name: string;
+  expert_role: string;
+  expert_photo: string | null;
+  expert_photo_url: string;
+  expert_note: string;
+  updated_at: string;
+}
+
+export interface AboutResponse {
+  team: TeamMember[];
+  brands: BrandPartner[];
+  stats: {
+    products: number;
+    storefronts: number;
+    listings: number;
+    articles: number;
+    orders: number;
+    provinces: number;
+  };
+  contact: SiteContactInfo;
 }
 
 // ========================================
@@ -153,6 +519,18 @@ export interface MockProduct {
   warnings: string[];
   compatibleWith: string[];
   brochureAvailable: boolean;
+  /**
+   * Catalogue additions that a card or the quick-view needs: the real star
+   * average (0 until a review is approved), the spec table and the quote-only
+   * flag that replaces the price with «تماس بگیرید».
+   */
+  attributes?: ProductAttribute[];
+  priceOnRequest?: boolean;
+  packageWeight?: string;
+  /** Second catalogue photo; the card cross-fades to it on hover. */
+  secondImage?: string;
+  /** A declared batch inside the 90-day warning window. */
+  expiringSoon?: boolean;
 }
 
 // ========================================
@@ -189,6 +567,9 @@ export interface CartItem {
   available_quantity: number;
   min_order_quantity: number;
   is_in_stock: boolean;
+  /** The chosen packaging, when the product declares more than one. */
+  product_package?: number | null;
+  package_label?: string;
 }
 
 export interface Cart {
@@ -215,13 +596,75 @@ export interface User {
 /** Access levels 1-5; see UserAccount.LEVEL_CHOICES on the backend. */
 export const USER_LEVEL = {
   BUYER: 1,
-  SELLER: 2,
-  MODERATOR: 3,
-  ADMIN: 4,
-  OWNER: 5,
+  VERIFIED_BUYER: 2,
+  SELLER: 3,
+  VERIFIED_SELLER: 4,
+  DESK_AGENT: 5,
+  MODERATOR: 6,
+  ADMIN: 7,
+  OWNER: 8,
 } as const;
 
 export type UserLevel = (typeof USER_LEVEL)[keyof typeof USER_LEVEL];
+
+/** The first staff rank: from here up, a person answers the desks. */
+export const STAFF_LEVEL_FLOOR: UserLevel = USER_LEVEL.DESK_AGENT;
+
+/**
+ * What a rank buys. The list itself comes from the server (`/api/levels/`);
+ * these names exist so a call site is a typo-checked string instead of a
+ * free-form key.
+ */
+export type UserCapability =
+  | 'browse'
+  | 'order'
+  | 'review'
+  | 'contact_storefront'
+  | 'support_chat'
+  | 'consult_desk'
+  | 'loyalty'
+  | 'affiliate'
+  | 'verified_badge'
+  | 'sell'
+  | 'featured_storefront'
+  | 'desk_queue'
+  | 'moderate'
+  | 'console'
+  | 'manage_staff'
+  | 'own';
+
+export type UserCapabilities = Partial<Record<UserCapability, boolean>>;
+
+/** One step of the ladder, as the API publishes it. */
+export interface LevelRank {
+  value: UserLevel;
+  key: string;
+  label: string;
+  short_label: string;
+  promise: string;
+  how: string;
+  is_staff: boolean;
+  unlocks: { key: UserCapability; label: string }[];
+}
+
+/** «یک پله جلوتر» on the profile card. */
+export interface LevelNextStep {
+  value: number;
+  label: string;
+  how: string;
+  promise: string;
+}
+
+export interface LevelsSnapshot {
+  ladder: LevelRank[];
+  capabilities: Record<UserCapability, { label: string; minimum_level: number }>;
+  level_range: { min: number; max: number };
+  viewer_level: number;
+  viewer_rank: Pick<LevelRank, 'value' | 'label' | 'short_label' | 'promise'> | null;
+  viewer_is_staff: boolean;
+  viewer_capabilities: UserCapabilities;
+  next_step: LevelNextStep | null;
+}
 
 export interface UserAccount {
   id: number;
@@ -236,6 +679,12 @@ export interface UserAccount {
   avatar_url: string;
   level: UserLevel;
   level_label: string;
+  /** «غرفه‌دار» without the «سطح ۳ — » prefix, for chips. */
+  level_short_label: string;
+  /** What this account may do, straight from the server's ladder. */
+  capabilities?: UserCapabilities;
+  /** The rank one step up and how to reach it; null at the top or at a wall. */
+  next_level?: LevelNextStep | null;
   has_storefront: boolean;
   created: string;
   updated: string;
@@ -253,11 +702,19 @@ export interface Comment {
   body: string;
   image: string | null;
   sticker: string;
+  /** 1..5 star score of a review; null on a question or an answer. */
+  rating: number | null;
+  /** The reviewer has a paid order containing this product. */
+  is_verified_purchase?: boolean;
   parent: number | null;
   created: string;
   updated: string;
   active: boolean;
   replies?: Comment[];
+  /** How many readers marked this review useful. */
+  helpful_count?: number;
+  is_featured?: boolean;
+  is_reported?: boolean;
 }
 
 // ========================================
@@ -276,6 +733,12 @@ export interface AuthResponse {
   account: UserAccount | null;
   message: string;
   created?: boolean;
+  /**
+   * Present only in a preview started with GK_PREVIEW_IFRAME_COOKIES under DEBUG:
+   * the fallback for a frame that will not store the session cookie. The production
+   * response has no such field, so this is not a place to read a credential from.
+   */
+  preview_token?: string;
 }
 
 export interface OtpRequestResponse {
@@ -313,6 +776,8 @@ export interface OrderItem {
   unit_price: number;
   quantity: number;
   total_price: number;
+  /** Packaging as it was sold; snapshotted, so a retired label still reads right. */
+  package_label?: string;
 }
 
 export interface ShipmentTrackingEvent {
@@ -373,6 +838,9 @@ export interface Order {
   shipments: Shipment[];
   created_at: string;
   updated_at: string;
+  /** When the buyer accepted the terms, and which text they accepted. */
+  terms_accepted_at: string | null;
+  legal_version: string;
 }
 
 export interface CheckoutPayload {
@@ -390,6 +858,11 @@ export interface CheckoutPayload {
   affiliate_code?: string;
   coupon_code?: string;
   terms_accepted: boolean;
+  /**
+   * Which delivery service the buyer picked. Only the services the server
+   * offered are accepted; the price is always recomputed at checkout.
+   */
+  shipping_service?: 'standard' | 'express';
 }
 
 export interface PaymentProviderOption {
@@ -649,6 +1122,8 @@ export interface MarketplaceListing {
   discounted_price: number;
   rejection_reason: string;
   reviewed_at: string | null;
+  /** Optional spec rows the seller can publish with the آگهی. */
+  attributes?: ProductAttribute[];
   created_at: string;
   updated_at: string;
 }
@@ -685,15 +1160,131 @@ export interface QuotedMessage {
   is_deleted: boolean;
 }
 
+/** The land case file a farmer shares, in the shape a consultant reads it. */
+export interface SharedLandDossier {
+  id: number;
+  name: string;
+  land_type: LandType;
+  land_type_label: string;
+  area_label: string;
+  crop_type: string;
+  crop_variety: string;
+  province: string;
+  city: string;
+  soil_type_label: string;
+  irrigation_type_label: string;
+  planting_date: string | null;
+  notes: string;
+  event_count: number;
+  owner_name: string;
+}
+
+/** A button inside a message bubble: the post, product or desk it refers to. */
+export interface MessageLink {
+  kind: string;
+  label: string;
+  url: string;
+}
+
+/** The desk profile of whoever answers — the name the farmer should see. */
+export interface DeskAgentPublic {
+  id: number;
+  name: string;
+  title: string;
+  photo_url: string;
+  role: 'consulting' | 'support';
+  specialties: string[];
+  on_duty: boolean;
+  online: boolean;
+  open_threads: number;
+  rating_average: number;
+  rating_count: number;
+}
+
+export interface DeskQuickReply {
+  id: number;
+  label: string;
+  text: string;
+  first_message_only: boolean;
+}
+
+/** One object that answers «کی هست و کی جواب می‌دهد», shared by chat and queue. */
+export interface DeskState {
+  channel: Exclude<MessageChannel, 'storefront' | 'comment'>;
+  channel_label: string;
+  is_open: boolean;
+  tracked: boolean;
+  hours: string;
+  work_days: string[];
+  opens_at: string | null;
+  opens_at_label: string;
+  out_of_hours_note: string;
+  online_count: number;
+  waiting_expected_minutes: number;
+  agents: DeskAgentPublic[];
+  viewer_is_staff: boolean;
+  quick_replies: DeskQuickReply[];
+  /**
+   * Whether this viewer may be a *customer* of this desk. Nobody queues in
+   * front of a farmer at the desk they staff, so the card offers the queue
+   * instead of a chat, and says why.
+   */
+  customer_allowed: boolean;
+  customer_denied_reason: string;
+}
+
+/** Whether the satisfaction card is due on this thread. */
+export interface ConversationSurvey {
+  closed: boolean;
+  closed_at: string | null;
+  has_rating: boolean;
+  can_rate: boolean;
+}
+
+/** The stored answer of one farmer, shown to the desk's managers only. */
+export interface ConversationRating {
+  id: number;
+  conversation: number;
+  conversation_info: { id: number; channel: MessageChannel; channel_label: string; customer: string };
+  rater: number;
+  rater_name: string;
+  agent: number | null;
+  agent_name: string;
+  score: number;
+  solved: boolean | null;
+  comment: string;
+  created_at: string;
+}
+
+export interface DeskRatingReport {
+  days: number;
+  window: { ratings: number; average: number; solved_rate: number };
+  agents: {
+    agent: DeskAgentPublic;
+    window_ratings: number;
+    window_average: number;
+    open_threads: number;
+  }[];
+  results: ConversationRating[];
+}
+
 export interface StorefrontMessage {
   id: number;
   conversation: number;
-  sender: number;
+  sender: number | null;
   sender_name: string;
   sender_avatar_url: string;
+  /** «مشاور کشاورزی» under the name, so the title travels with the reply. */
+  sender_role_label: string;
+  /** Level 2+ (a confirmed phone number) or staff: the name carries the mark. */
+  sender_verified?: boolean;
+  /** Written by the platform (closing, hours), not by a person. */
+  is_system: boolean;
   is_mine: boolean;
   body: string;
   listing: AttachedListing | null;
+  land: SharedLandDossier | null;
+  link: MessageLink | null;
   attachment: string | null;
   attachment_url: string;
   attachment_type: MessageAttachmentType | '';
@@ -721,8 +1312,23 @@ export interface StorefrontConversation {
   counterpart_avatar_url: string;
   last_message: StorefrontMessage | null;
   unread_count: number;
+  /** «اتمام مکالمه» moves an open thread to closed, which unlocks the survey. */
+  status: 'open' | 'closed';
+  status_label: string;
+  closed_at: string | null;
+  /** Who the desk placed this thread with. */
+  agent: DeskAgentPublic | null;
+  /** Set only when someone else answered last: whose name the header shows. */
+  last_agent: DeskAgentPublic | null;
+  assigned_to_me: boolean;
+  survey: ConversationSurvey;
   created_at: string;
   updated_at: string;
+}
+
+/** The service-thread response also carries the desk's own state. */
+export interface ServiceConversationResponse extends StorefrontConversation {
+  desk: DeskState;
 }
 
 export interface InboxResponse {
@@ -959,6 +1565,49 @@ export interface StorefrontPostComment {
 }
 
 // ========================================
+// Legal documents
+// ========================================
+
+/** A section of a legal document as authored in the admin panel. */
+export interface LegalBlock {
+  id: number;
+  type: SitePageBlockType;
+  title: string;
+  text: string;
+}
+
+export interface LegalDocumentSummary {
+  slug: string;
+  title: string;
+  /** The footer/menu label: shorter than the page heading. */
+  short_title: string;
+  group: string;
+  group_label: string;
+  icon: string;
+  summary: string;
+  /** `page` = published admin text, `code` = the wording shipped with the app. */
+  source: 'page' | 'code';
+  updated_at: string | null;
+  url: string;
+}
+
+export interface LegalDocument extends LegalDocumentSummary {
+  blocks: LegalBlock[];
+  sections: Array<{ title: string; body: string }>;
+  /** Present on «بازگشت کالا»: the live window, so the text never guesses one. */
+  policy?: LegalPolicy;
+}
+
+export interface LegalIndex {
+  groups: Array<{ id: string; label: string; items: LegalDocumentSummary[] }>;
+  documents: LegalDocumentSummary[];
+  /** Fingerprint of the text in force; recorded on every order. */
+  version: string;
+  /** What the operator configured for returns and express delivery. */
+  policy?: LegalPolicy;
+}
+
+// ========================================
 // Helper Types
 // ========================================
 
@@ -976,6 +1625,17 @@ export interface ProductQueryParams {
   has_discount?: boolean;
   min_price?: number;
   max_price?: number;
+  brand?: string;
+  /** Brand pages filter on the slug, which survives a supplier renaming its text. */
+  brand_slug?: string;
+  subcategory?: string;
+  tag?: string;
+  /** Star floor and "has reviews", both computed from the same aggregate the cards show. */
+  min_rating?: number;
+  has_reviews?: boolean;
+  expiring_soon?: boolean;
+  package_weight?: string;
+  price_on_request?: boolean;
 }
 export interface ManagementMetric {
   paid_revenue: number | null;

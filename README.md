@@ -12,6 +12,7 @@
 - ورود با کوکی HttpOnly، رمز عبور یا OTP موبایل، محدودسازی نرخ و قفل brute-force با Axes
 - صندوق پیام داخلی و outbox پایدار برای SMS، بله، تلگرام، WhatsApp و Web Push
 - پنل مدیریت نقش‌محور، audit log کسب‌وکار، تاریخچه انتخابی و import/export کنترل‌شده
+- ظرفیت سایت از توان واقعی سرور اندازه‌گیری می‌شود، صف ورودی اختیاری کاربر را بیرون نمی‌اندازد، و خطای سمت کاربر در لاگ سیستم ثبت می‌شود
 - داده مرجع استان/شهر، تقویم مزرعه، درخواست مشاوره و ماشین‌حساب دوز
 - PWA مبتنی بر Workbox، cache محدود، نصب‌پذیری و اعلان مرورگر چنددستگاهی
 - SEO مسیر/محصول، canonical و JSON-LD، sitemap/robots، صفحات حریم خصوصی و شرایط
@@ -52,6 +53,7 @@ cp .env.example .env
 python manage.py migrate
 python manage.py seed_locations
 python manage.py seed_agri_inputs
+python manage.py seed_site_content     # خدمات، صفحات اطلاعاتی و (با --with-landing) صفحه فرود نمونه
 python manage.py bootstrap_management_roles
 python manage.py createsuperuser
 python manage.py runserver 0.0.0.0:8000

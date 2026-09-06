@@ -7,7 +7,7 @@ type Dictionary = Record<string, string>;
 const dictionaries: Record<Locale, Dictionary> = {
   fa: {
     "nav.home": "خانه", "nav.products": "محصولات", "nav.services": "خدمات کشاورزی", "nav.marketplace": "بازار کشاورزان", "nav.offers": "تخفیف‌ها", "nav.storefronts": "غرفه‌داران",
-    "nav.cart": "سبد خرید", "nav.wishlist": "علاقه‌مندی‌ها", "nav.more": "بیشتر", "nav.messages": "پیام‌ها", "nav.farmers": "پشتیبانی کشاورزان", "nav.direct": "دایرکت", "nav.profile": "حساب من", "nav.orders": "سفارش‌ها", "nav.login": "ورود", "nav.logout": "خروج",
+    "nav.cart": "سبد خرید", "nav.wishlist": "علاقه‌مندی‌ها", "nav.more": "بیشتر", "nav.messages": "پیام‌ها", "nav.farmers": "پشتیبانی کشاورزان", "nav.direct": "دایرکت", "nav.profile": "حساب من", "nav.orders": "سفارش‌ها", "nav.blog": "بلاگ", "nav.guides": "راهنمای کشت", "nav.about": "درباره ما", "nav.contact": "تماس با ما", "nav.newsletter": "خبرنامه", "nav.login": "ورود", "nav.logout": "خروج",
     "header.searchPlaceholder": "جستجوی کود، سم، بذر و بازار کشاورزان...",
     "header.menu": "منو", "header.openMenu": "باز کردن منوی کامل", "header.closeMenu": "بستن منو",
     "header.themeToLight": "تغییر به حالت روز", "header.themeToDark": "تغییر به حالت شب",
@@ -62,7 +62,7 @@ const dictionaries: Record<Locale, Dictionary> = {
   },
   en: {
     "nav.home": "Home", "nav.products": "Products", "nav.services": "Farm services", "nav.marketplace": "Farmers market", "nav.offers": "Offers", "nav.storefronts": "Sellers",
-    "nav.cart": "Cart", "nav.wishlist": "Wishlist", "nav.more": "More", "nav.messages": "Messages", "nav.farmers": "Farmer support", "nav.direct": "Direct", "nav.profile": "My account", "nav.orders": "Orders", "nav.login": "Sign in", "nav.logout": "Sign out",
+    "nav.cart": "Cart", "nav.wishlist": "Wishlist", "nav.more": "More", "nav.messages": "Messages", "nav.farmers": "Farmer support", "nav.direct": "Direct", "nav.profile": "My account", "nav.orders": "Orders", "nav.blog": "Blog", "nav.guides": "Growing guides", "nav.about": "About us", "nav.contact": "Contact", "nav.newsletter": "Newsletter", "nav.login": "Sign in", "nav.logout": "Sign out",
     "header.searchPlaceholder": "Search fertilizers, pesticides, seeds and farm products...",
     "header.menu": "Menu", "header.openMenu": "Open full menu", "header.closeMenu": "Close menu",
     "header.themeToLight": "Switch to light mode", "header.themeToDark": "Switch to dark mode",
@@ -117,7 +117,7 @@ const dictionaries: Record<Locale, Dictionary> = {
   },
   ar: {
     "nav.home": "الرئيسية", "nav.products": "المنتجات", "nav.services": "الخدمات الزراعية", "nav.marketplace": "سوق المزارعين", "nav.offers": "العروض", "nav.storefronts": "الباعة",
-    "nav.cart": "السلة", "nav.wishlist": "المفضلة", "nav.more": "المزيد", "nav.messages": "الرسائل", "nav.farmers": "دعم المزارعين", "nav.direct": "الرسائل المباشرة", "nav.profile": "حسابي", "nav.orders": "الطلبات", "nav.login": "تسجيل الدخول", "nav.logout": "خروج",
+    "nav.cart": "السلة", "nav.wishlist": "المفضلة", "nav.more": "المزيد", "nav.messages": "الرسائل", "nav.farmers": "دعم المزارعين", "nav.direct": "الرسائل المباشرة", "nav.profile": "حسابي", "nav.orders": "الطلبات", "nav.blog": "المدونة", "nav.guides": "أدلة الزراعة", "nav.about": "من نحن", "nav.contact": "اتصل بنا", "nav.newsletter": "النشرة البريدية", "nav.login": "تسجيل الدخول", "nav.logout": "خروج",
     "header.searchPlaceholder": "ابحث عن الأسمدة والمبيدات والبذور ومنتجات المزارع...",
     "header.menu": "القائمة", "header.openMenu": "فتح القائمة الكاملة", "header.closeMenu": "إغلاق القائمة",
     "header.themeToLight": "التبديل إلى الوضع النهاري", "header.themeToDark": "التبديل إلى الوضع الليلي",

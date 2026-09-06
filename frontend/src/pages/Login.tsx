@@ -1,7 +1,9 @@
 // frontend/src/pages/Login.tsx
 
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { LEGAL_CORE_LINKS } from '../config/legal';
 import {
   ArrowRight,
   CheckCircle2,
@@ -160,7 +162,7 @@ export default function Login() {
     : isRegister ? 'ثبت‌نام با رمز عبور' : 'ورود با رمز عبور';
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-emerald-50 to-lime-50 px-4 py-12 dark:from-emerald-950 dark:to-emerald-900">
+    <main className="flex min-h-dvh items-center justify-center bg-gradient-to-br from-emerald-50 to-lime-50 px-4 py-12 dark:from-emerald-950 dark:to-emerald-900">
       <motion.section
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -331,6 +333,10 @@ export default function Login() {
                   <ShieldCheck className="mt-1 shrink-0 text-emerald-600 dark:text-lime-400" size={18} />
                   کد کوتاه‌عمر است، در سرور به‌صورت هش نگهداری می‌شود و با تعداد تلاش و ارسال محدود محافظت می‌شود.
                 </div>
+
+                {/* Entering a phone number creates the account as often as it
+                    signs someone in, so the rules are shown right here. */}
+                <LegalDisclosure />
               </form>
             )
           ) : (
@@ -415,6 +421,8 @@ className={`${AUTH_INPUT_CLASS} ps-10`}
                 {isLoading ? <Spinner /> : isRegister ? <><UserPlus size={18} /> ثبت‌نام</> : <><LogIn size={18} /> ورود</>}
               </motion.button>
 
+              {isRegister && <LegalDisclosure />}
+
               <div className="pt-2 text-center text-sm text-slate-500 dark:text-emerald-300">
                 {isRegister ? 'قبلاً ثبت‌نام کرده‌اید؟' : 'حساب رمزدار ندارید؟'}{' '}
                 <button
@@ -471,5 +479,32 @@ function PasswordToggle({ shown, onClick }: { shown: boolean; onClick: () => voi
     >
       {shown ? <EyeOff size={18} /> : <Eye size={18} />}
     </button>
+  );
+}
+
+/**
+ * The rules a new account is created under.
+ *
+ * A number and a code are all it takes to open an account here, which is why the
+ * documents are named at that exact moment rather than hidden in the footer: an
+ * acceptance nobody could have read is not an acceptance.
+ */
+function LegalDisclosure() {
+  return (
+    <p className="text-center text-fluid-2xs leading-6 text-slate-500 dark:text-emerald-200">
+      با ادامه،{' '}
+      {LEGAL_CORE_LINKS.map((item, index) => (
+        <Fragment key={item.to}>
+          {index > 0 && (index === LEGAL_CORE_LINKS.length - 1 ? ' و ' : '، ')}
+          <Link to={item.to} className="font-bold text-emerald-700 hover:underline dark:text-lime-300">
+            {item.label}
+          </Link>
+        </Fragment>
+      ))}{' '}
+      را می‌پذیرید.{' '}
+      <Link to="/legal" className="font-bold underline-offset-4 hover:underline">
+        بقیه اسناد
+      </Link>
+    </p>
   );
 }

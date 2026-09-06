@@ -35,7 +35,8 @@ interface CartState {
 
   // Actions
   fetchCart: () => Promise<void>;
-  addToCart: (productId: number, quantity?: number) => Promise<void>;
+  /** `packageId` picks one of the product's declared packagings. */
+  addToCart: (productId: number, quantity?: number, packageId?: number | null) => Promise<void>;
   addListingToCart: (listingId: number, quantity?: number) => Promise<void>;
   removeFromCart: (itemId: number) => Promise<void>;
   updateQuantity: (itemId: number, quantity: number) => Promise<void>;
@@ -80,9 +81,9 @@ export const useCartStore = create<CartState>()(
       // ========================================
       // Add catalogue product to cart
       // ========================================
-      addToCart: async (productId: number, quantity: number = 1) => {
+      addToCart: async (productId: number, quantity: number = 1, packageId?: number | null) => {
         try {
-          const response = await cartApi.add(productId, quantity);
+          const response = await cartApi.add(productId, quantity, packageId);
 
           set({ cart: response.data, isOpen: true, lastError: null });
 

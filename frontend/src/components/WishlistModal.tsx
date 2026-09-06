@@ -80,7 +80,7 @@ export default function WishlistModal({
           {/* ======================================== */}
           {/* Content */}
           {/* ======================================== */}
-          <div className="max-h-[70vh] overflow-y-auto p-4">
+          <div className="max-h-[70dvh] overflow-y-auto p-4">
             {wishlist.length === 0 ? (
               /* ========================================
                  Empty State

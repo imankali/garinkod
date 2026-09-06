@@ -1,6 +1,8 @@
 import uuid
+from datetime import time, timedelta
 
 from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils import timezone
 from django.contrib.auth.models import User
@@ -9,6 +11,26 @@ from django.conf import settings
 from django.db.models import Q, Sum, F
 from django.db.models.functions import Lower
 from simple_history.models import HistoricalRecords
+
+from .levels import (
+    LEVEL_ADMIN,
+    LEVEL_BUYER,
+    LEVEL_CHOICES,
+    LEVEL_DESK_AGENT,
+    LEVEL_GUEST,
+    LEVEL_MODERATOR,
+    LEVEL_OWNER,
+    LEVEL_SELLER,
+    LEVEL_VERIFIED_BUYER,
+    LEVEL_VERIFIED_SELLER,
+    MAXIMUM_LEVEL,
+    MINIMUM_LEVEL,
+    STAFF_LEVELS,
+    level_for,
+    rank_for,
+    label as level_label,
+)
+from .persian import fa_digits, platform_day_index
 
 
 # --- Managers ---
@@ -84,6 +106,13 @@ class Product(models.Model):
     discount_percent = models.PositiveSmallIntegerField(default=0, verbose_name="درصد تخفیف")
     sales_count = models.PositiveIntegerField(default=0, verbose_name="تعداد فروش")
     brand = models.CharField(max_length=120, blank=True, verbose_name="برند")
+    # Free-form package size ("۲۵ کیلوگرم", "۱ تن") used by the shop's package
+    # filter. Kept as text because suppliers publish it in many units.
+    package_weight = models.CharField(max_length=40, blank=True, db_index=True, verbose_name="وزن بسته")
+    # Catalogue parity with wholesale suppliers: bulk/quote-only lines carry no
+    # price and the storefront shows "تماس بگیرید" instead of an add-to-cart.
+    price_on_request = models.BooleanField(default=False, verbose_name="قیمت با تماس")
+
     sku = models.CharField(max_length=80, blank=True, db_index=True, verbose_name="شناسه کالا")
     gtin = models.CharField(max_length=14, blank=True, db_index=True, verbose_name="GTIN")
     seo_title = models.CharField(max_length=70, blank=True, verbose_name="عنوان سئو")
@@ -92,6 +121,25 @@ class Product(models.Model):
     shipping_length_cm = models.PositiveSmallIntegerField(default=0, verbose_name="طول بسته (سانتی‌متر)")
     shipping_width_cm = models.PositiveSmallIntegerField(default=0, verbose_name="عرض بسته (سانتی‌متر)")
     shipping_height_cm = models.PositiveSmallIntegerField(default=0, verbose_name="ارتفاع بسته (سانتی‌متر)")
+
+    # Bulk sales of an agricultural input are decided on facts a supplier states
+    # per batch: how long the bag has left, the smallest amount we are willing to
+    # open a bag for, and whether a small order is filled bulk from a bigger one.
+    # These lived inside the description text, where nothing could filter,
+    # validate or badge them.
+    production_date = models.DateField(null=True, blank=True, verbose_name="تاریخ تولید")
+    expiry_date = models.DateField(null=True, blank=True, verbose_name="تاریخ انقضا")
+    min_order_quantity = models.PositiveIntegerField(default=1, verbose_name="حداقل سفارش")
+    bulk_note = models.TextField(max_length=500, blank=True, verbose_name="توضیح فروش فله")
+    video_url = models.URLField(max_length=300, blank=True, verbose_name="ویدئوی معرفی")
+    tags = models.ManyToManyField('Tag', blank=True, related_name='products', verbose_name="برچسب‌ها")
+    # «پربازدیدترین» needs a column incremented in a single UPDATE, not a value
+    # derived per request.
+    views = models.PositiveIntegerField(default=0, db_index=True, verbose_name="بازدید")
+    # Brand pages are addressable (/brand/<slug>), so the slug a product was filed
+    # under has to be a column; deriving it per request from free text would make
+    # the brand list and the brand page disagree as soon as a supplier renames one.
+    brand_slug = models.SlugField(max_length=140, blank=True, db_index=True, verbose_name="اسلاگ برند")
 
     objects = ProductManager()
     history = HistoricalRecords()
@@ -104,8 +152,18 @@ class Product(models.Model):
     def __str__(self):
         return self.title
 
+    def save(self, *args, **kwargs):
+        from .slugs import slugify_fa
+        self.brand_slug = slugify_fa(self.brand)
+        super().save(*args, **kwargs)
+
     def get_absolute_url(self):
         return reverse('shop:product_detail', args=[self.slug])
+
+    @property
+    def brand_url(self) -> str:
+        """Address of this product's brand page, when the brand is declared."""
+        return f"/brand/{self.brand_slug}" if self.brand_slug else ''
 
     @property
     def image_url(self):
@@ -123,6 +181,178 @@ class Product(models.Model):
         if self.discount_percent and self.discount_percent > 0:
             return max(int(self.price * (100 - self.discount_percent) / 100), 0)
         return self.price
+
+
+
+    @property
+    def expiry_days_left(self) -> int | None:
+        """Days before the earliest declared expiry, product-level or per package.
+
+        An absent date is unknown, not expired, so nothing is claimed here.
+        """
+        dates = [self.expiry_date] if self.expiry_date else []
+        dates += [pkg.expiry_date for pkg in self.packages.all() if pkg.expiry_date]
+        if not dates:
+            return None
+        return (min(dates) - timezone.localdate()).days
+
+    @property
+    def is_expiring_soon(self) -> bool:
+        """True when a declared batch is inside the 90-day warning window."""
+        left = self.expiry_days_left
+        return left is not None and left <= 90
+
+    @property
+    def gallery(self) -> list:
+        """Cover first, then the admin gallery, without repeating the cover."""
+        shots = [{'url': self.image_url, 'caption': ''}]
+        seen = {self.image.name} if self.image else set()
+        for item in self.images.all():
+            if item.image and item.image.name not in seen:
+                seen.add(item.image.name)
+                shots.append({'url': item.image.url, 'caption': item.caption})
+        return shots
+
+    @property
+    def default_package(self):
+        """The package a cart row should be created with, if any is declared."""
+        packages = list(self.packages.all())
+        if not packages:
+            return None
+        for package in packages:
+            if package.is_default:
+                return package
+        return packages[0]
+
+
+class Tag(models.Model):
+    """A cross-category label («کود محلول‌پاشی»، «مصرف خاکی»).
+
+    A category answers "what is it", a tag answers "how is it used", so the
+    catalogue stays navigable along the axis a farmer actually thinks in. The slug
+    is derived from the Persian name with the site's own transliterating helper.
+    """
+
+    name = models.CharField(max_length=80, unique=True, verbose_name="نام برچسب")
+    slug = models.SlugField(max_length=90, unique=True, verbose_name="اسلاگ")
+    description = models.TextField(max_length=1000, blank=True, verbose_name="توضیح")
+    image = models.ImageField(upload_to='tags/', blank=True, null=True, verbose_name="تصویر")
+    seo_title = models.CharField(max_length=70, blank=True, verbose_name="عنوان سئو")
+    seo_description = models.CharField(max_length=170, blank=True, verbose_name="توضیح متا")
+    history = HistoricalRecords()
+
+    class Meta:
+        ordering = ('name',)
+        verbose_name = "برچسب"
+        verbose_name_plural = "برچسب‌ها"
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            from .slugs import unique_slug
+            self.slug = unique_slug(self.__class__, self.name, fallback='tag')
+        super().save(*args, **kwargs)
+
+    def get_absolute_url(self):
+        # A literal path rather than a named route: the frontend owns these
+        # addresses and Django only renders the shell.
+        return f'/tag/{self.slug}'
+
+
+class ProductImage(models.Model):
+    """One extra photo in a product's gallery."""
+
+    product = models.ForeignKey(
+        Product, on_delete=models.CASCADE, related_name='images', verbose_name="محصول"
+    )
+    image = models.ImageField(upload_to='products/gallery/', verbose_name="تصویر")
+    caption = models.CharField(max_length=200, blank=True, verbose_name="زیرنویس")
+    order = models.PositiveSmallIntegerField(default=0, verbose_name="ترتیب")
+
+    class Meta:
+        ordering = ('order', 'id')
+        verbose_name = "تصویر محصول"
+        verbose_name_plural = "تصاویر محصول"
+
+    def __str__(self):
+        return f"تصویر محصول {self.product_id}"
+
+
+class ProductPackage(models.Model):
+    """A purchasable packaging of a product, with its own price and stock.
+
+    «۱ کیلویی فله» and «کیسه ۲۵ کیلویی» are the same input at two unit
+    economics; a single price on the product forces either a wrong number or a
+    description that lies. When a product has no package rows at all the
+    storefront falls back to the product's own price and stock, so nothing here is
+    mandatory and the existing catalogue keeps working untouched.
+    """
+
+    product = models.ForeignKey(
+        Product, on_delete=models.CASCADE, related_name='packages', verbose_name="محصول"
+    )
+    label = models.CharField(max_length=120, verbose_name="نوع بسته‌بندی")
+    weight_kg = models.DecimalField(
+        max_digits=10, decimal_places=3, null=True, blank=True, verbose_name="وزن (کیلوگرم)"
+    )
+    # A null price/stock means "follow the product", which is what a shop that
+    # only sells one bag should not have to duplicate.
+    price = models.PositiveBigIntegerField(null=True, blank=True, verbose_name="قیمت (خالی = قیمت محصول)")
+    stock = models.PositiveIntegerField(null=True, blank=True, verbose_name="موجودی (خالی = موجودی محصول)")
+    min_order_quantity = models.PositiveIntegerField(default=1, verbose_name="حداقل سفارش")
+    bulk_note = models.TextField(max_length=500, blank=True, verbose_name="توضیح فروش فله")
+    production_date = models.DateField(null=True, blank=True, verbose_name="تاریخ تولید")
+    expiry_date = models.DateField(null=True, blank=True, verbose_name="تاریخ انقضا")
+    is_default = models.BooleanField(default=False, verbose_name="پیش‌فرض")
+    order = models.PositiveSmallIntegerField(default=0, verbose_name="ترتیب")
+
+    class Meta:
+        ordering = ('order', 'id')
+        verbose_name = "بسته‌بندی محصول"
+        verbose_name_plural = "بسته‌بندی‌های محصول"
+        constraints = [
+            models.UniqueConstraint(fields=['product', 'label'], name='unique_product_package_label'),
+        ]
+
+    def __str__(self):
+        return f"{self.product.title} — {self.label}"
+
+    @property
+    def effective_price(self) -> int:
+        return self.price if self.price is not None else self.product.price
+
+    @property
+    def discounted_price(self) -> int:
+        percent = self.product.discount_percent or 0
+        price = self.effective_price
+        return max(int(price * (100 - percent) / 100), 0) if percent else price
+
+    @property
+    def effective_stock(self) -> int:
+        return self.stock if self.stock is not None else self.product.stock
+
+    @property
+    def is_in_stock(self) -> bool:
+        return self.product.available and self.effective_stock > 0
+
+    @property
+    def expiry_days_left(self) -> int | None:
+        if not self.expiry_date:
+            return self.product.expiry_days_left
+        return (self.expiry_date - timezone.localdate()).days
+
+    @property
+    def price_per_kg(self) -> int | None:
+        """Unit price, when both the weight and a price are known.
+
+        Comparing «۱,۷۵۰,۰۰۰ تومان برای ۵ لیتر» against «۲۹۰,۰۰۰ برای ۵۰ کیلو»
+        by eye is how a bulk buyer overpays; the number that matters is per unit.
+        """
+        if self.weight_kg and self.effective_price and self.weight_kg > 0:
+            return int(self.effective_price / float(self.weight_kg))
+        return None
 
 
 # --- مشخصات اختصاصی برای هر دسته ---
@@ -192,22 +422,25 @@ class UserAccount(models.Model):
         ('female', 'خانم'),
     )
 
-    # Access levels 1..5.  The level is authoritative for coarse-grained access
-    # (for example the /poshtiban console); Django groups still express the
-    # fine-grained "which model may I change" permissions on top of it.
-    LEVEL_BUYER = 1
-    LEVEL_SELLER = 2
-    LEVEL_MODERATOR = 3
-    LEVEL_ADMIN = 4
-    LEVEL_OWNER = 5
-    LEVEL_CHOICES = (
-        (LEVEL_BUYER, 'سطح ۱ — خریدار'),
-        (LEVEL_SELLER, 'سطح ۲ — غرفه‌دار'),
-        (LEVEL_MODERATOR, 'سطح ۳ — ناظر محتوا'),
-        (LEVEL_ADMIN, 'سطح ۴ — مدیر'),
-        (LEVEL_OWNER, 'سطح ۵ — مالک سیستم'),
-    )
-    STAFF_LEVELS = (LEVEL_MODERATOR, LEVEL_ADMIN, LEVEL_OWNER)
+    # Access levels: the eight-step ladder in ``shop/levels.py``. The level is
+    # authoritative for coarse-grained access (the console, the storefront
+    # tools, whether someone may open a ticket at all); Django groups still
+    # express the fine-grained "which model may I change" permissions on top of
+    # it. Labels and choices live in one place so a gate and the screen that
+    # explains it cannot drift apart.
+    LEVEL_GUEST = LEVEL_GUEST
+    LEVEL_BUYER = LEVEL_BUYER
+    LEVEL_VERIFIED_BUYER = LEVEL_VERIFIED_BUYER
+    LEVEL_SELLER = LEVEL_SELLER
+    LEVEL_VERIFIED_SELLER = LEVEL_VERIFIED_SELLER
+    LEVEL_DESK_AGENT = LEVEL_DESK_AGENT
+    LEVEL_MODERATOR = LEVEL_MODERATOR
+    LEVEL_ADMIN = LEVEL_ADMIN
+    LEVEL_OWNER = LEVEL_OWNER
+    LEVEL_CHOICES = LEVEL_CHOICES
+    STAFF_LEVELS = STAFF_LEVELS
+    MINIMUM_LEVEL = MINIMUM_LEVEL
+    MAXIMUM_LEVEL = MAXIMUM_LEVEL
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='account')
     phone = models.CharField(max_length=11, db_index=True, verbose_name="شماره تلفن")
@@ -261,6 +494,19 @@ class UserAccount(models.Model):
     def is_staff_level(self) -> bool:
         return self.level in self.STAFF_LEVELS
 
+    @property
+    def level_label(self) -> str:
+        return level_label(self.level)
+
+    @property
+    def rank(self):
+        """The ladder row for this account, or None for an unknown value."""
+        return rank_for(self.level)
+
+    @property
+    def verified_phone(self) -> bool:
+        return self.phone_verified_at is not None
+
     def promote_to(self, level: int, *, save: bool = True) -> 'UserAccount':
         """Raise the level, never silently lowering an existing one."""
         if level > self.level:
@@ -273,17 +519,10 @@ class UserAccount(models.Model):
 def account_level(user) -> int:
     """Resolve a user's level without assuming the profile row exists.
 
-    Superusers are always owners so a fresh `createsuperuser` account can
-    reach the console before any profile row has been written.
+    A thin alias for :func:`shop.levels.level_for`, kept because most of the
+    codebase already speaks this name.
     """
-    if not user or not user.is_authenticated:
-        return 0
-    if user.is_superuser:
-        return UserAccount.LEVEL_OWNER
-    account = getattr(user, 'account', None)
-    if account:
-        return account.level
-    return UserAccount.LEVEL_BUYER
+    return level_for(user)
 
 
 # --- Comment ---
@@ -295,7 +534,23 @@ class Comment(models.Model):
     body = models.TextField(verbose_name="متن")
     image = models.ImageField(upload_to='comments/%Y/%m/', blank=True, null=True, verbose_name="تصویر")
     sticker = models.CharField(max_length=16, blank=True, verbose_name="استیکر")
+    # A 1..5 star score. Optional: a question or a seller answer is still a
+    # comment, it just does not rate the product, so it must not join the
+    # average. Reviews are the aggregate shown on cards and in Product schema.org.
+    rating = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1), MaxValueValidator(5)],
+        verbose_name="امتیاز (۱ تا ۵)",
+    )
     parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='replies')
+    # «مفید بود» lets buyers rank each other's experience; keeping the tally as a
+    # column means a review list can be ordered by it in one query.
+    helpful_count = models.PositiveIntegerField(default=0, verbose_name="رأی مفید بودن")
+    is_reported = models.BooleanField(default=False, verbose_name="گزارش‌شده")
+    # A «تجربه خرید مشتریان» page has to be curated: an editor picks which real
+    # reviews represent the shop, instead of the newest three at random.
+    is_featured = models.BooleanField(default=False, db_index=True, verbose_name="نمایش در تجربه خرید مشتریان")
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
     active = models.BooleanField(default=False, verbose_name="فعال")
@@ -304,6 +559,9 @@ class Comment(models.Model):
         ordering = ('created',)
         verbose_name = "نظر"
         verbose_name_plural = "نظرات"
+        indexes = [
+            models.Index(fields=['product', 'active'], name='comment_product_active_idx'),
+        ]
 
     def __str__(self):
         return f"کامنت توسط {self.name} روی {self.product}"
@@ -313,8 +571,88 @@ class Comment(models.Model):
         return self.parent is not None
 
     @property
+    def is_review(self):
+        """Top-level feedback carrying a score, i.e. a counted review."""
+        return self.parent_id is None and self.rating is not None
+
+    @property
     def replies_count(self):
         return self.replies.count()
+
+
+# --- Structured product specifications ---
+class ProductAttribute(models.Model):
+    """One row of the "ویژگی‌ها" table on a product page.
+
+    Suppliers publish long spec sheets (variety, packaging, germination
+    temperature, harvest days, per-hectare rate ...). Modelling them as ordered
+    label/value pairs keeps the catalogue usable for any category without
+    adding a column per attribute.
+    """
+
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='attributes', verbose_name="محصول")
+    label = models.CharField(max_length=80, verbose_name="عنوان ویژگی")
+    # Blank on purpose: the admin action seeds the eighteen standard labels and
+    # the manager fills the values in over time. Rows without a value are not
+    # rendered on the product page.
+    value = models.CharField(max_length=300, blank=True, verbose_name="مقدار")
+    order = models.PositiveSmallIntegerField(default=0, verbose_name="ترتیب")
+
+    class Meta:
+        ordering = ('order', 'id')
+        verbose_name = "ویژگی محصول"
+        verbose_name_plural = "ویژگی‌های محصول"
+
+    def __str__(self):
+        return f"{self.label}: {self.value}"
+
+
+class ListingAttribute(models.Model):
+    """The same spec table for a storefront listing (optional for sellers)."""
+
+    listing = models.ForeignKey(
+        'MarketplaceListing', on_delete=models.CASCADE, related_name='attributes', verbose_name="آگهی"
+    )
+    label = models.CharField(max_length=80, verbose_name="عنوان ویژگی")
+    # Optional like the catalogue's rows, so a seller can save the skeleton and
+    # complete the values later; empty rows are never rendered.
+    value = models.CharField(max_length=300, blank=True, verbose_name="مقدار")
+    order = models.PositiveSmallIntegerField(default=0, verbose_name="ترتیب")
+
+    class Meta:
+        ordering = ('order', 'id')
+        verbose_name = "ویژگی آگهی"
+        verbose_name_plural = "ویژگی‌های آگهی"
+        constraints = [
+            models.UniqueConstraint(fields=['listing', 'label', 'order'], name='unique_listing_attribute_row'),
+        ]
+
+    def __str__(self):
+        return f"{self.label}: {self.value}"
+
+
+# The eighteen rows the flagship suppliers publish for every variety. Seeded by
+# the admin action below so a manager only has to fill in values.
+PRODUCT_ATTRIBUTE_TEMPLATE = (
+    'نوع رقم',
+    'محتوای بسته',
+    'نوع بسته‌بندی',
+    'کشور سازنده',
+    'تاریخ تولید',
+    'تاریخ انقضا',
+    'شماره بچ',
+    'مناسب کشت در',
+    'نوع کشت',
+    'فصل کشت',
+    'عمق کاشت',
+    'فاصله کاشت',
+    'دمای مناسب جوانه‌زنی',
+    'روز تا گلدهی',
+    'روز تا برداشت',
+    'مصرف در هکتار',
+    'نیاز آبی',
+    'شرایط نگهداری',
+)
 
 
 # --- Shopping Cart ---
@@ -367,6 +705,12 @@ class CartItem(models.Model):
 
     cart = models.ForeignKey(Cart, related_name='items', on_delete=models.CASCADE)
     product = models.ForeignKey(Product, null=True, blank=True, on_delete=models.CASCADE)
+    # Which packaging was picked, so «کیسه ۲۵ کیلویی» and «۱ کیلویی فله» are two
+    # rows with two prices instead of one row with a guess.
+    product_package = models.ForeignKey(
+        'ProductPackage', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='cart_items', verbose_name="بسته‌بندی"
+    )
     listing = models.ForeignKey(
         'MarketplaceListing', null=True, blank=True, on_delete=models.CASCADE, related_name='cart_items'
     )
@@ -376,10 +720,18 @@ class CartItem(models.Model):
         verbose_name = "آیتم سبد"
         verbose_name_plural = "آیتم‌های سبد"
         constraints = [
+            # Two constraints rather than one three-column one: NULL never
+            # collides inside a partial unique index, so a row without a chosen
+            # packaging needs its own guard to keep «one row per product».
             models.UniqueConstraint(
                 fields=['cart', 'product'],
-                condition=models.Q(product__isnull=False),
-                name='unique_cart_product',
+                condition=models.Q(product__isnull=False, product_package__isnull=True),
+                name='unique_cart_product_without_package',
+            ),
+            models.UniqueConstraint(
+                fields=['cart', 'product', 'product_package'],
+                condition=models.Q(product_package__isnull=False),
+                name='unique_cart_product_package',
             ),
             models.UniqueConstraint(
                 fields=['cart', 'listing'],
@@ -407,24 +759,52 @@ class CartItem(models.Model):
         return self.listing.title if self.listing_id else self.product.title
 
     @property
+    def package(self):
+        """The chosen packaging, if the product declares any."""
+        return self.product_package
+
+    @property
+    def package_label(self) -> str:
+        return self.product_package.label if self.product_package_id else ''
+
+    @property
     def unit_price(self) -> int:
-        source = self.listing if self.listing_id else self.product
-        return int(getattr(source, 'price', 0) or 0)
+        if self.listing_id:
+            return int(self.listing.price or 0)
+        if self.product_package_id:
+            return int(self.product_package.effective_price or 0)
+        return int(self.product.price or 0)
 
     @property
     def total_price(self):
         return self.quantity * self.unit_price
 
     @property
+    def shipping_weight_grams(self) -> int:
+        """Weight of one row, taken from the packaging when it declares one."""
+        if self.product_package_id and self.product_package.weight_kg:
+            return int(float(self.product_package.weight_kg) * 1000)
+        return self.product.shipping_weight_grams if self.product_id else 0
+
+    @property
     def available_quantity(self) -> int:
         if self.listing_id:
             return int(self.listing.quantity_available)
+        if self.product_package_id:
+            return min(int(self.product_package.effective_stock), int(self.product.stock))
         return int(self.product.stock)
 
     @property
     def is_in_stock(self):
         if self.listing_id:
             return self.listing.is_purchasable and self.quantity <= int(self.listing.quantity_available)
+        if self.product_package_id:
+            package = self.product_package
+            return (
+                package.is_in_stock
+                and self.quantity <= package.effective_stock
+                and self.quantity <= self.product.stock
+            )
         return self.product.is_in_stock and self.quantity <= self.product.stock
 
 
@@ -494,6 +874,12 @@ class Order(models.Model):
     payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='unpaid', db_index=True)
     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES, default='coordination')
     affiliate_code = models.CharField(max_length=32, blank=True, db_index=True)
+    # Which legal text this order was placed under, and when it was accepted.
+    # ``terms_accepted`` in the request only proves that a checkbox arrived; the
+    # version says *which* promises the buyer saw, so a dispute two years later
+    # can be read against the text of that day rather than today's.
+    terms_accepted_at = models.DateTimeField(null=True, blank=True, verbose_name='زمان پذیرش شرایط')
+    legal_version = models.CharField(max_length=40, blank=True, verbose_name='نسخه متن حقوقی')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     history = HistoricalRecords()
@@ -584,6 +970,9 @@ class OrderItem(models.Model):
     kind = models.CharField(max_length=10, choices=KIND_CHOICES, default='product', db_index=True)
     product_title = models.CharField(max_length=250)
     product_slug = models.SlugField(max_length=250)
+    # The packaging is copied onto the row, because a package can later be
+    # relabelled or retired while the invoice must keep saying what was sold.
+    package_label = models.CharField(max_length=120, blank=True, verbose_name="بسته‌بندی فروخته‌شده")
     storefront_name = models.CharField(max_length=150, blank=True, verbose_name='نام غرفه')
     storefront_slug = models.SlugField(max_length=180, blank=True)
     unit = models.CharField(max_length=30, blank=True)
@@ -1452,6 +1841,24 @@ class StorefrontConversation(models.Model):
         related_name='handled_conversations', verbose_name='کارشناس',
     )
     subject = models.CharField(max_length=150, blank=True, verbose_name='موضوع')
+    # A thread can be ended by either side. It stays writable — closing is not
+    # an archive, it is the signal that starts the satisfaction survey, and a
+    # farmer who remembers one more question must be able to ask it.
+    STATUS_OPEN = 'open'
+    STATUS_CLOSED = 'closed'
+    STATUS_CHOICES = (
+        (STATUS_OPEN, 'باز'),
+        (STATUS_CLOSED, 'بسته شده'),
+    )
+    status = models.CharField(
+        max_length=10, choices=STATUS_CHOICES, default=STATUS_OPEN, db_index=True,
+        verbose_name='وضعیت گفتگو',
+    )
+    closed_at = models.DateTimeField(null=True, blank=True, verbose_name='بسته شد در')
+    closed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='closed_conversations', verbose_name='بسته شده توسط',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -1507,13 +1914,67 @@ class StorefrontConversation(models.Model):
         return False
 
     def unread_count_for(self, user) -> int:
-        """Messages the given participant has not read yet."""
-        if user.is_authenticated:
-            return self.messages.filter(is_read=False).exclude(sender=user).count()
-        return 0
+        """Messages the given participant has not read yet.
+
+        Notices the platform wrote for the desk side (an out-of-hours line after
+        a farmer's message, for instance) are not counted against the farmer:
+        they were not addressed to them.
+        """
+        if not user.is_authenticated:
+            return 0
+        return self.messages.filter(is_read=False, is_notice=False).exclude(sender=user).count()
 
     def last_message(self):
         return self.messages.order_by('-created_at').first()
+
+    @property
+    def is_closed(self) -> bool:
+        return self.status == self.STATUS_CLOSED
+
+    def close(self, *, by=None):
+        """End the thread. Idempotent, so two operators tapping «اتمام» cannot fight."""
+        if self.status == self.STATUS_CLOSED:
+            return self
+        self.status = self.STATUS_CLOSED
+        self.closed_at = timezone.now()
+        self.closed_by = by
+        self.save(update_fields=['status', 'closed_at', 'closed_by', 'updated_at'])
+        return self
+
+    def reopen(self, *, by=None):
+        if self.status == self.STATUS_OPEN:
+            return self
+        self.status = self.STATUS_OPEN
+        self.closed_at = None
+        self.closed_by = by
+        self.save(update_fields=['status', 'closed_at', 'closed_by', 'updated_at'])
+        return self
+
+    def is_open_now(self, moment=None) -> bool:
+        """Whether the desk behind this thread answers right now.
+
+        A storefront negotiation or a comment reply is between two people, not a
+        staffed queue, so it counts as open: the working hours belong to the two
+        service desks only.
+        """
+        if self.channel not in {self.CHANNEL_SUPPORT, self.CHANNEL_CONSULTING}:
+            return True
+        return DeskSettings.load().is_open_at(self.channel, moment)
+
+    def latest_agent_message(self):
+        """The staff member who answered last, if any.
+
+        The thread has one ``agent`` for assignment, but a queue is shared: when
+        a second operator replies, the reader must see *that* person's name and
+        photo in the header instead of the original assignee.
+        """
+        return (
+            self.messages.exclude(sender=None)
+            .exclude(sender_id=self.customer_id)
+            .order_by('-created_at')
+            .select_related('sender', 'sender__account')
+            .first()
+        )
 
 
 def message_attachment_path(instance, filename):
@@ -1546,14 +2007,34 @@ class StorefrontMessage(models.Model):
     conversation = models.ForeignKey(
         StorefrontConversation, on_delete=models.CASCADE, related_name='messages'
     )
+    # Nullable because the desk also writes its own notices («گفتگو بسته شد»،
+    # «خارج از ساعت کاری»); those have no author, and pretending the farmer sent
+    # them would put words in the wrong mouth.
     sender = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='sent_storefront_messages'
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='sent_storefront_messages',
     )
     body = models.TextField(max_length=2000, blank=True)
     listing = models.ForeignKey(
         MarketplaceListing, null=True, blank=True, on_delete=models.SET_NULL,
         related_name='direct_messages',
     )
+    # A farmer sharing their land case file with a consultant: the real record,
+    # not a screenshot, so the consultant reads the soil and calendar data that
+    # the identification form holds.
+    land = models.ForeignKey(
+        'FarmLand', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='shared_in_messages', verbose_name='پرونده زمین',
+    )
+    # A deep link rendered as a button inside the bubble — «مشاهده پست» after a
+    # comment reply, or «گفتگو با مشاور» when support hands a question over.
+    link_kind = models.CharField(max_length=20, blank=True, verbose_name='نوع لینک')
+    link_label = models.CharField(max_length=120, blank=True, verbose_name='متن لینک')
+    link_url = models.CharField(max_length=300, blank=True, verbose_name='آدرس لینک')
+    # A line the desk wrote for its own bookkeeping («گفتگو بسته شد», «خارج از
+    # ساعت کاری»). It is shown, but it is not an unread message: a badge that
+    # counts platform notices is a badge the user learns to ignore.
+    is_notice = models.BooleanField(default=False, verbose_name='اعلان سیستمی')
     attachment = models.FileField(
         upload_to=message_attachment_path, blank=True, null=True, verbose_name='پیوست'
     )
@@ -1589,11 +2070,19 @@ class StorefrontMessage(models.Model):
         ]
 
     def __str__(self):
-        return f'{self.sender.username}: {self.body[:40]}'
+        author = getattr(self.sender, 'username', None)
+        if author is None:
+            return f'«اعلان»: {self.body[:40]}'
+        return f'{author}: {self.body[:40]}'
 
     @property
     def attachment_url(self) -> str:
         return self.attachment.url if self.attachment else ''
+
+    @property
+    def is_system(self) -> bool:
+        """A notice written by the platform itself."""
+        return self.sender_id is None
 
     @property
     def is_deleted(self) -> bool:
@@ -1609,12 +2098,17 @@ class StorefrontMessage(models.Model):
             self.attachment.delete(save=False)
         self.body = ''
         self.listing = None
+        self.land = None
+        self.link_kind = ''
+        self.link_label = ''
+        self.link_url = ''
         self.attachment = None
         self.attachment_type = ''
         self.attachment_duration = None
         self.deleted_at = timezone.now()
         self.save(update_fields=[
-            'body', 'listing', 'attachment', 'attachment_type',
+            'body', 'listing', 'land', 'link_kind', 'link_label', 'link_url',
+            'attachment', 'attachment_type',
             'attachment_duration', 'deleted_at',
         ])
 
@@ -2177,3 +2671,1192 @@ class NotificationDelivery(models.Model):
 
     def __str__(self):
         return f'{self.get_event_display()} / {self.get_channel_display()} / {self.get_status_display()}'
+
+
+# ========================================
+# Site content: articles, growing guides, services, landing pages, trust pages
+# ========================================
+class SiteArticle(models.Model):
+    """A site-wide editorial article or a per-crop growing guide.
+
+    ``guide`` articles are the "راهنمای کشت گل کلم" style pages: climate, soil,
+    planting, care, harvest and storage, linked to the catalogue products and
+    storefront listings that belong to that crop.
+    """
+
+    KIND_ARTICLE = 'article'
+    KIND_GUIDE = 'guide'
+    KIND_CHOICES = (
+        (KIND_ARTICLE, 'مقاله'),
+        (KIND_GUIDE, 'راهنمای کشت'),
+    )
+
+    title = models.CharField(max_length=220, verbose_name="عنوان")
+    slug = models.SlugField(max_length=240, unique=True, verbose_name="اسلاگ")
+    kind = models.CharField(max_length=10, choices=KIND_CHOICES, default=KIND_ARTICLE, db_index=True)
+    excerpt = models.TextField(max_length=500, blank=True, verbose_name="چکیده")
+    body = models.TextField(verbose_name="متن مقاله")
+    cover = models.ImageField(upload_to='articles/%Y/%m/', blank=True, null=True, verbose_name="تصویر جلد")
+    crop = models.CharField(max_length=120, blank=True, db_index=True, verbose_name="محصول/گیاه")
+    author = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name='articles', verbose_name="نویسنده"
+    )
+    products = models.ManyToManyField(Product, blank=True, related_name='articles', verbose_name="محصولات مرتبط")
+    listings = models.ManyToManyField(
+        'MarketplaceListing', blank=True, related_name='articles', verbose_name="آگهی‌های مرتبط"
+    )
+    related_articles = models.ManyToManyField('self', blank=True, symmetrical=False, verbose_name="مقالات مرتبط")
+    reading_minutes = models.PositiveSmallIntegerField(default=0, verbose_name="زمان مطالعه (دقیقه)")
+    views = models.PositiveIntegerField(default=0, verbose_name="بازدید")
+    is_published = models.BooleanField(default=False, db_index=True, verbose_name="منتشر شده")
+    published_at = models.DateTimeField(null=True, blank=True, verbose_name="تاریخ انتشار")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="تاریخ به‌روزرسانی")
+    is_featured = models.BooleanField(default=False, verbose_name="نمایش در صفحه اصلی")
+    seo_title = models.CharField(max_length=70, blank=True, verbose_name="عنوان سئو")
+    seo_description = models.CharField(max_length=170, blank=True, verbose_name="توضیح متا")
+    created_at = models.DateTimeField(auto_now_add=True)
+    history = HistoricalRecords()
+
+    class Meta:
+        ordering = ('-published_at', '-id')
+        verbose_name = "مقاله سایت"
+        verbose_name_plural = "مقالات سایت"
+
+    def __str__(self):
+        return self.title
+
+    def save(self, *args, **kwargs):
+        if self.is_published and not self.published_at:
+            self.published_at = timezone.now()
+        if not self.reading_minutes:
+            # Rough Persian reading speed (~180 words per minute).
+            words = len((self.body or '').split())
+            self.reading_minutes = max(1, round(words / 180)) if words else 0
+        super().save(*args, **kwargs)
+
+    @property
+    def cover_url(self):
+        return self.cover.url if self.cover else '/images/hero-farm.jpg'
+
+    def get_absolute_url(self):
+        prefix = '/guides' if self.kind == self.KIND_GUIDE else '/blog'
+        return f"{prefix}/{self.slug}"
+
+
+class Service(models.Model):
+    """A purchasable/quotable farm service with its own detail page."""
+
+    # ``code`` mirrors ServiceRequest.service_type so a service page can deep
+    # link straight into the request form with the right option preselected.
+    title = models.CharField(max_length=150, verbose_name="عنوان خدمت")
+    slug = models.SlugField(max_length=170, unique=True, verbose_name="اسلاگ")
+    code = models.CharField(max_length=30, verbose_name="کد خدمت")
+    summary = models.TextField(max_length=400, verbose_name="خلاصه")
+    body = models.TextField(blank=True, verbose_name="توضیحات کامل")
+    highlights = models.TextField(
+        blank=True,
+        verbose_name="مزایا (هر خط یک مورد)",
+        help_text="یک مورد در هر خط؛ در صفحه جزئیات خدمت به‌صورت فهرست نمایش داده می‌شود.",
+    )
+    icon = models.CharField(max_length=40, default='sprout', verbose_name="آیکون")
+    image = models.ImageField(upload_to='services/', blank=True, null=True, verbose_name="تصویر")
+    price_note = models.CharField(max_length=160, blank=True, verbose_name="یادداشت هزینه")
+    is_active = models.BooleanField(default=True, db_index=True, verbose_name="فعال")
+    order = models.PositiveSmallIntegerField(default=0, verbose_name="ترتیب")
+    seo_title = models.CharField(max_length=70, blank=True, verbose_name="عنوان سئو")
+    seo_description = models.CharField(max_length=170, blank=True, verbose_name="توضیح متا")
+
+    class Meta:
+        ordering = ('order', 'title')
+        verbose_name = "خدمت"
+        verbose_name_plural = "خدمات"
+
+    def __str__(self):
+        return self.title
+
+    @property
+    def image_url(self):
+        return self.image.url if self.image else '/images/hero-farm.jpg'
+
+    @property
+    def highlight_list(self) -> list[str]:
+        return [line.strip() for line in (self.highlights or '').splitlines() if line.strip()]
+
+
+class SitePage(models.Model):
+    """Admin-editable page: an info page (bank accounts, environment) or a
+    product landing page (the vermicompost-style flagship page)."""
+
+    KIND_PAGE = 'page'
+    KIND_LANDING = 'landing'
+    KIND_CHOICES = (
+        (KIND_PAGE, 'صفحه اطلاعاتی'),
+        (KIND_LANDING, 'لندینگ محصول'),
+    )
+
+    title = models.CharField(max_length=200, verbose_name="عنوان")
+    slug = models.CharField(max_length=200, unique=True, verbose_name="اسلاگ")
+    kind = models.CharField(max_length=10, choices=KIND_CHOICES, default=KIND_PAGE, db_index=True)
+    hero_text = models.TextField(max_length=600, blank=True, verbose_name="متن هدر")
+    hero_image = models.ImageField(upload_to='pages/heroes/', blank=True, null=True, verbose_name="تصویر هدر")
+    badge = models.CharField(max_length=60, blank=True, verbose_name="برچسب")
+    product = models.ForeignKey(
+        Product, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='landing_pages', verbose_name="محصول مرتبط"
+    )
+    cta_label = models.CharField(max_length=60, blank=True, verbose_name="متن دکمه")
+    cta_url = models.CharField(max_length=300, blank=True, verbose_name="لینک دکمه")
+    published = models.BooleanField(default=False, db_index=True, verbose_name="منتشر شده")
+    published_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    seo_title = models.CharField(max_length=70, blank=True, verbose_name="عنوان سئو")
+    seo_description = models.CharField(max_length=170, blank=True, verbose_name="توضیح متا")
+    history = HistoricalRecords()
+
+    class Meta:
+        ordering = ('title',)
+        verbose_name = "صفحه سایت"
+        verbose_name_plural = "صفحات سایت"
+
+    def __str__(self):
+        return self.title
+
+    def save(self, *args, **kwargs):
+        if self.published and not self.published_at:
+            self.published_at = timezone.now()
+        super().save(*args, **kwargs)
+
+    @property
+    def hero_image_url(self):
+        return self.hero_image.url if self.hero_image else ''
+
+    def get_absolute_url(self):
+        prefix = '/offer' if self.kind == self.KIND_LANDING else '/page'
+        return f"{prefix}/{self.slug}"
+
+
+class SitePageBlock(models.Model):
+    """One ordered section of a SitePage, so a landing page can be rebuilt from
+    the admin without a code change."""
+
+    BLOCK_CHOICES = (
+        ('heading', 'سرتیتر'),
+        ('text', 'متن'),
+        ('bullets', 'فهرست موردی'),
+        ('image', 'تصویر'),
+        ('spec_table', 'جدول مشخصات'),
+        ('price_table', 'جدول قیمت'),
+        ('video', 'ویدئو'),
+        ('products', 'شبکه محصولات'),
+        ('articles', 'شبکه مقالات'),
+        ('cta', 'دکمه اقدام'),
+        ('quote', 'نقل‌قول'),
+        ('faq', 'پرسش و پاسخ'),
+    )
+
+    page = models.ForeignKey(SitePage, on_delete=models.CASCADE, related_name='blocks', verbose_name="صفحه")
+    block_type = models.CharField(max_length=15, choices=BLOCK_CHOICES, default='text', verbose_name="نوع بلوک")
+    title = models.CharField(max_length=200, blank=True, verbose_name="عنوان بلوک")
+    text = models.TextField(
+        blank=True,
+        verbose_name="متن",
+        help_text="در بلوک «فهرست موردی» هر خط یک مورد است؛ در بلوک متن، خط خالی پاراگراف را جدا می‌کند.",
+    )
+    rows = models.TextField(
+        blank=True,
+        verbose_name="ردیف‌های جدول",
+        help_text="هر خط یک ردیف؛ ستون‌ها را با «|» جدا کنید. مثال: «گرید A | ۱۲۰,۰۰۰ تومان | هر کیلوگرم»",
+    )
+    image = models.ImageField(upload_to='pages/blocks/', blank=True, null=True, verbose_name="تصویر")
+    video = models.FileField(upload_to='pages/video/', blank=True, null=True, verbose_name="فایل ویدئو")
+    link = models.CharField(max_length=300, blank=True, verbose_name="لینک")
+    data = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name="پارامترهای تکمیلی",
+        help_text='مثال برای شبکه محصولات: {"category": "fertilizer", "limit": 8, "ordering": "-discount_percent"}',
+    )
+    position = models.PositiveSmallIntegerField(default=0, verbose_name="ترتیب")
+
+    class Meta:
+        ordering = ('position', 'id')
+        verbose_name = "بلوک صفحه"
+        verbose_name_plural = "بلوک‌های صفحه"
+
+    def __str__(self):
+        return f'{self.page.title} — {self.get_block_type_display()}'
+
+    @property
+    def image_url(self):
+        return self.image.url if self.image else ''
+
+    @property
+    def video_url(self):
+        return self.video.url if self.video else ''
+
+    @property
+    def table_rows(self) -> list[list[str]]:
+        """``rows`` split into cells; empty cells are tolerated."""
+        table = []
+        for line in (self.rows or '').splitlines():
+            if not line.strip():
+                continue
+            table.append([cell.strip() for cell in line.split('|')])
+        return table
+
+
+class TeamMember(models.Model):
+    """About-page team, shown with role and photo to build buyer trust."""
+
+    name = models.CharField(max_length=120, verbose_name="نام")
+    role = models.CharField(max_length=120, verbose_name="سمت")
+    bio = models.TextField(max_length=600, blank=True, verbose_name="بیوگرافی")
+    photo = models.ImageField(upload_to='team/', blank=True, null=True, verbose_name="تصویر")
+    order = models.PositiveSmallIntegerField(default=0, verbose_name="ترتیب")
+    is_active = models.BooleanField(default=True, db_index=True, verbose_name="نمایش")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ('order', 'name')
+        verbose_name = "عضو تیم"
+        verbose_name_plural = "تیم گرین کود"
+
+    def __str__(self):
+        return f'{self.name} — {self.role}'
+
+    @property
+    def photo_url(self):
+        return self.photo.url if self.photo else ''
+
+
+class BrandPartner(models.Model):
+    """A brand or partner the site represents (logo wall on the about page)."""
+
+    name = models.CharField(max_length=120, verbose_name="نام برند/شرکت")
+    # The catalogue is matched to a represented brand by slug rather than by
+    # string equality, so «ایکس گرین» and «XGREEN» in a supplier sheet can be
+    # reconciled once, in the admin, instead of in code.
+    slug = models.SlugField(max_length=140, unique=True, blank=True, verbose_name="اسلاگ")
+    logo = models.ImageField(upload_to='brands/', blank=True, null=True, verbose_name="لوگو")
+    website = models.URLField(max_length=300, blank=True, verbose_name="وب‌سایت")
+    description = models.CharField(max_length=300, blank=True, verbose_name="توضیح کوتاه")
+    since_year = models.PositiveSmallIntegerField(null=True, blank=True, verbose_name="از سال")
+    order = models.PositiveSmallIntegerField(default=0, verbose_name="ترتیب")
+    is_active = models.BooleanField(default=True, db_index=True, verbose_name="نمایش")
+
+    class Meta:
+        ordering = ('order', 'name')
+        verbose_name = "برند و شریک"
+        verbose_name_plural = "برندها و شرکا"
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            from .slugs import unique_slug
+            self.slug = unique_slug(self.__class__, self.name, fallback='brand')
+        super().save(*args, **kwargs)
+
+    @property
+    def logo_url(self):
+        return self.logo.url if self.logo else ''
+
+    def get_absolute_url(self):
+        return f'/brand/{self.slug}'
+
+    def product_count(self) -> int:
+        return Product.objects.filter(status='published', brand_slug=self.slug).count()
+
+
+class SiteContact(models.Model):
+    """Single, admin-editable source of the company's contact channels."""
+
+    address = models.TextField(max_length=400, blank=True, verbose_name="نشانی مرکزی")
+    provinces_note = models.CharField(max_length=300, blank=True, verbose_name="توضیح شعب/بسته")
+    phones = models.TextField(blank=True, verbose_name="تلفن‌ها (هر خط یک شماره)")
+    emails = models.TextField(blank=True, verbose_name="ایمیل‌ها (هر خط یک ایمیل)")
+    working_hours = models.CharField(max_length=200, blank=True, verbose_name="ساعات کاری")
+    whatsapp_number = models.CharField(max_length=20, blank=True, verbose_name="شماره واتساپ")
+    telegram_url = models.CharField(max_length=300, blank=True, verbose_name="لینک تلگرام")
+    instagram_url = models.CharField(max_length=300, blank=True, verbose_name="لینک اینستاگرام")
+    eitaa_url = models.CharField(max_length=300, blank=True, verbose_name="لینک ایتا")
+    map_lat = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, verbose_name="عرض جغرافیایی")
+    map_lng = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, verbose_name="طول جغرافیایی")
+    map_note = models.CharField(max_length=200, blank=True, verbose_name="راهنمای نشانی در نقشه")
+    expert_name = models.CharField(max_length=120, blank=True, verbose_name="نام کارشناس مشاوره")
+    expert_role = models.CharField(max_length=120, blank=True, verbose_name="سمت کارشناس")
+    expert_photo = models.ImageField(upload_to='site/expert/', blank=True, null=True, verbose_name="تصویر کارشناس")
+    expert_note = models.CharField(max_length=200, blank=True, verbose_name="یادداشت کارت مشاوره")
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "اطلاعات تماس شرکت"
+        verbose_name_plural = "اطلاعات تماس شرکت"
+
+    def save(self, *args, **kwargs):
+        # A singleton: always edit the same row instead of creating new ones.
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return "اطلاعات تماس شرکت"
+
+    @classmethod
+    def load(cls) -> 'SiteContact':
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    @property
+    def phone_list(self) -> list[str]:
+        return [line.strip() for line in (self.phones or '').splitlines() if line.strip()]
+
+    @property
+    def email_list(self) -> list[str]:
+        return [line.strip() for line in (self.emails or '').splitlines() if line.strip()]
+
+    @property
+    def expert_photo_url(self):
+        return self.expert_photo.url if self.expert_photo else ''
+
+
+class NewsletterSubscriber(models.Model):
+    """Opt-in mailing list for offers and new growing guides."""
+
+    email = models.EmailField(blank=True, verbose_name="ایمیل")
+    mobile = models.CharField(max_length=15, blank=True, verbose_name="موبایل")
+    topics = models.CharField(max_length=200, blank=True, verbose_name="علایق")
+    source = models.CharField(max_length=60, default='site-footer', verbose_name="منبع ثبت‌نام")
+    is_active = models.BooleanField(default=True, db_index=True, verbose_name="عضو فعال")
+    subscribed_at = models.DateTimeField(auto_now_add=True)
+    unsubscribed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ('-subscribed_at',)
+        verbose_name = "عضو خبرنامه"
+        verbose_name_plural = "اعضای خبرنامه"
+        constraints = [
+            models.UniqueConstraint(
+                fields=['email'],
+                condition=Q(email__gt='') & Q(is_active=True),
+                name='unique_active_newsletter_email',
+            ),
+            models.UniqueConstraint(
+                fields=['mobile'],
+                condition=Q(mobile__gt='') & Q(is_active=True),
+                name='unique_active_newsletter_mobile',
+            ),
+        ]
+
+    def __str__(self):
+        return self.email or self.mobile
+
+    def clean(self):
+        super().clean()
+        if not (self.email or self.mobile):
+            raise ValidationError('برای عضویت در خبرنامه ایمیل یا موبایل لازم است.')
+
+
+# ========================================
+# Service desks: consultants, support, working hours, satisfaction
+# ========================================
+
+class DeskSettings(models.Model):
+    """Working hours and canned notices for the two service desks.
+
+    One editable row rather than settings hard-coded in the theme: whether the
+    farm-desk answers at 6am or 9am is a business decision of whoever runs the
+    deployment, and the auto-reply that tells a farmer "we are closed" has to be
+    worded by them too.
+
+    Times are compared in the project timezone (``Asia/Tehran``), so the desk
+    opens at six in the morning *for the farmer reading it*, not for a server in
+    another zone.
+    """
+
+    DAY_CHOICES = (
+        (0, 'شنبه'), (1, 'یکشنبه'), (2, 'دوشنبه'), (3, 'سه‌شنبه'),
+        (4, 'چهارشنبه'), (5, 'پنجشنبه'), (6, 'جمعه'),
+    )
+
+    consulting_start = models.TimeField(default=time(6, 0), verbose_name='شروع مشاوره')
+    consulting_end = models.TimeField(default=time(22, 0), verbose_name='پایان مشاوره')
+    support_start = models.TimeField(default=time(6, 0), verbose_name='شروع پشتیبانی')
+    support_end = models.TimeField(default=time(22, 0), verbose_name='پایان پشتیبانی')
+    work_days = models.CharField(
+        max_length=40, default='0,1,2,3,4,5,6',
+        help_text='روزهای کاری با ایندکس شنبه=۰ تا جمعه=۶، جدا شده با کاما.',
+        verbose_name='روزهای کاری',
+    )
+    presence_minutes = models.PositiveSmallIntegerField(
+        default=10, help_text='چند دقیقه فعالیت آخر یک کارشناس «آنلاین» حساب شود.',
+        verbose_name='بازه حضور (دقیقه)',
+    )
+    out_of_hours_note = models.TextField(
+        max_length=400,
+        default=(
+            'الان خارج از ساعت کاری هستیم. درخواستتان را همین‌جا بنویسید؛ '
+            'در اولین بازه کاری بعدی پاسخ می‌دهیم.'
+        ),
+        verbose_name='پیام خارج از ساعت کاری',
+    )
+    is_active = models.BooleanField(
+        default=True, verbose_name='نمایش وضعیت میز خدمت',
+        help_text='خاموش کردن، نشانگر آنلاین/ساعت کاری را از چت حذف می‌کند.',
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'تنظیمات میز خدمت'
+        verbose_name_plural = 'تنظیمات میز خدمت'
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return 'تنظیمات میز خدمت'
+
+    @classmethod
+    def load(cls) -> 'DeskSettings':
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    @property
+    def work_day_indexes(self) -> list[int]:
+        days = []
+        for part in (self.work_days or '').split(','):
+            part = part.strip()
+            if part.isdigit() and 0 <= int(part) <= 6:
+                days.append(int(part))
+        return sorted(set(days)) or list(range(7))
+
+    def window_for(self, channel: str) -> tuple[time, time]:
+        if channel == 'consulting':
+            return self.consulting_start, self.consulting_end
+        return self.support_start, self.support_end
+
+    @staticmethod
+    def platform_day_index(moment) -> int:
+        """Map Python's Monday=0 weekday onto the site's Saturday=0 index."""
+        return platform_day_index(moment)
+
+    def is_open_at(self, channel: str, moment=None) -> bool:
+        """Whether the desk answers right now, in the project timezone."""
+        if not self.is_active:
+            return True
+        moment = moment or timezone.localtime()
+        start, end = self.window_for(channel)
+        if self.platform_day_index(moment) not in self.work_day_indexes:
+            return False
+        current = moment.timetz().replace(tzinfo=None)
+        if start <= end:
+            return start <= current < end
+        # A night shift (۲۲ تا ۶) is open before midnight *and* after it.
+        return current >= start or current < end
+
+    def hours_label(self, channel: str) -> str:
+        start, end = self.window_for(channel)
+        return f'{fa_digits(start.strftime("%H:%M"))} تا {fa_digits(end.strftime("%H:%M"))}'
+
+
+class DeskAgent(models.Model):
+    """A named consultant or support operator, with their own duty window.
+
+    The platform's permission system decides *who may answer*; this row decides
+    what the farmer sees and who the work is spread over. Without it a reply
+    from the desk is signed «پشتیبانی» and nobody knows whom they are talking
+    to — which is exactly what the user asked to fix.
+    """
+
+    ROLE_CONSULTING = 'consulting'
+    ROLE_SUPPORT = 'support'
+    ROLE_CHOICES = (
+        (ROLE_CONSULTING, 'مشاور کشاورزی'),
+        (ROLE_SUPPORT, 'پشتیبانی'),
+    )
+
+    # A foreign key rather than a one-to-one on purpose: on a small team the same
+    # person does cover both desks, and each desk needs its own name, photo,
+    # shift and rating average. ``(user, role)`` is what has to be unique.
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='desk_profiles',
+        verbose_name='کاربر کارشناس',
+    )
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default=ROLE_SUPPORT, verbose_name='میز')
+    display_name = models.CharField(max_length=120, blank=True, verbose_name='نام نمایشی')
+    title = models.CharField(max_length=120, blank=True, verbose_name='سمت', help_text='مثلاً «کارشناس ارشد تغذیه گیاه»')
+    photo = models.ImageField(upload_to='desk/', blank=True, null=True, verbose_name='تصویر')
+    bio = models.TextField(max_length=400, blank=True, verbose_name='تخصص‌ها و سوابق')
+    specialties = models.CharField(
+        max_length=200, blank=True, verbose_name='حوزه‌ها (با کاما)',
+        help_text='مثلاً «سم‌پاشی، تغذیه، آبیاری» — برای تقسیم کار در صف.',
+    )
+    work_days = models.CharField(max_length=40, blank=True, verbose_name='روزهای کاری شخصی')
+    work_start = models.TimeField(null=True, blank=True, verbose_name='شروع شیفت')
+    work_end = models.TimeField(null=True, blank=True, verbose_name='پایان شیفت')
+    max_open_threads = models.PositiveSmallIntegerField(
+        default=0, verbose_name='سقف گفتگوی باز', help_text='۰ یعنی بدون سقف.',
+    )
+    is_active = models.BooleanField(default=True, db_index=True, verbose_name='عضو فعال')
+    order = models.PositiveSmallIntegerField(default=0, verbose_name='ترتیب')
+    last_seen_at = models.DateTimeField(null=True, blank=True, verbose_name='آخرین فعالیت')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'کارشناس میز خدمت'
+        verbose_name_plural = 'کارشناسان میز خدمت'
+        ordering = ('order', 'display_name', 'id')
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'role'], name='unique_desk_agent_user_role',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.display_label} — {self.get_role_display()}'
+
+    @classmethod
+    def for_user(cls, user, role: str | None = None) -> 'DeskAgent | None':
+        """The profile this user shows on a desk, preferring the desk's role.
+
+        Reads the prefetch cache when the queryset provided one (a thread
+        serialises one message per reply, and one query per reply would be
+        absurd), and falls back to a single lookup otherwise.
+        """
+        if user is None:
+            return None
+        profiles = None
+        cache = getattr(getattr(user, '_prefetched_objects_cache', None), 'get', None)
+        if cache is not None:
+            profiles = cache('desk_profiles')
+        rows = list(user.desk_profiles.all()) if profiles is not None else list(
+            cls.objects.filter(user=user)
+        )
+        active = [row for row in rows if row.is_active]
+        if role:
+            for row in active:
+                if row.role == role:
+                    return row
+        return active[0] if active else None
+
+    @property
+    def display_label(self) -> str:
+        return (
+            self.display_name
+            or self.user.get_full_name()
+            or self.user.username
+        )
+
+    @property
+    def photo_url(self) -> str:
+        if self.photo:
+            return self.photo.url
+        account = getattr(self.user, 'account', None)
+        return account.avatar_url if account else ''
+
+    @property
+    def specialty_list(self) -> list[str]:
+        return [item.strip() for item in (self.specialties or '').split(',') if item.strip()]
+
+    def duty_window(self, settings_row: DeskSettings) -> tuple[time, time]:
+        default = settings_row.window_for(self.role)
+        return (self.work_start or default[0], self.work_end or default[1])
+
+    def is_on_duty(self, settings_row: DeskSettings | None = None, moment=None) -> bool:
+        """This person's own shift, not merely the desk's published hours."""
+        settings_row = settings_row or DeskSettings.load()
+        moment = moment or timezone.localtime()
+        if not self.is_active:
+            return False
+        days = [
+            int(part) for part in (self.work_days or '').split(',')
+            if part.strip().isdigit() and 0 <= int(part.strip()) <= 6
+        ]
+        if days and settings_row.platform_day_index(moment) not in days:
+            return False
+        start, end = self.duty_window(settings_row)
+        current = moment.timetz().replace(tzinfo=None)
+        if start <= end:
+            return start <= current < end
+        return current >= start or current < end
+
+    def is_present(self, settings_row: DeskSettings | None = None, moment=None) -> bool:
+        """Online = the operator touched the desk very recently."""
+        settings_row = settings_row or DeskSettings.load()
+        if not self.last_seen_at:
+            return False
+        moment = moment or timezone.now()
+        window = max(1, settings_row.presence_minutes) * 60
+        return (moment - self.last_seen_at).total_seconds() <= window
+
+    def open_threads(self):
+        return StorefrontConversation.objects.filter(
+            agent=self.user, status=StorefrontConversation.STATUS_OPEN,
+        )
+
+    @property
+    def rating_average(self) -> float:
+        rows = self.ratings.aggregate(total=Sum('score'), count=models.Count('id'))
+        count = rows['count'] or 0
+        if not count:
+            return 0.0
+        return round(rows['total'] / count, 2)
+
+    @property
+    def rating_count(self) -> int:
+        return self.ratings.count()
+
+
+class QuickReply(models.Model):
+    """One tap-to-send line in a chat.
+
+    Two audiences, because the ask was symmetrical: a farmer opening a
+    consulting thread wants the questions other farmers ask («دوز مصرف را چطور
+    حساب کنم؟»), while the operator answering 40 threads a day wants their own
+    stock replies. Both are editable in the admin instead of being frozen in the
+    front-end bundle.
+    """
+
+    AUDIENCE_CUSTOMER = 'customer'
+    AUDIENCE_STAFF = 'staff'
+    AUDIENCE_CHOICES = (
+        (AUDIENCE_CUSTOMER, 'کاربر / کشاورز'),
+        (AUDIENCE_STAFF, 'کارشناس میز'),
+    )
+    CHANNEL_CHOICES = (
+        ('any', 'همه میزها'),
+        (DeskAgent.ROLE_CONSULTING, 'مشاوره کشاورزی'),
+        (DeskAgent.ROLE_SUPPORT, 'پشتیبانی'),
+    )
+
+    audience = models.CharField(max_length=10, choices=AUDIENCE_CHOICES, default=AUDIENCE_CUSTOMER)
+    channel = models.CharField(max_length=20, choices=CHANNEL_CHOICES, default='any', verbose_name='میز')
+    label = models.CharField(
+        max_length=60, blank=True, verbose_name='برچسب کوتاه',
+        help_text='متن دکمه؛ خالی بمانید خود متن استفاده می‌شود.',
+    )
+    text = models.CharField(max_length=400, verbose_name='متن پیام')
+    is_first_message_only = models.BooleanField(
+        default=False, verbose_name='فقط برای اولین پیام',
+        help_text='برای سؤالات متداولی که فقط بار اول لازم است.',
+    )
+    order = models.PositiveSmallIntegerField(default=0)
+    is_active = models.BooleanField(default=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'پاسخ آماده'
+        verbose_name_plural = 'پاسخ‌های آماده'
+        ordering = ('order', 'id')
+
+    def __str__(self):
+        return f'[{self.get_audience_display()}/{self.get_channel_display()}] {self.label or self.text[:40]}'
+
+
+class ConversationRating(models.Model):
+    """The satisfaction survey a user leaves when a desk thread ends.
+
+    Kept on its own rather than as a ``Comment.rating`` because it rates *the
+    person who answered*, and the management panel needs to average it per
+    operator to see whether a desk is actually helping.
+    """
+
+    conversation = models.ForeignKey(
+        StorefrontConversation, on_delete=models.CASCADE, related_name='ratings',
+    )
+    rater = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='conversation_ratings',
+        verbose_name='ثبت‌کننده',
+    )
+    agent = models.ForeignKey(
+        DeskAgent, null=True, blank=True, on_delete=models.SET_NULL, related_name='ratings',
+        verbose_name='کارشناس',
+    )
+    score = models.PositiveSmallIntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(5)], verbose_name='امتیاز (۱ تا ۵)',
+    )
+    solved = models.BooleanField(
+        null=True, blank=True, verbose_name='مشکل حل شد؟',
+    )
+    comment = models.TextField(max_length=1000, blank=True, verbose_name='توضیح')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'رضایت از گفتگو'
+        verbose_name_plural = 'نظرسنجی گفتگوها'
+        ordering = ('-created_at',)
+        constraints = [
+            models.UniqueConstraint(
+                fields=['conversation', 'rater'], name='unique_rating_per_conversation',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.score}★ — گفتگوی {self.conversation_id}'
+
+
+class CommentVote(models.Model):
+    """One «مفید بود» per visitor per comment.
+
+    Votes are anonymous-friendly on purpose (many buyers read reviews without
+    logging in), but the row is keyed so a refresh cannot inflate a review, and it
+    can be withdrawn.
+    """
+
+    comment = models.ForeignKey(
+        Comment, on_delete=models.CASCADE, related_name='votes', verbose_name="نظر"
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, blank=True,
+        related_name='comment_votes',
+    )
+    visitor_key = models.CharField(max_length=64, blank=True, verbose_name="کلید بازدیدکننده")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "رأی مفید بودن"
+        verbose_name_plural = "رأی‌های مفید بودن"
+        constraints = [
+            models.UniqueConstraint(fields=['comment', 'user'], name='unique_helpful_vote_per_user'),
+        ]
+
+    def __str__(self):
+        return f"مفید بودنِ نظر {self.comment_id}"
+
+
+class ReturnPolicySettings(models.Model):
+    """How long a buyer has to send goods back, decided by the operator.
+
+    A shop of this kind prints «۷ روز ضمانت بازگشت» in its footer and then
+    answers questions differently on the phone. The number belongs in one record
+    that both the badge and the legal text read, and it is left empty on purpose
+    here: an unset window shows no number anywhere rather than an invented one.
+    """
+
+    window_days = models.PositiveSmallIntegerField(
+        null=True, blank=True, verbose_name="مهلت بازگشت (روز)"
+    )
+    conditions = models.TextField(
+        max_length=1500, blank=True,
+        help_text='شرایطی که در همان صفحه حقوقی و زیر بنر پاورقی نمایش داده می‌شود.',
+        verbose_name="شرایط بازگشت کالا",
+    )
+    express_shipping_enabled = models.BooleanField(
+        default=False,
+        help_text='گزینه «تحویل فوری» را در انتخاب روش ارسال فعال می‌کند.',
+        verbose_name="ارسال فوری در سبد خرید",
+    )
+    express_shipping_fee = models.PositiveIntegerField(
+        default=0, verbose_name="هزینه اضافی ارسال فوری (تومان)"
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "تنظیمات سیاست بازگشت کالا"
+        verbose_name_plural = "تنظیمات سیاست بازگشت کالا"
+
+    def __str__(self):
+        if self.window_days:
+            return f"بازگشت کالا تا {self.window_days} روز"
+        return "سیاست بازگشت هنوز اعلام نشده"
+
+    @classmethod
+    def load(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    @property
+    def window_label(self) -> str:
+        return f"{fa_digits(self.window_days)} روز ضمانت بازگشت کالا" if self.window_days else ""
+
+
+# ========================================
+# Operations: capacity, presence, admission and the system log
+# ========================================
+
+class CapacitySettings(models.Model):
+    """How many people the shop serves at once, and how that number is found.
+
+    The default answer is measured, not remembered: the process reads its own
+    container limits, so a 1 GB box is sized as a 1 GB box even when the host
+    behind it has 64. What the operator supplies is two ratios they can argue with
+    and one safety margin; a fixed number stays available for a deployment that
+    knows something /proc does not.
+
+    The waiting room is off by default. Locking real buyers out is a worse failure
+    than a slow page, so the shop first reports the pressure and the operator
+    decides when to start holding people at the door.
+    """
+
+    STRATEGY_AUTO = 'auto'
+    STRATEGY_FIXED = 'fixed'
+    STRATEGY_CHOICES = (
+        (STRATEGY_AUTO, 'تطبیقی با توان سرور'),
+        (STRATEGY_FIXED, 'عدد ثابت (دستی)'),
+    )
+
+    strategy = models.CharField(
+        max_length=8, choices=STRATEGY_CHOICES, default=STRATEGY_AUTO, verbose_name='روش تعیین ظرفیت'
+    )
+    fixed_limit = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text='فقط در روش دستی استفاده می‌شود؛ تعداد نفرانی که هم‌زمان داخل سایت می‌مانند.',
+        verbose_name='سقف دستی',
+    )
+    users_per_cpu_core = models.PositiveSmallIntegerField(
+        default=80,
+        help_text='تخمین نفر به‌ازای هر هسته پردازنده، پیش از کسر ضریب اطمینان.',
+        verbose_name='کاربر به‌ازای هر هسته',
+    )
+    users_per_gb_ram = models.PositiveSmallIntegerField(
+        default=40,
+        help_text='تخمین نفر به‌ازای هر گیگابایت حافظه‌ی آزادِ در دسترس این پروسه.',
+        verbose_name='کاربر به‌ازای هر گیگابایت',
+    )
+    safety_percent = models.PositiveSmallIntegerField(
+        default=75,
+        help_text='سهمی از توان اندازه‌گیری‌شده که واقعاً به بازدیدکننده داده می‌شود؛ بقیه برای '
+                  'کرنل، دیتابیس و جاهای غیرمنتظره می‌ماند.',
+        verbose_name='ضریب اطمینان (٪)',
+    )
+    derate_load_percent = models.PositiveSmallIntegerField(
+        default=150,
+        help_text='اگر بار یک‌دقیقه‌ای هر هسته از این درصد بگذرد، سقف همان لحظه به همان نسبت '
+                  'کم می‌شود؛ یعنی وقتی خودِ ماشین زیر فشار است، صف زودتر شروع می‌شود.',
+        verbose_name='آستانه فشار (٪ بار هر هسته)',
+    )
+    activity_window_minutes = models.PositiveSmallIntegerField(
+        default=5,
+        help_text='چند دقیقه از آخرین درخواست یک نفر، او را «آنلاین» حساب می‌کند.',
+        verbose_name='بازه حضور (دقیقه)',
+    )
+    sample_interval_seconds = models.PositiveSmallIntegerField(
+        default=60,
+        help_text='چند وقت یک‌بار وضعیت سرور نمونه‌برداری و در نمودار ثبت می‌شود.',
+        verbose_name='بازه نمونه‌برداری (ثانیه)',
+    )
+    queue_enabled = models.BooleanField(
+        default=False,
+        help_text='با روشن‌کردن، بازدیدکننده‌ی تازه‌ای که جایی نمانده به صفحه انتظار می‌رود و '
+                  'هرچه باز می‌شود به ترتیب ورودش داخل می‌آید.',
+        verbose_name='صف انتظار',
+    )
+    queue_max_minutes = models.PositiveSmallIntegerField(
+        default=30,
+        help_text='پس از این مدت در صف، کاربر بدون توجه به ظرفیت وارد می‌شود؛ هیچ‌کس تا '
+                  'ابدیدر صف نمی‌ماند.',
+        verbose_name='حداکثر ماندن در صف (دقیقه)',
+    )
+    queue_message = models.TextField(
+        max_length=600, blank=True,
+        help_text='متنی که کاربر در صفحه انتظار می‌خواند. خالی بماند، پیام پیش‌فرض نمایش داده می‌شود.',
+        verbose_name='پیام صفحه انتظار',
+    )
+    bypass_staff = models.BooleanField(
+        default=True,
+        help_text='کارمندان و مدیران هرگز در صف نمی‌مانند تا بتوانند سایت را درست کنند.',
+        verbose_name='عبور کارکنان از صف',
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'تنظیمات ظرفیت و صف'
+        verbose_name_plural = 'تنظیمات ظرفیت و صف'
+
+    # The middleware reads this on every request, so the row is cached for a few
+    # seconds instead of being selected per page view.
+    _CACHE_SECONDS = 15.0
+    _cache: dict = {'row': None, 'until': 0.0}
+
+    def __str__(self):
+        if self.strategy == self.STRATEGY_FIXED:
+            return f"سقف دستی: {fa_digits(self.fixed_limit or 0)} نفر"
+        return 'ظرفیت تطبیقی با توان سرور'
+
+    @classmethod
+    def load(cls) -> 'CapacitySettings':
+        import time
+
+        now = time.monotonic()
+        row = cls._cache['row']
+        if row is not None and now < cls._cache['until']:
+            return row
+        obj, _ = cls.objects.get_or_create(pk=1)
+        cls._cache['row'] = obj
+        cls._cache['until'] = now + cls._CACHE_SECONDS
+        return obj
+
+    @classmethod
+    def clear_cache(cls) -> None:
+        """Called on save, so an edit in the admin takes effect at once."""
+        cls._cache['row'] = None
+        cls._cache['until'] = 0.0
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        type(self).clear_cache()
+
+    @property
+    def is_measured(self) -> bool:
+        return self.strategy == self.STRATEGY_AUTO
+
+    @property
+    def queue_is_live(self) -> bool:
+        return self.queue_enabled
+
+    def clean(self):
+        if self.strategy == self.STRATEGY_FIXED and not self.fixed_limit:
+            raise ValidationError({'fixed_limit': 'در روش دستی، یک عدد برای سقف لازم است.'})
+
+
+class ResourceSample(models.Model):
+    """One reading of the machine, kept so a graph is made of measurements.
+
+    Nothing here is estimated after the fact: the row is written by the request
+    path at most once per sampling interval, which is also what makes the
+    «وضعیت در لحظه فشار» in the console something an operator can trust.
+    """
+
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    cpu_count = models.PositiveSmallIntegerField(null=True, blank=True, verbose_name='هسته‌ها')
+    load_1m = models.FloatField(null=True, blank=True, verbose_name='بار یک‌دقیقه‌ای')
+    load_5m = models.FloatField(null=True, blank=True, verbose_name='بار پنج‌دقیقه‌ای')
+    memory_total_mb = models.PositiveIntegerField(null=True, blank=True, verbose_name='حافظه کل (مگابایت)')
+    memory_available_mb = models.PositiveIntegerField(null=True, blank=True, verbose_name='حافظه آزاد')
+    container_limit_mb = models.PositiveIntegerField(
+        null=True, blank=True, verbose_name='سقف حافظه کانتینر'
+    )
+    disk_free_mb = models.PositiveIntegerField(null=True, blank=True, verbose_name='فضای آزاد دیسک')
+    disk_total_mb = models.PositiveIntegerField(null=True, blank=True, verbose_name='فضای کل دیسک')
+    gpu = models.CharField(max_length=140, blank=True, verbose_name='پردازنده گرافیکی')
+    online_users = models.PositiveIntegerField(default=0, verbose_name='کاربران آنلاین')
+    online_guests = models.PositiveIntegerField(default=0, verbose_name='مهمان‌های آنلاین')
+    queue_waiting = models.PositiveIntegerField(default=0, verbose_name='در صف')
+    capacity_limit = models.PositiveIntegerField(default=0, verbose_name='سقف استفاده‌شده')
+    capacity_basis = models.CharField(max_length=220, blank=True, verbose_name='نحوه محاسبه')
+
+    class Meta:
+        verbose_name = 'نمونه وضعیت سرور'
+        verbose_name_plural = 'نمونه‌های وضعیت سرور'
+        ordering = ('-created_at',)
+
+    def __str__(self):
+        return (
+            f"{self.created_at:%Y-%m-%d %H:%M} — {fa_digits(self.online_users + self.online_guests)} نفر، "
+            f"سقف {fa_digits(self.capacity_limit)}"
+        )
+
+
+class PresenceBeat(models.Model):
+    """One row per visitor, refreshed at most once a minute.
+
+    «چند نفر آنلاین‌اند» has to come from somewhere, and the only honest source is
+    the requests people actually make. A dedicated row per identity (rather than a
+    counter) is what lets the console also answer «چه کسانی»، and the write is
+    self-throttling: one UPDATE per visitor per window, so a flood of traffic adds
+    one query per person per minute and not one per page view.
+    """
+
+    KIND_USER = 'user'
+    KIND_GUEST = 'guest'
+
+    identity = models.CharField(max_length=90, unique=True, verbose_name='شناسه نشست')
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.CASCADE,
+        related_name='presence_beats', verbose_name='کاربر'
+    )
+    kind = models.CharField(max_length=5, choices=((KIND_USER, 'کاربر'), (KIND_GUEST, 'مهمان')), db_index=True)
+    is_staff = models.BooleanField(default=False, verbose_name='از کارکنان')
+    path = models.CharField(max_length=200, blank=True, verbose_name='آخرین نشانی')
+    requests = models.PositiveIntegerField(default=1, verbose_name='درخواست‌ها در این بازه')
+    started_at = models.DateTimeField(auto_now_add=True, verbose_name='شروع این نشست')
+    last_seen_at = models.DateTimeField(db_index=True, verbose_name='آخرین فعالیت')
+
+    class Meta:
+        verbose_name = 'حضور کاربر'
+        verbose_name_plural = 'حضور کاربران'
+        ordering = ('-last_seen_at',)
+        indexes = [models.Index(fields=['kind', 'last_seen_at'])]
+
+    def __str__(self):
+        label = self.user.get_username() if self.user else 'مهمان'
+        return f"{label} — ساعت {fa_digits(timezone.localtime(self.last_seen_at).strftime('%H:%M'))}"
+
+    @classmethod
+    def online(cls, window_minutes: int | None = None) -> 'QuerySet':
+        """Everyone whose last request is inside the presence window."""
+        minutes = window_minutes if window_minutes is not None else cls.settings_window()
+        since = timezone.now() - timedelta(minutes=max(1, minutes))
+        return cls.objects.filter(last_seen_at__gte=since)
+
+    @staticmethod
+    def settings_window() -> int:
+        return max(1, CapacitySettings.load().activity_window_minutes)
+
+
+class QueueTicket(models.Model):
+    """A visitor held at the door, in line for a free place.
+
+    Admission is first-come-first-served and the line moves on its own: every time
+    the pressure drops, the oldest waiting ticket is let in. Nobody is trapped —
+    after the configured ceiling of patience a visitor is admitted whatever the
+    load, because an infinity of waiting is how a shop loses a customer for good.
+    """
+
+    STATUS_WAITING = 'waiting'
+    STATUS_ADMITTED = 'admitted'
+    STATUS_CHOICES = ((STATUS_WAITING, 'در صف'), (STATUS_ADMITTED, 'وارد شده'))
+
+    key = models.CharField(max_length=64, unique=True, verbose_name='کلید صف')
+    status = models.CharField(
+        max_length=10, choices=STATUS_CHOICES, default=STATUS_WAITING, db_index=True
+    )
+    path = models.CharField(max_length=200, blank=True, verbose_name='صفحه‌ی درخواستی')
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True, verbose_name='ورود به صف')
+    admitted_at = models.DateTimeField(null=True, blank=True, verbose_name='زمان ورود')
+    waits = models.PositiveIntegerField(
+        default=1, help_text='چند بار پشت‌درپیش به صفحه انتظار برگشته است؛ برای اینکه کسی '
+                             'با رفراف‌کردن جلوتر نزند.',
+        verbose_name='تعداد مراجعه',
+    )
+
+    class Meta:
+        verbose_name = 'بلیت صف'
+        verbose_name_plural = 'بلیت‌های صف'
+        ordering = ('created_at', 'id')
+
+    def __str__(self):
+        state = 'در صف' if self.status == self.STATUS_WAITING else 'وارد شده'
+        return f"صف {state} — {self.created_at:%H:%M}"
+
+    @property
+    def position(self) -> int:
+        """How many people came before this one and are still waiting."""
+        if self.status != self.STATUS_WAITING:
+            return 0
+        return QueueTicket.objects.filter(
+            status=QueueTicket.STATUS_WAITING, created_at__lt=self.created_at
+        ).count() + 1
+
+    def minutes_waiting(self) -> int:
+        return int((timezone.now() - self.created_at).total_seconds() // 60)
+
+
+class SystemLogEntry(models.Model):
+    """What broke, how often, and whether anyone has looked at it.
+
+    Errors are grouped rather than appended: a bug that fires on every page view
+    would otherwise bury the two things that matter in a wall of identical lines.
+    ``count``/``last_at`` keep the frequency honest while the list stays readable,
+    and a client can report what it saw here too — which is the difference between
+    «the app froze for someone» and a report of it that nobody receives.
+
+    Secrets never come near this table: what is written is run through
+    :func:`shop.capacity.redact` first.
+    """
+
+    LEVEL_ERROR = 'error'
+    LEVEL_WARNING = 'warning'
+    LEVEL_NOTICE = 'notice'
+    LEVEL_CHOICES = (
+        (LEVEL_ERROR, 'خطا'),
+        (LEVEL_WARNING, 'هشدار'),
+        (LEVEL_NOTICE, 'ثبت'),
+    )
+
+    group = models.CharField(
+        max_length=40, unique=True, db_index=True,
+        help_text='اثر انگشت یکسان برای رویدادهای تکراری؛ یک ردیف، یک مشکل.',
+        verbose_name='گروه',
+    )
+    level = models.CharField(max_length=7, choices=LEVEL_CHOICES, default=LEVEL_ERROR, db_index=True)
+    source = models.CharField(max_length=70, db_index=True, verbose_name='بخش')
+    title = models.CharField(max_length=200, verbose_name='خلاصه')
+    message = models.TextField(max_length=4000, blank=True, verbose_name='جزئیات')
+    path = models.CharField(max_length=200, blank=True, verbose_name='نشانی')
+    method = models.CharField(max_length=8, blank=True, verbose_name='روش')
+    status_code = models.PositiveSmallIntegerField(null=True, blank=True, verbose_name='کد وضعیت')
+
+    count = models.PositiveIntegerField(default=1, verbose_name='تکرار')
+    first_at = models.DateTimeField(auto_now_add=True, verbose_name='نخستین بار')
+    last_at = models.DateTimeField(default=timezone.now, db_index=True, verbose_name='آخرین بار')
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='system_logs', verbose_name='کاربر'
+    )
+    user_label = models.CharField(max_length=120, blank=True, verbose_name='نام کاربر در زمان رخداد')
+    visitor_key = models.CharField(max_length=64, blank=True, verbose_name='کلید بازدیدکننده')
+    context = models.JSONField(default=dict, blank=True, verbose_name='بافت')
+
+    resolved_at = models.DateTimeField(null=True, blank=True, db_index=True, verbose_name='برطرف شد')
+    resolved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='resolved_logs', verbose_name='توسط'
+    )
+    note = models.TextField(max_length=1000, blank=True, verbose_name='یادداشت رفع')
+
+    class Meta:
+        verbose_name = 'رویداد سامانه'
+        verbose_name_plural = 'رویدادهای سامانه'
+        ordering = ('-last_at',)
+
+    def __str__(self):
+        return f"[{self.get_level_display()}] {self.source} — {self.title[:60]}"
+
+    @property
+    def is_open(self) -> bool:
+        return self.resolved_at is None
+
+    @staticmethod
+    def group_key(source: str, title: str) -> str:
+        import hashlib
+
+        return hashlib.sha1(f"{source}|{title[:180]}".encode('utf-8')).hexdigest()[:40]
+
+    @classmethod
+    def record(
+        cls, *, source: str, title: str, level: str = LEVEL_ERROR, message: str = '',
+        path: str = '', method: str = '', status_code: int | None = None,
+        user=None, visitor_key: str = '', context: dict | None = None,
+    ) -> 'SystemLogEntry | None':
+        """Add one occurrence, opening a row the first time it is seen.
+
+        Returns ``None`` rather than raising: a log that can itself break the
+        request it is describing would turn a fault into an outage.
+        """
+        from .capacity import redact
+
+        try:
+            entry, created = cls.objects.get_or_create(
+                group=cls.group_key(source, title[:200]),
+                defaults={
+                    'level': level,
+                    'source': source[:70],
+                    'title': title[:200],
+                    'message': message[:4000],
+                    'path': path[:200],
+                    'method': method[:8],
+                    'status_code': status_code,
+                    'user': user if getattr(user, 'pk', None) else None,
+                    'user_label': (user.get_username() if getattr(user, 'pk', None) else '')[:120],
+                    'visitor_key': visitor_key[:64],
+                    'context': redact(context or {}),
+                },
+            )
+            if not created:
+                cls.objects.filter(pk=entry.pk).update(
+                    count=F('count') + 1,
+                    last_at=timezone.now(),
+                    # A resolved problem that came back must not stay closed.
+                    resolved_at=None,
+                    level=level,
+                    message=message[:4000] or entry.message,
+                    path=path[:200] or entry.path,
+                )
+                entry.refresh_from_db()
+            return entry
+        except Exception:  # pragma: no cover - logging must never break a request
+            return None

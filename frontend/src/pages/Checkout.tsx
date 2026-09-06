@@ -3,13 +3,14 @@ import { Link } from "react-router-dom";
 import { CheckCircle2, ClipboardCheck, LocateFixed, PackageCheck, Phone, ShieldCheck } from "lucide-react";
 import toast from "react-hot-toast";
 
+import { LEGAL_CORE_LINKS } from "../config/legal";
 import { ordersApi, paymentsApi, shippingApi } from "../api/services";
 import { parseApiError, type FieldErrors } from "../api/errors";
 import LocationPicker from "../components/LocationPicker";
 import PurchaseSteps from "../components/PurchaseSteps";
 import { useAuthStore } from "../store/authStore";
 import { useCartStore } from "../store/cartStore";
-import type { CheckoutPayload, Order, PaymentProviderOption } from "../types";
+import type { CheckoutPayload, Order, PaymentProviderOption, ShippingQuote } from "../types";
 import { formatPrice } from "../utils/formatPrice";
 import { toEnglishDigits, normalizePhoneNumber, normalizeNumericInput } from "../utils/normalizeDigits";
 
@@ -39,7 +40,10 @@ export default function Checkout() {
   const [restartingPayment, setRestartingPayment] = useState(false);
   const [order, setOrder] = useState<Order | null>(null);
   const [paymentError, setPaymentError] = useState('');
-  const [quotedShipping, setQuotedShipping] = useState<number | null>(null);
+  // Every service the shipping layer currently offers — usually just standard,
+  // and express only if the operator enabled it. The buyer never sees a choice
+  // that cannot be honoured.
+  const [quotes, setQuotes] = useState<ShippingQuote[]>([]);
   const [locating, setLocating] = useState(false);
   // Server-side validation is mapped back onto the individual inputs so the
   // buyer sees which field is wrong instead of a single generic toast.
@@ -63,22 +67,32 @@ export default function Checkout() {
 
   useEffect(() => {
     if (!form.province || !form.city || !cart?.items.length) {
-      setQuotedShipping(null);
+      setQuotes([]);
       return;
     }
     let cancelled = false;
     shippingApi.quote(form.province, form.city)
       .then((response) => {
-        if (!cancelled) setQuotedShipping(response.data.quotes[0]?.amount ?? null);
+        if (cancelled) return;
+        const available = response.data.quotes || [];
+        setQuotes(available);
+        // A service that disappeared between two quotes must not be sent off, so
+        // the choice is re-checked against what just came back.
+        setForm((current) => {
+          if (!current.shipping_service) return current;
+          if (available.some((quote) => quote.service === current.shipping_service)) return current;
+          return { ...current, shipping_service: undefined };
+        });
       })
       .catch(() => {
-        if (!cancelled) setQuotedShipping(null);
+        if (!cancelled) setQuotes([]);
       });
     return () => { cancelled = true; };
   }, [form.province, form.city, cart?.items.length, cart?.total_price]);
 
   const subtotal = cart?.total_price || 0;
-  const shippingPrice = subtotal === 0 ? 0 : quotedShipping;
+  const selectedQuote = quotes.find((quote) => quote.service === (form.shipping_service || 'standard'));
+  const shippingPrice = subtotal === 0 ? 0 : (selectedQuote?.amount ?? quotes[0]?.amount ?? null);
   const total = shippingPrice === null ? subtotal : subtotal + shippingPrice;
 
   function updateField<Key extends keyof CheckoutPayload>(key: Key, value: CheckoutPayload[Key]) {
@@ -201,6 +215,24 @@ export default function Checkout() {
             <p className="mt-1 text-xl font-extrabold tracking-wider text-emerald-700 dark:text-lime-300" dir="ltr">{order.code}</p>
             {order.discount_amount > 0 && <p className="mt-3 text-sm font-bold text-emerald-700 dark:text-lime-300">تخفیف اعمال‌شده: {formatPrice(order.discount_amount)}</p>}
             <p className="mt-3 text-sm font-bold text-slate-700 dark:text-white">مبلغ ثبت‌شده: {formatPrice(order.total_price)}</p>
+            {/*
+              The acceptance is written on the order, so the receipt says what it
+              says: the moment the box was ticked and the version of the text the
+              buyer agreed to. If a term is ever disputed, this is the answer.
+            */}
+            {order.terms_accepted_at && (
+              <p className="mt-3 text-fluid-2xs leading-6 text-slate-500 dark:text-emerald-300">
+                شرایط خرید در {new Date(order.terms_accepted_at).toLocaleString("fa-IR")} پذیرفته شد
+                {order.legal_version && (
+                  <>
+                    {' '}· نسخه متن <span dir="ltr" className="font-bold">{order.legal_version}</span>
+                  </>
+                )}{' '}
+                <Link to="/legal" className="font-bold text-emerald-700 hover:underline dark:text-lime-300">
+                  دیدن اسناد
+                </Link>
+              </p>
+            )}
           </div>
           <p className="mt-4 text-xs text-slate-400">پرداخت فقط از طریق روش فعال‌شده و تأییدشدهٔ سرور انجام می‌شود؛ هیچ درگاه غیرفعالی مبلغ دریافت نمی‌کند.</p>
           <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
@@ -219,7 +251,7 @@ export default function Checkout() {
 
   if (!isLoading && !cart?.items.length) {
     return (
-      <main className="mx-auto min-h-[55vh] max-w-3xl px-[var(--page-gutter)] py-8 md:py-12">
+      <main className="mx-auto min-h-[55dvh] max-w-3xl px-[var(--page-gutter)] py-8 md:py-12">
         <PurchaseSteps currentStep="cart" />
         <section className="flex flex-col items-center justify-center py-12 text-center">
           <ClipboardCheck size={50} className="text-emerald-500" />
@@ -287,6 +319,34 @@ export default function Checkout() {
             <textarea value={form.notes || ""} onChange={(event) => updateField("notes", event.target.value)} rows={3} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-normal outline-none transition focus:border-emerald-500 dark:border-emerald-700 dark:bg-emerald-900" placeholder="زمان مناسب تماس، نیاز به مشاوره مصرف، مشخصات دسترسی و..." />
           </label>
 
+          {quotes.length > 1 && (
+            <fieldset className="rounded-2xl border border-slate-200 p-4 dark:border-emerald-800">
+              <legend className="px-1 text-sm font-extrabold text-slate-700 dark:text-emerald-50">روش ارسال</legend>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {quotes.map((quote) => {
+                  const active = (form.shipping_service || 'standard') === quote.service;
+                  return (
+                    <button
+                      key={quote.service}
+                      type="button"
+                      onClick={() => updateField('shipping_service', quote.service as 'standard' | 'express')}
+                      className={`rounded-xl border p-3 text-start transition ${active ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-900' : 'border-slate-200 dark:border-emerald-800'}`}
+                    >
+                      <span className="block text-sm font-extrabold text-slate-800 dark:text-white">{quote.label}</span>
+                      <span className="mt-1 block text-fluid-2xs text-slate-500 dark:text-emerald-200">
+                        {quote.amount === 0 ? 'رایگان' : `${formatPrice(quote.amount)} تومان`}
+                        {quote.estimated_days_min && quote.estimated_days_max
+                          ? ` · تحویل ${quote.estimated_days_min.toLocaleString('fa-IR')}${quote.estimated_days_max > quote.estimated_days_min ? ` تا ${quote.estimated_days_max.toLocaleString('fa-IR')}` : ''} روز کاری`
+                          : ''}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-2 text-fluid-2xs text-slate-400">مبلغ و زمان ارسال در لحظه ثبت سفارش دوباره محاسبه می‌شود.</p>
+            </fieldset>
+          )}
+
           <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
             <div className="flex items-center gap-2 font-extrabold"><Phone size={17} /> روش پرداخت</div>
             <p className="mt-1">فقط روش‌هایی که سرور با credential، callback verify و تست کامل فعال کرده باشد قابل انتخاب‌اند. روش‌های دیگر صرفاً برای شفافیت نمایش داده می‌شوند.</p>
@@ -313,7 +373,21 @@ export default function Checkout() {
           <div>
             <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-slate-50 p-3 text-xs leading-6 text-slate-600 dark:bg-emerald-900/40 dark:text-emerald-100">
               <input id="checkout-terms_accepted" type="checkbox" checked={form.terms_accepted} onChange={(event) => updateField("terms_accepted", event.target.checked)} aria-invalid={Boolean(fieldErrors.terms_accepted)} className="mt-1 h-4 w-4 accent-emerald-600" />
-              <span>صحت اطلاعات تحویل و مبلغ را تأیید می‌کنم و می‌پذیرم سفارش فقط پس از تأیید سمت سرور و، برای پرداخت آنلاین، تأیید زرین‌پال پرداخت‌شده تلقی شود.</span>
+              <span>
+                صحت اطلاعات تحویل و مبلغ را تأیید می‌کنم و می‌پذیرم سفارش فقط پس از تأیید سمت سرور و، برای پرداخت
+                آنلاین، تأیید درگاه پرداخت‌شده تلقی شود.
+                <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-fluid-2xs">
+                  <span className="text-slate-400">متن کامل:</span>
+                  {LEGAL_CORE_LINKS.map((item) => (
+                    <Link key={item.to} to={item.to} className="font-bold text-emerald-700 hover:underline dark:text-lime-300">
+                      {item.label}
+                    </Link>
+                  ))}
+                  {/* The number is stamped server-side on the order, so this line
+                      is a receipt, not a promise the frontend has to keep. */}
+                  <span className="text-slate-400">· شماره نسخه متن روی سفارش شما ثبت می‌شود.</span>
+                </span>
+              </span>
             </label>
             {fieldErrors.terms_accepted && <p role="alert" className="mt-1 text-fluid-xs font-semibold text-rose-600">{fieldErrors.terms_accepted}</p>}
           </div>
@@ -334,7 +408,7 @@ export default function Checkout() {
           <ul className="mt-4 space-y-3 border-b border-emerald-100 pb-4 dark:border-emerald-800">
             {cart?.items.map((item) => (
               <li key={item.id} className="flex items-start justify-between gap-3 text-sm">
-                <span className="line-clamp-2 text-slate-600 dark:text-emerald-100">
+                <span className="line-clamp-2 min-w-0 text-slate-600 dark:text-emerald-100">
                   {item.quantity} × {item.title}
                   {/* Marketplace lines name their storefront so the buyer knows
                       who is actually shipping each part of the order. */}
@@ -344,14 +418,17 @@ export default function Checkout() {
                     </span>
                   )}
                 </span>
-                <strong className="whitespace-nowrap text-slate-800 dark:text-white">
+                <strong className="shrink-0 whitespace-nowrap text-slate-800 dark:text-white">
                   {formatPrice(item.total_price)}
                 </strong>
               </li>
             ))}
           </ul>
           <SummaryRow label="جمع کالاها" value={formatPrice(subtotal)} />
-          <SummaryRow label="هزینه ارسال" value={shippingPrice === null ? "پس از انتخاب شهر" : shippingPrice === 0 ? "رایگان" : formatPrice(shippingPrice)} />
+          <SummaryRow
+            label={selectedQuote ? `هزینه ارسال (${selectedQuote.label})` : "هزینه ارسال"}
+            value={shippingPrice === null ? "پس از انتخاب شهر" : shippingPrice === 0 ? "رایگان" : formatPrice(shippingPrice)}
+          />
           <div className="mt-3 flex items-center justify-between border-t border-emerald-200 pt-4 text-base font-extrabold text-slate-800 dark:border-emerald-700 dark:text-white"><span>مبلغ قابل پرداخت</span><span className="text-emerald-700 dark:text-lime-300">{formatPrice(total)}</span></div>
           <div className="mt-5 flex gap-2 rounded-xl bg-white/70 p-3 text-fluid-xs leading-5 text-slate-500 dark:bg-emerald-950/50 dark:text-emerald-200"><ShieldCheck size={18} className="shrink-0 text-emerald-600" />مبلغ نهایی توسط سرور با قیمت و موجودی لحظه‌ای محاسبه می‌شود.</div>
         </aside>

@@ -23,8 +23,31 @@ def _token_matches(request) -> bool:
     return bool(supplied) and hmac.compare_digest(supplied, expected)
 
 
+def user_from_token_header(request):
+    """The user behind the credential this request presents, when it presents one.
+
+    DRF views authenticate an ``Authorization: Token`` header themselves; the operations
+    endpoints are plain Django views so that a monitoring box and the console read the same
+    URL, and without this lookup they answer 404 to a client holding a perfectly good
+    credential — which is how an embedded preview behaves, its browser refusing to keep a
+    cookie. ``shop.preview`` decides what a request may present: the header anywhere, and
+    in a preview also the parameter the frame can put in its own address.
+    """
+    from .preview import user_for
+
+    return user_for(request)
+
+
 def has_operations_access(request) -> bool:
-    return bool(getattr(request.user, "is_staff", False)) or _token_matches(request)
+    if bool(getattr(request.user, "is_staff", False)) or _token_matches(request):
+        return True
+    user = user_from_token_header(request)
+    if user is None:
+        return False
+    # These views attribute their own writes — a resolved log line names who closed it —
+    # so the operator is put on the request instead of being answered with a bare yes.
+    request.user = user
+    return True
 
 
 def operations_access_required(view):

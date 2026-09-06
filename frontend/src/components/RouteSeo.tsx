@@ -25,6 +25,26 @@ const ROUTES: Record<string, { title: string; description: string }> = {
     title: 'خدمات و مشاوره کشاورزی | گرین کود',
     description: 'برای مشاوره زراعی، آبیاری، خاک، گلخانه و ماشین‌آلات درخواست ثبت کنید.',
   },
+  '/blog': {
+    title: 'مجله گرین کود | مقاله و آموزش کشاورزی',
+    description: 'مقاله‌های تخصصی کود، سم، بذر و بازار کشاورزی به‌همراه راهنمای کشت گیاهان.',
+  },
+  '/guides': {
+    title: 'راهنمای کشت گیاهان | گرین کود',
+    description: 'آموزش گام‌به‌گام کاشت، داشت و برداشت هر گیاه همراه با نهاده‌های مناسب همان فصل.',
+  },
+  '/about': {
+    title: 'درباره گرین کود | تیم، برندها و پیشینه',
+    description: 'تیم گرین کود، برندهایی که نمایندگی می‌کنیم و نحوه بررسی آگهی غرفه‌داران.',
+  },
+  '/contact': {
+    title: 'تماس با گرین کود | نشانی، تلفن و ساعت کاری',
+    description: 'راه‌های ارتباطی با تیم فروش، پشتیبانی و مشاوره کشاورزی گرین کود.',
+  },
+  '/newsletter': {
+    title: 'خبرنامه گرین کود',
+    description: 'تازه‌ترین قیمت، موجودی و راهنمای کشت را در ایمیل یا پیامک دریافت کنید.',
+  },
   '/farmer-sell': {
     title: 'فروش محصول کشاورز | گرین کود',
     description: 'درخواست تأمین و فروش محصول کشاورزی خود را برای بررسی ثبت کنید.',
@@ -55,7 +75,7 @@ const PRIVATE_PREFIXES = [
 export default function RouteSeo() {
   const location = useLocation();
   // Dynamic detail pages own their entity-specific metadata and structured data.
-  if (/^\/(products|storefronts)\/[^/]+$/.test(location.pathname)) return null;
+  if (/^\/(products|storefronts|blog|guides|page|offer|services)\/[^/]+$/.test(location.pathname)) return null;
 
   const siteUrl = (import.meta.env.VITE_SITE_URL || window.location.origin).replace(/\/$/, '');
   const route = ROUTES[location.pathname] || {

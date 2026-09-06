@@ -5,20 +5,28 @@
 // are two stacked views, on desktop a two-pane layout.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { MessageCircle } from 'lucide-react';
 
 import { messagesApi } from '../api/services';
 import ChannelChips, { type ChannelFilter } from '../components/direct/ChannelChips';
 import ConversationRow from '../components/direct/ConversationRow';
+import DeskEntries from '../components/direct/DeskEntries';
 import DirectThread from '../components/direct/DirectThread';
+import { parseApiError } from '../api/errors';
+import { useBackgroundPolling } from '../hooks/useBackgroundPolling';
 import { useAuthStore } from '../store/authStore';
+import toast from 'react-hot-toast';
 import { useTranslation } from '../i18n';
 import type { MessageChannel, StorefrontConversation } from '../types';
+
+/** Ten seconds: honest for a chat list, cheap enough that a rate limit is not the first thing a farmer meets. */
+const INBOX_POLL_MS = 10000;
 
 export default function Messages() {
   const { t } = useTranslation();
   const { isAuthenticated, isSessionChecked } = useAuthStore();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [conversations, setConversations] = useState<StorefrontConversation[]>([]);
   const [channels, setChannels] = useState<{ value: MessageChannel; label: string }[]>([]);
   const [unreadByChannel, setUnreadByChannel] = useState<Partial<Record<MessageChannel, number>>>({});
@@ -40,23 +48,62 @@ export default function Messages() {
       if (window.matchMedia('(min-width: 1024px)').matches) {
         setActiveId((current) => current ?? response.data.results?.[0]?.id ?? null);
       }
-    } catch {
+    } catch (caught) {
+      // A rate limit is rethrown on purpose: the polling hook reads it and backs
+      // off for the server's own retry window instead of erroring every 10s.
       setConversations([]);
+      if (parseApiError(caught).code === 'throttled') throw caught;
     } finally {
       setLoading(false);
     }
   }, []);
 
+  // The inbox refreshes while the tab is in the foreground; an open thread is
+  // kept live by its own event stream, so the list does not need to be faster.
+  useBackgroundPolling(load, INBOX_POLL_MS, isAuthenticated && isSessionChecked);
+
   useEffect(() => {
     if (!isSessionChecked) return;
-    if (isAuthenticated) {
-      void load();
-      const interval = setInterval(() => void load(), 6000);
-      return () => clearInterval(interval);
-    }
+    if (isAuthenticated) return undefined;
     setLoading(false);
     return undefined;
-  }, [isAuthenticated, isSessionChecked, load]);
+  }, [isAuthenticated, isSessionChecked]);
+
+  /*
+    A link that says «ادامه گفتگو در مشاوره کشاورزی» — written by the support desk
+    when a question turns out to need an agronomist — has to land the farmer in
+    that thread, not at the top of the inbox with a hint to look for it. Same for
+    the menu's «مشاوره کشاورزی» entry. The parameter is removed afterwards so a
+    refresh does not yank them back out of whatever they opened next.
+  */
+  const requestedChannel = searchParams.get('channel');
+  useEffect(() => {
+    if (!isAuthenticated || !isSessionChecked) return;
+    if (requestedChannel !== 'consulting' && requestedChannel !== 'support') return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const response = await messagesApi.openServiceConversation(requestedChannel);
+        if (cancelled) return;
+        setActiveId(response.data.id);
+        setFilter('all');
+      } catch (caught) {
+        // A staff member is refused as a customer of the desk they staff — for
+        // them the same deep link means "show me that queue", and the server's
+        // own sentence explains the difference instead of a silent no-op.
+        const parsed = parseApiError(caught);
+        if (!cancelled && parsed.code === 'staff_not_a_desk_customer') {
+          setFilter(requestedChannel);
+          toast(parsed.message);
+        }
+      } finally {
+        if (!cancelled) setSearchParams({}, { replace: true });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, isSessionChecked, requestedChannel, setSearchParams]);
 
   const visibleConversations = useMemo(
     () =>
@@ -68,7 +115,7 @@ export default function Messages() {
 
   if (!isSessionChecked || loading) {
     return (
-      <main className="flex min-h-[55vh] items-center justify-center">
+      <main className="flex min-h-[55dvh] items-center justify-center">
         <p className="text-sm text-slate-500 dark:text-emerald-200">{t('common.loading')}</p>
       </main>
     );
@@ -76,7 +123,7 @@ export default function Messages() {
 
   if (!isAuthenticated) {
     return (
-      <main className="mx-auto flex min-h-[55vh] max-w-md flex-col items-center justify-center px-4 text-center">
+      <main className="mx-auto flex min-h-[55dvh] max-w-md flex-col items-center justify-center px-4 text-center">
         <MessageCircle size={40} className="text-emerald-500" />
         <h1 className="mt-4 text-xl font-extrabold text-slate-800 dark:text-white">{t('direct.title')}</h1>
         <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-emerald-200">
@@ -109,9 +156,14 @@ export default function Messages() {
         and the fixed bottom bar, so the composer sits just above the bar
         instead of being pushed off-screen by a fixed 70vh. Desktop keeps a
         comfortable fixed height.
+
+        No minimum on a phone, deliberately: a floor in rem is the one thing that
+        can make this panel taller than the space it was measured out, and what
+        slid off the bottom of it was the composer — the canned replies first,
+        since they are the last rows before the edge.
       */}
       <div
-        className="chat-shell mt-4 grid min-h-[24rem] overflow-hidden rounded-3xl border border-emerald-100 bg-white shadow-sm dark:border-emerald-800 dark:bg-emerald-950 lg:mt-5 lg:grid-cols-[320px_minmax(0,1fr)]"
+        className="chat-shell mt-4 grid overflow-hidden rounded-3xl border border-emerald-100 bg-white shadow-sm dark:border-emerald-800 dark:bg-emerald-950 lg:mt-5 lg:min-h-[24rem] lg:grid-cols-[320px_minmax(0,1fr)]"
       >
         {/* Conversation list */}
         <aside className={`${activeId ? 'hidden' : ''} flex h-full min-h-0 flex-col overflow-hidden lg:flex`}>
@@ -128,8 +180,20 @@ export default function Messages() {
           )}
 
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3">
+            {/*
+              The two desks first: entering the messenger should look like the
+              messenger the request describes — a chat with a consultant and a
+              chat with support — and only then the shop conversations.
+            */}
+            <DeskEntries
+              conversations={conversations}
+              onOpen={setActiveId}
+              onFilterChannel={setFilter}
+              className="mb-3"
+            />
+
             {visibleConversations.length === 0 ? (
-              <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
+              <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
                 <MessageCircle size={32} className="text-emerald-300" />
                 <p className="max-w-60 text-xs leading-6 text-slate-500 dark:text-emerald-200">
                   {t('direct.empty')}

@@ -8,11 +8,12 @@ import {
 import toast from "react-hot-toast";
 
 import { agricultureApi, ordersApi, webPushApi } from "../api/services";
+import { ACCOUNT_ITEMS, visibleItems } from "../config/navigation";
 import AvatarUploader from "../components/AvatarUploader";
 import FarmPanel from "../components/farm/FarmPanel";
 import LocationPicker from "../components/LocationPicker";
 import { LANGUAGES, useTranslation } from "../i18n";
-import { useAuthStore } from "../store/authStore";
+import { useAuthStore, useUserLevel } from "../store/authStore";
 import { useThemeStore } from "../store/themeStore";
 import type { MarketplaceListing, Order, Storefront } from "../types";
 import { formatPrice } from "../utils/formatPrice";
@@ -32,6 +33,7 @@ interface ProfileForm {
 const emptyStore = { name: "", slug: "", seller_type: "farmer" as Storefront["seller_type"], bio: "", province: "", city: "" };
 export default function Profile() {
   const { user, account, isAuthenticated, isLoading, isSessionChecked, logout, fetchProfile, updateProfile } = useAuthStore();
+  const level = useUserLevel();
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>(() => {
@@ -146,7 +148,7 @@ export default function Profile() {
   }
 
   if (!isSessionChecked || !isAuthenticated || isLoading) {
-    return <main className="flex min-h-[55vh] items-center justify-center"><div className="text-center"><div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" /><p className="mt-4 text-sm text-slate-500">{t("common.loading")}</p></div></main>;
+    return <main className="flex min-h-[55dvh] items-center justify-center"><div className="text-center"><div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" /><p className="mt-4 text-sm text-slate-500">{t("common.loading")}</p></div></main>;
   }
 
   const fullName = [user?.first_name, user?.last_name].filter(Boolean).join(" ") || user?.username || "—";
@@ -161,7 +163,7 @@ export default function Profile() {
   ];
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-gradient-to-b from-emerald-50 via-[#f8faf6] to-white px-[var(--page-gutter)] py-6 dark:from-emerald-950 dark:via-[#062d21] dark:to-emerald-950 md:py-8">
+    <main className="min-h-dvh bg-gradient-to-b from-emerald-50 via-[#f8faf6] to-white px-[var(--page-gutter)] py-6 dark:from-emerald-950 dark:via-[#062d21] dark:to-emerald-950 md:py-8">
       <div className="mx-auto max-w-7xl">
         <section className="overflow-hidden rounded-3xl bg-gradient-to-l from-emerald-800 via-emerald-700 to-lime-600 p-5 text-white shadow-xl shadow-emerald-900/15 sm:p-6 md:p-8">
           <div className="flex flex-col justify-between gap-5 md:flex-row md:items-center">
@@ -171,17 +173,41 @@ export default function Profile() {
                 <p className="text-fluid-xs text-lime-200">{t("account.title")}</p>
                 <h1 className="mt-1 truncate text-fluid-xl font-extrabold">{fullName}</h1>
                 <p className="mt-1 truncate text-fluid-xs text-emerald-100">{user?.email || user?.username}</p>
+                {account?.next_level && (
+                  <p className="mt-1 truncate text-fluid-2xs text-lime-200/90">
+                    پله بعد: {account.next_level.label.replace(/^سطح [^—]+— */, '')} — {account.next_level.how}
+                  </p>
+                )}
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="flex min-h-9 items-center rounded-full bg-white/15 px-3 text-fluid-xs font-bold"><UserRound size={14} className="me-1 inline" />{account?.level_label || t("role.buyer")}</span>
+              <span className="flex min-h-11 items-center rounded-full bg-white/15 px-3 text-fluid-xs font-bold" title={account?.level_label || ''}><UserRound size={14} className="me-1 inline" />{account?.level_short_label || account?.level_label || t("role.buyer")}</span>
               {storefront && <span className="flex min-h-9 items-center rounded-full bg-lime-300/20 px-3 text-fluid-xs font-bold text-lime-100"><Store size={14} className="me-1 inline" />{t("role.seller")}</span>}
               <button onClick={signOut} className="flex min-h-11 items-center rounded-full bg-white/15 px-4 text-fluid-xs font-bold transition hover:bg-white/25"><LogOut size={14} className="me-1 inline" />{t("account.signout")}</button>
             </div>
           </div>
         </section>
 
-        <div className="mt-5 grid min-w-0 gap-5 md:mt-6 md:gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
+        {/*
+          حساب فقط همین پنج تب نیست: پاداش، دفتر مالی، استودیو غرفه و پیام‌ها مقصد‌هایی
+          هستند که کاربر همین‌جا انتظارشان را دارد. از همان فهرستِ منو خوانده می‌شوند تا
+          هیچ‌وقت از هم جدا نیفتند، و در موبایل در یک ردیف کشویی می‌ایستند تا چیزی پشت
+          لبه پنهان نماند.
+        */}
+        <nav aria-label="میان‌برهای حساب" className="no-scrollbar mt-5 flex snap-x gap-2 overflow-x-auto pb-1">
+          {visibleItems(ACCOUNT_ITEMS, { level, isAuthenticated }).filter((item) => item.id !== "profile").map((item) => (
+            <Link
+              key={item.id}
+              to={item.to}
+              className="flex min-h-11 shrink-0 snap-start items-center gap-2 rounded-2xl border border-emerald-100 bg-white px-3.5 text-fluid-xs font-bold text-slate-600 shadow-sm transition hover:border-emerald-300 hover:text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-100 sm:text-fluid-sm"
+            >
+              <item.icon size={16} className="shrink-0 text-emerald-600 dark:text-lime-300" aria-hidden="true" />
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+
+        <div className="mt-4 grid min-w-0 gap-5 md:mt-6 md:gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
           <aside className="h-fit min-w-0 rounded-3xl border border-emerald-100 bg-white p-2.5 shadow-sm dark:border-emerald-900 dark:bg-emerald-950 sm:p-3 lg:sticky lg:top-[calc(var(--header-height)+1rem)]">
             <nav
               className="no-scrollbar flex snap-x gap-2 overflow-x-auto lg:flex-col lg:overflow-visible"
@@ -199,7 +225,7 @@ export default function Profile() {
                 </button>
               ))}
             </nav>
-            <div className="mt-3 hidden rounded-2xl bg-emerald-50 p-4 text-xs leading-6 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-100 lg:block">
+            <div className="mt-3 rounded-2xl bg-emerald-50 p-4 text-xs leading-6 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-100">
               <Leaf size={16} className="mb-1" />
               حساب شما می‌تواند هم‌زمان خریدار و فروشنده باشد؛ نقش فروشنده با ساخت غرفه فعال می‌شود.
             </div>
@@ -307,7 +333,7 @@ function SellerPanel({ storefront, listings, loading, storeForm, setStoreForm, c
       </section>
 
       {/* Listing health at a glance */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid gap-3 sm:grid-cols-3">
         <Stat icon={Building2} label="منتشرشده" value={published.toLocaleString("fa-IR")} />
         <Stat icon={ClipboardList} label="در انتظار بررسی" value={pending.toLocaleString("fa-IR")} />
         <Stat icon={AlertTriangle} label="ردشده" value={rejected.length.toLocaleString("fa-IR")} />
@@ -328,7 +354,7 @@ function SellerPanel({ storefront, listings, loading, storeForm, setStoreForm, c
                     <h3 className="truncate font-bold text-slate-800 dark:text-white">{listing.title}</h3>
                     <p className="mt-1 text-xs text-slate-500">{listing.quantity_available} {listing.unit} · {formatPrice(listing.price)}</p>
                   </div>
-                  <Link to={storeUrl} className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-xl border border-rose-300 px-3 text-fluid-xs font-bold text-rose-700 transition hover:bg-rose-100 dark:border-rose-700 dark:text-rose-200 dark:hover:bg-rose-950/50">
+                  <Link to={storeUrl} className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl border border-rose-300 px-3 text-fluid-xs font-bold text-rose-700 transition hover:bg-rose-100 dark:border-rose-700 dark:text-rose-200 dark:hover:bg-rose-950/50">
                     <Edit3 size={13} />
                     اصلاح در غرفه
                   </Link>

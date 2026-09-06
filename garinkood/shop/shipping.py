@@ -12,7 +12,7 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
-from .models import Order, Shipment, ShipmentTrackingEvent
+from .models import Order, ReturnPolicySettings, Shipment, ShipmentTrackingEvent
 
 
 @dataclass(frozen=True)
@@ -39,6 +39,14 @@ class ShippingProvider(Protocol):
     def refresh_tracking(self, shipment: Shipment) -> Shipment: ...
 
 
+class ShippingServiceUnavailable(Exception):
+    """Raised when a buyer asks for a delivery service that is not on offer.
+
+    Silently downgrading «تحویل فوری» to standard would be the polite answer and
+    the wrong one: the fee and the promise both change under the buyer's feet.
+    """
+
+
 class FlatRateShippingProvider:
     """Local fallback: no carrier claim, credential, or network dependency."""
 
@@ -46,7 +54,7 @@ class FlatRateShippingProvider:
 
     def quote(self, *, subtotal: int, province: str, city: str, weight_grams: int = 0) -> list[ShippingQuote]:
         amount = 0 if subtotal >= settings.SHIPPING_FREE_THRESHOLD else settings.SHIPPING_FLAT_RATE
-        return [
+        quotes = [
             ShippingQuote(
                 provider=self.code,
                 service="standard",
@@ -56,6 +64,23 @@ class FlatRateShippingProvider:
                 estimated_days_max=7,
             )
         ]
+        # Read straight off the row rather than through ``load()``: quoting a
+        # delivery price must not create settings on a GET.
+        express = ReturnPolicySettings.objects.filter(pk=1).values_list(
+            "express_shipping_enabled", "express_shipping_fee"
+        ).first()
+        if express and express[0]:
+            quotes.append(
+                ShippingQuote(
+                    provider=self.code,
+                    service="express",
+                    label="تحویل فوری",
+                    amount=amount + int(express[1] or 0),
+                    estimated_days_min=1,
+                    estimated_days_max=1,
+                )
+            )
+        return quotes
 
     def create_shipment(self, order: Order) -> Shipment:
         return Shipment.objects.create(
@@ -74,10 +99,34 @@ class FlatRateShippingProvider:
 flat_rate_provider = FlatRateShippingProvider()
 
 
-def quote_shipping(*, subtotal: int, province: str, city: str, weight_grams: int = 0) -> ShippingQuote:
+def shipping_options(*, subtotal: int, province: str, city: str, weight_grams: int = 0) -> list[ShippingQuote]:
+    """Every delivery service the buyer can actually pick, cheapest promise last."""
     return flat_rate_provider.quote(
         subtotal=subtotal, province=province, city=city, weight_grams=weight_grams
-    )[0]
+    )
+
+
+def quote_shipping(*, subtotal: int, province: str, city: str, weight_grams: int = 0,
+                   service: str = "standard") -> ShippingQuote:
+    quotes = shipping_options(
+        subtotal=subtotal, province=province, city=city, weight_grams=weight_grams
+    )
+    for quote in quotes:
+        if quote.service == service:
+            return quote
+    return quotes[0]
+
+
+def select_shipping_quote(*, subtotal: int, province: str, city: str, weight_grams: int = 0,
+                          service: str = "standard") -> ShippingQuote:
+    """Like ``quote_shipping`` but refuses a service that is not on offer."""
+    quotes = shipping_options(
+        subtotal=subtotal, province=province, city=city, weight_grams=weight_grams
+    )
+    for quote in quotes:
+        if quote.service == service:
+            return quote
+    raise ShippingServiceUnavailable('گزینه ارسال انتخابی در حال حاضر ارائه نمی‌شود.')
 
 
 def create_initial_shipment(order: Order) -> Shipment:

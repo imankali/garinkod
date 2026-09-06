@@ -1,10 +1,11 @@
 // frontend/src/components/management/UserLevels.tsx
 
 import { useCallback, useEffect, useState } from 'react';
-import { Loader2, ShieldCheck, UserCog } from 'lucide-react';
+import { BadgeCheck, ChevronDown, Loader2, ShieldCheck, UserCog } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 import { managementApi, type ManagedUser } from '../../api/services';
+import type { LevelRank } from '../../types';
 import { parseApiError } from '../../api/errors';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { USER_LEVEL } from '../../types';
@@ -12,11 +13,13 @@ import { USER_LEVEL } from '../../types';
 const PAGE_SIZE = 20;
 
 /**
- * Level 1-5 administration.
+ * The access ladder: eight ranks, what each one unlocks, and who holds them.
  *
- * The owner (level 5) is rendered read-only: the server refuses to change or
- * deactivate one, and showing an enabled control that always fails would be
- * worse than showing none.
+ * The list of levels and their promises come from the server (`/api/levels/`
+ * via the management payload), so this screen can never describe a permission
+ * the API would refuse. The owner (level 8) is rendered read-only: the server
+ * refuses to change or deactivate one, and showing an enabled control that
+ * always fails would be worse than showing none.
  */
 export default function UserLevels({ viewerLevel }: { viewerLevel: number }) {
   const [searchInput, setSearchInput] = useState('');
@@ -26,6 +29,8 @@ export default function UserLevels({ viewerLevel }: { viewerLevel: number }) {
 
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [levels, setLevels] = useState<{ value: number; label: string }[]>([]);
+  const [ladder, setLadder] = useState<LevelRank[]>([]);
+  const [showLadder, setShowLadder] = useState(false);
   const [count, setCount] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -44,6 +49,7 @@ export default function UserLevels({ viewerLevel }: { viewerLevel: number }) {
       });
       setUsers(response.data.results);
       setLevels(response.data.levels);
+      setLadder(response.data.ladder ?? []);
       setCount(response.data.count);
       setTotalPages(response.data.total_pages);
     } catch (caught) {
@@ -109,9 +115,77 @@ export default function UserLevels({ viewerLevel }: { viewerLevel: number }) {
         <UserCog size={20} className="text-emerald-600" />
         مدیریت کاربران و سطوح دسترسی
       </h2>
-      <p className="mt-1 text-sm text-slate-500 dark:text-emerald-200">
-        سطح ۱ خریدار، سطح ۲ غرفه‌دار، سطح ۳ ناظر، سطح ۴ مدیر و سطح ۵ مالک سیستم است.
+      <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-emerald-200">
+        {ladder.length
+          ? `${ladder.length} پله: ${ladder.map((row) => row.short_label).join(' ← ')}. هر پله آنچه سرور تعریف کرده باز می‌کند، نه آنچه این صفحه حفظ کرده است.`
+          : 'نردبان دسترسی از سرور خوانده می‌شود.'}
       </p>
+
+      {ladder.length > 0 && (
+        <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/70 dark:border-emerald-900 dark:bg-emerald-900/20">
+          <button
+            type="button"
+            onClick={() => setShowLadder((open) => !open)}
+            aria-expanded={showLadder}
+            className="flex min-h-11 w-full items-center justify-between gap-2 px-4 text-start text-fluid-sm font-extrabold text-slate-700 transition hover:bg-white/70 dark:text-emerald-100 dark:hover:bg-emerald-950/40"
+          >
+            <span className="flex items-center gap-2">
+              <ShieldCheck size={16} className="text-emerald-600 dark:text-lime-300" aria-hidden="true" />
+              آنچه هر پله باز می‌کند
+            </span>
+            <ChevronDown size={16} className={showLadder ? 'rotate-180 transition' : 'transition'} aria-hidden="true" />
+          </button>
+          {showLadder && (
+            <ol className="space-y-2 border-t border-slate-200 p-3 dark:border-emerald-900">
+              {ladder.map((row) => (
+                <li
+                  key={row.value}
+                  className="rounded-xl bg-white p-3 shadow-sm dark:bg-emerald-950 sm:flex sm:items-start sm:gap-3"
+                >
+                  <span className="flex shrink-0 items-center gap-2">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-fluid-2xs font-extrabold text-emerald-700 dark:bg-emerald-800 dark:text-lime-200">
+                      {row.value.toLocaleString('fa-IR')}
+                    </span>
+                    <span className="text-fluid-sm font-extrabold text-slate-800 dark:text-white">
+                      {row.short_label}
+                    </span>
+                    {row.is_staff && (
+                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-fluid-2xs font-bold text-amber-800 dark:bg-amber-900/60 dark:text-amber-200">
+                        تیم
+                      </span>
+                    )}
+                  </span>
+                  <span className="mt-1 block min-w-0 flex-1 text-fluid-2xs leading-6 text-slate-600 dark:text-emerald-100 sm:mt-0">
+                    {row.promise}
+                    {row.unlocks.length > 0 && (
+                      <span className="mt-1.5 flex flex-wrap gap-1.5">
+                        {row.unlocks.map((capability) => (
+                          <span
+                            key={capability.key}
+                            className="rounded-full bg-emerald-50 px-2 py-0.5 text-fluid-2xs font-bold text-emerald-700 dark:bg-emerald-900 dark:text-lime-300"
+                          >
+                            {capability.label}
+                          </span>
+                        ))}
+                      </span>
+                    )}
+                  </span>
+                  <span className="mt-1 block shrink-0 text-fluid-2xs text-slate-400 dark:text-emerald-300/70 sm:mt-0">
+                    {row.how}
+                  </span>
+                </li>
+              ))}
+              <li className="flex items-start gap-2 rounded-xl bg-emerald-50/70 p-3 text-fluid-2xs leading-6 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-100">
+                <BadgeCheck size={15} className="mt-0.5 shrink-0 text-emerald-600 dark:text-lime-300" aria-hidden="true" />
+                <span>
+                  کسی که خودِ میز خدمات را اداره می‌کند (سطح ۵ به بالا یا عضو صف پشتیبانی/مشاوره) مشتری همان میز نمی‌شود؛
+                  پیامش را از صف پیگیری می‌کند تا نوبت کشاورزها جلو نیفتد.
+                </span>
+              </li>
+            </ol>
+          )}
+        </div>
+      )}
 
       <div className="mt-4 grid gap-2 sm:grid-cols-2">
         <input

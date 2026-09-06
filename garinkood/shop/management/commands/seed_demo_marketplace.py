@@ -7,12 +7,12 @@ published listings, posts and stories.
 
 from datetime import timedelta
 
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Permission, User
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
 
-from shop.models import MarketplaceListing, Storefront, StorefrontPost, UserAccount
+from shop.models import DeskAgent, MarketplaceListing, Storefront, StorefrontPost, UserAccount
 from shop.slugs import slugify_fa
 
 DEMO_SELLERS = [
@@ -91,7 +91,9 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         created_sellers = created_listings = created_posts = 0
 
-        # A demo consultant (level 3) who can open the farmer-support desk.
+        # A demo consultant on the service desk: level 5 (کارشناس میز خدمات), which is the
+        # rank that opens the queue — deliberately *not* a content moderator, so the
+        # sample data shows what the ladder actually separates.
         consultant, _ = User.objects.get_or_create(
             username='moshaver',
             defaults={'email': 'moshaver@example.com', 'first_name': 'کارشناس', 'last_name': 'گرین کود'},
@@ -100,9 +102,25 @@ class Command(BaseCommand):
             consultant.set_password(self.DEMO_PASSWORD)
             consultant.save(update_fields=['password'])
         consultant_account, _ = UserAccount.objects.get_or_create(user=consultant)
-        if consultant_account.level < UserAccount.LEVEL_MODERATOR:
-            consultant_account.level = UserAccount.LEVEL_MODERATOR
+        if consultant_account.level < UserAccount.LEVEL_DESK_AGENT:
+            consultant_account.level = UserAccount.LEVEL_DESK_AGENT
             consultant_account.save(update_fields=['level'])
+        consultant.user_permissions.add(*Permission.objects.filter(
+            content_type__app_label='shop',
+            codename__in=('view_farmconsultationrequest', 'change_farmconsultationrequest'),
+        ))
+        if not consultant.is_staff:
+            consultant.is_staff = True
+            consultant.save(update_fields=['is_staff'])
+        DeskAgent.objects.get_or_create(
+            user=consultant,
+            defaults={
+                'role': DeskAgent.ROLE_CONSULTING,
+                'display_name': 'کارشناس گرین کود',
+                'title': 'مشاور ارشد کشاورزی',
+                'is_active': True,
+            },
+        )
 
         for entry in DEMO_SELLERS:
             user, _ = User.objects.get_or_create(

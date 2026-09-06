@@ -154,4 +154,14 @@ def integration_configuration_check(app_configs, **kwargs):
                 id="shop.W100",
             )
         )
+    if getattr(settings, "PREVIEW_IFRAME_COOKIES", False) and not settings.DEBUG:
+        errors.append(
+            checks.Warning(
+                "GK_PREVIEW_IFRAME_COOKIES در محیط غیر از DEBUG روشن است؛ "
+                "کوکی‌ها با SameSite=None و Secure ذخیره می‌شوند. این کلید فقط برای "
+                "پیش‌نمایش محلی است و در production باید خاموش بماند.",
+                id="shop.W110",
+                hint="کلید را بردارید یا DEBUG را روشن کنید.",
+            )
+        )
     return errors

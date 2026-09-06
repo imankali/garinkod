@@ -484,8 +484,8 @@ export function StorefrontCard({ storefront }: { storefront: Storefront }) {
           )}
         </span>
         <div className="min-w-0 flex-1">
-          <h3 className="flex items-center gap-1 truncate text-sm font-extrabold text-slate-800 dark:text-white">
-            {storefront.name}
+          <h3 className="flex min-w-0 items-center gap-1 text-sm font-extrabold text-slate-800 dark:text-white">
+            <span className="truncate">{storefront.name}</span>
             {storefront.is_verified && <BadgeCheck size={14} className="shrink-0 text-emerald-500" />}
           </h3>
           <p className="mt-0.5 truncate text-fluid-xs text-slate-500 dark:text-emerald-200">

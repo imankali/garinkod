@@ -198,3 +198,118 @@ must include:
 Changing `SECRET_KEY` invalidates signed values/sessions; schedule accordingly.
 Changing VAPID keys invalidates existing Push subscriptions and needs explicit
 customer re-enrolment planning.
+
+## 12. Capacity, the waiting room and the error notebook
+
+The shop measures its own box and can hold the door when the line gets long.
+Both halves are off or inert until an operator says otherwise.
+
+**Where the numbers come from.** `shop/capacity.py` reads `/proc/meminfo`, the
+cgroup memory ceiling (`memory.max`, else `memory.limit_in_bytes`), the CPU
+allowance (`sched_getaffinity` intersected with `cpu.max`), load average and
+`shutil.disk_usage`. A GPU label is shown only if
+`/proc/driver/nvidia/gpus/*/information` exists; nothing is invented as a zero.
+`python manage.py shell -c "from shop.capacity import measure_server, effective_limit; print(measure_server().as_dict()); print(effective_limit())"`
+prints the same reading the console prints, with the sentence that explains it.
+
+**Raising or lowering the ceiling.** In `/admin/shop/capacitysettings/`:
+`users_per_cpu_core` and `users_per_gb_ram` are the weights, `safety_percent`
+the headroom, `derate_load_percent` the point where a strained processor starts
+shrinking the number, and `activity_window_minutes` how long an idle tab counts
+as a visitor. `strategy = fixed` + `fixed_limit` overrides the measurement
+entirely — the console and the samples keep saying «عدد دستی پنل» so nobody
+mistakes a hand-picked number for a measurement.
+
+**Opening the queue.** `queue_enabled` defaults to **off** and nothing is held
+while it is off, whatever the utilisation says. When it is on:
+
+- page requests from a visitor who is not admitted render a self-refreshing
+  waiting page from the API process itself (no bundle, no redirect, `noindex`);
+- API requests answer `503` with `Retry-After` and `code: "shop_overloaded"`;
+  the SPA replaces itself with a queue screen and polls `GET /api/ops/admission/`
+  only, which is why a waiting room cannot turn into a stampede;
+- `POST`/`PUT`/`DELETE` are never held, `/admin/`, `/media/`, `/static/`,
+  `/health`, `/ops/metrics` and the waiting page are never held, and staff are
+  never held while `bypass_staff` is on;
+- after `queue_max_minutes` a waiting visitor is admitted even if the hall is
+  still full. The line delays people; it does not abandon them.
+
+Every branch of the door fails open: an exception inside admission is logged and
+the request is served. If the queue ever misbehaves, switch it off in the admin —
+no deploy, and nobody inside the shop is asked to leave.
+
+**The notebook.** `SystemLogEntry` receives every `>=500` response (and `429` as
+a `notice`), automatic or client-reported, grouped by source + title with a
+counter. Bodies are scrubbed before they are stored: password/token/cookie/card/
+cvv/otp keys are masked and long values are cut. `GET /api/ops/logs/` and the
+console tab read it; `POST /api/ops/logs/<id>/resolve/` marks it fixed, and a
+resolved group that fires again reopens on its own.
+
+**If it fills up in production.** Check in this order: the basis sentence in the
+console (is the ceiling the box's fault or a fixed number?), the load and free
+memory facts, whether one `source` in the log is dominating (one bad view is
+cheaper to fix than a bigger server), and only then the plan's size. Presence
+and sample tables prune themselves — a day of samples and two days of beats is
+kept — so the feature that watches the disk cannot become the thing that fills it.
+
+## 13. Signing in from an embedded preview
+
+A development preview is usually shown inside an iframe of another host. That host is a
+third-party context for the browser, and a `SameSite=Lax` cookie is never sent from one —
+the shop answers the login with a session cookie, the browser keeps it to itself, and the
+next request is a stranger again. The visitor sees «خطا» and is thrown back to the door;
+five attempts in five seconds, each with a brand-new session row in `django_session`, and
+no error anywhere in the log. Nothing is broken, which is exactly what makes this hard to
+spot.
+
+Three things cover it:
+
+- **`GK_PREVIEW_IFRAME_COOKIES=1`** (settings: `PREVIEW_IFRAME_COOKIES`) moves the auth,
+  session and CSRF cookies to `SameSite=None; Secure`, which an iframe can carry. It is a
+  local switch: production keeps `Lax`, because widening cookie scope for nobody's benefit
+  is a CSRF surface. Requires the preview to be served over HTTPS, as the sandbox's is.
+- **`shop.W110`** warns at `manage.py check` if the flag is on while `DEBUG` is off — the
+  misconfiguration is reported where it is set, not after the outage it prevents.
+- **`preview_token`** is the second attempt, for the frames that refuse every cookie. While
+  the switch is on *and* `DEBUG` is set, the auth responses carry the same key the HttpOnly
+  cookie holds; `api/previewSession.ts` keeps it in that frame's own storage and the axios
+  request interceptor sends it as `Authorization: Token …`. `has_operations_access()`
+  recognises that header too — the operations endpoints are plain Django views, and without
+  the lookup the console would answer its own signed-in operator with a 404. Neither half
+  of this exists in production: with the switch off the response has no token field, so the
+  cookie remains the only credential JavaScript cannot read.
+- **Three tiers of keeping it.** The credential is held in memory first (so it survives a
+  frame that denies every API of `localStorage`), then in that storage when it answers, and
+  only when storage throws as well it is written into the address as `?gk_preview_token=…`
+  and read back by `adoptPreviewTokenFromUrl()` before the router runs — which is what lets a
+  reload in a storage-less frame still know who it is. The parameter is removed from the
+  address as it is read, and nothing trusts it: an unknown key leaves the visitor a visitor.
+  With no cookie at all, `AdmissionMiddleware` recognises the header too, so a signed-in
+  operator is tallied as a user and is not queued behind their own shop. A proxy in front of
+  the frame can pass the page and drop the header — it has no reason to keep an
+  `Authorization` it does not use — so the same key is also sent as `?gk_token=…` on the
+  request (`shop/preview.py`), which a rewriting proxy leaves alone because it is the
+  address the page is already fetching. It is accepted only while the preview switch is on
+  under DEBUG, and recorded nowhere: the error notebook and presence store paths without
+  their query strings, and a key nobody recognises authenticates nobody.
+- **`CookieJarNotice`** in the SPA verifies a sign-in actually stuck: after every password,
+  OTP and registration success the store probes `/api/auth/session/` once, and if the
+  session is anonymous — cookie and stored token both refused — it clears the half-logged
+  state, keeps the visitor on the form, and says what to do (open the preview in its own
+  tab, unblock third-party cookies for the address, leave strict private mode) instead of
+  letting them repeat a correct password.
+
+A sandboxed frame usually refuses `window.open` as well, so the notice does not rely on it:
+when the call returns nothing, it reveals the address to copy instead of pretending the click
+worked.
+
+Two things are worth reading from the server log before blaming the shop: a `POST
+/api/auth/login/` returning 200 followed one second later by `GET /api/auth/session/`
+returning 401 is the frame refusing cookies, and five new rows in `django_session` inside
+five seconds is the same fact seen from the database.
+
+The workaround that needs no flag is the one to reach for first: open the preview in its own
+browser tab, where the cookie is first-party and the flow is exactly the one the tests cover.
+Django's own `/admin/` stays on that rule — it authenticates from the session cookie alone, so
+it is not reachable inside a frame that will not keep one; the staff console at `/management`
+is, because it can use the header.

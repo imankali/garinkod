@@ -1,51 +1,87 @@
 """Level-aware DRF permissions.
 
-The platform has five user levels (see ``UserAccount.LEVEL_CHOICES``). These
-classes express "who may reach this endpoint at all"; Django's model
-permissions still decide "which records may they change" on top of that.
+The platform runs on the eight-step ladder in :mod:`shop.levels`. These classes
+express "who may reach this endpoint at all"; Django's model permissions still
+decide "which records may they change" on top of that.
+
+Every message states the level in the number the console shows, and the numbers
+come from the ladder rather than being typed here — a gate and the screen that
+explains it must not be able to disagree after the next step is added.
 """
 
 from rest_framework import permissions
 
-from .models import UserAccount, account_level
+from .levels import (
+    LEVEL_ADMIN,
+    LEVEL_BUYER,
+    LEVEL_DESK_AGENT,
+    LEVEL_MODERATOR,
+    LEVEL_OWNER,
+    LEVEL_SELLER,
+    LEVEL_VERIFIED_BUYER,
+    level_for,
+)
+from .persian import fa_digits
+
+
+def _level_word(value: int) -> str:
+    return f'سطح {fa_digits(str(value))}'
 
 
 class IsAtLeastLevel(permissions.BasePermission):
     """Grant access when the caller's level is at or above ``required_level``."""
 
-    required_level = UserAccount.LEVEL_BUYER
+    required_level = LEVEL_BUYER
     message = 'سطح دسترسی شما برای این بخش کافی نیست.'
 
     def has_permission(self, request, view):
-        return account_level(request.user) >= self.required_level
+        return level_for(request.user) >= self.required_level
+
+
+class IsVerifiedBuyer(IsAtLeastLevel):
+    """Level 2+: the phone number behind the account was confirmed."""
+
+    required_level = LEVEL_VERIFIED_BUYER
+    message = f'برای این بخش شماره تلفن خود را تأیید کنید ({_level_word(LEVEL_VERIFIED_BUYER)}).'
 
 
 class IsSeller(IsAtLeastLevel):
-    """Level 2+: owns a storefront."""
+    """Level 3+: owns a storefront."""
 
-    required_level = UserAccount.LEVEL_SELLER
+    required_level = LEVEL_SELLER
     message = 'برای این بخش باید غرفه فعال داشته باشید.'
 
 
-class IsModerator(IsAtLeastLevel):
-    """Level 3+: may review listings, posts, comments and complaints."""
+class IsDeskAgent(IsAtLeastLevel):
+    """Level 5+: staffs one of the service desks.
 
-    required_level = UserAccount.LEVEL_MODERATOR
-    message = 'دسترسی به مرکز مدیریت از سطح ۳ به بالا امکان‌پذیر است.'
+    This is the tier the ladder gained so a hired operator can work the queue
+    without also being handed the moderation tools.
+    """
+
+    required_level = LEVEL_DESK_AGENT
+    message = f'کار روی صف میز خدمات به {_level_word(LEVEL_DESK_AGENT)} (کارشناس میز خدمات) نیاز دارد.'
+
+
+class IsModerator(IsAtLeastLevel):
+    """Level 6+: may review listings, posts, comments and complaints."""
+
+    required_level = LEVEL_MODERATOR
+    message = f'دسترسی به مرکز مدیریت از {_level_word(LEVEL_MODERATOR)} به بالا امکان‌پذیر است.'
 
 
 class IsAdminLevel(IsAtLeastLevel):
-    """Level 4+: may manage other staff members."""
+    """Level 7+: may manage other staff members."""
 
-    required_level = UserAccount.LEVEL_ADMIN
-    message = 'این عملیات نیازمند سطح ۴ (مدیر) است.'
+    required_level = LEVEL_ADMIN
+    message = f'این عملیات نیازمند {_level_word(LEVEL_ADMIN)} (مدیر) است.'
 
 
 class IsOwnerLevel(IsAtLeastLevel):
-    """Level 5: the system owner."""
+    """Level 8: the system owner."""
 
-    required_level = UserAccount.LEVEL_OWNER
-    message = 'تنها مالک سیستم (سطح ۵) اجازه این عملیات را دارد.'
+    required_level = LEVEL_OWNER
+    message = f'تنها مالک سیستم ({_level_word(LEVEL_OWNER)}) اجازه این عملیات را دارد.'
 
 
 class IsStorefrontOwnerOrReadOnly(permissions.BasePermission):
@@ -60,7 +96,7 @@ class IsStorefrontOwnerOrReadOnly(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
         if request.method in permissions.SAFE_METHODS:
             return True
-        if account_level(request.user) >= UserAccount.LEVEL_MODERATOR:
+        if level_for(request.user) >= LEVEL_MODERATOR:
             return True
         owner_id = None
         if hasattr(obj, 'storefront_id') and obj.storefront_id:

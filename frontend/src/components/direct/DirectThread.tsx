@@ -14,6 +14,7 @@ import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   ArrowRight,
+  BadgeCheck,
   Ban,
   Check,
   Copy,
@@ -25,15 +26,17 @@ import {
   Reply,
   Send,
   Trash2,
-  X,
+  X
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-import { messagesApi } from '../../api/services';
+import { deskApi, messagesApi } from '../../api/services';
 import { useDirectStore } from '../../store/directStore';
 import { useTranslation } from '../../i18n';
 import type {
   AttachedListing,
+  DeskState,
+  FarmLand,
   QuotedMessage,
   StorefrontConversation,
   StorefrontMessage,
@@ -45,6 +48,14 @@ import { listingHref } from '../../utils/listingHref';
 import { CHANNEL_TONE, conversationIdentity } from '../../utils/conversation';
 import MessageAttachment from './MessageAttachment';
 import VoiceRecorder from './VoiceRecorder';
+import DeskComposer from './DeskComposer';
+import LandDossierCard from './LandDossierCard';
+import MessageLink from './MessageLink';
+import MessageStatusTicks from './MessageStatusTicks';
+import SurveyCard from './SurveyCard';
+import { AttachLandButton, AttachedLandChip } from './ShareLandButton';
+import { DeskIdentity } from './DeskPresence';
+import { CloseThreadButton, HandoffButton } from './ThreadClosure';
 
 /** Images and clips the composer will accept before upload. */
 const MEDIA_ACCEPT = 'image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime';
@@ -92,6 +103,8 @@ export default function DirectThread({
   const { t } = useTranslation();
   const attachedListing = useDirectStore((state) => state.attachedListing);
   const attachListing = useDirectStore((state) => state.attachListing);
+  const attachedLand = useDirectStore((state) => state.attachedLand);
+  const attachLand = useDirectStore((state) => state.attachLand);
   const setConversationId = useDirectStore((state) => state.setConversationId);
 
   const [messages, setMessages] = useState<StorefrontMessage[]>([]);
@@ -109,6 +122,13 @@ export default function DirectThread({
   const [menuFor, setMenuFor] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<StorefrontMessage | null>(null);
   const [highlighted, setHighlighted] = useState<number | null>(null);
+  /**
+   * Presence, duty window and canned lines for the desk behind this thread.
+   * Fetched with the thread and refreshed by the same poll, because «آنلاین
+   * است» that is true when you open a chat and false twenty minutes later is
+   * worse than no indicator at all.
+   */
+  const [desk, setDesk] = useState<DeskState | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
@@ -125,6 +145,19 @@ export default function DirectThread({
       if (thread) {
         setConversation(thread);
         if (!conversationId) setConversationId(thread.id);
+        // Only the two service desks have hours, presence or canned replies; a
+        // private shop chat must not go looking for them.
+        if (thread.channel === 'support' || thread.channel === 'consulting') {
+          try {
+            const state = await deskApi.state(thread.channel);
+            setDesk(state.data);
+          } catch {
+            // The desk header is decoration next to the conversation itself: a
+            // failed presence poll must not look like a broken chat.
+          }
+        } else {
+          setDesk(null);
+        }
       }
     } catch {
       // A revoked or missing thread simply shows the empty state.
@@ -200,19 +233,37 @@ export default function DirectThread({
     };
   }, [conversationId, load]);
 
+  /*
+    A sent message's green «هنوز باز نشده» mark has to clear the moment the desk
+    opens the thread. The live stream announces new messages, not read receipts,
+    so while any of my own messages are still unopened the thread is re-read on a
+    timer — which switches itself off once every one of them has been seen, and
+    never runs at all on a conversation where nothing is waiting.
+  */
+  useEffect(() => {
+    const waiting = messages.some(
+      (message) => message.is_mine && !message.is_read && !message.is_system,
+    );
+    if (!waiting) return undefined;
+    const interval = setInterval(() => void load(true), POLL_MS);
+    return () => clearInterval(interval);
+  }, [messages, load]);
+
   useEffect(() => {
     // Keep the newest message in view as the thread grows.
     const element = scrollRef.current;
     if (element) element.scrollTop = element.scrollHeight;
   }, [messages.length]);
 
-  // Switching threads drops any half-finished reply/edit.
+  // Switching threads drops any half-finished reply/edit, and a land that was
+  // about to be shared in the other conversation.
   useEffect(() => {
     setReplyTo(null);
     setEditing(null);
     setMenuFor(null);
     setBody('');
-  }, [conversationId]);
+    attachLand(null);
+  }, [conversationId, attachLand]);
 
   // Close an open bubble menu on outside tap or Escape.
   useEffect(() => {
@@ -260,18 +311,20 @@ export default function DirectThread({
       return;
     }
 
-    if (!text && !attachedListing && !pendingMedia) return;
+    if (!text && !attachedListing && !pendingMedia && !attachedLand) return;
     setSending(true);
     try {
       await messagesApi.send(conversationId, {
         body: text,
         listing: attachedListing ? attachedListing.id : undefined,
+        land: attachedLand?.id,
         attachment: pendingMedia?.file ?? null,
         attachmentName: pendingMedia?.file.name,
         replyTo: replyTo?.id ?? null,
       });
       setBody('');
       attachListing(null);
+      attachLand(null);
       clearPendingMedia();
       setReplyTo(null);
       await load(true);
@@ -281,6 +334,32 @@ export default function DirectThread({
       setSending(false);
       composerRef.current?.focus();
     }
+  }
+
+  /**
+   * A tapped canned line, sent as it stands.
+   *
+   * Only used for the farmer's side; an operator's chip writes into the composer
+   * instead (see ``DeskComposer``), because their reply usually has to name the
+   * farmer's crop or number before it is true.
+   */
+  async function sendCannedReply(text: string) {
+    if (sending || !text.trim()) return;
+    setSending(true);
+    try {
+      await messagesApi.send(conversationId, { body: text.trim() });
+      await load(true);
+    } catch {
+      // Reported by the API client.
+    } finally {
+      setSending(false);
+    }
+  }
+
+  /** Picking a land from the desk's sheet queues it with the next message. */
+  function pickLand(land: FarmLand) {
+    attachLand(land);
+    composerRef.current?.focus();
   }
 
   /** A finished voice note is sent immediately — holding it adds no value. */
@@ -384,11 +463,17 @@ export default function DirectThread({
   }
 
   const identity = conversation ? conversationIdentity(conversation) : null;
+  const isDeskThread = conversation?.channel === 'support' || conversation?.channel === 'consulting';
+  const otherDesk = conversation?.channel === 'support' ? 'consulting' : 'support';
+  const otherDeskLabel = otherDesk === 'consulting' ? 'مشاوره کشاورزی' : 'پشتیبانی';
+  // Any real message from this side ends the "first message" phase, after which
+  // the opening FAQ lines stop being useful.
+  const hasWritten = messages.some((message) => message.is_mine && !message.is_system);
   const composerDisabled =
     sending ||
     (editing
       ? !body.trim() && !editing.listing
-      : !body.trim() && !attachedListing && !pendingMedia);
+      : !body.trim() && !attachedListing && !pendingMedia && !attachedLand);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -404,7 +489,22 @@ export default function DirectThread({
             <ArrowRight size={17} />
           </button>
         )}
-        {identity ? (
+        {identity && isDeskThread && conversation ? (
+          /*
+            A service desk is staffed by people, so the header names the person
+            who is actually answering: the published photo, name and title of the
+            operator, with a presence dot from their real activity. When a
+            colleague takes the thread over, this changes with them — which is
+            the point, since the alternative is a name that stops matching the
+            answers halfway through a conversation.
+          */
+          <DeskIdentity
+            agent={conversation.last_agent || conversation.agent}
+            desk={desk}
+            channelLabel={conversation.channel_label}
+            handover={Boolean(conversation.last_agent)}
+          />
+        ) : identity ? (
           <>
             {/* Counterpart avatar, or a channel-tinted initial when the
                 source has no picture (support, consulting, replies). */}
@@ -428,6 +528,20 @@ export default function DirectThread({
             {t('direct.title')}
           </span>
         )}
+
+        {isDeskThread && conversation && (
+          <span className="flex shrink-0 items-center gap-0.5">
+            {desk?.viewer_is_staff && (
+              <HandoffButton
+                conversation={conversation}
+                target={otherDesk as 'consulting' | 'support'}
+                targetLabel={otherDeskLabel}
+                onDone={() => void load(true)}
+              />
+            )}
+            <CloseThreadButton conversation={conversation} onChanged={() => void load(true)} />
+          </span>
+        )}
       </header>
 
       {/* Messages */}
@@ -445,7 +559,8 @@ export default function DirectThread({
             </p>
           </div>
         ) : (
-          messages.map((message) => (
+          <>
+            {messages.map((message) => (
             <MessageBubble
               key={message.id}
               message={message}
@@ -467,15 +582,42 @@ export default function DirectThread({
                 else bubbleRefs.current.delete(message.id);
               }}
             />
-          ))
+            ))}
+
+            {/*
+              The satisfaction box is part of the conversation, appended where the
+              thread ended — that is where the farmer looks after «اتمام مکالمه»,
+              and a modal over the page would interrupt reading the answers they
+              just got.
+            */}
+            {isDeskThread && conversation && (
+              <div className="pt-3">
+                <SurveyCard
+                  conversationId={conversation.id}
+                  survey={conversation.survey}
+                  agentName={
+                    conversation.last_agent?.name
+                    || conversation.agent?.name
+                    || conversation.channel_label
+                  }
+                  onSubmitted={() => void load(true)}
+                />
+              </div>
+            )}
+          </>
         )}
       </div>
 
-      {/* Composer */}
+      {/* Composer.
+          Able to give way, and scrollable inside what it kept: a conversation with a quoted
+          reply, a photo waiting, the out-of-hours note and the desk's canned lines is a
+          taller block than a phone screen, and a plain `shrink-0` let it run past the
+          shell — whose `overflow-hidden` then cut the input off. The composer yields
+          instead, and the input row is pinned to its bottom, so what a person is about to
+          press is never the part that disappears. */}
       <form
         onSubmit={send}
-        className="shrink-0 border-t border-emerald-100 bg-white p-2.5 dark:border-emerald-800 dark:bg-emerald-950 sm:p-3"
-        style={{ paddingBottom: 'max(0.625rem, env(safe-area-inset-bottom, 0px))' }}
+        className="min-h-[5rem] overflow-y-auto overscroll-contain border-t border-emerald-100 bg-white p-2.5 pb-0 dark:border-emerald-800 dark:bg-emerald-950 sm:p-3 sm:pb-0"
       >
         {/* Quoted message / edit banner above the input, like Telegram. */}
         <AnimatePresence initial={false}>
@@ -527,6 +669,23 @@ export default function DirectThread({
             </button>
           </div>
         )}
+
+        {isDeskThread && !editing && attachedLand && (
+          <AttachedLandChip land={attachedLand} onRemove={() => attachLand(null)} />
+        )}
+
+        {isDeskThread && !editing && desk && (
+          <DeskComposer
+            desk={desk}
+            started={hasWritten}
+            disabled={sending}
+            onSend={(text) => void sendCannedReply(text)}
+            onFill={(text) => {
+              setBody(text);
+              composerRef.current?.focus();
+            }}
+          />
+        )}
         {/* Pending photo/clip preview — sending is still an explicit action. */}
         {pendingMedia && !editing && (
           <div className="mb-2 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-2 dark:border-emerald-700 dark:bg-emerald-900/40">
@@ -558,7 +717,10 @@ export default function DirectThread({
           aria-label="انتخاب تصویر یا ویدیو"
         />
 
-        <div className="flex items-end gap-1.5">
+        <div
+          className="sticky bottom-0 -mx-2.5 flex items-end gap-1.5 bg-white px-2.5 pt-1 sm:-mx-3 sm:px-3 dark:bg-emerald-950"
+          style={{ paddingBottom: 'max(0.625rem, env(safe-area-inset-bottom, 0px))' }}
+        >
           {/* Media and voice make no sense while rewriting a text message. */}
           {!editing && (
             <>
@@ -571,6 +733,12 @@ export default function DirectThread({
               >
                 <ImagePlus size={19} />
               </button>
+
+              {/* A land case file only means something to the desks that advise
+                  on the field, not to a shop negotiation. */}
+              {isDeskThread && (
+                <AttachLandButton disabled={sending} onPick={pickLand} />
+              )}
 
               <VoiceRecorder onRecorded={(blob, seconds, name) => void sendVoice(blob, seconds, name)} disabled={sending} />
             </>
@@ -731,6 +899,13 @@ function MessageBubble({
   const mine = message.is_mine;
   const deleted = message.is_deleted;
 
+  // A line the platform wrote («گفتگو بسته شد», «خارج از ساعت کاری») has no
+  // author and nothing to reply to, so it is centred as a note instead of
+  // pretending to be somebody's bubble.
+  if (message.is_system) {
+    return <SystemNotice message={message} />;
+  }
+
   return (
     <motion.article
       ref={registerRef}
@@ -852,6 +1027,10 @@ function MessageBubble({
                 )}
                 <MessageAttachment message={message} onOpenImage={onOpenImage} />
                 {message.listing && <AttachedProductCard listing={message.listing} />}
+                {message.land && (
+                  <LandDossierCard land={message.land} tone={mine ? 'dark' : 'light'} />
+                )}
+                {message.link && <MessageLink link={message.link} tone={mine ? 'dark' : 'light'} />}
               </>
             )}
           </div>
@@ -864,6 +1043,19 @@ function MessageBubble({
           )}
         >
           <span>{mine ? t('direct.you') : message.sender_name}</span>
+          {!mine && message.sender_verified && (
+            <BadgeCheck
+              size={13}
+              className="shrink-0 text-emerald-500 dark:text-lime-300"
+              aria-label="حساب تأییدشده"
+            />
+          )}
+          {!mine && message.sender_role_label && (
+            <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 font-bold text-emerald-700 dark:bg-emerald-900 dark:text-lime-300">
+              {message.sender_role_label}
+            </span>
+          )}
+          {mine && <MessageStatusTicks isRead={message.is_read} />}
           {message.created_at && (
             <time dateTime={message.created_at}>
               {new Date(message.created_at).toLocaleTimeString('fa-IR', {
@@ -893,6 +1085,35 @@ function MessageBubble({
         </p>
       </div>
     </motion.article>
+  );
+}
+
+/**
+ * A centred system line: closed threads, reopened threads, the out-of-hours
+ * notice. Deliberately quiet — it is a state change, not another voice in the
+ * conversation, and it never counts as an unread message.
+ */
+function SystemNotice({ message }: { message: StorefrontMessage }) {
+  return (
+    <motion.p
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="mx-auto flex w-fit max-w-[88%] items-center gap-1.5 rounded-full bg-emerald-100/70 px-3 py-1 text-center text-fluid-2xs font-bold leading-5 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200"
+    >
+      <span className="whitespace-pre-wrap break-words">{message.body}</span>
+      {message.created_at && (
+        <time
+          dateTime={message.created_at}
+          className="shrink-0 opacity-70"
+          title={new Date(message.created_at).toLocaleString('fa-IR')}
+        >
+          {new Date(message.created_at).toLocaleTimeString('fa-IR', {
+            hour: '2-digit',
+            minute: '2-digit',
+          })}
+        </time>
+      )}
+    </motion.p>
   );
 }
 

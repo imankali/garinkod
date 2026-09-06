@@ -1,5 +1,6 @@
 import hashlib
 
+from django.db.models import Count, Exists, OuterRef, Q
 from rest_framework import serializers
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -16,9 +17,24 @@ from .models import (
     StorefrontPostLike, StorefrontPostComment, StorefrontStoryView,
     FarmLand, FarmCalendarEvent, FarmConsultationRequest, AdminAuditLog,
     Shipment, ShipmentTrackingEvent, WebPushSubscription,
+    ProductAttribute, ListingAttribute, ProductPackage, ProductImage, Tag, ReturnPolicySettings,
+    SiteArticle, Service, SitePage, SitePageBlock,
+    TeamMember, BrandPartner, SiteContact, NewsletterSubscriber, PRODUCT_ATTRIBUTE_TEMPLATE,
+    DeskAgent, DeskSettings, QuickReply, ConversationRating,
 )
+from .desk import agent_payload, desk_channel
 from .phone_numbers import normalize_iranian_mobile
 from .slugs import slugify_fa, unique_storefront_slug
+
+
+def desk_agent_of(sender, channel: str):
+    """The published profile of whoever answered a desk message.
+
+    One message per reply must not mean one query per reply, so this reads the
+    ``desk_profiles`` prefetch the thread querysets add and only falls back to a
+    lookup when nothing was prefetched.
+    """
+    return DeskAgent.for_user(sender, desk_channel(channel))
 
 
 # ========================================
@@ -75,6 +91,77 @@ class EquipmentDetailSerializer(serializers.ModelSerializer):
 # ========================================
 # Product Serializer
 # ========================================
+class FilledRowListSerializer(serializers.ListSerializer):
+    """Drop spec rows whose value is still blank.
+
+    The admin action seeds the standard labels before anyone has typed a value.
+    Filtering here (rather than with ``.exclude()``) keeps the prefetched cache
+    intact, so a list of products pays one query in total instead of one per
+    row.
+    """
+
+    def to_representation(self, data):
+        if hasattr(data, 'all'):
+            data = [row for row in data.all() if row.value]
+        return super().to_representation(data)
+
+
+class ProductAttributeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProductAttribute
+        fields = ['id', 'label', 'value', 'order']
+        list_serializer_class = FilledRowListSerializer
+
+
+class ListingAttributeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ListingAttribute
+        fields = ['id', 'label', 'value', 'order']
+        list_serializer_class = FilledRowListSerializer
+
+
+class TagSerializer(serializers.ModelSerializer):
+    product_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Tag
+        fields = ['id', 'name', 'slug', 'description', 'product_count']
+
+    def get_product_count(self, obj) -> int:
+        return obj.products.filter(status='published').count()
+
+
+class ProductPackageSerializer(serializers.ModelSerializer):
+    """One packaging of a product, priced and stocked on its own."""
+
+    effective_price = serializers.IntegerField(read_only=True)
+    discounted_price = serializers.IntegerField(read_only=True)
+    effective_stock = serializers.IntegerField(read_only=True)
+    price_per_kg = serializers.IntegerField(read_only=True)
+    is_in_stock = serializers.BooleanField(read_only=True)
+    expiry_days_left = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = ProductPackage
+        fields = [
+            'id', 'label', 'weight_kg', 'price', 'effective_price', 'discounted_price',
+            'stock', 'effective_stock', 'min_order_quantity', 'bulk_note',
+            'production_date', 'expiry_date', 'expiry_days_left', 'is_in_stock',
+            'price_per_kg', 'is_default',
+        ]
+
+
+class ProductImageSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProductImage
+        fields = ['id', 'image', 'image_url', 'caption', 'order']
+
+    def get_image_url(self, obj) -> str:
+        return obj.image.url if obj.image else ''
+
+
 class ProductSerializer(serializers.ModelSerializer):
     category = CategorySerializer(read_only=True)
     subcategory = SubCategorySerializer(read_only=True)
@@ -86,8 +173,14 @@ class ProductSerializer(serializers.ModelSerializer):
     pesticide_detail = PesticideDetailSerializer(read_only=True)
     seed_detail = SeedDetailSerializer(read_only=True)
     equipment_detail = EquipmentDetailSerializer(read_only=True)
+    attributes = ProductAttributeSerializer(many=True, read_only=True)
+    images = ProductImageSerializer(many=True, read_only=True)
+    gallery = serializers.SerializerMethodField()
+    packages = serializers.SerializerMethodField()
+    tags = TagSerializer(many=True, read_only=True)
 
     discounted_price = serializers.SerializerMethodField()
+    rating_summary = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
@@ -96,11 +189,52 @@ class ProductSerializer(serializers.ModelSerializer):
             'description', 'publish', 'created', 'updated', 'status',
             'price', 'stock', 'available', 'is_featured', 'image', 'image_url',
             'is_in_stock', 'discount_percent', 'sales_count', 'discounted_price',
-            'brand', 'sku', 'gtin', 'seo_title', 'seo_description',
+            'brand', 'brand_slug', 'sku', 'gtin', 'package_weight', 'price_on_request',
+            'seo_title', 'seo_description',
             'shipping_weight_grams', 'shipping_length_cm', 'shipping_width_cm',
             'shipping_height_cm', 'fertilizer_detail', 'pesticide_detail',
-            'seed_detail', 'equipment_detail'
+            'seed_detail', 'equipment_detail', 'attributes', 'rating_summary',
+            'images', 'gallery', 'packages', 'tags', 'views',
+            'production_date', 'expiry_date', 'expiry_days_left', 'is_expiring_soon',
+            'min_order_quantity', 'bulk_note', 'video_url',
         ]
+
+    def get_gallery(self, obj) -> list[dict]:
+        return obj.gallery
+
+    def get_packages(self, obj) -> list[dict]:
+        """Declared packagings, or one implicit entry from the product itself.
+
+        Serving a synthetic row keeps the storefront's price/stock logic in one
+        branch instead of duplicating "no package chosen" handling in the UI.
+        """
+        rows = list(obj.packages.all())
+        if rows:
+            return ProductPackageSerializer(rows, many=True).data
+        return [{
+            'id': None,
+            'label': obj.package_weight or 'تک بسته',
+            'weight_kg': None,
+            'price': obj.price,
+            'effective_price': obj.price,
+            'discounted_price': obj.discounted_price,
+            'stock': obj.stock,
+            'effective_stock': obj.stock,
+            'min_order_quantity': obj.min_order_quantity,
+            'bulk_note': obj.bulk_note,
+            'production_date': obj.production_date,
+            'expiry_date': obj.expiry_date,
+            'expiry_days_left': obj.expiry_days_left,
+            'is_in_stock': obj.is_in_stock,
+            'price_per_kg': None,
+            'is_default': True,
+        }]
+
+    def get_expiry_days_left(self, obj):
+        return obj.expiry_days_left
+
+    def get_is_expiring_soon(self, obj) -> bool:
+        return obj.is_expiring_soon
         read_only_fields = ['created', 'updated']
 
     def get_discounted_price(self, obj) -> int:
@@ -112,6 +246,38 @@ class ProductSerializer(serializers.ModelSerializer):
     def get_is_in_stock(self, obj) -> bool:
         return obj.is_in_stock
 
+    def get_rating_summary(self, obj) -> dict:
+        """Average score, review count and star distribution.
+
+        The viewset annotates list/detail querysets; the fallback keeps the
+        serializer usable from any other call site (admin exports, tests).
+        """
+        average = getattr(obj, 'avg_rating', None)
+        count = getattr(obj, 'reviews_count', None)
+        distribution = getattr(obj, 'rating_distribution', None)
+        if average is None or count is None or distribution is None:
+            average, count, distribution = rating_breakdown(obj)
+        return {
+            'average': round(float(average), 2) if average else 0,
+            'reviews_count': int(count or 0),
+            'distribution': distribution,
+        }
+
+
+def rating_breakdown(product) -> tuple[float | None, int, dict[str, int]]:
+    """Average/star histogram over a product's approved top-level reviews."""
+    reviews = product.comments.filter(active=True, parent__isnull=True, rating__isnull=False)
+    count = reviews.count()
+    if not count:
+        return None, 0, {'1': 0, '2': 0, '3': 0, '4': 0, '5': 0}
+    buckets = reviews.values('rating').annotate(total=Count('rating')).order_by()
+    distribution = {str(star): 0 for star in range(1, 6)}
+    total = 0
+    for row in buckets:
+        distribution[str(row['rating'])] = row['total']
+        total += row['rating'] * row['total']
+    return total / count, count, distribution
+
 
 class ProductListSerializer(serializers.ModelSerializer):
     """Serializer سبک‌تر برای لیست محصولات"""
@@ -120,6 +286,11 @@ class ProductListSerializer(serializers.ModelSerializer):
     is_in_stock = serializers.SerializerMethodField()
 
     discounted_price = serializers.SerializerMethodField()
+    avg_rating = serializers.SerializerMethodField()
+    reviews_count = serializers.SerializerMethodField()
+    image_alt_url = serializers.SerializerMethodField()
+    is_expiring_soon = serializers.SerializerMethodField()
+    tags = TagSerializer(many=True, read_only=True)
 
     class Meta:
         model = Product
@@ -127,6 +298,8 @@ class ProductListSerializer(serializers.ModelSerializer):
             'id', 'title', 'slug', 'category', 'price', 'stock',
             'available', 'is_featured', 'image', 'image_url', 'is_in_stock',
             'discount_percent', 'sales_count', 'discounted_price', 'brand', 'sku',
+            'package_weight', 'price_on_request', 'avg_rating', 'reviews_count',
+            'image_alt_url', 'is_expiring_soon', 'views', 'brand_slug', 'tags',
         ]
 
     def get_image_url(self, obj) -> str:
@@ -138,18 +311,35 @@ class ProductListSerializer(serializers.ModelSerializer):
     def get_discounted_price(self, obj) -> int:
         return obj.discounted_price
 
+    def get_avg_rating(self, obj) -> float:
+        value = getattr(obj, 'avg_rating', None)
+        return round(float(value), 2) if value else 0
+
+    def get_reviews_count(self, obj) -> int:
+        return int(getattr(obj, 'reviews_count', 0) or 0)
+
+    def get_image_alt_url(self, obj) -> str:
+        """Second gallery photo, for the hover swap on a card."""
+        shots = obj.gallery
+        return shots[1]['url'] if len(shots) > 1 else ''
+
+    def get_is_expiring_soon(self, obj) -> bool:
+        return obj.is_expiring_soon
+
 
 # ========================================
 # Comment Serializer
 # ========================================
 class CommentSerializer(serializers.ModelSerializer):
     replies = serializers.SerializerMethodField()
+    is_verified_purchase = serializers.SerializerMethodField()
 
     class Meta:
         model = Comment
         fields = [
-            'id', 'product', 'name', 'email', 'body', 'image', 'sticker', 'parent',
-            'created', 'updated', 'active', 'replies'
+            'id', 'product', 'name', 'email', 'body', 'image', 'sticker', 'rating',
+            'parent', 'created', 'updated', 'active', 'replies', 'is_verified_purchase',
+            'helpful_count', 'is_featured', 'is_reported',
         ]
         read_only_fields = ['created', 'updated', 'active']
 
@@ -157,6 +347,22 @@ class CommentSerializer(serializers.ModelSerializer):
         if image and image.size > settings.VISUAL_SEARCH_MAX_UPLOAD_BYTES:
             raise serializers.ValidationError('حجم تصویر نظر از حد مجاز بیشتر است.')
         return image
+
+    def validate_rating(self, rating):
+        # Only a real review may be scored; a reply to a question is not one.
+        if rating and self.initial_data.get('parent'):
+            raise serializers.ValidationError('پاسخ‌ها امتیاز ندارند؛ امتیاز فقط برای دیدگاه ثبت می‌شود.')
+        return rating
+
+    def get_is_verified_purchase(self, obj) -> bool:
+        annotated = getattr(obj, 'verified_purchase', None)
+        if annotated is not None:
+            return bool(annotated)
+        if not obj.user_id:
+            return False
+        return obj.user.orders.filter(
+            items__product_id=obj.product_id, payment_status='paid'
+        ).exists()
 
     def get_replies(self, obj) -> list[dict]:
         replies = obj.replies.filter(active=True)
@@ -172,6 +378,9 @@ class UserAccountSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
     avatar_url = serializers.SerializerMethodField()
     level_label = serializers.CharField(source='get_level_display', read_only=True)
+    level_short_label = serializers.SerializerMethodField()
+    capabilities = serializers.SerializerMethodField()
+    next_level = serializers.SerializerMethodField()
     has_storefront = serializers.SerializerMethodField()
 
     class Meta:
@@ -179,14 +388,35 @@ class UserAccountSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'username', 'email', 'full_name', 'phone', 'phone_verified_at',
             'gender', 'address', 'avatar', 'avatar_url', 'level', 'level_label',
+            'level_short_label', 'capabilities', 'next_level',
             'has_storefront', 'created', 'updated'
         ]
         # `level` is derived from what the user owns and may only be changed
         # through the management API, never by the profile endpoint.
         read_only_fields = [
             'created', 'updated', 'level', 'level_label', 'avatar_url',
+            'level_short_label', 'capabilities', 'next_level',
             'has_storefront', 'phone_verified_at',
         ]
+
+    def get_level_short_label(self, obj) -> str:
+        """«غرفه‌دار» without the «سطح ۳ — » prefix, for chips."""
+        from .levels import label as level_label_for
+
+        value = level_label_for(obj.level)
+        return value.split('—', 1)[1].strip() if '—' in value else value
+
+    def get_capabilities(self, obj) -> dict:
+        """What this account may do, straight from the ladder module."""
+        from .levels import capabilities_for
+
+        return capabilities_for(obj.user)
+
+    def get_next_level(self, obj):
+        """The rank one step up and how to reach it, or None at the top."""
+        from .levels import next_step
+
+        return next_step(obj.user)
 
     def get_full_name(self, obj):
         return obj.user.get_full_name()
@@ -274,16 +504,22 @@ class CartItemSerializer(serializers.ModelSerializer):
     available_quantity = serializers.IntegerField(read_only=True)
     is_in_stock = serializers.BooleanField(read_only=True)
     min_order_quantity = serializers.SerializerMethodField()
+    package_label = serializers.CharField(read_only=True)
 
     class Meta:
         model = CartItem
         fields = [
             'id', 'kind', 'product', 'listing', 'title', 'quantity', 'unit_price',
             'total_price', 'available_quantity', 'min_order_quantity', 'is_in_stock',
+            'product_package', 'package_label',
         ]
 
     def get_min_order_quantity(self, obj) -> int:
-        return obj.listing.minimum_order if obj.listing_id else 1
+        if obj.listing_id:
+            return obj.listing.minimum_order
+        if obj.product_package_id:
+            return obj.product_package.min_order_quantity
+        return obj.product.min_order_quantity
 
 
 class CartSerializer(serializers.ModelSerializer):
@@ -418,7 +654,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'kind', 'kind_label', 'product', 'listing', 'product_title', 'product_slug',
             'storefront', 'storefront_name', 'storefront_slug', 'seller_name',
-            'unit', 'unit_price', 'quantity', 'total_price',
+            'unit', 'unit_price', 'quantity', 'total_price', 'package_label',
         ]
         read_only_fields = fields
 
@@ -444,6 +680,7 @@ class OrderSerializer(serializers.ModelSerializer):
             'coupon_code', 'shipping_price', 'shipping_provider', 'shipping_service', 'total_price',
             'status', 'status_label', 'payment_status', 'payment_status_label', 'payment_method',
             'payment_method_label', 'affiliate_code', 'total_items', 'items', 'shipments',
+            'terms_accepted_at', 'legal_version',
             'created_at', 'updated_at'
         ]
         read_only_fields = fields
@@ -473,6 +710,9 @@ class CheckoutSerializer(serializers.Serializer):
     affiliate_code = serializers.CharField(max_length=32, required=False, allow_blank=True)
     coupon_code = serializers.CharField(max_length=40, required=False, allow_blank=True)
     terms_accepted = serializers.BooleanField()
+    # Only validated against what the shipping layer currently offers; a frontend
+    # cannot invent a service by posting a name.
+    shipping_service = serializers.ChoiceField(choices=['standard', 'express'], required=False, default='standard')
 
     def validate_phone(self, value):
         normalised = value.replace(' ', '').replace('-', '')
@@ -685,6 +925,9 @@ class MarketplaceListingSerializer(serializers.ModelSerializer):
     is_purchasable = serializers.BooleanField(read_only=True)
     minimum_order = serializers.IntegerField(read_only=True)
     discounted_price = serializers.SerializerMethodField()
+    # Sellers may attach the same structured spec table the catalogue uses; it is
+    # optional, and writing it replaces the whole set in one call.
+    attributes = ListingAttributeSerializer(many=True, required=False)
 
     class Meta:
         model = MarketplaceListing
@@ -693,7 +936,7 @@ class MarketplaceListingSerializer(serializers.ModelSerializer):
             'price', 'unit', 'quantity_available', 'min_order_quantity', 'minimum_order',
             'harvest_date', 'image', 'image_url', 'status', 'status_label',
             'is_purchasable', 'discount_percent', 'sales_count', 'discounted_price',
-            'rejection_reason', 'reviewed_at',
+            'rejection_reason', 'reviewed_at', 'attributes',
             'created_at', 'updated_at'
         ]
         read_only_fields = [
@@ -715,6 +958,48 @@ class MarketplaceListingSerializer(serializers.ModelSerializer):
         if value <= 0:
             raise serializers.ValidationError('حداقل سفارش باید بزرگ‌تر از صفر باشد.')
         return value
+
+    def validate_attributes(self, value):
+        if len(value) > 40:
+            raise serializers.ValidationError('حداکثر ۴۰ ویژگی برای هر آگهی ثبت می‌شود.')
+        return value
+
+    def _write_attributes(self, instance) -> None:
+        if 'attributes' not in self.validated_data:
+            return
+        rows = self.validated_data['attributes']
+        instance.attributes.all().delete()
+        ListingAttribute.objects.bulk_create(
+            [
+                ListingAttribute(
+                    listing=instance,
+                    label=row['label'][:80],
+                    value=row['value'][:300],
+                    order=index,
+                )
+                for index, row in enumerate(rows)
+            ]
+        )
+
+    def create(self, validated_data):
+        rows = validated_data.pop('attributes', None)
+        instance = super().create(validated_data)
+        if rows:
+            ListingAttribute.objects.bulk_create(
+                [
+                    ListingAttribute(
+                        listing=instance, label=row['label'][:80], value=row['value'][:300], order=index
+                    )
+                    for index, row in enumerate(rows)
+                ]
+            )
+        return instance
+
+    def update(self, instance, validated_data):
+        validated_data.pop('attributes', None)
+        instance = super().update(instance, validated_data)
+        self._write_attributes(instance)
+        return instance
 
     def validate(self, attrs):
         """The minimum order can never exceed what is actually on offer."""
@@ -1046,8 +1331,13 @@ class StorefrontPostSerializer(serializers.ModelSerializer):
 class StorefrontMessageSerializer(serializers.ModelSerializer):
     sender_name = serializers.SerializerMethodField()
     sender_avatar_url = serializers.SerializerMethodField()
+    sender_role_label = serializers.SerializerMethodField()
+    sender_verified = serializers.SerializerMethodField()
     is_mine = serializers.SerializerMethodField()
     listing = serializers.SerializerMethodField()
+    land = serializers.SerializerMethodField()
+    link = serializers.SerializerMethodField()
+    is_system = serializers.BooleanField(read_only=True)
     attachment_url = serializers.SerializerMethodField()
     reply_to = serializers.SerializerMethodField()
     is_edited = serializers.BooleanField(read_only=True)
@@ -1058,15 +1348,18 @@ class StorefrontMessageSerializer(serializers.ModelSerializer):
     class Meta:
         model = StorefrontMessage
         fields = [
-            'id', 'conversation', 'sender', 'sender_name', 'sender_avatar_url', 'is_mine', 'body',
-            'listing', 'attachment', 'attachment_url', 'attachment_type', 'attachment_duration',
+            'id', 'conversation', 'sender', 'sender_name', 'sender_avatar_url', 'sender_role_label',
+            'sender_verified', 'is_mine', 'is_system', 'body',
+            'listing', 'land', 'link',
+            'attachment', 'attachment_url', 'attachment_type', 'attachment_duration',
             'reply_to', 'is_edited', 'edited_at', 'is_deleted', 'deleted_at',
             'can_edit', 'can_delete', 'is_read', 'created_at',
         ]
         read_only_fields = [
-            'id', 'conversation', 'sender', 'sender_name', 'sender_avatar_url', 'is_mine',
-            'attachment_url', 'reply_to', 'is_edited', 'edited_at', 'is_deleted', 'deleted_at',
-            'can_edit', 'can_delete', 'is_read', 'created_at',
+            'id', 'conversation', 'sender', 'sender_name', 'sender_avatar_url', 'sender_role_label',
+            'sender_verified', 'is_system', 'attachment_url', 'reply_to', 'is_edited', 'edited_at', 'is_deleted',
+            'deleted_at', 'can_edit', 'can_delete', 'is_read', 'created_at',
+            'link', 'land',
         ]
 
     def get_reply_to(self, obj):
@@ -1097,38 +1390,109 @@ class StorefrontMessageSerializer(serializers.ModelSerializer):
         return bool(self.get_is_mine(obj) and not obj.is_deleted)
 
     def get_sender_name(self, obj):
-        """Who is speaking — by role, not by username, for service channels.
+        """Who is speaking, named as the reader can act on it.
 
-        In a support or consulting thread the operator answers on behalf of the
-        platform. Showing a staff member's personal username there would leak
-        an identity the reader did not ask for and make replies from different
-        operators look like different people.
+        A platform notice («گفتگو بسته شد») has no author and says so. In a
+        storefront thread the answer comes from the shop, so the shop is named.
+        In a support or consulting thread the reader asked to know *which*
+        operator they are talking to — a desk with several people is only
+        trustworthy if the name and photo change when the person changes, and
+        the name printed is the one the admin publishes (``DeskAgent``), never a
+        private username.
         """
         conversation = obj.conversation
+        if obj.sender_id is None:
+            return 'گرین کود'
         if obj.sender_id != conversation.customer_id:
             if conversation.channel == StorefrontConversation.CHANNEL_STOREFRONT:
                 if conversation.storefront_id:
                     return conversation.storefront.name
             else:
+                agent = desk_agent_of(obj.sender, conversation.channel)
+                if agent is not None:
+                    return agent.display_label
                 return conversation.get_channel_display()
         return obj.sender.get_full_name() or obj.sender.username
 
     def get_sender_avatar_url(self, obj):
         conversation = obj.conversation
+        if obj.sender_id is None:
+            return ''
         if (
             obj.sender_id != conversation.customer_id
             and conversation.channel == StorefrontConversation.CHANNEL_STOREFRONT
             and conversation.storefront_id
         ):
             return conversation.storefront.avatar_url
+        if obj.sender_id != conversation.customer_id and desk_channel(conversation.channel):
+            agent = desk_agent_of(obj.sender, conversation.channel)
+            if agent is not None:
+                return agent.photo_url
         account = getattr(obj.sender, 'account', None)
         return account.avatar_url if account else ''
+
+    def get_sender_verified(self, obj) -> bool:
+        """Level 2+ (verified phone) or staff: the name carries the verified mark."""
+        from .levels import LEVEL_VERIFIED_BUYER, level_for
+
+        if obj.sender_id is None:
+            return False
+        return level_for(obj.sender) >= LEVEL_VERIFIED_BUYER
+
+    def get_sender_role_label(self, obj) -> str:
+        """«مشاور کشاورزی» under the name, so the title travels with the reply."""
+        if obj.sender_id is None:
+            return 'اعلان سیستم'
+        conversation = obj.conversation
+        if obj.sender_id != conversation.customer_id and desk_channel(conversation.channel):
+            agent = desk_agent_of(obj.sender, conversation.channel)
+            if agent is not None:
+                return agent.title or agent.get_role_display()
+            return conversation.get_channel_display()
+        return ''
+
+    def get_land(self, obj):
+        """The land case file a farmer shared, in the shape a consultant reads.
+
+        Emitted inline rather than as a link because the answer usually needs the
+        soil and irrigation facts, and making the operator click away from the
+        chat to remember them is how a consultation takes three days.
+        """
+        if obj.land_id is None:
+            return None
+        land = obj.land
+        return {
+            'id': land.id,
+            'name': land.name,
+            'land_type': land.land_type,
+            'land_type_label': land.get_land_type_display(),
+            'area_label': land.area_label,
+            'crop_type': land.crop_type,
+            'crop_variety': land.crop_variety,
+            'province': land.province,
+            'city': land.city,
+            'soil_type_label': land.get_soil_type_display(),
+            'irrigation_type_label': land.get_irrigation_type_display(),
+            'planting_date': land.planting_date.isoformat() if land.planting_date else '',
+            'notes': land.notes,
+            'event_count': land.calendar_events.count(),
+            'owner_name': land.owner.get_full_name() or land.owner.username,
+        }
+
+    def get_link(self, obj):
+        """A button inside the bubble: the post, product or desk thread this
+        notice is about. Empty for ordinary messages."""
+        if not obj.link_url:
+            return None
+        return {'kind': obj.link_kind, 'label': obj.link_label or 'مشاهده', 'url': obj.link_url}
 
     def get_attachment_url(self, obj):
         return obj.attachment_url
 
     def get_is_mine(self, obj) -> bool:
         request = self.context.get('request')
+        if obj.sender_id is None:
+            return False
         return bool(request and request.user.is_authenticated and obj.sender_id == request.user.id)
 
     def get_listing(self, obj):
@@ -1159,14 +1523,21 @@ class StorefrontConversationSerializer(serializers.ModelSerializer):
     counterpart_name = serializers.SerializerMethodField()
     counterpart_avatar_url = serializers.SerializerMethodField()
     channel_label = serializers.CharField(source='get_channel_display', read_only=True)
+    status_label = serializers.CharField(source='get_status_display', read_only=True)
     last_message = serializers.SerializerMethodField()
     unread_count = serializers.SerializerMethodField()
+    agent = serializers.SerializerMethodField()
+    last_agent = serializers.SerializerMethodField()
+    assigned_to_me = serializers.SerializerMethodField()
+    survey = serializers.SerializerMethodField()
 
     class Meta:
         model = StorefrontConversation
         fields = [
             'id', 'channel', 'channel_label', 'subject', 'storefront',
             'counterpart_name', 'counterpart_avatar_url', 'last_message', 'unread_count',
+            'status', 'status_label', 'closed_at',
+            'agent', 'last_agent', 'assigned_to_me', 'survey',
             'created_at', 'updated_at',
         ]
         read_only_fields = fields
@@ -1214,6 +1585,122 @@ class StorefrontConversationSerializer(serializers.ModelSerializer):
     def get_unread_count(self, obj):
         request = self.context.get('request')
         return obj.unread_count_for(request.user) if request else 0
+
+    def _sender_of_last_agent_reply(self, obj):
+        """The user who wrote the newest desk-side message, if any.
+
+        The thread carries one ``agent`` for assignment, but a queue is shared:
+        when a second operator replies, the reader must see *that* person. The
+        inbox querysets prefetch the message list newest-first, so this is free
+        there and falls back to one query on a single-thread response.
+        """
+        prefetched = getattr(obj, '_prefetched_objects_cache', None) or {}
+        if 'messages' in prefetched:
+            for message in obj.messages.all():
+                if message.sender_id and message.sender_id != obj.customer_id:
+                    return message.sender
+            return None
+        latest = obj.latest_agent_message()
+        return latest.sender if latest else None
+
+    def get_agent(self, obj):
+        if obj.agent_id is None:
+            return None
+        agent = DeskAgent.for_user(obj.agent, desk_channel(obj.channel))
+        if agent is None:
+            return None
+        return agent_payload(agent, DeskSettings.load(), timezone.localtime())
+
+    def get_last_agent(self, obj):
+        sender = self._sender_of_last_agent_reply(obj)
+        if sender is None or (obj.agent_id and sender.id == obj.agent_id):
+            return None
+        agent = DeskAgent.for_user(sender, desk_channel(obj.channel))
+        if agent is None:
+            return None
+        return agent_payload(agent, DeskSettings.load(), timezone.localtime())
+
+    def get_assigned_to_me(self, obj) -> bool:
+        request = self.context.get('request')
+        return bool(request and obj.agent_id and request.user.id == obj.agent_id)
+
+    def get_survey(self, obj) -> dict:
+        """Whether the satisfaction card should appear for this thread.
+
+        ``rating_total`` is annotated on the inbox queryset; single-thread
+        responses do the one extra count.
+        """
+        total = getattr(obj, 'rating_total', None)
+        has_rating = bool(total) if total is not None else obj.ratings.exists()
+        closed = obj.status == StorefrontConversation.STATUS_CLOSED
+        return {
+            'closed': closed,
+            'closed_at': obj.closed_at.isoformat() if obj.closed_at else None,
+            'has_rating': has_rating,
+            'can_rate': closed and not has_rating,
+        }
+
+
+class ConversationRatingSerializer(serializers.ModelSerializer):
+    """The survey a user answers once a desk thread is closed.
+
+    Deliberately not public: the user's rating of how the desk performed is a
+    management signal (it is averaged per operator in the panel), not a star row
+    on a stranger's profile.
+    """
+
+    rater_name = serializers.SerializerMethodField()
+    agent_name = serializers.SerializerMethodField()
+    conversation_info = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ConversationRating
+        fields = [
+            'id', 'conversation', 'conversation_info', 'rater', 'rater_name', 'agent', 'agent_name',
+            'score', 'solved', 'comment', 'created_at',
+        ]
+        read_only_fields = ['id', 'conversation', 'rater', 'agent', 'created_at']
+        extra_kwargs = {'comment': {'required': False, 'allow_blank': True}}
+
+    def get_rater_name(self, obj) -> str:
+        return obj.rater.get_full_name() or obj.rater.username
+
+    def get_agent_name(self, obj) -> str:
+        return obj.agent.display_label if obj.agent else ''
+
+    def get_conversation_info(self, obj) -> dict:
+        conversation = obj.conversation
+        return {
+            'id': conversation.id,
+            'channel': conversation.channel,
+            'channel_label': conversation.channel_label,
+            'customer': conversation.customer.get_full_name() or conversation.customer.username,
+        }
+
+    def validate(self, attrs):
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        conversation = attrs.get('conversation') or getattr(self.instance, 'conversation', None)
+        if conversation is None:
+            raise serializers.ValidationError({'conversation': 'گفتگو مشخص نیست.'})
+        if user is not None:
+            # Only the farmer on the other side of a desk thread rates the desk —
+            # an operator scoring themselves would defeat the number entirely.
+            if user.id != conversation.customer_id:
+                raise serializers.ValidationError(
+                    {'detail': 'only the customer of a thread can rate the desk.'}
+                )
+            if ConversationRating.objects.filter(conversation=conversation, rater=user).exists():
+                raise serializers.ValidationError(
+                    {'detail': 'شما پیش‌تر به این گفتگو امتیاز داده‌اید.'}
+                )
+        if conversation.status != StorefrontConversation.STATUS_CLOSED:
+            raise serializers.ValidationError(
+                {'detail': 'نظرسنجی پس از بسته شدن گفتگو باز می‌شود.'}
+            )
+        if user is not None and conversation.agent_id:
+            attrs['agent'] = DeskAgent.for_user(conversation.agent, desk_channel(conversation.channel))
+        return attrs
 
 
 class FarmLandSerializer(serializers.ModelSerializer):
@@ -1309,3 +1796,280 @@ class AdminAuditLogSerializer(serializers.ModelSerializer):
         model = AdminAuditLog
         fields = ['id', 'actor_username', 'action', 'target_type', 'target_id', 'summary', 'metadata', 'created_at']
         read_only_fields = fields
+
+
+# ========================================
+# Site content: blog, growing guides, services, landing pages, trust pages
+# ========================================
+class SiteArticleListSerializer(serializers.ModelSerializer):
+    """Card shape for /blog and the home-page magazine block."""
+
+    author_name = serializers.SerializerMethodField()
+    cover_url = serializers.SerializerMethodField()
+    kind_label = serializers.CharField(source='get_kind_display', read_only=True)
+    products_count = serializers.IntegerField(source='products.count', read_only=True)
+
+    class Meta:
+        model = SiteArticle
+        fields = [
+            'id', 'title', 'slug', 'kind', 'kind_label', 'excerpt', 'crop', 'cover', 'cover_url',
+            'author_name', 'published_at', 'updated_at', 'reading_minutes', 'views',
+            'is_featured', 'products_count', 'seo_title', 'seo_description',
+        ]
+
+    def get_author_name(self, obj) -> str:
+        if obj.author:
+            full = f'{obj.author.first_name} {obj.author.last_name}'.strip()
+            return full or obj.author.username
+        return 'تیم گرین کود'
+
+    def get_cover_url(self, obj) -> str:
+        return obj.cover_url
+
+
+class SiteArticleSerializer(serializers.ModelSerializer):
+    """Detail shape: full body plus the products and listings it recommends."""
+
+    author_name = serializers.SerializerMethodField()
+    cover_url = serializers.SerializerMethodField()
+    kind_label = serializers.CharField(source='get_kind_display', read_only=True)
+    products = ProductListSerializer(many=True, read_only=True)
+    listings = serializers.SerializerMethodField()
+    related_articles = SiteArticleListSerializer(many=True, read_only=True)
+    headings = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SiteArticle
+        fields = [
+            'id', 'title', 'slug', 'kind', 'kind_label', 'excerpt', 'body', 'crop',
+            'cover', 'cover_url', 'author', 'author_name', 'published_at', 'updated_at',
+            'reading_minutes', 'views', 'products', 'listings', 'related_articles',
+            'headings', 'seo_title', 'seo_description',
+        ]
+
+    def get_author_name(self, obj) -> str:
+        if obj.author:
+            full = f'{obj.author.first_name} {obj.author.last_name}'.strip()
+            return full or obj.author.username
+        return 'تیم گرین کود'
+
+    def get_cover_url(self, obj) -> str:
+        return obj.cover_url
+
+    def get_listings(self, obj) -> list[dict]:
+        return [
+            {
+                'id': listing.id,
+                'title': listing.title,
+                'slug': listing.slug,
+                'crop_name': listing.crop_name,
+                'price': listing.price,
+                'unit': listing.unit,
+                'image_url': listing.image_url,
+                'storefront_name': listing.storefront.name,
+                'storefront_slug': listing.storefront.slug,
+            }
+            for listing in obj.listings.select_related('storefront').filter(status='published')
+        ]
+
+    def get_headings(self, obj) -> list[dict]:
+        """Table of contents derived from the article body.
+
+        Headings are marked in the source with a leading "## " so the reader can
+        build an index without parsing HTML on the server.
+        """
+        headings = []
+        for line in (obj.body or '').splitlines():
+            stripped = line.strip()
+            if stripped.startswith('## '):
+                text = stripped[3:].strip()
+                headings.append({'title': text, 'anchor': article_anchor(text)})
+        return headings
+
+
+def article_anchor(text: str) -> str:
+    """A stable, RTL-safe DOM id for a Persian heading."""
+    from .slugs import slugify_fa
+
+    slug = slugify_fa(text)
+    return slug or f'h{abs(hash(text)) % 100000}'
+
+
+class ServiceSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+    highlights = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Service
+        fields = [
+            'id', 'title', 'slug', 'code', 'summary', 'body', 'highlights', 'icon',
+            'image', 'image_url', 'price_note', 'order', 'seo_title', 'seo_description',
+        ]
+
+    def get_image_url(self, obj) -> str:
+        return obj.image_url
+
+    def get_highlights(self, obj) -> list[str]:
+        return obj.highlight_list
+
+
+class SitePageBlockSerializer(serializers.ModelSerializer):
+    block_type_label = serializers.CharField(source='get_block_type_display', read_only=True)
+    image_url = serializers.SerializerMethodField()
+    video_url = serializers.SerializerMethodField()
+    rows = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SitePageBlock
+        fields = [
+            'id', 'block_type', 'block_type_label', 'title', 'text', 'rows', 'image',
+            'image_url', 'video', 'video_url', 'link', 'data', 'position',
+        ]
+
+    def get_image_url(self, obj) -> str:
+        return obj.image_url
+
+    def get_video_url(self, obj) -> str:
+        return obj.video_url
+
+    def get_rows(self, obj) -> list[list[str]]:
+        return obj.table_rows
+
+
+class SitePageSerializer(serializers.ModelSerializer):
+    blocks = SitePageBlockSerializer(many=True, read_only=True)
+    hero_image_url = serializers.SerializerMethodField()
+    kind_label = serializers.CharField(source='get_kind_display', read_only=True)
+    product = serializers.SerializerMethodField()
+    updated_by = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SitePage
+        fields = [
+            'id', 'title', 'slug', 'kind', 'kind_label', 'hero_text', 'hero_image',
+            'hero_image_url', 'badge', 'product', 'cta_label', 'cta_url', 'blocks',
+            'published_at', 'updated_at', 'updated_by', 'seo_title', 'seo_description',
+        ]
+
+    def get_hero_image_url(self, obj) -> str:
+        return obj.hero_image_url
+
+    def get_updated_by(self, obj) -> str:
+        return 'تیم گرین کود'
+
+    def get_product(self, obj) -> dict | None:
+        if not obj.product_id:
+            return None
+        product = obj.product
+        return {
+            'id': product.id,
+            'title': product.title,
+            'slug': product.slug,
+            'price': product.price,
+            'discounted_price': product.discounted_price,
+            'image_url': product.image_url,
+            'is_in_stock': product.is_in_stock,
+            'price_on_request': product.price_on_request,
+        }
+
+
+class TeamMemberSerializer(serializers.ModelSerializer):
+    photo_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TeamMember
+        fields = ['id', 'name', 'role', 'bio', 'photo', 'photo_url', 'order']
+
+    def get_photo_url(self, obj) -> str:
+        return obj.photo_url
+
+
+class BrandPartnerSerializer(serializers.ModelSerializer):
+    logo_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = BrandPartner
+        # ``slug`` is the brand page's address: a logo that only decorates the
+        # about page wastes the one thing a buyer wants from it — the product list.
+        fields = ['id', 'name', 'slug', 'logo', 'logo_url', 'website', 'description', 'since_year', 'order']
+
+    def get_logo_url(self, obj) -> str:
+        return obj.logo_url
+
+
+class SiteContactSerializer(serializers.ModelSerializer):
+    phones = serializers.SerializerMethodField()
+    emails = serializers.SerializerMethodField()
+    expert_photo_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SiteContact
+        fields = [
+            'address', 'provinces_note', 'phones', 'emails', 'working_hours',
+            'whatsapp_number', 'telegram_url', 'instagram_url', 'eitaa_url',
+            'map_lat', 'map_lng', 'map_note', 'expert_name', 'expert_role',
+            'expert_photo', 'expert_photo_url', 'expert_note', 'updated_at',
+        ]
+
+    def get_phones(self, obj) -> list[str]:
+        return obj.phone_list
+
+    def get_emails(self, obj) -> list[str]:
+        return obj.email_list
+
+    def get_expert_photo_url(self, obj) -> str:
+        return obj.expert_photo_url
+
+
+class NewsletterSubscribeSerializer(serializers.ModelSerializer):
+    """Public opt-in. Either channel is enough; a topic list is optional."""
+
+    # Declared explicitly so DRF does not attach its UniqueValidator: a repeat
+    # subscription must re-activate the existing row instead of erroring.
+    email = serializers.EmailField(required=False, allow_blank=True)
+    mobile = serializers.CharField(required=False, allow_blank=True, max_length=15)
+
+    class Meta:
+        model = NewsletterSubscriber
+        fields = ['id', 'email', 'mobile', 'topics', 'source', 'is_active', 'subscribed_at']
+        read_only_fields = ['id', 'is_active', 'subscribed_at']
+
+    def validate_mobile(self, value):
+        # An empty field means "no SMS channel", not a malformed number.
+        if not value:
+            return ''
+        try:
+            return normalize_iranian_mobile(value)
+        except ValueError as exc:
+            raise serializers.ValidationError(str(exc)) from exc
+
+    def validate(self, attrs):
+        email = (attrs.get('email') or '').strip()
+        mobile = (attrs.get('mobile') or '').strip()
+        if not email and not mobile:
+            raise serializers.ValidationError('برای عضویت، ایمیل یا شماره موبایل را وارد کنید.')
+        if mobile:
+            attrs['mobile'] = mobile
+        attrs['email'] = email
+        # Re-subscribing an existing address is idempotent, not a duplicate error.
+        existing = None
+        if email:
+            existing = NewsletterSubscriber.objects.filter(email=email).first()
+        if existing is None and mobile:
+            existing = NewsletterSubscriber.objects.filter(mobile=mobile).first()
+        if existing is not None:
+            attrs['_existing_id'] = existing.id
+        return attrs
+
+    def create(self, validated_data):
+        existing_id = validated_data.pop('_existing_id', None)
+        if existing_id:
+            existing = NewsletterSubscriber.objects.get(pk=existing_id)
+            for field, value in validated_data.items():
+                if value:
+                    setattr(existing, field, value)
+            existing.is_active = True
+            existing.unsubscribed_at = None
+            existing.save()
+            return existing
+        return super().create(validated_data)

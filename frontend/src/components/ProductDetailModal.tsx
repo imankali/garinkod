@@ -1,6 +1,8 @@
 // frontend/src/components/ProductDetailModal.tsx
 
 import { useState } from "react";
+import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { useFocusTrap } from "../hooks/useFocusTrap";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -17,13 +19,16 @@ import {
   Star,
   X,
 } from "lucide-react";
+import { BadgeCheck, MessageCircle } from "lucide-react";
 import { formatPrice } from "../utils/formatPrice";
+import { productsApi } from "../api/services";
+import SpecTable from "./SpecTable";
 import type { MockProduct } from "../types";
 
 // ========================================
 // Types
 // ========================================
-type Tab = "description" | "usage" | "warnings" | "brochure";
+type Tab = "description" | "specs" | "usage" | "warnings" | "brochure";
 
 interface TabItem {
   id: Tab;
@@ -44,6 +49,7 @@ interface ProductDetailModalProps {
 // ========================================
 const tabs: TabItem[] = [
   { id: "description", label: "توضیحات", icon: FileText },
+  { id: "specs", label: "ویژگی‌ها", icon: BadgeCheck },
   { id: "usage", label: "نحوه مصرف و دوز", icon: Beaker },
   { id: "warnings", label: "هشدارها", icon: AlertTriangle },
   { id: "brochure", label: "بروشور", icon: Download },
@@ -63,8 +69,22 @@ export default function ProductDetailModal({
   const [qty, setQty] = useState(1);
   const [activeTab, setActiveTab] = useState<Tab>("description");
 
+  // Quick view is opened from a list payload, which has no spec table. The
+  // detail request reuses the product page's cache key, so it is free when the
+  // visitor has already been on that page.
+  const detailSlug = product?.slug ?? "";
+  const { data: detail } = useQuery({
+    queryKey: ["product", detailSlug],
+    queryFn: async () => (await productsApi.getBySlug(detailSlug)).data,
+    enabled: Boolean(detailSlug),
+    staleTime: 5 * 60 * 1000,
+  });
+
   // اگر محصولی وجود ندارد، هیچ چیزی نمایش نده
   if (!product) return null;
+
+  const specRows = detail?.attributes || [];
+  const priceOnRequest = Boolean(detail?.price_on_request ?? product.priceOnRequest);
 
   // ========================================
   // Handle Add to Cart
@@ -105,7 +125,7 @@ export default function ProductDetailModal({
             aria-modal="true"
             aria-label={product?.name ?? "جزئیات محصول"}
             tabIndex={-1}
-            className="fixed inset-x-4 top-1/2 z-[90] mx-auto max-h-[90vh] max-w-3xl -translate-y-1/2 overflow-y-auto rounded-3xl bg-white shadow-2xl outline-none md:inset-x-auto"
+            className="fixed inset-x-4 top-1/2 z-[90] mx-auto max-h-[90dvh] max-w-3xl -translate-y-1/2 overflow-y-auto rounded-3xl bg-white shadow-2xl outline-none md:inset-x-auto"
           >
             {/* Close Button */}
             <motion.button
@@ -176,10 +196,19 @@ export default function ProductDetailModal({
                 </div>
 
                 {/* Price */}
-                <div className="mb-4 flex items-baseline gap-2">
-                  <span className="text-2xl font-extrabold text-brand-gradient">{formatPrice(product.price)}</span>
-                  {product.oldPrice && (
-                    <span className="text-sm text-slate-400 line-through">{formatPrice(product.oldPrice)}</span>
+                <div className="mb-4 flex flex-wrap items-baseline gap-2">
+                  {priceOnRequest ? (
+                    <>
+                      <span className="text-2xl font-extrabold text-slate-800">تماس بگیرید</span>
+                      <span className="text-xs text-slate-400">قیمت عمده به‌صورت استعلامی</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-2xl font-extrabold text-brand-gradient">{formatPrice(product.price)}</span>
+                      {product.oldPrice && (
+                        <span className="text-sm text-slate-400 line-through">{formatPrice(product.oldPrice)}</span>
+                      )}
+                    </>
                   )}
                 </div>
 
@@ -213,6 +242,31 @@ export default function ProductDetailModal({
                 {/* ======================================== */}
                 <div className="mb-4 min-h-[110px] flex-1">
                   <AnimatePresence mode="wait">
+                    {/* Specs Tab — the admin-edited attribute table */}
+                    {activeTab === "specs" && (
+                      <motion.div
+                        key="specs"
+                        initial={{ opacity: 0, x: 10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -10 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        {specRows.length > 0 ? (
+                          <SpecTable rows={specRows} />
+                        ) : (
+                          <p className="text-xs text-slate-400">
+                            {detail ? 'جدول ویژگی این کالا هنوز تکمیل نشده است.' : 'در حال بارگذاری مشخصات...'}
+                          </p>
+                        )}
+                        {detail?.rating_summary && detail.rating_summary.reviews_count > 0 && (
+                          <p className="mt-3 rounded-xl bg-amber-50 p-2.5 text-xs text-amber-800">
+                            میانگین امتیاز {detail.rating_summary.average.toLocaleString("fa-IR", { maximumFractionDigits: 1 })} از ۵
+                            بر پایه {detail.rating_summary.reviews_count.toLocaleString("fa-IR")} دیدگاه تأییدشده.
+                          </p>
+                        )}
+                      </motion.div>
+                    )}
+
                     {/* Description Tab */}
                     {activeTab === "description" && (
                       <motion.div
@@ -330,8 +384,17 @@ export default function ProductDetailModal({
                 {/* Actions: Quantity, Add to Cart, Wishlist */}
                 {/* ======================================== */}
                 <div className="mt-auto flex items-center gap-3">
+                  {priceOnRequest && (
+                    <a
+                      href="/contact"
+                      className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-900 py-3.5 text-sm font-bold text-lime-300"
+                    >
+                      <MessageCircle size={17} />
+                      استعلام قیمت و زمان تحویل
+                    </a>
+                  )}
                   {/* Quantity Selector */}
-                  <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 shadow-sm">
+                  <div className={priceOnRequest ? "hidden" : "flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 shadow-sm"}>
                     <motion.button
                       whileTap={{ scale: 0.85 }}
                       onClick={() => setQty((q) => q + 1)}
@@ -352,6 +415,7 @@ export default function ProductDetailModal({
                   </div>
 
                   {/* Add to Cart Button */}
+                  {!priceOnRequest && (
                   <motion.button
                     onClick={handleAdd}
                     disabled={!product.inStock}
@@ -362,6 +426,16 @@ export default function ProductDetailModal({
                     <ShoppingCart size={17} />
                     {product.inStock ? "افزودن به سبد خرید" : "ناموجود"}
                   </motion.button>
+                  )}
+                  {product.slug && (
+                    <Link
+                      to={`/products/${product.slug}`}
+                      onClick={onClose}
+                      className="flex h-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 px-3 text-fluid-2xs font-bold text-slate-500 transition-colors hover:border-[#0F8A5F] hover:text-[#0F8A5F]"
+                    >
+                      صفحه کامل
+                    </Link>
+                  )}
 
                   {/* Wishlist Button */}
                   <motion.button

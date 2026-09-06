@@ -61,6 +61,11 @@ MIDDLEWARE = [
     # Axes protects password authentication; the existing OTP limits stay
     # independent and continue to provide phone/IP/cooldown protection.
     "axes.middleware.AxesMiddleware",
+    # What broke (a row in the shop's own log) and who is here (a presence beat,
+    # plus the waiting room when the operator turns it on). Both run after auth so
+    # a row can say who, and both fail open: neither may cost a page its response.
+    "shop.logs.ErrorLogMiddleware",
+    "shop.admission.AdmissionMiddleware",
     "simple_history.middleware.HistoryRequestMiddleware",
     "waffle.middleware.WaffleMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
@@ -226,6 +231,7 @@ REST_FRAMEWORK = {
         "otp_request": config("THROTTLE_OTP_REQUEST", default="30/hour"),
         "otp_verify": config("THROTTLE_OTP_VERIFY", default="60/hour"),
         "search": config("THROTTLE_SEARCH", default="60/min"),
+        "inbox": config("THROTTLE_INBOX", default="60/min"),
         "checkout": config("THROTTLE_CHECKOUT", default="12/hour"),
         "upload": config("THROTTLE_UPLOAD", default="20/hour"),
         "feedback": config("THROTTLE_FEEDBACK", default="10/hour"),
@@ -261,6 +267,9 @@ SPECTACULAR_SETTINGS = {
     # lifecycle a stable client-facing component name instead of a hash.
     "ENUM_NAME_OVERRIDES": {
         "ShipmentStatusEnum": "shop.models.Shipment.STATUS_CHOICES",
+        # Articles and geography both name their choice field ``kind``.
+        "ArticleKindEnum": "shop.models.SiteArticle.KIND_CHOICES",
+        "LocationKindEnum": "shop.models.Location.KIND_CHOICES",
     },
 }
 
@@ -307,6 +316,22 @@ if not DEBUG:
     SECURE_HSTS_PRELOAD = True
     SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+# A sandbox preview is opened inside an iframe of another site, and a SameSite=Lax
+# cookie is simply not sent from such a frame: the login answers «welcome» and the
+# very next request is a stranger again, which looks exactly like a wrong password.
+# This flag is how that case is served — the cookies become SameSite=None; Secure,
+# which the preview's own HTTPS satisfies. It is a development switch: in production
+# the shop keeps Lax, because widening cookie scope for no user benefit is a CSRF
+# surface nobody needs. See shop.W110.
+PREVIEW_IFRAME_COOKIES = config("GK_PREVIEW_IFRAME_COOKIES", default=False, cast=bool)
+if PREVIEW_IFRAME_COOKIES:
+    AUTH_COOKIE_SAMESITE = "None"
+    AUTH_COOKIE_SECURE = True
+    SESSION_COOKIE_SAMESITE = "None"
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SAMESITE = "None"
+    CSRF_COOKIE_SECURE = True
 
 # Structured logging. Throttle events go to their own logger so a monitoring
 # system can alert on a spike of blocked requests (a sign of either an attack

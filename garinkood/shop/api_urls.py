@@ -1,6 +1,9 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from . import api_views, marketplace_views, reference_views, farm_views
+from . import (
+    api_views, catalog_views, content_views, desk_views, farm_views, marketplace_views, ops_views,
+    reference_views,
+)
 from .messaging.webhooks import whatsapp_webhook
 
 # ساخت Router
@@ -14,6 +17,12 @@ router.register(r'marketplace/posts', api_views.StorefrontPostViewSet, basename=
 router.register(r'marketplace/post-comments', api_views.StorefrontPostCommentViewSet, basename='marketplace-post-comment')
 router.register(r'marketplace/storefronts', marketplace_views.StorefrontDirectoryViewSet, basename='storefront-directory')
 router.register(r'marketplace/highlights', marketplace_views.StorefrontHighlightViewSet, basename='storefront-highlight')
+# Site content: the blog/growing guides, admin pages and the service catalogue.
+# Services live under ``services/catalog`` so the existing POST
+# ``services/requests`` route keeps resolving to the request form.
+router.register(r'articles', content_views.SiteArticleViewSet, basename='article')
+router.register(r'pages', content_views.SitePageViewSet, basename='site-page')
+router.register(r'services/catalog', content_views.ServiceViewSet, basename='service')
 
 urlpatterns = [
     # API Routes (از Router)
@@ -26,6 +35,7 @@ urlpatterns = [
     path('auth/otp/verify/', api_views.verify_login_otp_view, name='api_otp_verify'),
     path('auth/logout/', api_views.logout_view, name='api_logout'),
     path('auth/session/', api_views.auth_session, name='api_auth_session'),
+    path('levels/', api_views.access_levels, name='api_levels'),
 
     # Signed official-provider callbacks (no browser/session authentication).
     path('messaging/webhooks/whatsapp/', whatsapp_webhook, name='api_whatsapp_webhook'),
@@ -89,6 +99,28 @@ urlpatterns = [
         name='api_start_farmer_conversation',
     ),
 
+    # Service desks: duty windows, presence, canned replies, closing, survey.
+    # The farmer's chat and the operator's queue read the same object, so the
+    # «کی آنلاین است / ساعت کاری» sentence can never disagree between them.
+    path('desk/state/', desk_views.desk_state, name='api_desk_state'),
+    path('desk/queue/', desk_views.desk_queue, name='api_desk_queue'),
+    path('desk/ratings/', desk_views.desk_ratings, name='api_desk_ratings'),
+    path(
+        'desk/conversations/<int:conversation_id>/close/',
+        desk_views.close_conversation,
+        name='api_desk_close_conversation',
+    ),
+    path(
+        'desk/conversations/<int:conversation_id>/rate/',
+        desk_views.rate_conversation,
+        name='api_desk_rate_conversation',
+    ),
+    path(
+        'desk/conversations/<int:conversation_id>/handoff/',
+        desk_views.handoff_thread,
+        name='api_desk_handoff',
+    ),
+
     # Farm profile: lands, calendars and consultation
     path('farm/lands/', farm_views.my_lands, name='api_farm_lands'),
     path('farm/lands/<int:land_id>/', farm_views.land_detail, name='api_farm_land_detail'),
@@ -105,6 +137,27 @@ urlpatterns = [
     path('farm/consulting/lands/<int:land_id>/events/', farm_views.consulting_land_event, name='api_consulting_land_event'),
     path('marketplace/finance/', api_views.storefront_finance, name='api_storefront_finance'),
     path('marketplace/finance/export/', api_views.storefront_finance_export, name='api_storefront_finance_export'),
+    # Editorial/landing content, contact channels and the newsletter
+    path('site/contact/', content_views.site_contact, name='api_site_contact'),
+    path('site/about/', content_views.site_about, name='api_site_about'),
+    # Legal documents: the hub, then one document by slug.
+    # Catalogue landing pages, buyer experiences and the shop's own policies.
+    path('catalog/index/', catalog_views.catalog_index, name='api_catalog_index'),
+    # ``str`` rather than the slug converter: a Persian brand or tag slug is
+    # legitimately non-ASCII and must not 404 on its own address.
+    path(
+        'catalog/landing/<str:kind>/<str:slug>/',
+        catalog_views.catalog_landing,
+        name='api_catalog_landing',
+    ),
+    path('testimonials/', catalog_views.buyer_experiences, name='api_testimonials'),
+    path('site/policies/', catalog_views.site_policies, name='api_site_policies'),
+    path('legal/', content_views.legal_index, name='api_legal_index'),
+    path('legal/<slug:slug>/', content_views.legal_document, name='api_legal_document'),
+    path('guides/index/', content_views.growing_index, name='api_growing_index'),
+    path('newsletter/subscribe/', content_views.newsletter_subscribe, name='api_newsletter_subscribe'),
+    path('newsletter/unsubscribe/', content_views.newsletter_unsubscribe, name='api_newsletter_unsubscribe'),
+
     path('features/', api_views.feature_flags_view, name='api_feature_flags'),
     path('shipping/quote/', api_views.shipping_quote_view, name='api_shipping_quote'),
     path('payments/options/', api_views.payment_options_view, name='api_payment_options'),
@@ -129,6 +182,13 @@ urlpatterns = [
         name='management_shipment_tracking_event',
     ),
     path('management/users/', api_views.management_users, name='management_users'),
+    # Operations: the health of the machine, the notebook of what broke, and the
+    # inbox for a visitor's own report of an error. Staff session or ops token.
+    path('ops/health/', ops_views.health, name='ops_health'),
+    path('ops/logs/', ops_views.log_list, name='ops_logs'),
+    path('ops/logs/<int:pk>/resolve/', ops_views.log_resolve, name='ops_log_resolve'),
+    path('system/report/', ops_views.client_report, name='system_report'),
+    path('ops/admission/', ops_views.admission_state, name='ops_admission'),
     path('management/moderation/queue/', api_views.management_moderation_queue, name='management_moderation_queue'),
     path('management/moderation/bulk/', api_views.management_bulk_moderate, name='management_bulk_moderate'),
     path('management/moderate/<str:content_type>/<int:object_id>/', api_views.management_moderate_content, name='management_moderate_content'),

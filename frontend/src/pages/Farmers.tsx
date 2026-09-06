@@ -105,7 +105,7 @@ function RequestsView() {
   );
 
   return (
-    <div className="mt-5 grid h-[70vh] min-h-[28rem] overflow-hidden rounded-3xl border border-emerald-100 bg-white shadow-sm dark:border-emerald-800 dark:bg-emerald-950 lg:grid-cols-[340px_1fr]">
+    <div className="mt-5 grid h-[70dvh] overflow-hidden lg:min-h-[28rem] rounded-3xl border border-emerald-100 bg-white shadow-sm dark:border-emerald-800 dark:bg-emerald-950 lg:grid-cols-[340px_1fr]">
       {/* Queue */}
       <aside className={`${active ? 'hidden lg:flex' : 'flex'} h-full flex-col overflow-hidden`}>
         <div className="flex gap-1.5 border-b border-emerald-100 p-3 dark:border-emerald-900">
@@ -393,7 +393,7 @@ function FarmersDirectory() {
   }, [activeId]);
 
   return (
-    <div className="mt-5 grid h-[72vh] min-h-[28rem] overflow-hidden rounded-3xl border border-emerald-100 bg-white shadow-sm dark:border-emerald-800 dark:bg-emerald-950 lg:grid-cols-[320px_1fr]">
+    <div className="mt-5 grid h-[72dvh] overflow-hidden lg:min-h-[28rem] rounded-3xl border border-emerald-100 bg-white shadow-sm dark:border-emerald-800 dark:bg-emerald-950 lg:grid-cols-[320px_1fr]">
       {/* Directory */}
       <aside className={`${activeId ? 'hidden lg:flex' : 'flex'} h-full flex-col overflow-hidden`}>
         <div className="relative border-b border-emerald-100 p-3 dark:border-emerald-900">

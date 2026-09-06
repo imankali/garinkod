@@ -113,7 +113,7 @@ function OrderTimelineStepper({ status }: { status: string }) {
                 {isDone ? <Check size={14} /> : <Icon size={14} />}
               </div>
               <span
-                className={`mt-1.5 text-center text-[11px] font-bold sm:text-xs ${
+                className={`mt-1.5 text-center text-fluid-2xs font-bold sm:text-fluid-xs ${
                   isCurrent
                     ? 'text-emerald-700 dark:text-lime-300'
                     : isDone
@@ -412,6 +412,13 @@ function OrderCard({
           <li key={item.id} className="flex flex-wrap items-baseline justify-between gap-2 py-2.5">
             <span className="min-w-0 flex-1 text-fluid-sm text-slate-700 dark:text-emerald-100">
               {item.quantity.toLocaleString('fa-IR')} × {item.product_title}
+              {item.package_label && (
+                // What the bag was called on the day it sold: labels change, the
+                // invoice must not.
+                <span className="text-fluid-2xs font-bold text-emerald-700 dark:text-lime-300">
+                  ({item.package_label})
+                </span>
+              )}
               {item.kind === 'listing' && item.storefront_name && (
                 <span className="mt-0.5 flex items-center gap-1 text-fluid-2xs text-emerald-600 dark:text-lime-300">
                   <Store size={11} aria-hidden="true" />

@@ -126,8 +126,8 @@ export default function FeaturedStorefronts() {
                 </span>
 
                 <span className="min-w-0 flex-1">
-                  <span className="flex items-center gap-1 truncate text-fluid-sm font-extrabold text-slate-800 dark:text-white">
-                    {storefront.name}
+                  <span className="flex min-w-0 items-center gap-1 text-fluid-sm font-extrabold text-slate-800 dark:text-white">
+                    <span className="truncate">{storefront.name}</span>
                     {storefront.is_verified && (
                       <BadgeCheck
                         size={14}

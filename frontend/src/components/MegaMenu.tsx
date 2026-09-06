@@ -144,7 +144,7 @@ export default function MegaMenu() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -12, scale: 0.98 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
-            className="absolute start-0 top-[calc(100%+12px)] z-50 flex w-[640px] overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-2xl shadow-emerald-900/10 dark:border-emerald-800 dark:bg-emerald-950"
+            className="absolute start-0 top-[calc(100%+12px)] z-50 flex w-[640px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-2xl shadow-emerald-900/10 dark:border-emerald-800 dark:bg-emerald-950"
           >
             {/* ======================================== */}
             {/* Sidebar - لیست دسته‌بندی‌ها */}
@@ -188,7 +188,7 @@ export default function MegaMenu() {
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.2 }}
-                className="flex-1 p-5"
+                className="min-w-0 flex-1 p-5"
               >
                 {/* Header */}
                 <div className="mb-4 flex items-center gap-3">
