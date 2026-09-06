@@ -270,11 +270,28 @@ Three things cover it:
   is a CSRF surface. Requires the preview to be served over HTTPS, as the sandbox's is.
 - **`shop.W110`** warns at `manage.py check` if the flag is on while `DEBUG` is off — the
   misconfiguration is reported where it is set, not after the outage it prevents.
+- **`preview_token`** is the second attempt, for the frames that refuse every cookie. While
+  the switch is on *and* `DEBUG` is set, the auth responses carry the same key the HttpOnly
+  cookie holds; `api/previewSession.ts` keeps it in that frame's own storage and the axios
+  request interceptor sends it as `Authorization: Token …`. `has_operations_access()`
+  recognises that header too — the operations endpoints are plain Django views, and without
+  the lookup the console would answer its own signed-in operator with a 404. Neither half
+  of this exists in production: with the switch off the response has no token field, so the
+  cookie remains the only credential JavaScript cannot read.
 - **`CookieJarNotice`** in the SPA verifies a sign-in actually stuck: after every password,
   OTP and registration success the store probes `/api/auth/session/` once, and if the
-  session is anonymous it clears the half-logged state, keeps the visitor on the form, and
-  says what to do (open the preview in its own tab, unblock third-party cookies for the
-  address, leave strict private mode) instead of looping.
+  session is anonymous — cookie and stored token both refused — it clears the half-logged
+  state, keeps the visitor on the form, and says what to do (open the preview in its own
+  tab, unblock third-party cookies for the address, leave strict private mode) instead of
+  letting them repeat a correct password.
+
+Two things are worth reading from the server log before blaming the shop: a `POST
+/api/auth/login/` returning 200 followed one second later by `GET /api/auth/session/`
+returning 401 is the frame refusing cookies, and five new rows in `django_session` inside
+five seconds is the same fact seen from the database.
 
 The workaround that needs no flag is the one to reach for first: open the preview in its own
 browser tab, where the cookie is first-party and the flow is exactly the one the tests cover.
+Django's own `/admin/` stays on that rule — it authenticates from the session cookie alone, so
+it is not reachable inside a frame that will not keep one; the staff console at `/management`
+is, because it can use the header.

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import toast from 'react-hot-toast';
 
 import { authApi, avatarApi } from '../api/services';
+import { clearPreviewToken, writePreviewToken } from '../api/previewSession';
 import { parseApiError } from '../api/errors';
 import {
   USER_LEVEL,
@@ -85,6 +86,27 @@ async function sessionSurvivesTheBrowser(): Promise<boolean> {
   }
 }
 
+/** Said whenever the session survives only because the preview kept a token. */
+const PREVIEW_KEEP_NOTICE =
+  'ورود انجام شد؛ این قاب کوکی نگه نمی‌دارد، پس نشست در حافظه همین مرورگر ماند.';
+
+/**
+ * The one turn-around for a preview that refuses cookies.
+ *
+ * If the browser kept the session, nothing more is needed. If it did not, and the
+ * shop is running with the preview switch on, the response carried the credential to
+ * the page itself: keep it here, where a frame is allowed to store its own things,
+ * and ask again. The second probe is the last one — after that the visitor is told
+ * what to change rather than left to repeat a correct password.
+ */
+async function keepSessionIfPossible(data?: { preview_token?: string }): Promise<'cookie' | 'token' | null> {
+  if (await sessionSurvivesTheBrowser()) return 'cookie';
+  const token = data?.preview_token;
+  if (!token) return null;
+  writePreviewToken(token);
+  return (await sessionSurvivesTheBrowser()) ? 'token' : null;
+}
+
 export const useAuthStore = create<AuthState>((set, get) => ({
   ...signedOutState,
   isLoading: false,
@@ -113,13 +135,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isLoading: true });
     try {
       const response = await authApi.login(username, password);
-      if (!(await sessionSurvivesTheBrowser())) {
+      const kept = await keepSessionIfPossible(response.data);
+      if (!kept) {
         set({ ...signedOutState, cookieBlocked: true, isLoading: false, isSessionChecked: true });
-        toast.error('رمز درست بود، اما مرورگر کوکی نشست را نگه نداشت.');
+        toast.error('رمز درست بود، اما این قاب مرورگر نشست را نگه نمی‌دارد.');
         return;
       }
       set({ user: response.data.user, account: response.data.account, isAuthenticated: true, isLoading: false, isSessionChecked: true, cookieBlocked: false });
-      toast.success('ورود با موفقیت انجام شد');
+      toast.success(kept === 'token' ? PREVIEW_KEEP_NOTICE : 'ورود با موفقیت انجام شد');
     } catch (error) {
       const parsed = parseApiError(error);
       // The login endpoint is silent in the interceptor, so the message is
@@ -148,12 +171,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isLoading: true });
     try {
       const response = await authApi.verifyOtp(data);
-      const kept = await sessionSurvivesTheBrowser();
+      const kept = await keepSessionIfPossible(response.data);
       if (!kept) {
         set({ ...signedOutState, cookieBlocked: true, isLoading: false, isSessionChecked: true });
-        toast.error('کد درست بود، اما مرورگر کوکی نشست را نگه نداشت.');
+        toast.error('کد درست بود، اما این قاب مرورگر نشست را نگه نمی‌دارد.');
         return;
       }
+      // (the notice text below replaces the usual greeting on the fallback path)
       set({
         user: response.data.user,
         account: response.data.account,
@@ -162,7 +186,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isSessionChecked: true,
         cookieBlocked: false,
       });
-      toast.success(response.data.created ? 'حساب شما ساخته شد؛ خوش آمدید' : 'ورود با موفقیت انجام شد');
+      toast.success(
+        kept === 'token'
+          ? PREVIEW_KEEP_NOTICE
+          : response.data.created
+            ? 'حساب شما ساخته شد؛ خوش آمدید'
+            : 'ورود با موفقیت انجام شد',
+      );
     } catch (error) {
       set({ isLoading: false, isSessionChecked: true });
       throw error;
@@ -173,13 +203,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isLoading: true });
     try {
       const response = await authApi.register(data);
-      if (!(await sessionSurvivesTheBrowser())) {
+      const kept = await keepSessionIfPossible(response.data);
+      if (!kept) {
         set({ ...signedOutState, cookieBlocked: true, isLoading: false, isSessionChecked: true });
-        toast.error('حساب ساخته شد، اما مرورگر کوکی نشست را نگه نداشت.');
+        toast.error('حساب ساخته شد، اما این قاب مرورگر نشست را نگه نمی‌دارد.');
         return;
       }
       set({ user: response.data.user, account: response.data.account, isAuthenticated: true, isLoading: false, isSessionChecked: true, cookieBlocked: false });
-      toast.success('ثبت‌نام با موفقیت انجام شد');
+      toast.success(kept === 'token' ? PREVIEW_KEEP_NOTICE : 'ثبت‌نام با موفقیت انجام شد');
     } catch (error) {
       const parsed = parseApiError(error);
       // Field errors are rendered by the register form itself; only a
@@ -202,6 +233,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   dismissCookieNotice: () => set({ cookieBlocked: false }),
 
   logout: async () => {
+    clearPreviewToken();
     try {
       await authApi.logout();
     } catch {

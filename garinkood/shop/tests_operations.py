@@ -16,6 +16,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from django.utils import timezone
+from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
 from . import capacity
@@ -840,3 +841,67 @@ class PreviewCookieFlagTests(TestCase):
                 morsel = response.cookies[name]
                 self.assertEqual(morsel['samesite'], 'None')
                 self.assertTrue(morsel['secure'])
+
+    def test_the_token_is_never_handed_to_the_page_in_production(self):
+        """Without the preview switch, a cookie is the only place the token lives.
+
+        Exposing the credential to JavaScript is exactly what the HttpOnly cookie
+        exists to prevent, so this asserts the absence of the field on the ordinary
+        path rather than the presence of a setting.
+        """
+        response = self.client.post(
+            '/api/auth/login/',
+            {'username': 'preview-guest', 'password': 'Str0ngPassw0rd!'},
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200, response.content[:400])
+        self.assertNotIn('preview_token', response.json())
+
+    def test_the_preview_switch_hands_the_same_credential_to_the_page(self):
+        """…and only while DEBUG is on, so a frame without cookies can still work.
+
+        The fallback is useless unless the header it pairs with is accepted, so the
+        key is exercised rather than assumed.
+        """
+        with override_settings(DEBUG=True, PREVIEW_IFRAME_COOKIES=True):
+            response = self.client.post(
+                '/api/auth/login/',
+                {'username': 'preview-guest', 'password': 'Str0ngPassw0rd!'},
+                content_type='application/json',
+            )
+            key = response.json()['preview_token']
+            self.assertEqual(key, Token.objects.get(user=self.user).key)
+
+            session = self.client.get(
+                '/api/auth/session/', HTTP_AUTHORIZATION=f'Token {key}'
+            )
+        self.assertEqual(session.status_code, 200, session.content[:400])
+        self.assertEqual(session.json()['user']['username'], 'preview-guest')
+
+    def test_the_django_operations_view_recognises_the_header(self):
+        """The console endpoints are Django views, and must not 404 at real credentials.
+
+        Without this the health tab would be blank in exactly the case the preview
+        switch exists for: the SPA is signed in by header while the endpoint behind it
+        only understood cookies.
+        """
+        with override_settings(DEBUG=True, PREVIEW_IFRAME_COOKIES=True):
+            token, _created = Token.objects.get_or_create(user=self.user)
+            key = token.key
+            response = self.client.get('/api/ops/health/', HTTP_AUTHORIZATION=f'Token {key}')
+        self.assertEqual(response.status_code, 200, response.content[:200])
+        self.assertIn('capacity', response.json())
+
+    def test_a_key_that_is_not_there_still_reads_as_no_such_page(self):
+        # The 404 is the point: a stranger learns nothing about the console's shape.
+        response = self.client.get('/api/ops/health/', HTTP_AUTHORIZATION='Token ' + '0' * 40)
+        self.assertEqual(response.status_code, 404)
+
+    def test_debug_off_does_not_release_the_token(self):
+        with override_settings(DEBUG=False, PREVIEW_IFRAME_COOKIES=True):
+            response = self.client.post(
+                '/api/auth/login/',
+                {'username': 'preview-guest', 'password': 'Str0ngPassw0rd!'},
+                content_type='application/json',
+            )
+        self.assertNotIn('preview_token', response.json())

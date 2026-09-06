@@ -665,6 +665,12 @@ export interface AuthResponse {
   account: UserAccount | null;
   message: string;
   created?: boolean;
+  /**
+   * Present only in a preview started with GK_PREVIEW_IFRAME_COOKIES under DEBUG:
+   * the fallback for a frame that will not store the session cookie. The production
+   * response has no such field, so this is not a place to read a credential from.
+   */
+  preview_token?: string;
 }
 
 export interface OtpRequestResponse {

@@ -122,6 +122,14 @@ def _set_auth_cookie(response, token):
         samesite=settings.AUTH_COOKIE_SAMESITE,
         path='/',
     )
+    # A hardened preview can refuse to store any third-party cookie, and then no
+    # SameSite value helps. Where the preview switch is on under DEBUG, the same
+    # credential is also handed to the page, so it can be kept in that frame's own
+    # storage and sent as an Authorization header. Production never takes this
+    # branch: there the token exists only as an HttpOnly cookie.
+    if getattr(settings, 'PREVIEW_IFRAME_COOKIES', False) and settings.DEBUG:
+        if isinstance(response.data, dict):
+            response.data['preview_token'] = token.key
     return response
 
 
