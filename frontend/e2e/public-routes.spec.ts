@@ -11,6 +11,12 @@ const publicRoutes = [
   '/marketplace',
   '/support',
   '/legal',
+  '/faq',
+  '/customers',
+  // A group page that does not exist must still answer with its own empty state,
+  // not with a blank document — the catalog renames slugs and old links survive.
+  '/c/fertilizer',
+  '/brand/no-such-brand',
   '/legal/terms',
   '/legal/shipping',
   '/legal/complaints',
@@ -40,6 +46,27 @@ test('all public routes render without a browser crash', async ({ page }) => {
     await expect(page.locator('#root')).not.toBeEmpty();
     await expect(page.locator('text=خطای غیرمنتظره')).toHaveCount(0);
   }
+});
+
+test('a brand page that does not exist offers the catalogue instead of a blank page', async ({ page }) => {
+  await page.goto('/brand/no-such-brand');
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  await expect(page.getByRole('link', { name: /همه محصولات/ })).toBeVisible();
+});
+
+test('the buyers' page says where its quotes came from', async ({ page }) => {
+  await page.goto('/customers');
+  // Whichever tier the server is on, the page has to name it.
+  await expect(page.getByText(/منتخب تیم گرین کود|دیدگاه خریداران با پرداخت تأییدشده|بازخوردهای امتیازدار/)).toBeVisible();
+});
+
+test('the faq page renders the questions the admin publishes', async ({ page }) => {
+  await page.goto('/faq');
+  await expect(page.getByRole('heading', { level: 1 })).toContainText(/پرسش/);
+  const questions = page.locator('details > summary');
+  // Either the accordion is filled in, or the page admits it is not and points at
+  // the support desk; an empty silence is not an option.
+  expect((await questions.count()) > 0 || (await page.getByText(/هنوز در پنل مدیریت تنظیم نشده/).count()) > 0).toBe(true);
 });
 
 test('route metadata indexes public pages and protects account pages', async ({ page }) => {

@@ -30,6 +30,7 @@ import { convertToMockProduct } from '../utils/convertProduct';
 import { formatPrice } from '../utils/formatPrice';
 import type { MockProduct, SitePageBlock } from '../types';
 import { cn } from '../utils/cn';
+import FaqList, { faqPairsOfBlock } from '../components/FaqList';
 
 export default function SitePageView({ kind }: { kind: 'page' | 'landing' }) {
   const { slug = '' } = useParams();
@@ -391,6 +392,11 @@ function Block({ block }: { block: SitePageBlock }) {
           </a>
         </section>
       );
+
+    case 'faq':
+      // The same accordion /faq builds, so a page that carries questions never
+      // renders them differently from the questions page.
+      return <FaqList title={block.title} pairs={faqPairsOfBlock(block)} />;
 
     case 'text':
     default:

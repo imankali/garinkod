@@ -3442,4 +3442,4 @@ class ReturnPolicySettings(models.Model):
 
     @property
     def window_label(self) -> str:
-        return f"{self.window_days} روز ضمانت بازگشت کالا" if self.window_days else ""
+        return f"{fa_digits(self.window_days)} روز ضمانت بازگشت کالا" if self.window_days else ""

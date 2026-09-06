@@ -35,9 +35,7 @@ class ProductFilter(django_filters.FilterSet):
     # these two filters read the same numbers the cards show — a chip can never
     # promise a result set the UI then rates differently.
     min_rating = django_filters.NumberFilter(field_name="avg_rating", lookup_expr="gte")
-    has_reviews = django_filters.BooleanFilter(
-        field_name="reviews_count", lookup_expr="gt", label="فقط دارای بازخورد"
-    )
+    has_reviews = django_filters.BooleanFilter(method="filter_has_reviews", label="فقط دارای بازخورد")
     expiring_soon = django_filters.BooleanFilter(method="filter_expiring_soon")
 
     class Meta:
@@ -48,6 +46,23 @@ class ProductFilter(django_filters.FilterSet):
             "brand_slug", "subcategory", "tag", "min_rating", "has_reviews",
             "expiring_soon",
         ]
+
+    @staticmethod
+    def filter_has_reviews(queryset: QuerySet, _name: str, value: bool | None) -> QuerySet:
+        """Only the products a buyer has actually reviewed — one review counts.
+
+        Written against the relation rather than the ``reviews_count`` annotation
+        because the same filter object is reused by queryset paths that do not
+        annotate, and ``true`` must not quietly mean ``more than one``. The row
+        definition matches the one the cards aggregate: approved, top-level and
+        scored — a question is not a review.
+        """
+        if value is None:
+            return queryset
+        reviewed = Q(comments__active=True, comments__parent__isnull=True, comments__rating__isnull=False)
+        if value:
+            return queryset.filter(reviewed).distinct()
+        return queryset.exclude(reviewed)
 
     @staticmethod
     def filter_expiring_soon(queryset: QuerySet, _name: str, value: bool | None) -> QuerySet:

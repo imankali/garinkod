@@ -351,10 +351,10 @@ def buyer_experiences(request):
     Editors pin the reviews that represent the shop (``is_featured``); until
     anyone pins something the page shows the most-voted four- and five-star
     reviews of paid orders, which are real but nobody has vouched for. The
-    response says which of the two the reader is looking at.
+    response says which of the three the reader is looking at.
     """
     reviews = (
-        Comment.objects.filter(active=True, parent__isnull=True, rating__gte=4)
+        Comment.objects.filter(active=True, parent__isnull=True)
         .select_related('product', 'user')
         .annotate(
             bought=Exists(
@@ -370,17 +370,22 @@ def buyer_experiences(request):
     # then what a paid buyer wrote, then everything else that was rated well. The
     # response says which one this is, so an unverified review is never dressed up
     # as a purchase.
+    # A pinned review is shown whatever its score — an editor may well vouch for a
+    # critical but fair one — while anything the page picks by itself has to have
+    # earned it, so nobody has to scroll past noise on a marketing page.
     featured = list(reviews.filter(is_featured=True).order_by('-created')[:24])
-    bought_rows = list(reviews.filter(bought=True).order_by('-helpful_count', '-created')[:24])
+    bought_rows = list(reviews.filter(bought=True, rating__gte=4).order_by('-helpful_count', '-created')[:24])
     if featured:
         mode, rows = 'curated', featured
     elif bought_rows:
         mode, rows = 'verified', bought_rows
     else:
-        mode, rows = 'open', list(reviews.order_by('-helpful_count', '-created')[:24])
+        mode, rows = 'open', list(
+            reviews.filter(rating__gte=4).order_by('-helpful_count', '-created')[:24]
+        )
     return Response({
         'mode': mode,
-        'total': reviews.count(),
+        'total': reviews.filter(rating__isnull=False).count(),
         'items': [
             {
                 'id': row.id,

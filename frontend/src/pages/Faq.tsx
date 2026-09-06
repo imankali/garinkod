@@ -15,25 +15,22 @@
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronDown, LifeBuoy, Scale } from 'lucide-react';
+import { LifeBuoy, Scale } from 'lucide-react';
 
 import { sitePagesApi } from '../api/services';
 import { LEGAL_CORE_LINKS } from '../config/legal';
+import FaqList, { faqPairsOfBlock } from '../components/FaqList';
 import type { SitePageBlock } from '../types';
 
 const FAQ_SLUG = 'faq';
 
 function faqGroups(blocks: SitePageBlock[]) {
   return blocks
-    .filter((block) => block.block_type === 'faq' && (block.rows?.length ?? 0) > 0)
+    .filter((block) => block.block_type === 'faq')
     .map((block) => ({
       id: block.id,
       title: block.title || 'پرسش‌های متداول',
-      // A row is [question, answer]; a cell count other than two is the admin
-      // typing a stray pipe, so the row is skipped rather than half-rendered.
-      pairs: (block.rows ?? [])
-        .map((row) => ({ question: (row[0] ?? '').trim(), answer: row.slice(1).join(' | ').trim() }))
-        .filter((pair) => pair.question && pair.answer),
+      pairs: faqPairsOfBlock(block),
     }))
     .filter((group) => group.pairs.length > 0);
 }
@@ -52,7 +49,10 @@ export default function Faq() {
     <>
       <Helmet>
         <title>{data?.seo_title || 'سؤالات متداول | گرین کود'}</title>
-        <meta name="description" content={data?.seo_description || 'پاسخ کوتاه به پرسش‌های رایج خرید نهاده‌های کشاورزی'} />
+        <meta
+          name="description"
+          content={data?.seo_description || 'پاسخ کوتاه به پرسش‌های رایج خرید نهاده‌های کشاورزی'}
+        />
         <link rel="canonical" href="/faq" />
         {flat.length > 0 && (
           <script type="application/ld+json">
@@ -91,30 +91,11 @@ export default function Faq() {
           </p>
         )}
 
-        {groups.map((group) => (
-          <section key={group.id} className="mt-8" aria-labelledby={`faq-${group.id}`}>
-            <h2 id={`faq-${group.id}`} className="text-fluid-lg font-extrabold text-slate-800 dark:text-white">
-              {group.title}
-            </h2>
-            <div className="mt-3 divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-100 bg-white dark:divide-emerald-900 dark:border-emerald-900 dark:bg-emerald-950">
-              {group.pairs.map((pair) => (
-                <details key={pair.question} className="group/pair">
-                  <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5 text-fluid-sm font-extrabold text-slate-800 transition-colors hover:bg-emerald-50/60 dark:text-white dark:hover:bg-emerald-900/40">
-                    <span>{pair.question}</span>
-                    <ChevronDown
-                      size={17}
-                      aria-hidden="true"
-                      className="shrink-0 text-emerald-600 transition-transform duration-200 group-open/pair:rotate-180 dark:text-lime-300"
-                    />
-                  </summary>
-                  <p className="whitespace-pre-line px-4 pb-4 text-fluid-sm leading-8 text-slate-600 dark:text-emerald-100">
-                    {pair.answer}
-                  </p>
-                </details>
-              ))}
-            </div>
-          </section>
-        ))}
+        <div className="mt-8 space-y-4">
+          {groups.map((group) => (
+            <FaqList key={group.id} title={group.title} pairs={group.pairs} />
+          ))}
+        </div>
 
         <section className="mt-10 grid gap-3 rounded-3xl border border-emerald-100 bg-emerald-50/60 p-5 sm:grid-cols-2 dark:border-emerald-900 dark:bg-emerald-950/60">
           <Link

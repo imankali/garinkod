@@ -17,6 +17,10 @@ const PUBLIC_DESTINATIONS = [
   '/farmer-sell',
   '/support',
   '/orders',
+  // Guide and trust pages are part of the furniture too: they used to be reachable
+  // only by typing the address.
+  '/faq',
+  '/customers',
 ];
 
 async function collectLinks(page: Page): Promise<string[]> {
