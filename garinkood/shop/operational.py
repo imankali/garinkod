@@ -24,27 +24,18 @@ def _token_matches(request) -> bool:
 
 
 def user_from_token_header(request):
-    """The user behind an ``Authorization: Token …`` header, when the key is valid.
+    """The user behind the credential this request presents, when it presents one.
 
-    DRF views authenticate that header themselves; the operations endpoints are plain
-    Django views so that a monitoring box and the console read the same URL, and
-    without this lookup they answer 404 to a client presenting a perfectly good
-    credential — which is how an embedded preview behaves, its browser refusing to keep
-    a cookie. Nothing is widened here: an active account is recognised from a key it
-    already proved, exactly as TokenAuthentication would.
+    DRF views authenticate an ``Authorization: Token`` header themselves; the operations
+    endpoints are plain Django views so that a monitoring box and the console read the same
+    URL, and without this lookup they answer 404 to a client holding a perfectly good
+    credential — which is how an embedded preview behaves, its browser refusing to keep a
+    cookie. ``shop.preview`` decides what a request may present: the header anywhere, and
+    in a preview also the parameter the frame can put in its own address.
     """
-    from rest_framework.authtoken.models import Token
+    from .preview import user_for
 
-    authorization = request.headers.get("Authorization", "")
-    if not authorization.startswith("Token "):
-        return None
-    key = authorization[len("Token "):].strip()
-    if not key:
-        return None
-    row = Token.objects.select_related("user").filter(key=key[:64]).first()
-    if row is None or not row.user.is_active:
-        return None
-    return row.user
+    return user_for(request)
 
 
 def has_operations_access(request) -> bool:

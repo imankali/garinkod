@@ -927,6 +927,37 @@ class PreviewCookieFlagTests(TestCase):
             self.client.get('/api/products/', HTTP_AUTHORIZATION=f'Token {token.key}')
         self.assertFalse(PresenceBeat.objects.filter(user=self.user).exists())
 
+    def test_the_address_carries_the_credential_when_a_proxy_strips_the_header(self):
+        """The last thing a framed preview controls is the URL it is already fetching.
+
+        A rewriting proxy in front of a sandbox can pass the page and drop its headers,
+        which would leave the shop answering 401 to a client that is presenting the key
+        as well as it can. The parameter exists for exactly that, and only there.
+        """
+        with override_settings(DEBUG=True, PREVIEW_IFRAME_COOKIES=True):
+            token, _created = Token.objects.get_or_create(user=self.user)
+            session = self.client.get(f'/api/auth/session/?gk_token={token.key}')
+            health = self.client.get(f'/api/ops/health/?gk_token={token.key}')
+        self.assertEqual(session.status_code, 200, session.content[:200])
+        self.assertEqual(session.json()['user']['username'], 'preview-guest')
+        self.assertEqual(health.status_code, 200, health.content[:200])
+
+    def test_the_address_is_worth_nothing_without_the_preview_switch(self):
+        """Off by default, and outside DEBUG: a key in a URL authenticates nobody.
+
+        Tokens in addresses are logged by whatever sits in front of an app, so this is
+        not a way in — it is a preview that is allowed to be lazy about nothing else.
+        """
+        token, _created = Token.objects.get_or_create(user=self.user)
+        with override_settings(DEBUG=True, PREVIEW_IFRAME_COOKIES=False):
+            session = self.client.get(f'/api/auth/session/?gk_token={token.key}')
+        self.assertEqual(session.status_code, 401)
+
+    def test_a_key_that_is_not_a_key_in_the_address_changes_nothing(self):
+        with override_settings(DEBUG=True, PREVIEW_IFRAME_COOKIES=True):
+            response = self.client.get('/api/auth/session/?gk_token=' + '0' * 40)
+        self.assertEqual(response.status_code, 401)
+
     def test_debug_off_does_not_release_the_token(self):
         with override_settings(DEBUG=False, PREVIEW_IFRAME_COOKIES=True):
             response = self.client.post(

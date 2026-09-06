@@ -8,6 +8,11 @@
 // would be a cycle — and a component that has just crashed is not in a position
 // to run an interceptor chain.
 
+// previewSession imports nothing, so reaching for it here cannot close the cycle this
+// module carefully avoids with axios — and the two requests below are exactly the ones a
+// dying page still has to be able to make.
+import { withPreviewCredential } from './previewSession';
+
 export interface QueueSnapshot {
   /** 1-based place in line; 0 when the shop has no line for this visitor. */
   position: number;
@@ -112,7 +117,7 @@ export function reportClientError(report: ClientReport): Promise<ClientReportRes
 
   if (typeof fetch !== 'function') return Promise.resolve({ reported: false });
 
-  return fetch('/api/system/report/', {
+  return fetch(withPreviewCredential('/api/system/report/'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body,

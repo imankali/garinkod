@@ -1,19 +1,20 @@
 // frontend/src/components/CookieJarNotice.tsx
 //
 // The one thing a shop must not do is log someone in and then pretend it did not.
-// By the time this card appears, both ways of keeping a session have been tried and
-// refused: the HttpOnly cookie (which a frame of another origin often cannot store) and
-// the preview credential the store keeps itself (api/previewSession.ts), which needs the
-// preview switch on and somewhere to live. That combination is rare and it is
-// irreducible from inside the page — so instead of looping, the card hands over the one
-// address that always works and the one key that explains the rest.
 //
-// A popup is also refused by a sandboxed frame, so «open in another tab» is only the
-// first attempt: when the browser answers with null, the address itself is revealed for
-// copying rather than pretending the click did something.
+// By the time this card appears, every way of keeping a session has been tried and
+// refused: the HttpOnly cookie, the frame's own storage, the credential written into the
+// page's address for the proxy to carry, and the Authorization header. That is a setting of
+// the browser around this frame rather than anything about the account, and saying so is
+// worth more than another silent bounce to the login form.
+//
+// It deliberately does not promise what it cannot do. A preview shown inside a host that
+// only serves it framed cannot be opened "in a new tab" by the page itself — popups are
+// refused and the address is not reachable outside the host — so the card says where to go
+// instead, and hands over the address for copying when the visitor wants it in a real window.
 
 import { useEffect, useState } from 'react';
-import { Clipboard, Cookie, ExternalLink, RefreshCw, X } from 'lucide-react';
+import { Clipboard, Cookie, RefreshCw, X } from 'lucide-react';
 
 import { useAuthStore } from '../store/authStore';
 
@@ -22,8 +23,8 @@ export default function CookieJarNotice() {
   const recheckCookieJar = useAuthStore((state) => state.recheckCookieJar);
   const dismissCookieNotice = useAuthStore((state) => state.dismissCookieNotice);
   const [checking, setChecking] = useState(false);
-  const [showAddress, setShowAddress] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showAddress, setShowAddress] = useState(false);
 
   // A session that cannot be kept is not a page the visitor can keep using, so the tab
   // title says so too — it is the only place visible once this card is dismissed.
@@ -44,16 +45,6 @@ export default function CookieJarNotice() {
     setChecking(true);
     await recheckCookieJar();
     setChecking(false);
-  }
-
-  function openTopLevel() {
-    let opened: Window | null = null;
-    try {
-      opened = window.open(address, '_blank', 'noopener');
-    } catch {
-      opened = null;
-    }
-    if (!opened) setShowAddress(true);
   }
 
   async function copyAddress() {
@@ -79,35 +70,35 @@ export default function CookieJarNotice() {
 
         <div className="flex-1 space-y-2 text-sm leading-6 text-slate-700 dark:text-emerald-100">
           <h2 className="text-base font-bold text-slate-900 dark:text-white">
-            این قاب هنوز نشست را نگه نمی‌دارد
+            این قاب هیچ‌جایی برای نگه داشتن نشست ندارد
           </h2>
           <p>
-            نام کاربری و رمز درست بود و سرور شما را پذیرفت؛ اما هیچ‌یک از دو راه
-            نگه‌داشتن نشست در این قاب به نتیجه نرسید: کوکی ذخیره نشد و دادهٔ همین قاب
-            هم نگه داشته نشد. برای همین درخواست بعدی دوباره بی‌نام می‌ماند — این خطای
-            حساب نیست، تنظیم همین مرورگر است.
+            نام کاربری و رمز درست بود و سرور شما را پذیرفت؛ اما این قاب نه کوکی را نگه
+            داشت، نه دادهٔ خودش را، و نشانهٔ ورودی هم که در نشانی می‌گذاریم به صفحه نرسید.
+            برای همین درخواست بعدی دوباره بی‌نام می‌ماند. این خطای حساب نیست — تنظیم همین
+            قاب و مرورگرش است.
           </p>
           <ul className="list-inside list-disc space-y-1 text-xs leading-5">
             <li>
-              مطمئن‌ترین راه: سایت را بیرون از این قاب باز کنید؛ آدرسش همان است و آنجا
-              کوکی اول‌طرف (first-party) است.
+              پیش‌نمایش را از همان گفت‌وگو در میزبانش باز کنید؛ نشانی این قاب بیرون از
+              میزبان باز نمی‌شود، پس «تب تازه» از داخل این صفحه کاری انجام نمی‌دهد.
             </li>
             <li>
-              اگر مرورگر روی «مسدود کردن کوکی و دادهٔ سایت‌های دیگر» است، برای همین آدرس
-              آزادش کنید؛ در آن حالت هیچ جایی برای نگه داشتن نشست نیست.
+              اگر مرورگر روی «مسدود کردن کوکی و دادهٔ همهٔ سایت‌ها» است، برای همین نشانی
+              آزادش کنید — در آن حالت هیچ جا برای نگه داشتن نشست نمی‌ماند.
             </li>
             <li>
-              در پیش‌نمایش، توکن با کلید
-              <span className="font-mono"> GK_PREVIEW_IFRAME_COOKIES</span> به صفحه داده
-              می‌شود؛ اگر روشن نیست، این مسیر اصلاً باز نمی‌شود. در سایت واقعی هم هر دو
-              راه فقط همان کوکی HttpOnly است.
+              در پیش‌نمایش با کلید
+              <span className="font-mono"> GK_PREVIEW_IFRAME_COOKIES</span> همان نشانهٔ
+              کوکی یک‌بار به خود صفحه سپرده می‌شود تا با سربرگ یا نشانی فرستاده شود؛ در
+              سایت واقعی تنها همان کوکی HttpOnly وجود دارد.
             </li>
           </ul>
 
           {showAddress ? (
             <label className="block space-y-1">
               <span className="text-xs text-slate-500 dark:text-emerald-300">
-                این آدرس را در یک تب تازه باز کنید
+                نشانی همین پیش‌نمایش
               </span>
               <input
                 readOnly
@@ -122,11 +113,12 @@ export default function CookieJarNotice() {
           <div className="flex flex-wrap items-center gap-2 pt-1">
             <button
               type="button"
-              onClick={openTopLevel}
-              className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-emerald-700"
+              onClick={recheck}
+              disabled={checking}
+              className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-emerald-700 disabled:opacity-60"
             >
-              <ExternalLink className="size-4" aria-hidden="true" />
-              باز کردن در تب جدا
+              <RefreshCw className={`size-4 ${checking ? 'animate-spin' : ''}`} aria-hidden="true" />
+              {checking ? 'دارم بررسی می‌کنم…' : 'دوباره بررسی می‌کنم'}
             </button>
             <button
               type="button"
@@ -134,16 +126,7 @@ export default function CookieJarNotice() {
               className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-50 dark:border-emerald-800 dark:text-emerald-200 dark:hover:bg-emerald-900/40"
             >
               <Clipboard className="size-4" aria-hidden="true" />
-              {copied ? 'کپی شد' : 'کپی آدرس'}
-            </button>
-            <button
-              type="button"
-              onClick={recheck}
-              disabled={checking}
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-50 disabled:opacity-60 dark:border-emerald-800 dark:text-emerald-200 dark:hover:bg-emerald-900/40"
-            >
-              <RefreshCw className={`size-4 ${checking ? 'animate-spin' : ''}`} aria-hidden="true" />
-              {checking ? 'دارم بررسی می‌کنم…' : 'دوباره بررسی می‌کنم'}
+              {copied ? 'کپی شد' : 'کپی نشانی'}
             </button>
             <button
               type="button"

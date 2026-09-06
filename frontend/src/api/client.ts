@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 
 import { markWaiting } from './admission';
 import { parseApiError } from './errors';
-import { readPreviewToken } from './previewSession';
+import { PRESENTED_TOKEN_PARAM, readPreviewToken } from './previewSession';
 
 // Relative URL: the Vite proxy (dev) and the reverse proxy (production) both
 // forward /api to Django, so the same build works on localhost, a phone on the
@@ -39,6 +39,13 @@ apiClient.interceptors.request.use((config) => {
   const previewToken = readPreviewToken();
   if (previewToken) {
     config.headers.Authorization = `Token ${previewToken}`;
+    // A preview proxy may drop that header on its way through and the frame is left
+    // anonymous again; the address is the one thing it has to pass along. The API reads
+    // it only while the preview switch is on under DEBUG, so this is inert in production.
+    const params = config.params as Record<string, unknown> | undefined;
+    if (!params || params.constructor === Object) {
+      config.params = { [PRESENTED_TOKEN_PARAM]: previewToken, ...(params ?? {}) };
+    }
   }
   return config;
 });

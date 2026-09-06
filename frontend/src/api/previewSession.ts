@@ -17,6 +17,9 @@
 const STORAGE_KEY = 'garinkood:preview-token';
 const URL_PARAM = 'gk_preview_token';
 
+/** The name the API looks for on a request that cannot present a header. */
+export const PRESENTED_TOKEN_PARAM = 'gk_token';
+
 /** Held between requests without needing storage — a frame can deny even that. */
 let heldToken = '';
 
@@ -106,6 +109,26 @@ export function adoptPreviewTokenFromUrl(): void {
     window.localStorage.setItem(STORAGE_KEY, token);
   } catch {
     // Memory for this page view; the address still holds it for the next one.
+  }
+}
+
+/**
+ * Put the credential into a URL that is fetched without axios.
+ *
+ * The waiting room and the «this page errored» report are plain `fetch` calls — they have
+ * to keep working when the app is half-dead — and in a preview they are also the requests
+ * a proxy may strip of its header. A relative URL comes back a relative URL, so the
+ * preview's own host is never rewritten.
+ */
+export function withPreviewCredential(url: string): string {
+  const token = readPreviewToken();
+  if (!token) return url;
+  try {
+    const target = new URL(url, window.location.origin);
+    target.searchParams.set(PRESENTED_TOKEN_PARAM, token);
+    return `${target.pathname}${target.search}`;
+  } catch {
+    return url;
   }
 }
 

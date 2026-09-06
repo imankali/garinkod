@@ -285,7 +285,13 @@ Three things cover it:
   reload in a storage-less frame still know who it is. The parameter is removed from the
   address as it is read, and nothing trusts it: an unknown key leaves the visitor a visitor.
   With no cookie at all, `AdmissionMiddleware` recognises the header too, so a signed-in
-  operator is tallied as a user and is not queued behind their own shop.
+  operator is tallied as a user and is not queued behind their own shop. A proxy in front of
+  the frame can pass the page and drop the header — it has no reason to keep an
+  `Authorization` it does not use — so the same key is also sent as `?gk_token=…` on the
+  request (`shop/preview.py`), which a rewriting proxy leaves alone because it is the
+  address the page is already fetching. It is accepted only while the preview switch is on
+  under DEBUG, and recorded nowhere: the error notebook and presence store paths without
+  their query strings, and a key nobody recognises authenticates nobody.
 - **`CookieJarNotice`** in the SPA verifies a sign-in actually stuck: after every password,
   OTP and registration success the store probes `/api/auth/session/` once, and if the
   session is anonymous — cookie and stored token both refused — it clears the half-logged
