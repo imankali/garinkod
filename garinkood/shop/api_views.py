@@ -32,6 +32,7 @@ from .search import ResilientProductSearchFilter
 from .models import (
     Category, Product, Comment, UserAccount, Cart, CartItem, Order, OrderItem,
     ProductPackage, ProductImage, Tag, CommentVote, ReturnPolicySettings,
+    CapacitySettings, PresenceBeat,
     ServiceRequest, ProcurementRequest, Storefront, MarketplaceListing,
     PaymentAttempt, AffiliateProfile, AffiliateConversion, FinancialLedgerEntry,
     PlatformFeedback, StorefrontComplaint, VisualSearchRequest, Coupon, Wallet,
@@ -2576,14 +2577,35 @@ def management_users(request):
         if level_filter.isdigit():
             queryset = queryset.filter(account__level=int(level_filter))
 
+        # «کی همین حالا داخل سایت است» از همان جدول حضور خوانده می‌شود که میانه‌ی
+        # درخواست‌های واقعی نوشته‌اش می‌کند؛ نه از یک دکمه‌ی «online» در مرورگر.
+        capacity = CapacitySettings.load()
+        since = timezone.now() - timedelta(minutes=max(1, capacity.activity_window_minutes))
+        present = PresenceBeat.objects.filter(last_seen_at__gte=since, kind=PresenceBeat.KIND_USER)
+        if request.query_params.get('online') in ('1', 'true'):
+            queryset = queryset.filter(pk__in=present.values_list('user_id', flat=True))
+        if request.query_params.get('inactive') in ('1', 'true'):
+            queryset = queryset.filter(is_active=False)
+
         total = queryset.count()
         start = (page - 1) * page_size
         members = queryset[start:start + page_size]
+        ids = [member.pk for member in members]
+        beats = {beat.user_id: beat for beat in present.filter(user_id__in=ids)}
+        orders = dict(
+            Order.objects.filter(user_id__in=ids).values('user').annotate(total=Count('id'))
+            .values_list('user', 'total')
+        )
+        reviews = dict(
+            Comment.objects.filter(user_id__in=ids, parent__isnull=True).values('user').annotate(total=Count('id'))
+            .values_list('user', 'total')
+        )
         return Response({
             'count': total,
             'page': page,
             'page_size': page_size,
             'total_pages': (total + page_size - 1) // page_size or 1,
+            'presence_window_minutes': capacity.activity_window_minutes,
             'levels': [{'value': value, 'label': label} for value, label in UserAccount.LEVEL_CHOICES],
             'results': [
                 {
@@ -2598,6 +2620,12 @@ def management_users(request):
                     'is_superuser': member.is_superuser,
                     'groups': list(member.groups.values_list('name', flat=True)),
                     'date_joined': member.date_joined,
+                    'orders': orders.get(member.pk, 0),
+                    'reviews': reviews.get(member.pk, 0),
+                    'online': member.pk in beats,
+                    'last_seen_at': beats[member.pk].last_seen_at if member.pk in beats else None,
+                    'requests_in_window': beats[member.pk].requests if member.pk in beats else 0,
+                    'current_path': beats[member.pk].path if member.pk in beats else '',
                 }
                 for member in members
             ],

@@ -61,6 +61,11 @@ MIDDLEWARE = [
     # Axes protects password authentication; the existing OTP limits stay
     # independent and continue to provide phone/IP/cooldown protection.
     "axes.middleware.AxesMiddleware",
+    # What broke (a row in the shop's own log) and who is here (a presence beat,
+    # plus the waiting room when the operator turns it on). Both run after auth so
+    # a row can say who, and both fail open: neither may cost a page its response.
+    "shop.logs.ErrorLogMiddleware",
+    "shop.admission.AdmissionMiddleware",
     "simple_history.middleware.HistoryRequestMiddleware",
     "waffle.middleware.WaffleMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",

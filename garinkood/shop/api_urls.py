@@ -1,7 +1,8 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from . import (
-    api_views, catalog_views, content_views, desk_views, farm_views, marketplace_views, reference_views,
+    api_views, catalog_views, content_views, desk_views, farm_views, marketplace_views, ops_views,
+    reference_views,
 )
 from .messaging.webhooks import whatsapp_webhook
 
@@ -180,6 +181,13 @@ urlpatterns = [
         name='management_shipment_tracking_event',
     ),
     path('management/users/', api_views.management_users, name='management_users'),
+    # Operations: the health of the machine, the notebook of what broke, and the
+    # inbox for a visitor's own report of an error. Staff session or ops token.
+    path('ops/health/', ops_views.health, name='ops_health'),
+    path('ops/logs/', ops_views.log_list, name='ops_logs'),
+    path('ops/logs/<int:pk>/resolve/', ops_views.log_resolve, name='ops_log_resolve'),
+    path('system/report/', ops_views.client_report, name='system_report'),
+    path('ops/admission/', ops_views.admission_state, name='ops_admission'),
     path('management/moderation/queue/', api_views.management_moderation_queue, name='management_moderation_queue'),
     path('management/moderation/bulk/', api_views.management_bulk_moderate, name='management_bulk_moderate'),
     path('management/moderate/<str:content_type>/<int:object_id>/', api_views.management_moderate_content, name='management_moderate_content'),

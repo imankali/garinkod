@@ -5,7 +5,7 @@ from django.http import HttpResponseRedirect
 from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
 
-from shop import operational, seo_views
+from shop import operational, ops_views, seo_views
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -15,6 +15,9 @@ urlpatterns = [
     path("health/live/", operational.liveness, name="health-live"),
     path("ops/health/ready/", operational.ProtectedReadinessView.as_view(), name="health-ready"),
     path("ops/metrics/", operational.metrics, name="prometheus-metrics"),
+    # The waiting room is served here rather than inside the SPA: whoever is held
+    # out of a slow site must still be able to load the page that lets them in.
+    path("queue/", ops_views.queue_view, name="queue"),
     path("api/", include("shop.api_urls")),
     path("robots.txt", seo_views.robots_txt, name="robots"),
     path("sitemap.xml", seo_views.sitemap_xml, name="sitemap"),

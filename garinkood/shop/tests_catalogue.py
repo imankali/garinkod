@@ -706,3 +706,75 @@ class FaqPageTests(TestCase):
         call_command('seed_faq_page')
         slugs = [row['slug'] for row in self.client.get('/api/pages/').data]
         self.assertIn('faq', slugs)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class PackagingCopyActionTests(TestCase):
+    """The admin can repeat one product's packaging across a selection.
+
+    Nobody fills thirty products' bags in by hand, so the alternative is nobody
+    filling them in at all; the guard rail is that money never travels with the
+    structure.
+    """
+
+    def setUp(self):
+        self.seller = User.objects.create_user(username='seller-copy')
+        self.category = Category.objects.create(name='کود', slug='fertilizer')
+        self.source = make_product(self.category, self.seller, slug='source-bag', price=1_000_000)
+        self.target = make_product(self.category, self.seller, slug='target-bag', price=4_000_000, stock=3)
+        ProductPackage.objects.create(
+            product=self.source, label='کیسه ۵۰ کیلویی', weight_kg=50, price=4_000_000, stock=9,
+            min_order_quantity=2, bulk_note='زیر ۵۰ کیلو فله.', is_default=True,
+        )
+        self.tag = Tag.objects.create(name='کود شیمیایی', slug='کود-شیمیایی')
+        self.source.tags.add(self.tag)
+
+    def run_action(self):
+        """Call the action the way the changelist does, keeping its message.
+
+        ``request`` is only used for the message, so ``None`` is enough here —
+        what is under test is which columns travel, not the admin plumbing.
+        """
+        from django.contrib import admin as django_admin
+
+        from .models import Product as ProductModel
+
+        seen = []
+        original = django_admin.ModelAdmin.message_user
+        django_admin.ModelAdmin.message_user = (
+            lambda self, request, message, *args, **kwargs: seen.append(message)
+        )
+        try:
+            django_admin.site._registry[ProductModel].copy_packaging(
+                None, ProductModel.objects.filter(pk__in=[self.source.pk, self.target.pk]).order_by('id')
+            )
+        finally:
+            django_admin.ModelAdmin.message_user = original
+        return seen[0]
+
+    def test_structure_travels_and_money_does_not(self):
+        message = self.run_action()
+
+        copied = self.target.packages.get(label='کیسه ۵۰ کیلویی')
+        self.assertEqual(copied.weight_kg, 50)
+        self.assertEqual(copied.min_order_quantity, 2)
+        self.assertEqual(copied.bulk_note, 'زیر ۵۰ کیلو فله.')
+        self.assertTrue(copied.is_default)
+        self.assertIsNone(copied.price, 'a copied bag must not carry the other price')
+        self.assertIsNone(copied.stock)
+        # An empty field means "follow the product", so the copy is sellable now.
+        self.assertEqual(copied.effective_price, 4_000_000)
+        self.assertEqual(copied.effective_stock, 3)
+        self.assertIn('قیمت و موجودی هیچ‌کدام کپی نشد', message)
+
+    def test_the_source_product_is_left_alone_and_tags_are_shared(self):
+        self.run_action()
+        self.assertEqual(self.source.tags.count(), 1)
+        self.assertEqual(list(self.target.tags.values_list('slug', flat=True)), ['کود-شیمیایی'])
+        self.assertEqual(self.source.packages.count(), 1)
+
+    def test_rerunning_the_action_does_not_duplicate_labels(self):
+        self.run_action()
+        self.run_action()
+        self.assertEqual(self.target.packages.count(), 1)
+        self.assertEqual(self.target.tags.count(), 1)

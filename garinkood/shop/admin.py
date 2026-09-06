@@ -1,6 +1,6 @@
 from django.conf import settings
 from django.contrib import admin, messages
-from django.utils.html import format_html
+from django.utils.html import escape, format_html
 from django.db import transaction
 from django.db.models import Count, Q
 from django.utils import timezone
@@ -22,6 +22,7 @@ from .models import (
     TeamMember, BrandPartner, SiteContact, NewsletterSubscriber, PRODUCT_ATTRIBUTE_TEMPLATE,
     StorefrontConversation, StorefrontMessage, DeskSettings, DeskAgent, QuickReply,
     ConversationRating, ProductImage, ProductPackage, Tag, ReturnPolicySettings,
+    CapacitySettings, PresenceBeat, QueueTicket, ResourceSample, SystemLogEntry,
 )
 from .resources import OrderResource, ProductResource
 from .rewards import mark_order_paid_and_reward
@@ -193,7 +194,7 @@ class AdminProduct(ImportExportMixin, SimpleHistoryAdmin):
     readonly_fields = ('created', 'updated',)
     show_full_result_count = False
     save_as = True
-    actions = [make_published, make_draft, 'add_standard_attribute_rows']
+    actions = [make_published, make_draft, 'add_standard_attribute_rows', 'copy_packaging']
 
     inlines = [ProductAttributeInline, ProductImageInline, ProductPackageInline]
     fieldsets = (
@@ -277,6 +278,56 @@ class AdminProduct(ImportExportMixin, SimpleHistoryAdmin):
         self.message_user(
             request,
             f'{created} ردیف ویژگی اضافه شد. مقدار هر ردیف را وارد و ذخیره کنید.',
+        )
+
+    @admin.action(description='کپی بسته‌بندی و برچسب‌ها از نخستین محصول انتخابی')
+    def copy_packaging(self, request, queryset):
+        """Repeat one product's packaging structure across the selection.
+
+        Only the structure travels: labels, weights, minimum order, the bulk note
+        and the tags. Price and stock are deliberately left blank on the copies,
+        because a bag copied from another product carries another product's money —
+        and a shop that sells the wrong number once stops being trusted on any of
+        them. Leaving the field empty also means "follow my own price", so the copy
+        is sellable at once and correct until someone edits it.
+        """
+        products = list(queryset)
+        source = next((product for product in products if product.packages.exists()), None)
+        if source is None:
+            self.message_user(request, 'نخستین محصول انتخابی هیچ بسته‌بندی‌ای ندارد.', level='warning')
+            return
+
+        packages = 0
+        tags = 0
+        for product in products:
+            if product.pk == source.pk:
+                continue
+            taken = set(product.packages.values_list('label', flat=True))
+            ProductPackage.objects.bulk_create(
+                [
+                    ProductPackage(
+                        product=product,
+                        label=row.label,
+                        weight_kg=row.weight_kg,
+                        min_order_quantity=row.min_order_quantity,
+                        bulk_note=row.bulk_note,
+                        is_default=row.is_default,
+                        order=row.order,
+                    )
+                    for row in source.packages.all()
+                    if row.label not in taken
+                ]
+            )
+            packages += product.packages.count() - len(taken)
+            for tag in source.tags.all():
+                if not product.tags.filter(pk=tag.pk).exists():
+                    product.tags.add(tag)
+                    tags += 1
+
+        self.message_user(
+            request,
+            f'{packages} بسته‌بندی و {tags} برچسب کپی شد. '
+            'قیمت و موجودی هیچ‌کدام کپی نشد؛ برای هر کالا جدا وارد کنید.',
         )
 
 
@@ -1048,4 +1099,222 @@ class AdminReturnPolicySettings(admin.ModelAdmin):
         return not ReturnPolicySettings.objects.exists()
 
     def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(CapacitySettings)
+class AdminCapacitySettings(admin.ModelAdmin):
+    """One row, because a shop has one front door.
+
+    The measured figures are shown next to the ratios they feed, so the number the
+    waiting room uses can be argued with on the page where it is set — and the
+    button that opens it is deliberately far away from anything that invents a
+    number.
+    """
+
+    list_display = ('strategy', 'limit_now', 'queue_enabled', 'updated_at')
+    fields = (
+        'strategy', 'fixed_limit', 'users_per_cpu_core', 'users_per_gb_ram', 'safety_percent',
+        'derate_load_percent', 'activity_window_minutes', 'sample_interval_seconds',
+        'queue_enabled', 'queue_max_minutes', 'bypass_staff', 'queue_message', 'measured_now',
+    )
+    readonly_fields = ('measured_now',)
+
+    @admin.display(description='سقف همین لحظه')
+    def limit_now(self, obj) -> str:
+        from .capacity import effective_limit
+
+        limit, _basis = effective_limit(settings=obj)
+        return f'{limit} نفر'
+
+    @admin.display(description='آنچه از سرور خوانده می‌شود')
+    def measured_now(self, obj) -> str:
+        from .capacity import effective_limit, measure_server
+
+        data = measure_server()
+        limit, basis = effective_limit(data, obj)
+        rows = [
+            ('هسته پردازنده در دسترس', data.cpu_count if data.cpu_count is not None else '—'),
+            ('بار یک‌دقیقه‌ای', f'{data.load_1m:.2f}' if data.load_1m is not None else '—'),
+            ('حافظه آزاد', f'{data.memory_available_mb or 0} مگابایت'),
+            ('سقف حافظه کانتینر', f'{data.container_limit_mb} مگابایت' if data.container_limit_mb else 'محدود نشده'),
+            ('حافظه قابل استفاده برای محاسبه', f'{data.usable_memory_mb} مگابایت'),
+            ('فضای دیسک باقی‌مانده', f'{data.disk_free_mb or 0} مگابایت'),
+            ('پردازنده گرافیکی', data.gpu or 'گزارش نشده'),
+            ('سقف به‌دست‌آمده', f'{limit} نفر'),
+            ('نحوه محاسبه', basis),
+        ]
+        lines = '<br>'.join(
+            f'<strong>{escape(label)}:</strong> {escape(str(value))}' for label, value in rows
+        )
+        return format_html(
+            '<div style="max-width:44rem;line-height:1.9">{}</div>'
+            '<p class="help">این اعداد همین حالا از هسته‌ی لینوکس (proc و cgroup) خوانده شده‌اند؛ '
+            'ذخیره نمی‌شوند، پس با تغییر بار سرور عوض می‌شوند. '
+            '«ضریب اطمینان» را کم کنید اگر می‌خواهید سایت زودتر به صف برود.</p>',
+            format_html(lines),
+        )
+
+    def has_add_permission(self, request):
+        return not CapacitySettings.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(ResourceSample)
+class AdminResourceSample(admin.ModelAdmin):
+    """The graph's raw material: what the shop measured, when, and with what limit."""
+
+    list_display = ('created_at', 'online_users', 'online_guests', 'queue_waiting', 'capacity_limit', 'load_1m', 'memory_available_mb', 'disk_free_mb')
+    ordering = ('-created_at',)
+    list_filter = ()
+    date_hierarchy = 'created_at'
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(PresenceBeat)
+class AdminPresenceBeat(admin.ModelAdmin):
+    """Who is here now, from the requests they actually made."""
+
+    list_display = ('who', 'kind', 'path', 'requests', 'last_seen_at', 'is_staff')
+    list_filter = ('kind', 'is_staff')
+    search_fields = ('identity', 'path', 'user__username')
+    ordering = ('-last_seen_at',)
+    readonly_fields = ('identity', 'user', 'kind', 'is_staff', 'path', 'requests', 'started_at', 'last_seen_at')
+
+    @admin.display(description='کاربر', ordering='user__username')
+    def who(self, obj) -> str:
+        if obj.user_id and obj.user is not None:
+            return obj.user.get_full_name() or obj.user.get_username()
+        return 'مهمان'
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+def admit_tickets(modeladmin, request, queryset):
+    """Let these people in now — the shopkeeper's override of the line."""
+    updated = queryset.update(status=QueueTicket.STATUS_ADMITTED, admitted_at=timezone.now())
+    modeladmin.message_user(request, f'{updated} نفر وارد شدند.')
+
+
+admit_tickets.short_description = 'ورود فوری به سایت (بدون توجه به ظرفیت)'
+
+
+def release_tickets(modeladmin, request, queryset):
+    """Put them back in the line, which is what frees a place they abandoned."""
+    updated = queryset.update(status=QueueTicket.STATUS_WAITING, admitted_at=None)
+    modeladmin.message_user(request, f'{updated} نفر به صف برگشتند.')
+
+
+release_tickets.short_description = 'بازگرداندن به صف'
+
+
+@admin.register(QueueTicket)
+class AdminQueueTicket(admin.ModelAdmin):
+    list_display = ('position_or_state', 'key', 'path', 'status', 'created_at', 'admitted_at', 'waits')
+    list_filter = ('status',)
+    search_fields = ('key', 'path')
+    ordering = ('created_at',)
+    actions = [admit_tickets, release_tickets]
+
+    @admin.display(description='وضعیت')
+    def position_or_state(self, obj) -> str:
+        if obj.status == QueueTicket.STATUS_WAITING:
+            return f'نفر {obj.position} در صف ({obj.minutes_waiting()} دقیقه)'
+        return 'وارد شده'
+
+    def has_add_permission(self, request):
+        return False
+
+
+class ResolvedLogFilter(admin.SimpleListFilter):
+    """باز / برطرف‌شده — چون «وضعیت» یک بازه تاریخ نیست، یک تصمیم است."""
+
+    title = 'وضعیت'
+    parameter_name = 'state'
+
+    def lookups(self, request, model_admin):
+        return (('open', 'باز'), ('resolved', 'برطرف‌شده'))
+
+    def queryset(self, request, queryset):
+        value = self.value()
+        if value == 'open':
+            return queryset.filter(resolved_at__isnull=True)
+        if value == 'resolved':
+            return queryset.filter(resolved_at__isnull=False)
+        return queryset
+
+
+def mark_logs_resolved(modeladmin, request, queryset):
+    user = request.user if request.user.is_authenticated else None
+    updated = queryset.update(resolved_at=timezone.now(), resolved_by=user)
+    modeladmin.message_user(request, f'{updated} مورد بسته شد.')
+
+
+mark_logs_resolved.short_description = 'برطرف‌شده علامت بزن'
+
+
+def reopen_logs(modeladmin, request, queryset):
+    updated = queryset.update(resolved_at=None, resolved_by=None)
+    modeladmin.message_user(request, f'{updated} مورد دوباره باز شد.')
+
+
+reopen_logs.short_description = 'دوباره باز کن'
+
+
+@admin.register(SystemLogEntry)
+class AdminSystemLogEntry(admin.ModelAdmin):
+    """The notebook. Grouped, counted, and closable.
+
+    The message is shown read-only and the count is editable-free on purpose: a
+    row here is evidence about what happened, and rewriting it in place makes the
+    next reader guess which parts were typed by hand.
+    """
+
+    list_display = ('last_at', 'level', 'source', 'title', 'count', 'status_state', 'who_asked', 'path')
+    list_filter = ('level', 'source', ResolvedLogFilter)
+    search_fields = ('title', 'message', 'path', 'source')
+    ordering = ('-last_at',)
+    date_hierarchy = 'last_at'
+    actions = [mark_logs_resolved, reopen_logs]
+    readonly_fields = (
+        'group', 'level', 'source', 'title', 'message', 'path', 'method', 'status_code',
+        'count', 'first_at', 'last_at', 'user', 'user_label', 'visitor_key', 'context_view',
+    )
+    fieldsets = (
+        ('چه اتفاقی افتاد', {'fields': ('level', 'source', 'title', 'message')}),
+        ('کجا و چند بار', {'fields': ('path', 'method', 'status_code', 'count', 'first_at', 'last_at')}),
+        ('چه کسی دید', {'fields': ('user', 'user_label', 'visitor_key')}),
+        ('بافت (پاک‌سازی‌شده)', {'fields': ('context_view',)}),
+        ('رفع', {'fields': ('resolved_at', 'resolved_by', 'note')}),
+    )
+
+    @admin.display(description='تکرارها')
+    def status_state(self, obj) -> str:
+        return 'باز' if obj.is_open else f'بسته ({obj.resolved_at:%Y/%m/%d})' if obj.resolved_at else 'باز'
+
+    @admin.display(description='کاربر')
+    def who_asked(self, obj) -> str:
+        return obj.user_label or ('مهمان' if obj.visitor_key else '—')
+
+    @admin.display(description='بافت')
+    def context_view(self, obj) -> str:
+        from json import dumps
+
+        return dumps(obj.context or {}, ensure_ascii=False, indent=2)
+
+    def has_add_permission(self, request):
         return False
