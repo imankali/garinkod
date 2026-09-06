@@ -104,6 +104,21 @@ class Product(models.Model):
     shipping_width_cm = models.PositiveSmallIntegerField(default=0, verbose_name="عرض بسته (سانتی‌متر)")
     shipping_height_cm = models.PositiveSmallIntegerField(default=0, verbose_name="ارتفاع بسته (سانتی‌متر)")
 
+    # Bulk sales of an agricultural input are decided on facts a supplier states
+    # per batch: how long the bag has left, the smallest amount we are willing to
+    # open a bag for, and whether a small order is filled bulk from a bigger one.
+    # These lived inside the description text, where nothing could filter,
+    # validate or badge them.
+    production_date = models.DateField(null=True, blank=True, verbose_name="تاریخ تولید")
+    expiry_date = models.DateField(null=True, blank=True, verbose_name="تاریخ انقضا")
+    min_order_quantity = models.PositiveIntegerField(default=1, verbose_name="حداقل سفارش")
+    bulk_note = models.TextField(max_length=500, blank=True, verbose_name="توضیح فروش فله")
+    video_url = models.URLField(max_length=300, blank=True, verbose_name="ویدئوی معرفی")
+    tags = models.ManyToManyField('Tag', blank=True, related_name='products', verbose_name="برچسب‌ها")
+    # «پربازدیدترین» needs a column incremented in a single UPDATE, not a value
+    # derived per request.
+    views = models.PositiveIntegerField(default=0, db_index=True, verbose_name="بازدید")
+
     objects = ProductManager()
     history = HistoricalRecords()
 
@@ -134,6 +149,176 @@ class Product(models.Model):
         if self.discount_percent and self.discount_percent > 0:
             return max(int(self.price * (100 - self.discount_percent) / 100), 0)
         return self.price
+
+
+
+    @property
+    def expiry_days_left(self) -> int | None:
+        """Days before the earliest declared expiry, product-level or per package.
+
+        An absent date is unknown, not expired, so nothing is claimed here.
+        """
+        dates = [self.expiry_date] if self.expiry_date else []
+        dates += [pkg.expiry_date for pkg in self.packages.all() if pkg.expiry_date]
+        if not dates:
+            return None
+        return (min(dates) - timezone.localdate()).days
+
+    @property
+    def is_expiring_soon(self) -> bool:
+        """True when a declared batch is inside the 90-day warning window."""
+        left = self.expiry_days_left
+        return left is not None and left <= 90
+
+    @property
+    def gallery(self) -> list:
+        """Cover first, then the admin gallery, without repeating the cover."""
+        shots = [{'url': self.image_url, 'caption': ''}]
+        seen = {self.image.name} if self.image else set()
+        for item in self.images.all():
+            if item.image and item.image.name not in seen:
+                seen.add(item.image.name)
+                shots.append({'url': item.image.url, 'caption': item.caption})
+        return shots
+
+    @property
+    def default_package(self):
+        """The package a cart row should be created with, if any is declared."""
+        packages = list(self.packages.all())
+        if not packages:
+            return None
+        for package in packages:
+            if package.is_default:
+                return package
+        return packages[0]
+
+
+class Tag(models.Model):
+    """A cross-category label («کود محلول‌پاشی»، «مصرف خاکی»).
+
+    A category answers "what is it", a tag answers "how is it used", so the
+    catalogue stays navigable along the axis a farmer actually thinks in. The slug
+    is derived from the Persian name with the site's own transliterating helper.
+    """
+
+    name = models.CharField(max_length=80, unique=True, verbose_name="نام برچسب")
+    slug = models.SlugField(max_length=90, unique=True, verbose_name="اسلاگ")
+    description = models.TextField(max_length=1000, blank=True, verbose_name="توضیح")
+    image = models.ImageField(upload_to='tags/', blank=True, null=True, verbose_name="تصویر")
+    seo_title = models.CharField(max_length=70, blank=True, verbose_name="عنوان سئو")
+    seo_description = models.CharField(max_length=170, blank=True, verbose_name="توضیح متا")
+    history = HistoricalRecords()
+
+    class Meta:
+        ordering = ('name',)
+        verbose_name = "برچسب"
+        verbose_name_plural = "برچسب‌ها"
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            from .slugs import slugify_fa
+            self.slug = slugify_fa(self.name)
+        super().save(*args, **kwargs)
+
+    def get_absolute_url(self):
+        return reverse('shop:tag_detail', args=[self.slug])
+
+
+class ProductImage(models.Model):
+    """One extra photo in a product's gallery."""
+
+    product = models.ForeignKey(
+        Product, on_delete=models.CASCADE, related_name='images', verbose_name="محصول"
+    )
+    image = models.ImageField(upload_to='products/gallery/', verbose_name="تصویر")
+    caption = models.CharField(max_length=200, blank=True, verbose_name="زیرنویس")
+    order = models.PositiveSmallIntegerField(default=0, verbose_name="ترتیب")
+
+    class Meta:
+        ordering = ('order', 'id')
+        verbose_name = "تصویر محصول"
+        verbose_name_plural = "تصاویر محصول"
+
+    def __str__(self):
+        return f"تصویر محصول {self.product_id}"
+
+
+class ProductPackage(models.Model):
+    """A purchasable packaging of a product, with its own price and stock.
+
+    «۱ کیلویی فله» and «کیسه ۲۵ کیلویی» are the same input at two unit
+    economics; a single price on the product forces either a wrong number or a
+    description that lies. When a product has no package rows at all the
+    storefront falls back to the product's own price and stock, so nothing here is
+    mandatory and the existing catalogue keeps working untouched.
+    """
+
+    product = models.ForeignKey(
+        Product, on_delete=models.CASCADE, related_name='packages', verbose_name="محصول"
+    )
+    label = models.CharField(max_length=120, verbose_name="نوع بسته‌بندی")
+    weight_kg = models.DecimalField(
+        max_digits=10, decimal_places=3, null=True, blank=True, verbose_name="وزن (کیلوگرم)"
+    )
+    # A null price/stock means "follow the product", which is what a shop that
+    # only sells one bag should not have to duplicate.
+    price = models.PositiveBigIntegerField(null=True, blank=True, verbose_name="قیمت (خالی = قیمت محصول)")
+    stock = models.PositiveIntegerField(null=True, blank=True, verbose_name="موجودی (خالی = موجودی محصول)")
+    min_order_quantity = models.PositiveIntegerField(default=1, verbose_name="حداقل سفارش")
+    bulk_note = models.TextField(max_length=500, blank=True, verbose_name="توضیح فروش فله")
+    production_date = models.DateField(null=True, blank=True, verbose_name="تاریخ تولید")
+    expiry_date = models.DateField(null=True, blank=True, verbose_name="تاریخ انقضا")
+    is_default = models.BooleanField(default=False, verbose_name="پیش‌فرض")
+    order = models.PositiveSmallIntegerField(default=0, verbose_name="ترتیب")
+
+    class Meta:
+        ordering = ('order', 'id')
+        verbose_name = "بسته‌بندی محصول"
+        verbose_name_plural = "بسته‌بندی‌های محصول"
+        constraints = [
+            models.UniqueConstraint(fields=['product', 'label'], name='unique_product_package_label'),
+        ]
+
+    def __str__(self):
+        return f"{self.product.title} — {self.label}"
+
+    @property
+    def effective_price(self) -> int:
+        return self.price if self.price is not None else self.product.price
+
+    @property
+    def discounted_price(self) -> int:
+        percent = self.product.discount_percent or 0
+        price = self.effective_price
+        return max(int(price * (100 - percent) / 100), 0) if percent else price
+
+    @property
+    def effective_stock(self) -> int:
+        return self.stock if self.stock is not None else self.product.stock
+
+    @property
+    def is_in_stock(self) -> bool:
+        return self.product.available and self.effective_stock > 0
+
+    @property
+    def expiry_days_left(self) -> int | None:
+        if not self.expiry_date:
+            return self.product.expiry_days_left
+        return (self.expiry_date - timezone.localdate()).days
+
+    @property
+    def price_per_kg(self) -> int | None:
+        """Unit price, when both the weight and a price are known.
+
+        Comparing «۱,۷۵۰,۰۰۰ تومان برای ۵ لیتر» against «۲۹۰,۰۰۰ برای ۵۰ کیلو»
+        by eye is how a bulk buyer overpays; the number that matters is per unit.
+        """
+        if self.weight_kg and self.effective_price and self.weight_kg > 0:
+            return int(self.effective_price / float(self.weight_kg))
+        return None
 
 
 # --- مشخصات اختصاصی برای هر دسته ---
@@ -316,6 +501,13 @@ class Comment(models.Model):
         verbose_name="امتیاز (۱ تا ۵)",
     )
     parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='replies')
+    # «مفید بود» lets buyers rank each other's experience; keeping the tally as a
+    # column means a review list can be ordered by it in one query.
+    helpful_count = models.PositiveIntegerField(default=0, verbose_name="رأی مفید بودن")
+    is_reported = models.BooleanField(default=False, verbose_name="گزارش‌شده")
+    # A «تجربه خرید مشتریان» page has to be curated: an editor picks which real
+    # reviews represent the shop, instead of the newest three at random.
+    is_featured = models.BooleanField(default=False, db_index=True, verbose_name="نمایش در تجربه خرید مشتریان")
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
     active = models.BooleanField(default=False, verbose_name="فعال")
@@ -470,6 +662,12 @@ class CartItem(models.Model):
 
     cart = models.ForeignKey(Cart, related_name='items', on_delete=models.CASCADE)
     product = models.ForeignKey(Product, null=True, blank=True, on_delete=models.CASCADE)
+    # Which packaging was picked, so «کیسه ۲۵ کیلویی» and «۱ کیلویی فله» are two
+    # rows with two prices instead of one row with a guess.
+    product_package = models.ForeignKey(
+        'ProductPackage', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='cart_items', verbose_name="بسته‌بندی"
+    )
     listing = models.ForeignKey(
         'MarketplaceListing', null=True, blank=True, on_delete=models.CASCADE, related_name='cart_items'
     )
@@ -479,10 +677,18 @@ class CartItem(models.Model):
         verbose_name = "آیتم سبد"
         verbose_name_plural = "آیتم‌های سبد"
         constraints = [
+            # Two constraints rather than one three-column one: NULL never
+            # collides inside a partial unique index, so a row without a chosen
+            # packaging needs its own guard to keep «one row per product».
             models.UniqueConstraint(
                 fields=['cart', 'product'],
-                condition=models.Q(product__isnull=False),
-                name='unique_cart_product',
+                condition=models.Q(product__isnull=False, product_package__isnull=True),
+                name='unique_cart_product_without_package',
+            ),
+            models.UniqueConstraint(
+                fields=['cart', 'product', 'product_package'],
+                condition=models.Q(product_package__isnull=False),
+                name='unique_cart_product_package',
             ),
             models.UniqueConstraint(
                 fields=['cart', 'listing'],
@@ -510,9 +716,21 @@ class CartItem(models.Model):
         return self.listing.title if self.listing_id else self.product.title
 
     @property
+    def package(self):
+        """The chosen packaging, if the product declares any."""
+        return self.product_package
+
+    @property
+    def package_label(self) -> str:
+        return self.product_package.label if self.product_package_id else ''
+
+    @property
     def unit_price(self) -> int:
-        source = self.listing if self.listing_id else self.product
-        return int(getattr(source, 'price', 0) or 0)
+        if self.listing_id:
+            return int(self.listing.price or 0)
+        if self.product_package_id:
+            return int(self.product_package.effective_price or 0)
+        return int(self.product.price or 0)
 
     @property
     def total_price(self):
@@ -522,12 +740,21 @@ class CartItem(models.Model):
     def available_quantity(self) -> int:
         if self.listing_id:
             return int(self.listing.quantity_available)
+        if self.product_package_id:
+            return min(int(self.product_package.effective_stock), int(self.product.stock))
         return int(self.product.stock)
 
     @property
     def is_in_stock(self):
         if self.listing_id:
             return self.listing.is_purchasable and self.quantity <= int(self.listing.quantity_available)
+        if self.product_package_id:
+            package = self.product_package
+            return (
+                package.is_in_stock
+                and self.quantity <= package.effective_stock
+                and self.quantity <= self.product.stock
+            )
         return self.product.is_in_stock and self.quantity <= self.product.stock
 
 
@@ -693,6 +920,9 @@ class OrderItem(models.Model):
     kind = models.CharField(max_length=10, choices=KIND_CHOICES, default='product', db_index=True)
     product_title = models.CharField(max_length=250)
     product_slug = models.SlugField(max_length=250)
+    # The packaging is copied onto the row, because a package can later be
+    # relabelled or retired while the invoice must keep saying what was sold.
+    package_label = models.CharField(max_length=120, blank=True, verbose_name="بسته‌بندی فروخته‌شده")
     storefront_name = models.CharField(max_length=150, blank=True, verbose_name='نام غرفه')
     storefront_slug = models.SlugField(max_length=180, blank=True)
     unit = models.CharField(max_length=30, blank=True)
@@ -3098,3 +3328,78 @@ class ConversationRating(models.Model):
 
     def __str__(self):
         return f'{self.score}★ — گفتگوی {self.conversation_id}'
+
+
+class CommentVote(models.Model):
+    """One «مفید بود» per visitor per comment.
+
+    Votes are anonymous-friendly on purpose (many buyers read reviews without
+    logging in), but the row is keyed so a refresh cannot inflate a review, and it
+    can be withdrawn.
+    """
+
+    comment = models.ForeignKey(
+        Comment, on_delete=models.CASCADE, related_name='votes', verbose_name="نظر"
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, blank=True,
+        related_name='comment_votes',
+    )
+    visitor_key = models.CharField(max_length=64, blank=True, verbose_name="کلید بازدیدکننده")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "رأی مفید بودن"
+        verbose_name_plural = "رأی‌های مفید بودن"
+        constraints = [
+            models.UniqueConstraint(fields=['comment', 'user'], name='unique_helpful_vote_per_user'),
+        ]
+
+    def __str__(self):
+        return f"مفید بودنِ نظر {self.comment_id}"
+
+
+class ReturnPolicySettings(models.Model):
+    """How long a buyer has to send goods back, decided by the operator.
+
+    A shop of this kind prints «۷ روز ضمانت بازگشت» in its footer and then
+    answers questions differently on the phone. The number belongs in one record
+    that both the badge and the legal text read, and it is left empty on purpose
+    here: an unset window shows no number anywhere rather than an invented one.
+    """
+
+    window_days = models.PositiveSmallIntegerField(
+        null=True, blank=True, verbose_name="مهلت بازگشت (روز)"
+    )
+    conditions = models.TextField(
+        max_length=1500, blank=True,
+        help_text='شرایطی که در همان صفحه حقوقی و زیر بنر پاورقی نمایش داده می‌شود.',
+        verbose_name="شرایط بازگشت کالا",
+    )
+    express_shipping_enabled = models.BooleanField(
+        default=False,
+        help_text='گزینه «تحویل فوری» را در انتخاب روش ارسال فعال می‌کند.',
+        verbose_name="ارسال فوری در سبد خرید",
+    )
+    express_shipping_fee = models.PositiveIntegerField(
+        default=0, verbose_name="هزینه اضافی ارسال فوری (تومان)"
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "تنظیمات سیاست بازگشت کالا"
+        verbose_name_plural = "تنظیمات سیاست بازگشت کالا"
+
+    def __str__(self):
+        if self.window_days:
+            return f"بازگشت کالا تا {self.window_days} روز"
+        return "سیاست بازگشت هنوز اعلام نشده"
+
+    @classmethod
+    def load(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    @property
+    def window_label(self) -> str:
+        return f"{self.window_days} روز ضمانت بازگشت کالا" if self.window_days else ""

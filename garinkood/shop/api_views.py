@@ -30,6 +30,7 @@ from .filters import ProductFilter
 from .search import ResilientProductSearchFilter
 from .models import (
     Category, Product, Comment, UserAccount, Cart, CartItem, Order, OrderItem,
+    ProductPackage, ProductImage, Tag, CommentVote, ReturnPolicySettings,
     ServiceRequest, ProcurementRequest, Storefront, MarketplaceListing,
     PaymentAttempt, AffiliateProfile, AffiliateConversion, FinancialLedgerEntry,
     PlatformFeedback, StorefrontComplaint, VisualSearchRequest, Coupon, Wallet,
@@ -549,6 +550,34 @@ class CartViewSet(viewsets.ViewSet):
         product = get_object_or_404(Product, id=product_id, status='published')
         if not product.is_in_stock:
             return Response({'error': 'این محصول موجود نیست'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # An optional packaging: the price, the stock and the minimum order all
+        # follow the bag that was picked, not the product row.
+        package = None
+        package_id = request.data.get('package_id')
+        if package_id not in (None, ''):
+            try:
+                package = ProductPackage.objects.filter(pk=int(package_id), product=product).first()
+            except (TypeError, ValueError):
+                return Response(
+                    {'error': 'شناسه بسته‌بندی نامعتبر است.'}, status=status.HTTP_400_BAD_REQUEST
+                )
+            if package is None:
+                return Response(
+                    {'error': 'این بسته‌بندی به این کالا مرتبط نیست.'}, status=status.HTTP_400_BAD_REQUEST
+                )
+        else:
+            package = product.default_package
+
+        limit = package.effective_stock if package else product.stock
+        minimum = package.min_order_quantity if package else product.min_order_quantity
+        if minimum > 1 and quantity < minimum:
+            return Response(
+                {'error': f'حداقل سفارش این کالا {minimum:,} عدد است.'.replace(',', '٬')},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if limit < 1:
+            return Response({'error': 'از این بسته‌بندی موجود نیست'}, status=status.HTTP_400_BAD_REQUEST)
         if product.price_on_request:
             # Quote-only lines (bulk/contract pricing) never enter a cart, so a
             # placeholder price can never be charged to a buyer.
@@ -560,7 +589,7 @@ class CartViewSet(viewsets.ViewSet):
                 status=status.HTTP_409_CONFLICT,
             )
 
-        max_qty = min(10, product.stock)
+        max_qty = min(10, limit)
         quantity = min(quantity, max_qty)
 
         # Locking the cart item makes repeated clicks and concurrent requests
@@ -570,13 +599,15 @@ class CartViewSet(viewsets.ViewSet):
             with transaction.atomic():
                 cart = self._get_or_create_cart(request)
                 cart_item = CartItem.objects.select_for_update().filter(
-                    cart=cart, product=product
+                    cart=cart, product=product, product_package=package
                 ).first()
                 if cart_item:
                     cart_item.quantity = min(cart_item.quantity + quantity, max_qty)
                     cart_item.save(update_fields=['quantity'])
                 else:
-                    CartItem.objects.create(cart=cart, product=product, quantity=quantity)
+                    CartItem.objects.create(
+                        cart=cart, product=product, product_package=package, quantity=quantity
+                    )
 
         serializer = CartSerializer(cart, context={'request': request})
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -804,6 +835,13 @@ def checkout(request):
                 product.id: product
                 for product in Product.objects.select_for_update().filter(id__in=product_ids).order_by('id')
             }
+            package_ids = [item.product_package_id for item in product_items if item.product_package_id]
+            locked_packages = {
+                package.id: package
+                for package in ProductPackage.objects.select_for_update().filter(
+                    id__in=package_ids
+                ).order_by('id')
+            }
             listing_ids = [item.listing_id for item in listing_items]
             locked_listings = {
                 listing.id: listing
@@ -828,6 +866,9 @@ def checkout(request):
                         },
                         status=status.HTTP_409_CONFLICT,
                     )
+                package = locked_packages.get(item.product_package_id) if item.product_package_id else None
+                if package is not None and (not package.is_in_stock or package.effective_stock < item.quantity):
+                    missing_or_unavailable.append(f'{product.title} — {package.label}')
                 if not product or product.status != 'published' or not product.available or product.stock < item.quantity:
                     missing_or_unavailable.append(item.product.title)
             for item in listing_items:
@@ -919,17 +960,24 @@ def checkout(request):
             order_items = []
             for item in product_items:
                 product = locked_products[item.product_id]
+                package = locked_packages.get(item.product_package_id) if item.product_package_id else None
                 product.stock -= item.quantity
                 if product.stock == 0:
                     product.available = False
                 product.save(update_fields=['stock', 'available', 'updated'])
+                if package is not None and package.stock is not None:
+                    # Only a package with its own declared stock is decremented;
+                    # one that inherits the product total must not double-count.
+                    package.stock = max(package.stock - item.quantity, 0)
+                    package.save(update_fields=['stock'])
                 order_items.append(OrderItem(
                     order=order,
                     product=product,
                     kind='product',
                     product_title=product.title,
                     product_slug=product.slug,
-                    unit_price=product.price,
+                    package_label=item.package_label,
+                    unit_price=item.unit_price,
                     quantity=item.quantity,
                 ))
 

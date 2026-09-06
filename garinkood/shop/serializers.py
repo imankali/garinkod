@@ -17,7 +17,8 @@ from .models import (
     StorefrontPostLike, StorefrontPostComment, StorefrontStoryView,
     FarmLand, FarmCalendarEvent, FarmConsultationRequest, AdminAuditLog,
     Shipment, ShipmentTrackingEvent, WebPushSubscription,
-    ProductAttribute, ListingAttribute, SiteArticle, Service, SitePage, SitePageBlock,
+    ProductAttribute, ListingAttribute, ProductPackage, ProductImage, Tag, ReturnPolicySettings,
+    SiteArticle, Service, SitePage, SitePageBlock,
     TeamMember, BrandPartner, SiteContact, NewsletterSubscriber, PRODUCT_ATTRIBUTE_TEMPLATE,
     DeskAgent, DeskSettings, QuickReply, ConversationRating,
 )
@@ -119,6 +120,48 @@ class ListingAttributeSerializer(serializers.ModelSerializer):
         list_serializer_class = FilledRowListSerializer
 
 
+class TagSerializer(serializers.ModelSerializer):
+    product_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Tag
+        fields = ['id', 'name', 'slug', 'description', 'product_count']
+
+    def get_product_count(self, obj) -> int:
+        return obj.products.filter(status='published').count()
+
+
+class ProductPackageSerializer(serializers.ModelSerializer):
+    """One packaging of a product, priced and stocked on its own."""
+
+    effective_price = serializers.IntegerField(read_only=True)
+    discounted_price = serializers.IntegerField(read_only=True)
+    effective_stock = serializers.IntegerField(read_only=True)
+    price_per_kg = serializers.IntegerField(read_only=True)
+    is_in_stock = serializers.BooleanField(read_only=True)
+    expiry_days_left = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = ProductPackage
+        fields = [
+            'id', 'label', 'weight_kg', 'price', 'effective_price', 'discounted_price',
+            'stock', 'effective_stock', 'min_order_quantity', 'bulk_note',
+            'production_date', 'expiry_date', 'expiry_days_left', 'is_in_stock',
+            'price_per_kg', 'is_default',
+        ]
+
+
+class ProductImageSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProductImage
+        fields = ['id', 'image', 'image_url', 'caption', 'order']
+
+    def get_image_url(self, obj) -> str:
+        return obj.image.url if obj.image else ''
+
+
 class ProductSerializer(serializers.ModelSerializer):
     category = CategorySerializer(read_only=True)
     subcategory = SubCategorySerializer(read_only=True)
@@ -131,6 +174,10 @@ class ProductSerializer(serializers.ModelSerializer):
     seed_detail = SeedDetailSerializer(read_only=True)
     equipment_detail = EquipmentDetailSerializer(read_only=True)
     attributes = ProductAttributeSerializer(many=True, read_only=True)
+    images = ProductImageSerializer(many=True, read_only=True)
+    gallery = serializers.SerializerMethodField()
+    packages = serializers.SerializerMethodField()
+    tags = TagSerializer(many=True, read_only=True)
 
     discounted_price = serializers.SerializerMethodField()
     rating_summary = serializers.SerializerMethodField()
@@ -146,8 +193,48 @@ class ProductSerializer(serializers.ModelSerializer):
             'seo_title', 'seo_description',
             'shipping_weight_grams', 'shipping_length_cm', 'shipping_width_cm',
             'shipping_height_cm', 'fertilizer_detail', 'pesticide_detail',
-            'seed_detail', 'equipment_detail', 'attributes', 'rating_summary'
+            'seed_detail', 'equipment_detail', 'attributes', 'rating_summary',
+            'images', 'gallery', 'packages', 'tags', 'views',
+            'production_date', 'expiry_date', 'expiry_days_left', 'is_expiring_soon',
+            'min_order_quantity', 'bulk_note', 'video_url',
         ]
+
+    def get_gallery(self, obj) -> list[dict]:
+        return obj.gallery
+
+    def get_packages(self, obj) -> list[dict]:
+        """Declared packagings, or one implicit entry from the product itself.
+
+        Serving a synthetic row keeps the storefront's price/stock logic in one
+        branch instead of duplicating "no package chosen" handling in the UI.
+        """
+        rows = list(obj.packages.all())
+        if rows:
+            return ProductPackageSerializer(rows, many=True).data
+        return [{
+            'id': None,
+            'label': obj.package_weight or 'تک بسته',
+            'weight_kg': None,
+            'price': obj.price,
+            'effective_price': obj.price,
+            'discounted_price': obj.discounted_price,
+            'stock': obj.stock,
+            'effective_stock': obj.stock,
+            'min_order_quantity': obj.min_order_quantity,
+            'bulk_note': obj.bulk_note,
+            'production_date': obj.production_date,
+            'expiry_date': obj.expiry_date,
+            'expiry_days_left': obj.expiry_days_left,
+            'is_in_stock': obj.is_in_stock,
+            'price_per_kg': None,
+            'is_default': True,
+        }]
+
+    def get_expiry_days_left(self, obj):
+        return obj.expiry_days_left
+
+    def get_is_expiring_soon(self, obj) -> bool:
+        return obj.is_expiring_soon
         read_only_fields = ['created', 'updated']
 
     def get_discounted_price(self, obj) -> int:
@@ -201,6 +288,8 @@ class ProductListSerializer(serializers.ModelSerializer):
     discounted_price = serializers.SerializerMethodField()
     avg_rating = serializers.SerializerMethodField()
     reviews_count = serializers.SerializerMethodField()
+    image_alt_url = serializers.SerializerMethodField()
+    is_expiring_soon = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
@@ -209,6 +298,7 @@ class ProductListSerializer(serializers.ModelSerializer):
             'available', 'is_featured', 'image', 'image_url', 'is_in_stock',
             'discount_percent', 'sales_count', 'discounted_price', 'brand', 'sku',
             'package_weight', 'price_on_request', 'avg_rating', 'reviews_count',
+            'image_alt_url', 'is_expiring_soon', 'views',
         ]
 
     def get_image_url(self, obj) -> str:
@@ -227,6 +317,14 @@ class ProductListSerializer(serializers.ModelSerializer):
     def get_reviews_count(self, obj) -> int:
         return int(getattr(obj, 'reviews_count', 0) or 0)
 
+    def get_image_alt_url(self, obj) -> str:
+        """Second gallery photo, for the hover swap on a card."""
+        shots = obj.gallery
+        return shots[1]['url'] if len(shots) > 1 else ''
+
+    def get_is_expiring_soon(self, obj) -> bool:
+        return obj.is_expiring_soon
+
 
 # ========================================
 # Comment Serializer
@@ -240,6 +338,7 @@ class CommentSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'product', 'name', 'email', 'body', 'image', 'sticker', 'rating',
             'parent', 'created', 'updated', 'active', 'replies', 'is_verified_purchase',
+            'helpful_count', 'is_featured', 'is_reported',
         ]
         read_only_fields = ['created', 'updated', 'active']
 
@@ -380,16 +479,22 @@ class CartItemSerializer(serializers.ModelSerializer):
     available_quantity = serializers.IntegerField(read_only=True)
     is_in_stock = serializers.BooleanField(read_only=True)
     min_order_quantity = serializers.SerializerMethodField()
+    package_label = serializers.CharField(read_only=True)
 
     class Meta:
         model = CartItem
         fields = [
             'id', 'kind', 'product', 'listing', 'title', 'quantity', 'unit_price',
             'total_price', 'available_quantity', 'min_order_quantity', 'is_in_stock',
+            'product_package', 'package_label',
         ]
 
     def get_min_order_quantity(self, obj) -> int:
-        return obj.listing.minimum_order if obj.listing_id else 1
+        if obj.listing_id:
+            return obj.listing.minimum_order
+        if obj.product_package_id:
+            return obj.product_package.min_order_quantity
+        return obj.product.min_order_quantity
 
 
 class CartSerializer(serializers.ModelSerializer):
@@ -524,7 +629,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'kind', 'kind_label', 'product', 'listing', 'product_title', 'product_slug',
             'storefront', 'storefront_name', 'storefront_slug', 'seller_name',
-            'unit', 'unit_price', 'quantity', 'total_price',
+            'unit', 'unit_price', 'quantity', 'total_price', 'package_label',
         ]
         read_only_fields = fields
 
