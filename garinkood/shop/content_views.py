@@ -19,6 +19,7 @@ from .models import (
     SitePage, Storefront, TeamMember, NewsletterSubscriber, Order,
 )
 from . import legal
+from .catalog_views import policy_payload
 from .schema import documented_api
 from .serializers import (
     BrandPartnerSerializer, NewsletterSubscribeSerializer, ServiceSerializer,
@@ -287,8 +288,13 @@ def legal_index(request):
 
     Public on purpose. A policy a buyer has to log in to read is not a policy,
     and the checkout page links to these documents before anyone has an account.
+
+    ``policy`` carries what the operator has configured for returns and express
+    delivery, so the hub can quote a live number instead of the text guessing one.
     """
-    return Response(legal.index_payload())
+    data = legal.index_payload()
+    data['policy'] = policy_payload()
+    return Response(data)
 
 
 @documented_api
@@ -304,4 +310,9 @@ def legal_document(request, slug: str):
     doc = legal.get(slug)
     if doc is None:
         return Response({'detail': 'سند حقوقی پیدا نشد.'}, status=status.HTTP_404_NOT_FOUND)
-    return Response(legal.payload(doc))
+    data = legal.payload(doc)
+    if doc.slug == 'returns':
+        # The window itself is a business decision, so it is injected from the
+        # admin record and the shipped wording never claims a number.
+        data['policy'] = policy_payload()
+    return Response(data)

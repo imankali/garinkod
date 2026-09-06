@@ -383,6 +383,13 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                               <p className="line-clamp-2 text-sm font-bold leading-5 text-slate-800 dark:text-white">
                                 {item.title}
                               </p>
+                              {item.package_label && (
+                                // The bag was chosen on the product page; the cart repeats it so
+                                // a 1 kg row and a 50 kg row are never mistaken for each other.
+                                <p className="mt-0.5 text-fluid-2xs font-bold text-emerald-700 dark:text-lime-300">
+                                  بسته‌بندی: {item.package_label}
+                                </p>
+                              )}
                               <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-fluid-2xs text-slate-400 dark:text-emerald-200/70">
                                 {isListing ? (
                                   <>

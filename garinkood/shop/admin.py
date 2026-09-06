@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.contrib import admin, messages
+from django.utils.html import format_html
 from django.db import transaction
 from django.db.models import Count, Q
 from django.utils import timezone
@@ -20,7 +21,7 @@ from .models import (
     ProductAttribute, ListingAttribute, SiteArticle, Service, SitePage, SitePageBlock,
     TeamMember, BrandPartner, SiteContact, NewsletterSubscriber, PRODUCT_ATTRIBUTE_TEMPLATE,
     StorefrontConversation, StorefrontMessage, DeskSettings, DeskAgent, QuickReply,
-    ConversationRating,
+    ConversationRating, ProductImage, ProductPackage, Tag, ReturnPolicySettings,
 )
 from .resources import OrderResource, ProductResource
 from .rewards import mark_order_paid_and_reward
@@ -53,6 +54,31 @@ class EquipmentDetailInline(admin.StackedInline):
     extra = 1
     verbose_name = "مشخصات ابزار"
     verbose_name_plural = "مشخصات ابزار"
+
+
+class ProductImageInline(admin.TabularInline):
+    """The gallery behind the card's hover photo and the PDP thumbnails."""
+
+    model = ProductImage
+    extra = 0
+    fields = ('order', 'image', 'caption')
+    verbose_name = 'تصویر'
+    verbose_name_plural = 'گالری تصاویر محصول'
+
+
+class ProductPackageInline(admin.TabularInline):
+    """Packagings, each priced and stocked on its own.
+
+    Price and stock may be left empty to follow the product row — that is what a
+    single-bag product should do rather than repeat itself in two places.
+    """
+
+    model = ProductPackage
+    extra = 0
+    fields = ('order', 'label', 'weight_kg', 'price', 'stock', 'min_order_quantity',
+              'production_date', 'expiry_date', 'bulk_note', 'is_default')
+    verbose_name = 'بسته‌بندی'
+    verbose_name_plural = 'بسته‌بندی‌های فروش'
 
 
 class ProductAttributeInline(admin.TabularInline):
@@ -154,9 +180,9 @@ class AdminCategory(SimpleHistoryAdmin):
 @admin.register(Product)
 class AdminProduct(ImportExportMixin, SimpleHistoryAdmin):
     resource_classes = [ProductResource]
-    list_filter = ('status', 'publish', 'created', 'author', 'category')
-    list_display = ('title', 'author', 'category', 'slug', 'status', 'publish', 'price', 'stock')
-    search_fields = ('title', 'description', 'author__username')
+    list_filter = ('status', 'publish', 'created', 'author', 'category', 'tags')
+    list_display = ('title', 'author', 'category', 'slug', 'status', 'publish', 'price', 'stock', 'expiry_short')
+    search_fields = ('title', 'description', 'author__username', 'brand', 'sku', 'tags__name')
     prepopulated_fields = {'slug': ('title',)}
     autocomplete_fields = ('author',)
     date_hierarchy = 'publish'
@@ -169,15 +195,27 @@ class AdminProduct(ImportExportMixin, SimpleHistoryAdmin):
     save_as = True
     actions = [make_published, make_draft, 'add_standard_attribute_rows']
 
-    inlines = [ProductAttributeInline]
+    inlines = [ProductAttributeInline, ProductImageInline, ProductPackageInline]
     fieldsets = (
         ('اطلاعات اصلی', {'fields': ('title', 'slug', 'author', 'status')}),
-        ('دسته‌بندی و قیمت', {'fields': ('category', 'subcategory', 'price', 'stock', 'available', 'is_featured', 'discount_percent', 'package_weight', 'price_on_request')}),
-        ('محتوا', {'fields': ('description', 'image', 'brand', 'sku', 'gtin')}),
+        ('دسته‌بندی و قیمت', {'fields': ('category', 'subcategory', 'price', 'stock', 'available', 'is_featured', 'discount_percent', 'package_weight', 'price_on_request', 'tags')}),
+        ('محتوا', {'fields': ('description', 'image', 'brand', 'sku', 'gtin', 'video_url')}),
+        ('مصرف و batch', {
+            'fields': ('production_date', 'expiry_date', 'min_order_quantity', 'bulk_note'),
+            'description': 'اگر بسته‌بندی‌های جدا تعریف شده باشند، تاریخ و حداقل سفارش هر بسته در تب «بسته‌بندی‌های فروش» اولویت دارد.',
+        }),
         ('سئو', {'fields': ('seo_title', 'seo_description'), 'classes': ('collapse',)}),
         ('ارسال', {'fields': ('shipping_weight_grams', 'shipping_length_cm', 'shipping_width_cm', 'shipping_height_cm'), 'classes': ('collapse',)}),
         ('تاریخ‌ها', {'fields': ('publish', 'created', 'updated'), 'classes': ('collapse',)}),
     )
+
+    @admin.display(description='انقضا', ordering='expiry_date')
+    def expiry_short(self, obj):
+        """A short column so an ageing batch is findable without opening rows."""
+        days = obj.expiry_days_left
+        if days is None:
+            return '—'
+        return f'{days} روز مانده' if days >= 0 else f'{abs(days)} روز گذشته'
 
     def save_model(self, request, obj, form, change):
         if not change:
@@ -253,16 +291,40 @@ class AdminUserAccount(admin.ModelAdmin):
 
 
 # --- Admin Comment ---
+def feature_reviews(modeladmin, request, queryset):
+    """Pin reviews onto «تجربه خرید مشتریان».
+
+    The page is curated rather than automatic: an editor decides which real
+    review represents the shop, and the count it shows is the count of reviews
+    that actually exist.
+    """
+    updated = queryset.filter(parent__isnull=True).update(is_featured=True)
+    modeladmin.message_user(request, f'{updated} دیدگاه برای صفحه تجربه خرید مشتریان انتخاب شد.')
+
+
+feature_reviews.short_description = 'نمایش در «تجربه خرید مشتریان»'
+
+
+def unfeature_reviews(modeladmin, request, queryset):
+    queryset.update(is_featured=False)
+    modeladmin.message_user(request, 'انتخاب این دیدگاه‌ها از صفحه برداشته شد.')
+
+
+unfeature_reviews.short_description = 'حذف از «تجربه خرید مشتریان»'
+
+
 @admin.register(Comment)
 class AdminComment(admin.ModelAdmin):
-    list_display = ('name', 'product', 'rating', 'created', 'active', 'email')
-    list_filter = ('active', 'rating', 'created', 'updated')
+    list_display = ('name', 'product', 'rating', 'helpful_count', 'is_featured', 'is_reported', 'created', 'active')
+    list_filter = ('active', 'rating', 'is_featured', 'is_reported', 'created')
     list_editable = ('active',)
+    list_select_related = ('product',)
     fieldsets = (
         ('دیدگاه', {'fields': ('product', 'user', 'name', 'email', 'body', 'rating')}),
         ('رسانه و پاسخ', {'fields': ('image', 'sticker', 'parent')}),
-        ('وضعیت', {'fields': ('active', 'created', 'updated')}),
+        ('وضعیت', {'fields': ('active', 'is_featured', 'is_reported', 'helpful_count', 'created', 'updated')}),
     )
+    actions = [approve_comments, disapprove_comments, feature_reviews, unfeature_reviews]
     search_fields = ('name', 'email', 'body', 'product__title')
     actions = [approve_comments, disapprove_comments]
     date_hierarchy = 'created'
@@ -941,3 +1003,49 @@ class AdminStorefrontConversation(admin.ModelAdmin):
     def has_add_permission(self, request):
         return False
 
+
+@admin.register(Tag)
+class AdminTag(SimpleHistoryAdmin):
+    """Cross-category labels; the slug is derived from the Persian name."""
+
+    list_display = ('name', 'slug', 'product_count')
+    search_fields = ('name', 'description')
+    readonly_fields = ('slug',)
+    prepopulated_fields = {}
+
+    @admin.display(description='محصولات منتشرشده')
+    def product_count(self, obj):
+        return obj.products.filter(status='published').count()
+
+
+@admin.register(ReturnPolicySettings)
+class AdminReturnPolicySettings(admin.ModelAdmin):
+    """The return window and the express option, decided by whoever runs this.
+
+    Left empty on a fresh deploy on purpose: the footer badge and the legal
+    document both read this row, so an unset window means the site makes no
+    numeric promise anywhere rather than one nobody approved.
+    """
+
+    list_display = ('window_days', 'express_shipping_enabled', 'express_shipping_fee', 'updated_at')
+    readonly_fields = ('updated_at', 'preview')
+    fieldsets = (
+        ('بازگشت کالا', {'fields': ('window_days', 'conditions')}),
+        ('ارسال فوری', {'fields': ('express_shipping_enabled', 'express_shipping_fee')}),
+        ('هم‌زمان با متن حقوقی', {'fields': ('preview', 'updated_at')}),
+    )
+
+    @admin.display(description='پیش‌نمایش آنچه مشتری می‌بیند')
+    def preview(self, obj):
+        return format_html(
+            '<div class="help">بنر پاورقی: <b>{}</b><br>صفحه «خرید و بازگشت کالا»: '
+            '<span style="white-space:pre-line">{}</span></div>',
+            obj.window_label or 'بدون عدد (فقط «پس از هماهنگی با میز پشتیبانی»)',
+            obj.conditions or 'متنی وارد نشده است.',
+        )
+
+    def has_add_permission(self, request):
+        return not ReturnPolicySettings.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False

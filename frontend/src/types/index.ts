@@ -95,6 +95,25 @@ export interface Product {
   /** Structured specification table, detail endpoint only. */
   attributes?: ProductAttribute[];
   rating_summary?: RatingSummary;
+  /** Batch dates the supplier declares; null means "not stated", never "old". */
+  production_date?: string | null;
+  expiry_date?: string | null;
+  expiry_days_left?: number | null;
+  is_expiring_soon?: boolean;
+  /** Smallest quantity this line sells in (a bag, not a single kilo). */
+  min_order_quantity?: number;
+  /** «زیر ۵۰ کیلو از کیسه پر می‌شود» — the bulk rule for this product. */
+  bulk_note?: string;
+  /** Aparat/YouTube link, shown as a click-to-play card. */
+  video_url?: string;
+  views?: number;
+  /** Address of the brand page; matched by slug so a rename cannot break it. */
+  brand_slug?: string;
+  tags?: TagRef[];
+  /** Cover first, then the admin gallery. */
+  gallery?: GalleryShot[];
+  /** Purchasable packagings; one implicit row when none are declared. */
+  packages?: ProductPackage[];
 
   // ✅ فیلدهای detail (اختیاری - فقط در detail endpoint برمی‌گردند)
   fertilizer_detail?: FertilizerDetail;
@@ -129,6 +148,129 @@ export interface ProductList {
   /** Aggregate of approved 1-5 star reviews, computed on the server. */
   avg_rating?: number;
   reviews_count?: number;
+  /** Second photo, for the hover swap; empty when the product has no gallery. */
+  image_alt_url?: string;
+  is_expiring_soon?: boolean;
+  views?: number;
+  brand_slug?: string;
+  tags?: TagRef[];
+}
+
+/** A cross-category label («کود محلول‌پاشی»). */
+export interface TagRef {
+  id: number;
+  name: string;
+  slug: string;
+  description?: string;
+  product_count?: number;
+}
+
+export interface GalleryShot {
+  url: string;
+  caption: string;
+}
+
+/** One purchasable packaging, priced and stocked on its own. */
+export interface ProductPackage {
+  id: number | null;
+  label: string;
+  weight_kg: number | null;
+  price: number | null;
+  effective_price: number;
+  discounted_price: number;
+  stock: number | null;
+  effective_stock: number;
+  min_order_quantity: number;
+  bulk_note: string;
+  production_date: string | null;
+  expiry_date: string | null;
+  expiry_days_left: number | null;
+  is_in_stock: boolean;
+  price_per_kg: number | null;
+  is_default: boolean;
+}
+
+// ========================================
+// Catalogue landing pages (category / subcategory / brand / tag)
+// ========================================
+
+export type CatalogKind = 'category' | 'subcategory' | 'brand' | 'tag';
+
+export interface CatalogCard {
+  kind: CatalogKind;
+  title: string;
+  slug: string;
+  image_url: string;
+  description: string;
+  count: number;
+  url: string;
+}
+
+export interface CatalogLanding {
+  kind: CatalogKind;
+  title: string;
+  slug: string;
+  description: string;
+  image_url: string;
+  seo_title: string;
+  seo_description: string;
+  breadcrumb: Array<{ title: string; url: string }>;
+  /** Exactly what to send to the product list so the grid matches the page. */
+  filters: Record<string, string>;
+  children: CatalogCard[];
+  siblings: CatalogCard[];
+  count: number;
+  avg_rating: number;
+  facets: {
+    brands: Array<{ name: string; slug: string; count: number }>;
+    packages: Array<{ label: string; count: number }>;
+    price: { min: number; max: number; average: number };
+    has_expiring_soon: boolean;
+  };
+  articles: Array<{
+    title: string;
+    slug: string;
+    kind: string;
+    excerpt: string;
+    reading_minutes: number;
+  }>;
+  partner?: { website: string; since_year: number | null } | null;
+}
+
+export interface CatalogIndex {
+  categories: CatalogCard[];
+  tags: CatalogCard[];
+  brands: Array<{ title: string; slug: string; count: number; url: string }>;
+}
+
+/** A review picked (or simply rated) for «تجربه خرید مشتریان». */
+export interface BuyerExperience {
+  id: number;
+  name: string;
+  body: string;
+  rating: number | null;
+  sticker: string;
+  image_url: string;
+  created: string;
+  helpful_count: number;
+  verified_purchase: boolean;
+  product: { title: string; slug: string; brand: string; image_url: string; url: string };
+}
+
+export interface BuyerExperiencesResponse {
+  /** curated = editor-pinned, verified = paid buyers, open = best-rated reviews. */
+  mode: 'curated' | 'verified' | 'open';
+  total: number;
+  items: BuyerExperience[];
+}
+
+/** What the operator declared about returns and express delivery. */
+export interface SitePolicies {
+  return_window_days: number | null;
+  return_window_label: string;
+  return_conditions: string;
+  express_shipping: { enabled: boolean; fee: number };
+  updated_at: string;
 }
 
 // ========================================
@@ -226,7 +368,18 @@ export type SitePageBlockType =
   | 'products'
   | 'articles'
   | 'cta'
-  | 'quote';
+  | 'quote'
+  /** Question/answer rows, rendered as an accordion with FAQPage schema. */
+  | 'faq';
+
+/** The shop's own return window / express option, read from the admin record. */
+export interface LegalPolicy {
+  return_window_days: number | null;
+  return_window_label: string;
+  return_conditions: string;
+  express_shipping: { enabled: boolean; fee: number };
+  updated_at: string;
+}
 
 export interface SitePageBlock {
   id: number;
@@ -372,6 +525,10 @@ export interface MockProduct {
   attributes?: ProductAttribute[];
   priceOnRequest?: boolean;
   packageWeight?: string;
+  /** Second catalogue photo; the card cross-fades to it on hover. */
+  secondImage?: string;
+  /** A declared batch inside the 90-day warning window. */
+  expiringSoon?: boolean;
 }
 
 // ========================================
@@ -408,6 +565,9 @@ export interface CartItem {
   available_quantity: number;
   min_order_quantity: number;
   is_in_stock: boolean;
+  /** The chosen packaging, when the product declares more than one. */
+  product_package?: number | null;
+  package_label?: string;
 }
 
 export interface Cart {
@@ -481,6 +641,10 @@ export interface Comment {
   updated: string;
   active: boolean;
   replies?: Comment[];
+  /** How many readers marked this review useful. */
+  helpful_count?: number;
+  is_featured?: boolean;
+  is_reported?: boolean;
 }
 
 // ========================================
@@ -536,6 +700,8 @@ export interface OrderItem {
   unit_price: number;
   quantity: number;
   total_price: number;
+  /** Packaging as it was sold; snapshotted, so a retired label still reads right. */
+  package_label?: string;
 }
 
 export interface ShipmentTrackingEvent {
@@ -616,6 +782,11 @@ export interface CheckoutPayload {
   affiliate_code?: string;
   coupon_code?: string;
   terms_accepted: boolean;
+  /**
+   * Which delivery service the buyer picked. Only the services the server
+   * offered are accepted; the price is always recomputed at checkout.
+   */
+  shipping_service?: 'standard' | 'express';
 }
 
 export interface PaymentProviderOption {
@@ -1338,6 +1509,8 @@ export interface LegalDocumentSummary {
 export interface LegalDocument extends LegalDocumentSummary {
   blocks: LegalBlock[];
   sections: Array<{ title: string; body: string }>;
+  /** Present on «بازگشت کالا»: the live window, so the text never guesses one. */
+  policy?: LegalPolicy;
 }
 
 export interface LegalIndex {
@@ -1345,6 +1518,8 @@ export interface LegalIndex {
   documents: LegalDocumentSummary[];
   /** Fingerprint of the text in force; recorded on every order. */
   version: string;
+  /** What the operator configured for returns and express delivery. */
+  policy?: LegalPolicy;
 }
 
 // ========================================
@@ -1366,6 +1541,14 @@ export interface ProductQueryParams {
   min_price?: number;
   max_price?: number;
   brand?: string;
+  /** Brand pages filter on the slug, which survives a supplier renaming its text. */
+  brand_slug?: string;
+  subcategory?: string;
+  tag?: string;
+  /** Star floor and "has reviews", both computed from the same aggregate the cards show. */
+  min_rating?: number;
+  has_reviews?: boolean;
+  expiring_soon?: boolean;
   package_weight?: string;
   price_on_request?: boolean;
 }

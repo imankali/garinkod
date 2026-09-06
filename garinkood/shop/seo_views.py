@@ -10,7 +10,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_GET
 
 from . import legal
-from .models import Category, Product, Service, SiteArticle, SitePage, Storefront
+from .models import Category, Product, Service, SiteArticle, SitePage, Storefront, SubCategory, Tag
 
 # Only approved, top-level reviews that carry a score are quotable; a question
 # without a rating must not inflate the published aggregate.
@@ -61,8 +61,26 @@ def sitemap_xml(_request):
         *[(f"{_absolute('/legal')}/{doc.slug}", today, "yearly") for doc in legal.documents()],
     ]
 
+    # Category, subcategory, brand and tag pages are indexable addresses of their
+    # own now, so the sitemap lists those rather than a filtered query string —
+    # and a brand page only appears if products actually carry it.
+    entries.append((_absolute("/faq"), today, "monthly"))
+    entries.append((_absolute("/customers"), today, "weekly"))
+
     for category in Category.objects.all().only("slug"):
-        entries.append((_absolute(f"/products?category={category.slug}"), "", "weekly"))
+        entries.append((_absolute(f"/c/{category.slug}"), "", "weekly"))
+    for subcategory in SubCategory.objects.all().only("slug"):
+        entries.append((_absolute(f"/sc/{subcategory.slug}"), "", "weekly"))
+    for row in (
+        Product.objects.filter(status="published")
+        .exclude(brand_slug="")
+        .values("brand_slug")
+        .annotate(total=Count("id"))
+        .order_by("-total")[:120]
+    ):
+        entries.append((_absolute(f"/brand/{row['brand_slug']}"), "", "weekly"))
+    for tag in Tag.objects.all().only("slug"):
+        entries.append((_absolute(f"/tag/{tag.slug}"), "", "weekly"))
 
     for product in Product.objects.filter(status="published").only("slug", "updated"):
         entries.append(

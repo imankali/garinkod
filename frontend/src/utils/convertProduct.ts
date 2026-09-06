@@ -43,6 +43,10 @@ export function convertToMockProduct(apiProduct: ProductList | Product): MockPro
     packageWeight: apiProduct.package_weight || undefined,
     attributes: 'attributes' in apiProduct ? apiProduct.attributes : undefined,
     image: apiProduct.image_url || '/images/hero-farm.jpg',
+    // The hover photo and the expiry warning only exist on the list payload; a
+    // detail product has a full gallery instead.
+    secondImage: 'image_alt_url' in apiProduct ? apiProduct.image_alt_url || undefined : undefined,
+    expiringSoon: 'is_expiring_soon' in apiProduct ? Boolean(apiProduct.is_expiring_soon) : false,
     // No `badge` here: ProductCard derives the discount badge from oldPrice,
     // and a static badge would render a duplicate.
     inStock: apiProduct.is_in_stock,

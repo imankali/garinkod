@@ -11,6 +11,7 @@
 import {
   BadgePercent,
   BookOpen,
+  MessageSquareQuote,
   Building2,
   Leaf,
   MapPinned,
@@ -311,6 +312,20 @@ export const KNOWLEDGE_ITEMS: NavItem[] = [
     description: 'تیم، برندها و قراداد ما با کشاورز',
     to: '/about',
     icon: Users,
+  },
+  {
+    id: 'faq',
+    label: 'سؤالات متداول',
+    description: 'خرید مهمان، ارسال، پرداخت ناموفق و بازگشت کالا',
+    to: '/faq',
+    icon: BookOpen,
+  },
+  {
+    id: 'customers',
+    label: 'تجربه خرید مشتریان',
+    description: 'دیدگاه‌های منتشرشده خریداران، با تصویر و امتیاز',
+    to: '/customers',
+    icon: MessageSquareQuote,
   },
   {
     id: 'legal',

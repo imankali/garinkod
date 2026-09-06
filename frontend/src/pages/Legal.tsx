@@ -143,6 +143,9 @@ export default function Legal() {
 
   const Icon = ICONS[document.icon] ?? FileText;
   const parts = readParts(document);
+  // The live values are printed above the text, not inside it: the wording of the
+  // document is stable and auditable, while the window and the fee are settings.
+  const policy = document.policy;
   const review = document.updated_at
     ? `آخرین بازبینی: ${new Date(document.updated_at).toLocaleDateString('fa-IR')}`
     : 'متن پایه‌ای که با این نسخه نرم‌افزار منتشر شده است.';
@@ -211,6 +214,37 @@ export default function Legal() {
 
       <div className="mt-7 grid gap-5 lg:grid-cols-[minmax(0,1fr)_260px]">
         <div className="min-w-0 space-y-4 print:space-y-3">
+          {policy && (
+            <aside className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 text-fluid-2xs leading-7 dark:border-emerald-800 dark:bg-emerald-900/40">
+              <h2 className="text-fluid-xs font-extrabold text-slate-800 dark:text-white">
+                مقدار جاری این سیاست در سایت
+              </h2>
+              <ul className="mt-2 space-y-1 text-slate-600 dark:text-emerald-100">
+                <li>
+                  مهلت بازگشت کالا:{' '}
+                  <strong className="text-emerald-700 dark:text-lime-300">
+                    {policy.return_window_days
+                      ? `${policy.return_window_days.toLocaleString('fa-IR')} روز پس از تحویل`
+                      : 'به‌صورت عددی اعلام نشده است'}
+                  </strong>
+                </li>
+                {policy.express_shipping?.enabled && (
+                  <li>
+                    تحویل فوری:{' '}
+                    <strong className="text-emerald-700 dark:text-lime-300">
+                      فعال{policy.express_shipping.fee ? ` · ${policy.express_shipping.fee.toLocaleString('fa-IR')} تومان هزینه اضافی` : ''}
+                    </strong>
+                  </li>
+                )}
+                {policy.return_conditions && <li className="whitespace-pre-line">{policy.return_conditions}</li>}
+              </ul>
+              <p className="mt-2 text-slate-400">
+                این مقدار را تیم سایت در پنل مدیریت تنظیم می‌کند؛ متن این سند به همان مقدار ارجاع می‌دهد و
+                رقم تازه‌ای نمی‌سازد.
+              </p>
+            </aside>
+          )}
+
           {parts.map((part) => (
             <section
               key={part.id}

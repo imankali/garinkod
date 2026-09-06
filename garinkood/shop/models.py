@@ -118,6 +118,10 @@ class Product(models.Model):
     # «پربازدیدترین» needs a column incremented in a single UPDATE, not a value
     # derived per request.
     views = models.PositiveIntegerField(default=0, db_index=True, verbose_name="بازدید")
+    # Brand pages are addressable (/brand/<slug>), so the slug a product was filed
+    # under has to be a column; deriving it per request from free text would make
+    # the brand list and the brand page disagree as soon as a supplier renames one.
+    brand_slug = models.SlugField(max_length=140, blank=True, db_index=True, verbose_name="اسلاگ برند")
 
     objects = ProductManager()
     history = HistoricalRecords()
@@ -130,8 +134,18 @@ class Product(models.Model):
     def __str__(self):
         return self.title
 
+    def save(self, *args, **kwargs):
+        from .slugs import slugify_fa
+        self.brand_slug = slugify_fa(self.brand)
+        super().save(*args, **kwargs)
+
     def get_absolute_url(self):
         return reverse('shop:product_detail', args=[self.slug])
+
+    @property
+    def brand_url(self) -> str:
+        """Address of this product's brand page, when the brand is declared."""
+        return f"/brand/{self.brand_slug}" if self.brand_slug else ''
 
     @property
     def image_url(self):
@@ -219,12 +233,14 @@ class Tag(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.slug:
-            from .slugs import slugify_fa
-            self.slug = slugify_fa(self.name)
+            from .slugs import unique_slug
+            self.slug = unique_slug(self.__class__, self.name, fallback='tag')
         super().save(*args, **kwargs)
 
     def get_absolute_url(self):
-        return reverse('shop:tag_detail', args=[self.slug])
+        # A literal path rather than a named route: the frontend owns these
+        # addresses and Django only renders the shell.
+        return f'/tag/{self.slug}'
 
 
 class ProductImage(models.Model):
@@ -735,6 +751,13 @@ class CartItem(models.Model):
     @property
     def total_price(self):
         return self.quantity * self.unit_price
+
+    @property
+    def shipping_weight_grams(self) -> int:
+        """Weight of one row, taken from the packaging when it declares one."""
+        if self.product_package_id and self.product_package.weight_kg:
+            return int(float(self.product_package.weight_kg) * 1000)
+        return self.product.shipping_weight_grams if self.product_id else 0
 
     @property
     def available_quantity(self) -> int:
@@ -2801,6 +2824,7 @@ class SitePageBlock(models.Model):
         ('articles', 'شبکه مقالات'),
         ('cta', 'دکمه اقدام'),
         ('quote', 'نقل‌قول'),
+        ('faq', 'پرسش و پاسخ'),
     )
 
     page = models.ForeignKey(SitePage, on_delete=models.CASCADE, related_name='blocks', verbose_name="صفحه")
@@ -2882,6 +2906,10 @@ class BrandPartner(models.Model):
     """A brand or partner the site represents (logo wall on the about page)."""
 
     name = models.CharField(max_length=120, verbose_name="نام برند/شرکت")
+    # The catalogue is matched to a represented brand by slug rather than by
+    # string equality, so «ایکس گرین» and «XGREEN» in a supplier sheet can be
+    # reconciled once, in the admin, instead of in code.
+    slug = models.SlugField(max_length=140, unique=True, blank=True, verbose_name="اسلاگ")
     logo = models.ImageField(upload_to='brands/', blank=True, null=True, verbose_name="لوگو")
     website = models.URLField(max_length=300, blank=True, verbose_name="وب‌سایت")
     description = models.CharField(max_length=300, blank=True, verbose_name="توضیح کوتاه")
@@ -2897,9 +2925,21 @@ class BrandPartner(models.Model):
     def __str__(self):
         return self.name
 
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            from .slugs import unique_slug
+            self.slug = unique_slug(self.__class__, self.name, fallback='brand')
+        super().save(*args, **kwargs)
+
     @property
     def logo_url(self):
         return self.logo.url if self.logo else ''
+
+    def get_absolute_url(self):
+        return f'/brand/{self.slug}'
+
+    def product_count(self) -> int:
+        return Product.objects.filter(status='published', brand_slug=self.slug).count()
 
 
 class SiteContact(models.Model):

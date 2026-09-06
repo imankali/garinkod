@@ -2,8 +2,13 @@
 
 import apiClient from './client';
 import type {
+  BuyerExperiencesResponse,
+  CatalogIndex,
+  CatalogKind,
+  CatalogLanding,
   LegalDocument,
   LegalIndex,
+  SitePolicies,
   Product,
   ProductList,
   Category,
@@ -145,6 +150,21 @@ export const categoriesApi = {
 // ========================================
 export const commentsApi = {
   /**
+   * «مفید بود» را روشن/خاموش می‌کند.
+   * POST /api/comments/{id}/helpful/
+   */
+  toggleHelpful: (id: number) => {
+    return apiClient.post<{ voted: boolean; helpful_count: number }>(`/comments/${id}/helpful/`);
+  },
+
+  /**
+   * یک دیدگاه را برای بررسی به میز پشتیبانی می‌فرستد؛ منتشرشده را پنهان نمی‌کند.
+   * POST /api/comments/{id}/report/
+   */
+  report: (id: number, reason?: string) => {
+    return apiClient.post<{ reported: boolean }>(`/comments/${id}/report/`, { reason: reason || '' });
+  },
+  /**
    * دریافت لیست نظرات
    * GET /api/comments/
    */
@@ -216,8 +236,13 @@ export const cartApi = {
    * افزودن محصول به سبد خرید
    * POST /api/cart/add/
    */
-  add: (productId: number, quantity: number = 1) => {
-    return apiClient.post<Cart>('/cart/add/', { product_id: productId, quantity });
+  add: (productId: number, quantity: number = 1, packageId?: number | null) => {
+    return apiClient.post<Cart>('/cart/add/', {
+      product_id: productId,
+      quantity,
+      // Which bag was picked, when the product sells in more than one.
+      ...(packageId ? { package_id: packageId } : {}),
+    });
   },
 
   /**
@@ -974,6 +999,41 @@ export const sitePagesApi = {
 
   getBySlug: (slug: string) => {
     return apiClient.get<SitePage>(`/pages/${slug}/`);
+  },
+};
+
+export const catalogApi = {
+  /**
+   * GET /api/catalog/index/ — every addressable landing page in one read,
+   * used by the footer, the shop's «همه دسته‌ها» panel and the sitemap editor.
+   */
+  index: () => {
+    return apiClient.get<CatalogIndex>('/catalog/index/');
+  },
+
+  /**
+   * GET /api/catalog/landing/<kind>/<slug>/ — one category, subcategory, brand
+   * or tag page: its intro text, its children, and the filter its grid must use.
+   */
+  landing: (kind: CatalogKind, slug: string) => {
+    return apiClient.get<CatalogLanding>(`/catalog/landing/${kind}/${encodeURIComponent(slug)}/`);
+  },
+};
+
+export const testimonialsApi = {
+  /** GET /api/testimonials/ — real reviews, editor-pinned when there are any. */
+  list: () => {
+    return apiClient.get<BuyerExperiencesResponse>('/testimonials/');
+  },
+};
+
+export const policiesApi = {
+  /**
+   * GET /api/site/policies/ — the return window and the express option as the
+   * operator configured them. An unset window means the site states no number.
+   */
+  get: () => {
+    return apiClient.get<SitePolicies>('/site/policies/');
   },
 };
 

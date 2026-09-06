@@ -115,6 +115,28 @@ export default function ProductCard({
           />
         </a>
 
+        {/* Hover cross-fade to the second photo, the way a paper catalogue
+            cannot be. Touch devices never see it, so it is hidden outright
+            rather than waiting for a hover that will not come. */}
+        {product.secondImage && (
+          <img
+            src={product.secondImage}
+            alt=""
+            aria-hidden="true"
+            loading="lazy"
+            className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-500 group-hover:opacity-100 [@media(hover:none)]:hidden"
+            onError={(event) => {
+              event.currentTarget.style.display = 'none';
+            }}
+          />
+        )}
+
+        {product.expiringSoon && (
+          <span className="pointer-events-none absolute bottom-3 start-3 z-10 inline-flex items-center gap-1 rounded-full bg-rose-600/90 px-2.5 py-1 text-fluid-2xs font-bold text-white backdrop-blur">
+            نزدیک تاریخ انقضا
+          </span>
+        )}
+
         {/* Quick View Overlay — pointer/hover devices only. */}
         <motion.button
           onClick={() => onQuickView(product)}

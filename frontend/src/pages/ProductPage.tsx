@@ -14,8 +14,12 @@ import {
   Send,
   ShieldCheck,
   ShoppingCart,
+  Flag,
+  PlayCircle,
   Sparkles,
   Star,
+  Tag,
+  ThumbsUp,
   Weight,
   X,
 } from "lucide-react";
@@ -24,6 +28,8 @@ import toast from "react-hot-toast";
 import { articlesApi, commentsApi, productsApi } from "../api/services";
 import { parseApiError } from "../api/errors";
 import ConsultCard from "../components/product/ConsultCard";
+import PackagingPicker from "../components/product/PackagingPicker";
+import ProductGallery from "../components/product/ProductGallery";
 import ArticleCard from "../components/article/ArticleCard";
 import SharePanel from "../components/SharePanel";
 import SpecTable from "../components/SpecTable";
@@ -64,6 +70,9 @@ export default function ProductPage() {
   const openAuthModal = useAuthModalStore((state) => state.openAuthModal);
   const queryClient = useQueryClient();
   const { whatsappDigits, primaryPhone } = useSiteContact();
+  // Declared with the other hooks, before the page's early returns: the picked
+  // packaging survives a re-render, and resets when the product changes.
+  const [packageId, setPackageId] = useState<number | null>(null);
   const [commentBody, setCommentBody] = useState("");
   const [rating, setRating] = useState(0);
   const [sticker, setSticker] = useState("");
@@ -178,6 +187,15 @@ export default function ProductPage() {
     ? { [`gtin${product.gtin.length}`]: product.gtin }
     : {};
   const priceOnRequest = Boolean(product.price_on_request);
+
+  // Which bag is being bought decides the price, the stock, the minimum order and
+  // the expiry that is quoted, so the page reads everything off that row instead
+  // of mixing the product's own numbers with the selected one.
+  const packages = product.packages ?? [];
+  const selectedPackage = packages.find((item) => item.id === packageId) ?? packages[0] ?? null;
+  const displayPrice = selectedPackage ? selectedPackage.effective_price : product.price;
+  const displayDiscounted = selectedPackage ? selectedPackage.discounted_price : product.discounted_price;
+  const packageInStock = selectedPackage ? selectedPackage.is_in_stock : product.is_in_stock;
   const whatsappDraft = whatsappDigits
     ? whatsappHref(whatsappDigits, `سلام، درباره «${product.title}» و قیمت عمده سؤال دارم: ${productUrl}`)
     : '';
@@ -270,8 +288,24 @@ export default function ProductPage() {
 
     <div className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_320px]">
       <article className="grid gap-8 rounded-3xl border border-slate-100 bg-white p-5 shadow-sm md:grid-cols-2 md:p-8 dark:border-emerald-900 dark:bg-emerald-950">
-        <div className="overflow-hidden rounded-2xl bg-emerald-50 dark:bg-emerald-900/30"><img src={image} alt={product.title} className="aspect-square h-full w-full object-cover" onError={(event) => { event.currentTarget.src = FALLBACK_IMAGE; }} /></div>
-        <div className="flex flex-col">{category && <p className="mb-2 text-sm font-bold text-emerald-700 dark:text-lime-300">{category}</p>}
+        <ProductGallery shots={product.gallery ?? []} title={product.title} cover={image} />
+        <div className="flex flex-col">{category && (
+            <p className="mb-2 flex flex-wrap items-center gap-2 text-sm font-bold text-emerald-700 dark:text-lime-300">
+              {typeof product.category === "object" && product.category && 'slug' in product.category ? (
+                <Link to={`/c/${product.category.slug}`} className="hover:underline">{category}</Link>
+              ) : (
+                <span>{category}</span>
+              )}
+              {product.brand ? (
+                <Link
+                  to={`/brand/${product.brand_slug || product.brand}`}
+                  className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-fluid-2xs text-emerald-700 hover:underline dark:bg-emerald-900/60 dark:text-lime-300"
+                >
+                  <ShieldCheck size={12} aria-hidden="true" /> {product.brand}
+                </Link>
+              ) : null}
+            </p>
+          )}
           <div className="flex items-start justify-between gap-4">
             <h1 className="text-2xl font-extrabold leading-10 text-slate-800 md:text-3xl dark:text-white">{product.title}</h1>
           </div>
@@ -301,6 +335,38 @@ export default function ProductPage() {
             </ul>
           )}
 
+          {(product.is_expiring_soon || (product.tags?.length ?? 0) > 0 || product.video_url) && (
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              {product.is_expiring_soon && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-1 text-fluid-2xs font-bold text-rose-700 dark:bg-rose-950/60 dark:text-rose-200">
+                  <Sparkles size={12} aria-hidden="true" />
+                  {typeof product.expiry_days_left === 'number' && product.expiry_days_left >= 0
+                    ? `${product.expiry_days_left.toLocaleString('fa-IR')} روز تا انقضای اعلام‌شده`
+                    : 'به تاریخ انقضای اعلام‌شده نزدیک شده‌ایم'}
+                </span>
+              )}
+              {product.video_url && (
+                <a
+                  href={product.video_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-fluid-2xs font-bold text-slate-700 transition hover:bg-emerald-100 dark:bg-emerald-900/60 dark:text-emerald-100"
+                >
+                  <PlayCircle size={13} aria-hidden="true" /> ویدئوی معرفی محصول
+                </a>
+              )}
+              {(product.tags ?? []).map((item) => (
+                <Link
+                  key={item.slug}
+                  to={`/tag/${item.slug}`}
+                  className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-2.5 py-1 text-fluid-2xs font-bold text-slate-500 transition hover:border-emerald-300 hover:text-emerald-700 dark:border-emerald-800 dark:text-emerald-200"
+                >
+                  <Tag size={12} aria-hidden="true" /> {item.name}
+                </Link>
+              ))}
+            </div>
+          )}
+
           <p className="mt-5 whitespace-pre-line leading-8 text-slate-600 dark:text-emerald-100">{product.description}</p>
           <div className="mt-6 flex items-center gap-2 text-sm font-semibold">{product.is_in_stock ? <><PackageCheck size={18} className="text-emerald-600" /><span className="text-emerald-700 dark:text-lime-300">موجود در انبار</span></> : <><PackageX size={18} className="text-rose-500" /><span className="text-rose-600">ناموجود</span></>}</div>
           {/* The promise is worth reading where the decision is made, not only
@@ -317,10 +383,12 @@ export default function ProductPage() {
             </p>
           )}
 
+          <PackagingPicker packages={packages} selected={selectedPackage} onSelect={(id) => setPackageId(id)} />
+
           <div className="mt-auto border-t border-slate-100 pt-6 dark:border-emerald-900">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <p className="text-2xl font-extrabold text-slate-800 dark:text-white">
-                {priceOnRequest ? 'تماس بگیرید' : formatPrice(product.price)}
+                {priceOnRequest ? 'تماس بگیرید' : formatPrice(displayPrice)}
                 {!priceOnRequest && product.discount_percent > 0 && (
                   <span className="ms-2 text-sm font-bold text-slate-400 line-through">{formatPrice(product.price)}</span>
                 )}
@@ -333,7 +401,7 @@ export default function ProductPage() {
               )}
             </div>
             {!priceOnRequest && product.discount_percent > 0 && (
-              <p className="mt-1.5 text-fluid-sm font-extrabold text-emerald-700 dark:text-lime-300">{formatPrice(product.discounted_price)} تومان</p>
+              <p className="mt-1.5 text-fluid-sm font-extrabold text-emerald-700 dark:text-lime-300">{formatPrice(displayDiscounted)} تومان</p>
             )}
 
             {priceOnRequest ? (
@@ -352,7 +420,19 @@ export default function ProductPage() {
                 )}
               </div>
             ) : (
-              <button type="button" onClick={() => void addToCart(product.id)} disabled={!product.is_in_stock} className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-l from-emerald-600 to-lime-500 px-5 py-3 text-sm font-bold text-white shadow-md transition hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-40"><ShoppingCart size={18} />{product.is_in_stock ? "افزودن به سبد خرید" : "ناموجود"}</button>
+              <button
+                type="button"
+                onClick={() => void addToCart(
+                  product.id,
+                  (selectedPackage?.min_order_quantity ?? 1) > 1 ? (selectedPackage?.min_order_quantity ?? 1) : 1,
+                  selectedPackage?.id ?? null,
+                )}
+                disabled={!product.is_in_stock || !packageInStock}
+                className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-l from-emerald-600 to-lime-500 px-5 py-3 text-sm font-bold text-white shadow-md transition hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <ShoppingCart size={18} />
+                {product.is_in_stock && packageInStock ? "افزودن به سبد خرید" : "از این بسته‌بندی موجود نیست"}
+              </button>
             )}
             <div className="mt-3 flex items-center justify-between gap-2">
               <SharePanel url={productUrl} title={product.title} text={seoDescription} />
@@ -583,7 +663,37 @@ export default function ProductPage() {
   </main></>;
 }
 
-function CommentCard({ comment, onReply, nested = false, highlighted = false }: { comment: Comment; onReply: (comment: Comment) => void; nested?: boolean; /** The comment an inbox notification was about. */ highlighted?: boolean }) { return <article id={`comment-${comment.id}`} className={cn("scroll-mt-28 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-colors duration-500 dark:border-emerald-900 dark:bg-emerald-950", nested && "ms-6 mt-3", highlighted && "border-amber-300 ring-2 ring-amber-300 dark:border-amber-500")}>
+function CommentCard({ comment, onReply, nested = false, highlighted = false }: { comment: Comment; onReply: (comment: Comment) => void; nested?: boolean; /** The comment an inbox notification was about. */ highlighted?: boolean }) {
+  // «مفید بود» is writable by a guest, so the row keeps its own tally taken from
+  // the server response: the API returns the authoritative count after the
+  // toggle, so nothing is shown that the database has not recorded.
+  const [votes, setVotes] = useState({ count: comment.helpful_count ?? 0, voted: false, busy: false });
+  const [reported, setReported] = useState(Boolean(comment.is_reported));
+
+  async function toggleHelpful() {
+    if (votes.busy) return;
+    setVotes((current) => ({ ...current, busy: true }));
+    try {
+      const response = await commentsApi.toggleHelpful(comment.id);
+      setVotes({ count: response.data.helpful_count, voted: response.data.voted, busy: false });
+    } catch (error) {
+      setVotes((current) => ({ ...current, busy: false }));
+      toast.error(parseApiError(error).message);
+    }
+  }
+
+  async function reportReview() {
+    const reason = window.prompt('چه چیزی در این دیدگاه مشکل دارد؟ (اختیاری)') ?? '';
+    try {
+      await commentsApi.report(comment.id, reason);
+      setReported(true);
+      toast('گزارش برای بررسی به میز پشتیبانی رسید؛ دیدگاه پنهان نمی‌شود.');
+    } catch (error) {
+      toast.error(parseApiError(error).message);
+    }
+  }
+
+ return <article id={`comment-${comment.id}`} className={cn("scroll-mt-28 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-colors duration-500 dark:border-emerald-900 dark:bg-emerald-950", nested && "ms-6 mt-3", highlighted && "border-amber-300 ring-2 ring-amber-300 dark:border-amber-500")}>
   <div className="flex items-start justify-between gap-3">
     <div className="min-w-0">
       <div className="flex flex-wrap items-center gap-2">
@@ -601,7 +711,37 @@ function CommentCard({ comment, onReply, nested = false, highlighted = false }: 
   </div>
   <p className="mt-3 whitespace-pre-line text-fluid-sm leading-7 text-slate-600 dark:text-emerald-100">{comment.sticker && <span className="me-1 text-lg">{comment.sticker}</span>}{comment.body}</p>
   {comment.image && <img src={comment.image} alt="تصویر ارسالی کاربر" className="mt-3 max-h-72 rounded-xl object-cover" />}
-  <button onClick={() => onReply(comment)} className="mt-3 text-fluid-2xs font-bold text-emerald-700 hover:underline dark:text-lime-300">پاسخ دادن</button>
+  <div className="mt-2 flex flex-wrap items-center gap-2">
+    {!nested && (
+      <button
+        type="button"
+        onClick={() => void toggleHelpful()}
+        disabled={votes.busy}
+        aria-pressed={votes.voted}
+        className={cn(
+          "inline-flex min-h-9 items-center gap-1 rounded-lg border px-2.5 text-fluid-2xs font-bold transition",
+          votes.voted
+            ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/60 dark:text-lime-300"
+            : "border-slate-200 text-slate-500 hover:border-emerald-300 hover:text-emerald-700 dark:border-emerald-800 dark:text-emerald-200",
+        )}
+      >
+        <ThumbsUp size={13} aria-hidden="true" />
+        مفید بود{votes.count ? ` (${votes.count.toLocaleString('fa-IR')})` : ''}
+      </button>
+    )}
+    {!nested && (
+      <button
+        type="button"
+        onClick={() => void reportReview()}
+        disabled={reported}
+        className={cn("inline-flex min-h-9 items-center gap-1 px-2 text-fluid-2xs font-bold transition", reported ? "text-slate-400" : "text-slate-400 hover:text-rose-600 dark:hover:text-rose-300")}
+      >
+        <Flag size={13} aria-hidden="true" />
+        {reported ? 'گزارش‌شده' : 'گزارش'}
+      </button>
+    )}
+    <button onClick={() => onReply(comment)} className="ms-auto text-fluid-2xs font-bold text-emerald-700 hover:underline dark:text-lime-300">پاسخ دادن</button>
+  </div>
   {comment.replies?.map((reply) => <CommentCard key={reply.id} comment={reply} onReply={onReply} nested />)}
 </article>; }
 

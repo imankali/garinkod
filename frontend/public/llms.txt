@@ -17,3 +17,9 @@ Only payment methods explicitly marked active by the server should be described 
 
 ## Citation guidance
 Use the relevant canonical product, service or marketplace URL. Agricultural guidance must not replace local expert, label, safety or regulatory advice.
+
+## راهنما و اعتماد
+- /faq — پرسش‌های متداول: خرید مهمان، سقف سبد، پرداخت ناموفق، زمان ارسال، لغو و بازگشت، امتیاز وفاداری.
+- /customers — تجربه خرید مشتریان؛ فقط دیدگاه‌های منتشرشده خریداران واقعی، با ذکر اینکه انتخابی یا تأییدشده‌اند.
+- /c/<slug>، /sc/<slug>، /brand/<slug>، /tag/<slug> — صفحه هر دسته، زیردسته، برند و برچسب، با متن راهنما و فهرست محصولات همان گروه.
+- /site/policies (API) — مهلت بازگشت کالا و فعال بودن تحویل فوری؛ اگر مهلت عددی اعلام نشده باشد، مقدار null است و نباید عددی فرض شود.

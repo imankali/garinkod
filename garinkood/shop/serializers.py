@@ -189,7 +189,7 @@ class ProductSerializer(serializers.ModelSerializer):
             'description', 'publish', 'created', 'updated', 'status',
             'price', 'stock', 'available', 'is_featured', 'image', 'image_url',
             'is_in_stock', 'discount_percent', 'sales_count', 'discounted_price',
-            'brand', 'sku', 'gtin', 'package_weight', 'price_on_request',
+            'brand', 'brand_slug', 'sku', 'gtin', 'package_weight', 'price_on_request',
             'seo_title', 'seo_description',
             'shipping_weight_grams', 'shipping_length_cm', 'shipping_width_cm',
             'shipping_height_cm', 'fertilizer_detail', 'pesticide_detail',
@@ -290,6 +290,7 @@ class ProductListSerializer(serializers.ModelSerializer):
     reviews_count = serializers.SerializerMethodField()
     image_alt_url = serializers.SerializerMethodField()
     is_expiring_soon = serializers.SerializerMethodField()
+    tags = TagSerializer(many=True, read_only=True)
 
     class Meta:
         model = Product
@@ -298,7 +299,7 @@ class ProductListSerializer(serializers.ModelSerializer):
             'available', 'is_featured', 'image', 'image_url', 'is_in_stock',
             'discount_percent', 'sales_count', 'discounted_price', 'brand', 'sku',
             'package_weight', 'price_on_request', 'avg_rating', 'reviews_count',
-            'image_alt_url', 'is_expiring_soon', 'views',
+            'image_alt_url', 'is_expiring_soon', 'views', 'brand_slug', 'tags',
         ]
 
     def get_image_url(self, obj) -> str:
@@ -685,6 +686,9 @@ class CheckoutSerializer(serializers.Serializer):
     affiliate_code = serializers.CharField(max_length=32, required=False, allow_blank=True)
     coupon_code = serializers.CharField(max_length=40, required=False, allow_blank=True)
     terms_accepted = serializers.BooleanField()
+    # Only validated against what the shipping layer currently offers; a frontend
+    # cannot invent a service by posting a name.
+    shipping_service = serializers.ChoiceField(choices=['standard', 'express'], required=False, default='standard')
 
     def validate_phone(self, value):
         normalised = value.replace(' ', '').replace('-', '')

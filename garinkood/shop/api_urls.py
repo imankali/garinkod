@@ -1,6 +1,8 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from . import api_views, marketplace_views, reference_views, farm_views, content_views, desk_views
+from . import (
+    api_views, catalog_views, content_views, desk_views, farm_views, marketplace_views, reference_views,
+)
 from .messaging.webhooks import whatsapp_webhook
 
 # ساخت Router
@@ -137,6 +139,17 @@ urlpatterns = [
     path('site/contact/', content_views.site_contact, name='api_site_contact'),
     path('site/about/', content_views.site_about, name='api_site_about'),
     # Legal documents: the hub, then one document by slug.
+    # Catalogue landing pages, buyer experiences and the shop's own policies.
+    path('catalog/index/', catalog_views.catalog_index, name='api_catalog_index'),
+    # ``str`` rather than the slug converter: a Persian brand or tag slug is
+    # legitimately non-ASCII and must not 404 on its own address.
+    path(
+        'catalog/landing/<str:kind>/<str:slug>/',
+        catalog_views.catalog_landing,
+        name='api_catalog_landing',
+    ),
+    path('testimonials/', catalog_views.buyer_experiences, name='api_testimonials'),
+    path('site/policies/', catalog_views.site_policies, name='api_site_policies'),
     path('legal/', content_views.legal_index, name='api_legal_index'),
     path('legal/<slug:slug>/', content_views.legal_document, name='api_legal_document'),
     path('guides/index/', content_views.growing_index, name='api_growing_index'),

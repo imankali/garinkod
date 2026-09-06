@@ -59,6 +59,9 @@ const Messages = lazy(() => import("./pages/Messages"));
 const Farmers = lazy(() => import("./pages/Farmers"));
 const Legal = lazy(() => import("./pages/Legal"));
 const LegalHub = lazy(() => import("./pages/LegalHub"));
+const CatalogLanding = lazy(() => import("./pages/CatalogLanding"));
+const Faq = lazy(() => import("./pages/Faq"));
+const Customers = lazy(() => import("./pages/Customers"));
 const Blog = lazy(() => import("./pages/Blog"));
 const ArticlePage = lazy(() => import("./pages/ArticlePage"));
 const About = lazy(() => import("./pages/About"));
@@ -405,6 +408,16 @@ export default function App() {
                   address of each document; the three older routes stay alive
                   because they are printed in e-mails and saved in bookmarks, and
                   render the same component (which declares the canonical URL). */}
+              {/* Catalogue landing pages: one component for the four kinds of
+                  addressable group, so a category, a subcategory, a brand and a
+                  tag all behave the same and all take their product grid from the
+                  filters the server returned for that page. */}
+              <Route path="/c/:slug" element={<CatalogLanding kind="category" />} />
+              <Route path="/sc/:slug" element={<CatalogLanding kind="subcategory" />} />
+              <Route path="/brand/:slug" element={<CatalogLanding kind="brand" />} />
+              <Route path="/tag/:slug" element={<CatalogLanding kind="tag" />} />
+              <Route path="/faq" element={<Faq />} />
+              <Route path="/customers" element={<Customers />} />
               <Route path="/legal" element={<LegalHub />} />
               <Route path="/legal/:slug" element={<Legal />} />
               <Route path="/privacy" element={<Legal />} />

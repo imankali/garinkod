@@ -1,5 +1,6 @@
 from contextlib import nullcontext
 from decimal import Decimal, InvalidOperation
+import hashlib
 from datetime import timedelta
 from secrets import token_urlsafe
 from threading import Lock
@@ -66,7 +67,10 @@ from .payments import (
 )
 from .rewards import mark_order_paid_and_reward
 from .settlements import record_marketplace_sale, reverse_marketplace_sale, restore_listing_quantities
-from .shipping import create_initial_shipment, quote_shipping, record_tracking_event
+from .shipping import (
+    ShippingServiceUnavailable, create_initial_shipment, record_tracking_event,
+    select_shipping_quote, shipping_options,
+)
 from . import legal
 from .notifications import notify_comment_reply
 from .messaging.outbox import enqueue_order_event
@@ -332,7 +336,7 @@ class ProductViewSet(viewsets.ReadOnlyModelViewSet):
     search_fields = ['title', 'description', 'brand', 'sku']
     ordering_fields = [
         'price', 'publish', 'created', 'sales_count', 'discount_percent',
-        'avg_rating', 'reviews_count',
+        'avg_rating', 'reviews_count', 'views',
     ]
     ordering = ['-publish']
     lookup_field = 'slug'
@@ -356,15 +360,31 @@ class ProductViewSet(viewsets.ReadOnlyModelViewSet):
             )
         )
         if self.action == 'retrieve':
-            # The detail page renders the spec table; prefetch it instead of
-            # issuing one query per attribute row.
-            queryset = queryset.prefetch_related('attributes')
+            # The detail page renders the spec table, the gallery and the package
+            # picker; prefetch all three instead of one query per row.
+            queryset = queryset.prefetch_related(
+                Prefetch('images', queryset=ProductImage.objects.only('image', 'caption', 'order')),
+                'packages', 'tags', 'attributes',
+            )
         return queryset
 
     def get_serializer_class(self):
         if self.action == 'list':
             return ProductListSerializer
         return ProductSerializer
+
+    def get_object(self):
+        """Count a product-page view on the way to serving it.
+
+        One UPDATE instead of a read-modify-write: «پربازدیدترین» has to be a
+        ranking that follows traffic, not an exact meter, so a lost update on a
+        counter is not worth locking the catalogue row.
+        """
+        instance = super().get_object()
+        if self.action == 'retrieve':
+            Product.objects.filter(pk=instance.pk).update(views=F('views') + 1)
+            instance.views += 1
+        return instance
 
     @action(detail=False, methods=['get'], url_path='facets')
     def facets(self, request):
@@ -459,6 +479,70 @@ class CommentViewSet(viewsets.ModelViewSet):
             serializer = self.get_serializer(comments, many=True)
             return Response(serializer.data)
         return Response({'error': 'Product slug is required'}, status=400)
+
+    @staticmethod
+    def _visitor_key(request) -> str:
+        """A stable, non-reversible identity for a guest's vote.
+
+        Anonymous reviews are read by far more people than write them, so voting
+        has to work without an account — but it must not be free for a bot to
+        refresh a page and inflate a review either.
+        """
+        if request.user.is_authenticated:
+            return ''
+        seed = f"{request.session.session_key or ''}|{request.META.get('REMOTE_ADDR', '')}"
+        return hashlib.sha256(seed.encode('utf-8')).hexdigest()[:64]
+
+    @action(detail=True, methods=['post'], permission_classes=[permissions.AllowAny],
+            throttle_classes=[FeedbackRateThrottle])
+    def helpful(self, request, pk=None):
+        """Toggle «مفید بود» on a review.
+
+        The tally is recomputed from the rows rather than trusted from the
+        request, so a client cannot post a score of its own.
+        """
+        comment = self.get_object()
+        user = request.user if request.user.is_authenticated else None
+        votes = CommentVote.objects.filter(comment=comment)
+        if user:
+            votes = votes.filter(user=user)
+        else:
+            votes = votes.filter(user__isnull=True, visitor_key=self._visitor_key(request))
+        existing = votes.first()
+        if existing:
+            existing.delete()
+        else:
+            CommentVote.objects.create(comment=comment, user=user, visitor_key=self._visitor_key(request))
+        total = CommentVote.objects.filter(comment=comment).count()
+        Comment.objects.filter(pk=comment.pk).update(helpful_count=total)
+        return Response({'voted': existing is None, 'helpful_count': total})
+
+    @action(detail=True, methods=['post'], permission_classes=[permissions.AllowAny],
+            throttle_classes=[FeedbackRateThrottle])
+    def report(self, request, pk=None):
+        """Flag a review for a human to look at.
+
+        Nothing is hidden on the spot: the flag marks it and a row lands in the
+        feedback inbox staff already read, which is the difference between a
+        report and a mute button.
+        """
+        comment = self.get_object()
+        reason = str(request.data.get('reason', '')).strip()[:1000]
+        comment.is_reported = True
+        comment.save(update_fields=['is_reported', 'updated'])
+        PlatformFeedback.objects.create(
+            user=request.user if request.user.is_authenticated else None,
+            name=getattr(request.user, 'get_full_name', lambda: '')() or '',
+            kind='other',
+            subject=f"گزارش دیدگاه روی «{comment.product.title}»",
+            message=(
+                f"دیدگاه شماره {comment.pk} از «{comment.name}» گزارش شده است.\n"
+                f"نشانی دیدگاه: /products/{comment.product.slug}\n\n"
+                f"متن دیدگاه:\n{comment.body[:1200]}\n\n"
+                + (f"دلیل گزارش: {reason}" if reason else 'دلیلی ثبت نشده است.')
+            ),
+        )
+        return Response({'reported': True})
 
     @action(detail=False, methods=['get'])
     def rating_summary(self, request):
@@ -573,7 +657,10 @@ class CartViewSet(viewsets.ViewSet):
         minimum = package.min_order_quantity if package else product.min_order_quantity
         if minimum > 1 and quantity < minimum:
             return Response(
-                {'error': f'حداقل سفارش این کالا {minimum:,} عدد است.'.replace(',', '٬')},
+                {
+                    'error': f'حداقل سفارش این کالا {minimum} عدد است.',
+                    'fields': {'quantity': [f'حداقل سفارش {minimum} عدد است.']},
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
         if limit < 1:
@@ -782,14 +869,13 @@ def shipping_quote_view(request):
     cart = _checkout_cart(request)
     items = list(cart.items.select_related('product', 'listing'))
     subtotal = sum(item.total_price for item in items)
-    weight_grams = sum(
-        (item.product.shipping_weight_grams if item.product_id else 0) * item.quantity
-        for item in items
-    )
-    quote = quote_shipping(
-        subtotal=subtotal, province=province, city=city, weight_grams=weight_grams
-    )
-    return Response({'quotes': [quote.as_dict()], 'authoritative_at_checkout': True})
+    weight_grams = sum(item.shipping_weight_grams * item.quantity for item in items)
+    quotes = shipping_options(subtotal=subtotal, province=province, city=city, weight_grams=weight_grams)
+    return Response({
+        'quotes': [quote.as_dict() for quote in quotes],
+        'authoritative_at_checkout': True,
+        'note': 'مبلغ نهایی در لحظه ثبت سفارش دوباره محاسبه می‌شود.',
+    })
 
 
 @documented_api
@@ -911,11 +997,15 @@ def checkout(request):
                     )
                 except ValueError as error:
                     return Response({'error': str(error)}, status=status.HTTP_400_BAD_REQUEST)
-            shipping_quote = quote_shipping(
-                subtotal=subtotal - discount_amount,
-                province=details['province'],
-                city=details['city'],
-            )
+            try:
+                shipping_quote = select_shipping_quote(
+                    subtotal=subtotal - discount_amount,
+                    province=details['province'],
+                    city=details['city'],
+                    service=details.get('shipping_service') or 'standard',
+                )
+            except ShippingServiceUnavailable as error:
+                return Response({'error': str(error)}, status=status.HTTP_400_BAD_REQUEST)
             shipping_price = shipping_quote.amount
             affiliate_code = details.get('affiliate_code', '').strip().upper()
             affiliate = None

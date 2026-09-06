@@ -6,6 +6,7 @@ import { Instagram, Mail, MapPin, MessageCircle, Phone, Send, ShieldCheck } from
 
 import { visibleSections } from '../config/navigation';
 import { useSiteContact } from '../hooks/useSiteContact';
+import { useSitePolicies } from '../hooks/useSitePolicies';
 import { useAuthStore, useUserLevel } from '../store/authStore';
 import { useTranslation } from '../i18n';
 import Logo from './Logo';
@@ -31,6 +32,7 @@ export default function SiteFooter() {
   // Contact details are editable in the admin (SiteContact); the build-time env
   // values stay as the fallback so a deployment without rows still prints a phone.
   const { contact, primaryPhone, whatsappDigits, supportEmail } = useSiteContact();
+  const { hasReturnWindow, returnWindowLabel } = useSitePolicies();
   const phones = contact.phones.length ? contact.phones.slice(0, 2) : primaryPhone ? [primaryPhone] : [];
   const emails = contact.emails.length ? contact.emails.slice(0, 2) : supportEmail ? [supportEmail] : [];
 
@@ -169,9 +171,21 @@ export default function SiteFooter() {
               </button>
             )}
           </nav>
-          <p className="flex items-center gap-1.5">
-            <ShieldCheck size={13} aria-hidden="true" className="text-emerald-600" />
-            پرداخت امن و بازگشت وجه طبق قوانین پلتفرم
+          <p className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 sm:justify-start">
+            <span className="inline-flex items-center gap-1.5">
+              <ShieldCheck size={13} aria-hidden="true" className="text-emerald-600" />
+              پرداخت امن و بازگشت وجه طبق قوانین پلتفرم
+            </span>
+            {/* The number is the operator's decision; until it is stated, the
+                footer says what the platform does without inventing a period. */}
+            {hasReturnWindow && (
+              <Link
+                to="/legal/returns"
+                className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 font-bold text-emerald-700 hover:underline dark:bg-emerald-900/60 dark:text-lime-300"
+              >
+                {returnWindowLabel}
+              </Link>
+            )}
           </p>
         </div>
       </div>

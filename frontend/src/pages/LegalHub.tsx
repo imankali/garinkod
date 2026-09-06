@@ -111,6 +111,40 @@ export default function LegalHub() {
         </p>
       </header>
 
+      {/* What the operator has configured, stated once so no document has to
+          guess a number: the return window and the express option are values, and
+          an unset value is reported as unset rather than filled in. */}
+      <section aria-label="مقادیر جاری" className="mt-6 rounded-2xl border border-emerald-100 bg-emerald-50/50 p-4 dark:border-emerald-900 dark:bg-emerald-950/50">
+        <h2 className="text-fluid-xs font-extrabold text-slate-800 dark:text-white">مقادیر جاری سایت</h2>
+        <ul className="mt-2 grid gap-1.5 text-fluid-2xs leading-7 text-slate-600 sm:grid-cols-2 dark:text-emerald-100">
+          <li>
+            مهلت بازگشت کالا:{' '}
+            {data.policy?.return_window_days ? (
+              <strong className="text-emerald-700 dark:text-lime-300">
+                {data.policy.return_window_days.toLocaleString('fa-IR')} روز پس از تحویل
+              </strong>
+            ) : (
+              <strong className="text-slate-500 dark:text-emerald-200">
+                به‌صورت عددی اعلام نشده — رویه در سند بازگشت کالا توضیح داده شده
+              </strong>
+            )}
+          </li>
+          <li>
+            تحویل فوری:{' '}
+            {data.policy?.express_shipping?.enabled ? (
+              <strong className="text-emerald-700 dark:text-lime-300">
+                فعال{data.policy.express_shipping.fee ? ` · ${data.policy.express_shipping.fee.toLocaleString('fa-IR')} تومان هزینه اضافی` : ''}
+              </strong>
+            ) : (
+              <strong className="text-slate-500 dark:text-emerald-200">برای این سایت باز نیست</strong>
+            )}
+          </li>
+          {data.policy?.return_conditions && (
+            <li className="sm:col-span-2 whitespace-pre-line">{data.policy.return_conditions}</li>
+          )}
+        </ul>
+      </section>
+
       {/* The four questions that bring people here, before the formal list. */}
       <section aria-label="پاسخ‌های سریع" className="mt-7 grid gap-2 sm:grid-cols-2">
         {QUICK_ROWS.map((row) => {

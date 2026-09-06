@@ -10,7 +10,7 @@ import LocationPicker from "../components/LocationPicker";
 import PurchaseSteps from "../components/PurchaseSteps";
 import { useAuthStore } from "../store/authStore";
 import { useCartStore } from "../store/cartStore";
-import type { CheckoutPayload, Order, PaymentProviderOption } from "../types";
+import type { CheckoutPayload, Order, PaymentProviderOption, ShippingQuote } from "../types";
 import { formatPrice } from "../utils/formatPrice";
 import { toEnglishDigits, normalizePhoneNumber, normalizeNumericInput } from "../utils/normalizeDigits";
 
@@ -40,7 +40,10 @@ export default function Checkout() {
   const [restartingPayment, setRestartingPayment] = useState(false);
   const [order, setOrder] = useState<Order | null>(null);
   const [paymentError, setPaymentError] = useState('');
-  const [quotedShipping, setQuotedShipping] = useState<number | null>(null);
+  // Every service the shipping layer currently offers — usually just standard,
+  // and express only if the operator enabled it. The buyer never sees a choice
+  // that cannot be honoured.
+  const [quotes, setQuotes] = useState<ShippingQuote[]>([]);
   const [locating, setLocating] = useState(false);
   // Server-side validation is mapped back onto the individual inputs so the
   // buyer sees which field is wrong instead of a single generic toast.
@@ -64,22 +67,32 @@ export default function Checkout() {
 
   useEffect(() => {
     if (!form.province || !form.city || !cart?.items.length) {
-      setQuotedShipping(null);
+      setQuotes([]);
       return;
     }
     let cancelled = false;
     shippingApi.quote(form.province, form.city)
       .then((response) => {
-        if (!cancelled) setQuotedShipping(response.data.quotes[0]?.amount ?? null);
+        if (cancelled) return;
+        const available = response.data.quotes || [];
+        setQuotes(available);
+        // A service that disappeared between two quotes must not be sent off, so
+        // the choice is re-checked against what just came back.
+        setForm((current) => {
+          if (!current.shipping_service) return current;
+          if (available.some((quote) => quote.service === current.shipping_service)) return current;
+          return { ...current, shipping_service: undefined };
+        });
       })
       .catch(() => {
-        if (!cancelled) setQuotedShipping(null);
+        if (!cancelled) setQuotes([]);
       });
     return () => { cancelled = true; };
   }, [form.province, form.city, cart?.items.length, cart?.total_price]);
 
   const subtotal = cart?.total_price || 0;
-  const shippingPrice = subtotal === 0 ? 0 : quotedShipping;
+  const selectedQuote = quotes.find((quote) => quote.service === (form.shipping_service || 'standard'));
+  const shippingPrice = subtotal === 0 ? 0 : (selectedQuote?.amount ?? quotes[0]?.amount ?? null);
   const total = shippingPrice === null ? subtotal : subtotal + shippingPrice;
 
   function updateField<Key extends keyof CheckoutPayload>(key: Key, value: CheckoutPayload[Key]) {
@@ -306,6 +319,34 @@ export default function Checkout() {
             <textarea value={form.notes || ""} onChange={(event) => updateField("notes", event.target.value)} rows={3} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-normal outline-none transition focus:border-emerald-500 dark:border-emerald-700 dark:bg-emerald-900" placeholder="زمان مناسب تماس، نیاز به مشاوره مصرف، مشخصات دسترسی و..." />
           </label>
 
+          {quotes.length > 1 && (
+            <fieldset className="rounded-2xl border border-slate-200 p-4 dark:border-emerald-800">
+              <legend className="px-1 text-sm font-extrabold text-slate-700 dark:text-emerald-50">روش ارسال</legend>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {quotes.map((quote) => {
+                  const active = (form.shipping_service || 'standard') === quote.service;
+                  return (
+                    <button
+                      key={quote.service}
+                      type="button"
+                      onClick={() => updateField('shipping_service', quote.service as 'standard' | 'express')}
+                      className={`rounded-xl border p-3 text-start transition ${active ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-900' : 'border-slate-200 dark:border-emerald-800'}`}
+                    >
+                      <span className="block text-sm font-extrabold text-slate-800 dark:text-white">{quote.label}</span>
+                      <span className="mt-1 block text-fluid-2xs text-slate-500 dark:text-emerald-200">
+                        {quote.amount === 0 ? 'رایگان' : `${formatPrice(quote.amount)} تومان`}
+                        {quote.estimated_days_min && quote.estimated_days_max
+                          ? ` · تحویل ${quote.estimated_days_min.toLocaleString('fa-IR')}${quote.estimated_days_max > quote.estimated_days_min ? ` تا ${quote.estimated_days_max.toLocaleString('fa-IR')}` : ''} روز کاری`
+                          : ''}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-2 text-fluid-2xs text-slate-400">مبلغ و زمان ارسال در لحظه ثبت سفارش دوباره محاسبه می‌شود.</p>
+            </fieldset>
+          )}
+
           <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
             <div className="flex items-center gap-2 font-extrabold"><Phone size={17} /> روش پرداخت</div>
             <p className="mt-1">فقط روش‌هایی که سرور با credential، callback verify و تست کامل فعال کرده باشد قابل انتخاب‌اند. روش‌های دیگر صرفاً برای شفافیت نمایش داده می‌شوند.</p>
@@ -384,7 +425,10 @@ export default function Checkout() {
             ))}
           </ul>
           <SummaryRow label="جمع کالاها" value={formatPrice(subtotal)} />
-          <SummaryRow label="هزینه ارسال" value={shippingPrice === null ? "پس از انتخاب شهر" : shippingPrice === 0 ? "رایگان" : formatPrice(shippingPrice)} />
+          <SummaryRow
+            label={selectedQuote ? `هزینه ارسال (${selectedQuote.label})` : "هزینه ارسال"}
+            value={shippingPrice === null ? "پس از انتخاب شهر" : shippingPrice === 0 ? "رایگان" : formatPrice(shippingPrice)}
+          />
           <div className="mt-3 flex items-center justify-between border-t border-emerald-200 pt-4 text-base font-extrabold text-slate-800 dark:border-emerald-700 dark:text-white"><span>مبلغ قابل پرداخت</span><span className="text-emerald-700 dark:text-lime-300">{formatPrice(total)}</span></div>
           <div className="mt-5 flex gap-2 rounded-xl bg-white/70 p-3 text-fluid-xs leading-5 text-slate-500 dark:bg-emerald-950/50 dark:text-emerald-200"><ShieldCheck size={18} className="shrink-0 text-emerald-600" />مبلغ نهایی توسط سرور با قیمت و موجودی لحظه‌ای محاسبه می‌شود.</div>
         </aside>
