@@ -173,10 +173,15 @@ export default function Profile() {
                 <p className="text-fluid-xs text-lime-200">{t("account.title")}</p>
                 <h1 className="mt-1 truncate text-fluid-xl font-extrabold">{fullName}</h1>
                 <p className="mt-1 truncate text-fluid-xs text-emerald-100">{user?.email || user?.username}</p>
+                {account?.next_level && (
+                  <p className="mt-1 truncate text-fluid-2xs text-lime-200/90">
+                    پله بعد: {account.next_level.label.replace(/^سطح [^—]+— */, '')} — {account.next_level.how}
+                  </p>
+                )}
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="flex min-h-9 items-center rounded-full bg-white/15 px-3 text-fluid-xs font-bold"><UserRound size={14} className="me-1 inline" />{account?.level_label || t("role.buyer")}</span>
+              <span className="flex min-h-11 items-center rounded-full bg-white/15 px-3 text-fluid-xs font-bold" title={account?.level_label || ''}><UserRound size={14} className="me-1 inline" />{account?.level_short_label || account?.level_label || t("role.buyer")}</span>
               {storefront && <span className="flex min-h-9 items-center rounded-full bg-lime-300/20 px-3 text-fluid-xs font-bold text-lime-100"><Store size={14} className="me-1 inline" />{t("role.seller")}</span>}
               <button onClick={signOut} className="flex min-h-11 items-center rounded-full bg-white/15 px-4 text-fluid-xs font-bold transition hover:bg-white/25"><LogOut size={14} className="me-1 inline" />{t("account.signout")}</button>
             </div>

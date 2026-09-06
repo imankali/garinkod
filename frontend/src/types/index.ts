@@ -596,13 +596,75 @@ export interface User {
 /** Access levels 1-5; see UserAccount.LEVEL_CHOICES on the backend. */
 export const USER_LEVEL = {
   BUYER: 1,
-  SELLER: 2,
-  MODERATOR: 3,
-  ADMIN: 4,
-  OWNER: 5,
+  VERIFIED_BUYER: 2,
+  SELLER: 3,
+  VERIFIED_SELLER: 4,
+  DESK_AGENT: 5,
+  MODERATOR: 6,
+  ADMIN: 7,
+  OWNER: 8,
 } as const;
 
 export type UserLevel = (typeof USER_LEVEL)[keyof typeof USER_LEVEL];
+
+/** The first staff rank: from here up, a person answers the desks. */
+export const STAFF_LEVEL_FLOOR: UserLevel = USER_LEVEL.DESK_AGENT;
+
+/**
+ * What a rank buys. The list itself comes from the server (`/api/levels/`);
+ * these names exist so a call site is a typo-checked string instead of a
+ * free-form key.
+ */
+export type UserCapability =
+  | 'browse'
+  | 'order'
+  | 'review'
+  | 'contact_storefront'
+  | 'support_chat'
+  | 'consult_desk'
+  | 'loyalty'
+  | 'affiliate'
+  | 'verified_badge'
+  | 'sell'
+  | 'featured_storefront'
+  | 'desk_queue'
+  | 'moderate'
+  | 'console'
+  | 'manage_staff'
+  | 'own';
+
+export type UserCapabilities = Partial<Record<UserCapability, boolean>>;
+
+/** One step of the ladder, as the API publishes it. */
+export interface LevelRank {
+  value: UserLevel;
+  key: string;
+  label: string;
+  short_label: string;
+  promise: string;
+  how: string;
+  is_staff: boolean;
+  unlocks: { key: UserCapability; label: string }[];
+}
+
+/** «یک پله جلوتر» on the profile card. */
+export interface LevelNextStep {
+  value: number;
+  label: string;
+  how: string;
+  promise: string;
+}
+
+export interface LevelsSnapshot {
+  ladder: LevelRank[];
+  capabilities: Record<UserCapability, { label: string; minimum_level: number }>;
+  level_range: { min: number; max: number };
+  viewer_level: number;
+  viewer_rank: Pick<LevelRank, 'value' | 'label' | 'short_label' | 'promise'> | null;
+  viewer_is_staff: boolean;
+  viewer_capabilities: UserCapabilities;
+  next_step: LevelNextStep | null;
+}
 
 export interface UserAccount {
   id: number;
@@ -617,6 +679,12 @@ export interface UserAccount {
   avatar_url: string;
   level: UserLevel;
   level_label: string;
+  /** «غرفه‌دار» without the «سطح ۳ — » prefix, for chips. */
+  level_short_label: string;
+  /** What this account may do, straight from the server's ladder. */
+  capabilities?: UserCapabilities;
+  /** The rank one step up and how to reach it; null at the top or at a wall. */
+  next_level?: LevelNextStep | null;
   has_storefront: boolean;
   created: string;
   updated: string;
@@ -1156,6 +1224,13 @@ export interface DeskState {
   agents: DeskAgentPublic[];
   viewer_is_staff: boolean;
   quick_replies: DeskQuickReply[];
+  /**
+   * Whether this viewer may be a *customer* of this desk. Nobody queues in
+   * front of a farmer at the desk they staff, so the card offers the queue
+   * instead of a chat, and says why.
+   */
+  customer_allowed: boolean;
+  customer_denied_reason: string;
 }
 
 /** Whether the satisfaction card is due on this thread. */
@@ -1201,6 +1276,8 @@ export interface StorefrontMessage {
   sender_avatar_url: string;
   /** «مشاور کشاورزی» under the name, so the title travels with the reply. */
   sender_role_label: string;
+  /** Level 2+ (a confirmed phone number) or staff: the name carries the mark. */
+  sender_verified?: boolean;
   /** Written by the platform (closing, hours), not by a person. */
   is_system: boolean;
   is_mine: boolean;

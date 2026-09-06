@@ -29,6 +29,7 @@ from .models import (
 )
 from .attachments import validate_message_attachment
 from . import desk
+from .levels import may_contact_desk
 from .notifications import get_or_create_service_thread
 from .permissions import IsStorefrontOwnerOrReadOnly
 from .serializers import (
@@ -37,7 +38,7 @@ from .serializers import (
     StorefrontPostCommentSerializer, StorefrontPostSerializer, StorefrontSerializer,
 )
 from .slugs import slugify_fa
-from .throttling import SearchRateThrottle
+from .throttling import InboxRateThrottle, SearchRateThrottle
 
 User = get_user_model()
 
@@ -420,6 +421,7 @@ def _participant_conversations(user):
 @documented_api
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
+@throttle_classes([InboxRateThrottle])
 def my_conversations(request):
     """The caller's whole inbox, across every channel.
 
@@ -465,6 +467,19 @@ def my_conversations(request):
     })
 
 
+def _staff_exits(channel: str) -> list[dict[str, str]]:
+    """The doors a staff member should use instead of the customer queue.
+
+    A refusal that only says "no" sends a person hunting. These are the places
+    where the same thing actually gets handled: the queue they already staff,
+    and the internal feedback line that the support group reads.
+    """
+    exits = [{'label': 'بازخورد و انتقاد داخلی', 'url': '/support'}]
+    if desk.desk_channel(channel):
+        exits.insert(0, {'label': 'صف میز خدمات', 'url': '/messages'})
+    return exits
+
+
 @documented_api
 @api_view(['GET', 'POST'])
 @permission_classes([permissions.IsAuthenticated])
@@ -482,6 +497,21 @@ def service_conversation(request, channel):
     }
     if channel not in allowed:
         return Response({'error': 'کانال پیام نامعتبر است.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    staff_of_desk = desk.is_operator_for(request.user, channel)
+    contact_allowed, contact_reason = may_contact_desk(
+        request.user, channel, staff_of_desk=staff_of_desk,
+    )
+    if not contact_allowed:
+        return Response(
+            {
+                'error': contact_reason,
+                'code': 'staff_not_a_desk_customer',
+                'channel': channel,
+                'alt': _staff_exits(channel),
+            },
+            status=status.HTTP_403_FORBIDDEN,
+        )
 
     conversation = get_or_create_service_thread(request.user, channel)
     if request.method == 'POST':
@@ -583,6 +613,29 @@ def conversation_messages(request, conversation_id):
     )
     if not conversation.is_participant(request.user):
         return Response({'error': 'شما عضو این گفتگو نیستید.'}, status=status.HTTP_403_FORBIDDEN)
+
+    # Answering other people's tickets is the job; writing into a service thread
+    # *as its customer* is not, and a promoted account keeps its old thread.
+    if (
+        request.method == 'POST'
+        and desk.desk_channel(conversation.channel)
+        and conversation.customer_id == request.user.id
+    ):
+        contact_allowed, contact_reason = may_contact_desk(
+            request.user,
+            conversation.channel,
+            staff_of_desk=desk.is_operator_for(request.user, conversation.channel),
+        )
+        if not contact_allowed:
+            return Response(
+                {
+                    'error': contact_reason,
+                    'code': 'staff_not_a_desk_customer',
+                    'channel': conversation.channel,
+                    'alt': _staff_exits(conversation.channel),
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
     if request.method == 'GET':
         messages = conversation.messages.select_related(

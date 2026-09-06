@@ -12,6 +12,24 @@ from django.db.models import Q, Sum, F
 from django.db.models.functions import Lower
 from simple_history.models import HistoricalRecords
 
+from .levels import (
+    LEVEL_ADMIN,
+    LEVEL_BUYER,
+    LEVEL_CHOICES,
+    LEVEL_DESK_AGENT,
+    LEVEL_GUEST,
+    LEVEL_MODERATOR,
+    LEVEL_OWNER,
+    LEVEL_SELLER,
+    LEVEL_VERIFIED_BUYER,
+    LEVEL_VERIFIED_SELLER,
+    MAXIMUM_LEVEL,
+    MINIMUM_LEVEL,
+    STAFF_LEVELS,
+    level_for,
+    rank_for,
+    label as level_label,
+)
 from .persian import fa_digits, platform_day_index
 
 
@@ -404,22 +422,25 @@ class UserAccount(models.Model):
         ('female', 'خانم'),
     )
 
-    # Access levels 1..5.  The level is authoritative for coarse-grained access
-    # (for example the /poshtiban console); Django groups still express the
-    # fine-grained "which model may I change" permissions on top of it.
-    LEVEL_BUYER = 1
-    LEVEL_SELLER = 2
-    LEVEL_MODERATOR = 3
-    LEVEL_ADMIN = 4
-    LEVEL_OWNER = 5
-    LEVEL_CHOICES = (
-        (LEVEL_BUYER, 'سطح ۱ — خریدار'),
-        (LEVEL_SELLER, 'سطح ۲ — غرفه‌دار'),
-        (LEVEL_MODERATOR, 'سطح ۳ — ناظر محتوا'),
-        (LEVEL_ADMIN, 'سطح ۴ — مدیر'),
-        (LEVEL_OWNER, 'سطح ۵ — مالک سیستم'),
-    )
-    STAFF_LEVELS = (LEVEL_MODERATOR, LEVEL_ADMIN, LEVEL_OWNER)
+    # Access levels: the eight-step ladder in ``shop/levels.py``. The level is
+    # authoritative for coarse-grained access (the console, the storefront
+    # tools, whether someone may open a ticket at all); Django groups still
+    # express the fine-grained "which model may I change" permissions on top of
+    # it. Labels and choices live in one place so a gate and the screen that
+    # explains it cannot drift apart.
+    LEVEL_GUEST = LEVEL_GUEST
+    LEVEL_BUYER = LEVEL_BUYER
+    LEVEL_VERIFIED_BUYER = LEVEL_VERIFIED_BUYER
+    LEVEL_SELLER = LEVEL_SELLER
+    LEVEL_VERIFIED_SELLER = LEVEL_VERIFIED_SELLER
+    LEVEL_DESK_AGENT = LEVEL_DESK_AGENT
+    LEVEL_MODERATOR = LEVEL_MODERATOR
+    LEVEL_ADMIN = LEVEL_ADMIN
+    LEVEL_OWNER = LEVEL_OWNER
+    LEVEL_CHOICES = LEVEL_CHOICES
+    STAFF_LEVELS = STAFF_LEVELS
+    MINIMUM_LEVEL = MINIMUM_LEVEL
+    MAXIMUM_LEVEL = MAXIMUM_LEVEL
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='account')
     phone = models.CharField(max_length=11, db_index=True, verbose_name="شماره تلفن")
@@ -473,6 +494,19 @@ class UserAccount(models.Model):
     def is_staff_level(self) -> bool:
         return self.level in self.STAFF_LEVELS
 
+    @property
+    def level_label(self) -> str:
+        return level_label(self.level)
+
+    @property
+    def rank(self):
+        """The ladder row for this account, or None for an unknown value."""
+        return rank_for(self.level)
+
+    @property
+    def verified_phone(self) -> bool:
+        return self.phone_verified_at is not None
+
     def promote_to(self, level: int, *, save: bool = True) -> 'UserAccount':
         """Raise the level, never silently lowering an existing one."""
         if level > self.level:
@@ -485,17 +519,10 @@ class UserAccount(models.Model):
 def account_level(user) -> int:
     """Resolve a user's level without assuming the profile row exists.
 
-    Superusers are always owners so a fresh `createsuperuser` account can
-    reach the console before any profile row has been written.
+    A thin alias for :func:`shop.levels.level_for`, kept because most of the
+    codebase already speaks this name.
     """
-    if not user or not user.is_authenticated:
-        return 0
-    if user.is_superuser:
-        return UserAccount.LEVEL_OWNER
-    account = getattr(user, 'account', None)
-    if account:
-        return account.level
-    return UserAccount.LEVEL_BUYER
+    return level_for(user)
 
 
 # --- Comment ---

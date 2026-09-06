@@ -9,7 +9,10 @@ import {
   type OtpRequestResponse,
   type User,
   type UserAccount,
+  type UserCapability,
+  type UserCapabilities,
   type UserLevel,
+  STAFF_LEVEL_FLOOR,
 } from '../types';
 
 interface AuthState {
@@ -316,4 +319,29 @@ export function useUserLevel(): UserLevel | 0 {
 
 export function useHasLevel(required: UserLevel): boolean {
   return useUserLevel() >= required;
+}
+
+/**
+ * What the signed-in account may do, as the server said it.
+ *
+ * `undefined` while the session has not resolved yet — a component must not
+ * read that as "no" and hide a control, so it should fall back to a level
+ * check while `isSessionChecked` is false.
+ */
+export function useCapabilities(): UserCapabilities | undefined {
+  const { isAuthenticated, account } = useAuthStore();
+  if (!isAuthenticated) return {};
+  return account?.capabilities;
+}
+
+/** A single capability, defaulting to `fallback` while the session loads. */
+export function useCan(capability: UserCapability, fallback = true): boolean {
+  const capabilities = useCapabilities();
+  if (!capabilities || capabilities[capability] === undefined) return fallback;
+  return Boolean(capabilities[capability]);
+}
+
+/** Whether this person is on the platform's payroll (rank 5 and up). */
+export function useIsStaffMember(): boolean {
+  return useHasLevel(STAFF_LEVEL_FLOOR);
 }

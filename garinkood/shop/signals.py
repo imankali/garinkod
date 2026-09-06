@@ -3,11 +3,17 @@
 Levels are derived facts, not something a client can post:
 
 * every user gets a level-1 profile the moment the account exists;
-* opening a storefront promotes the owner to level 2;
-* levels 3-5 are granted deliberately by an owner through the management API.
+* verifying the phone number promotes them to level 2 — the platform has proven
+  the person behind the account, so their name now carries the verified badge;
+* opening a storefront promotes the owner to level 3;
+* an operator verifying that storefront promotes the owner to level 4, which is
+  what puts the storefront in front of buyers («غرفه‌های منتخب»);
+* levels 5-8 are appointments and are granted deliberately through the
+  management API — nothing here ever hands one out by accident.
 
-Promotion never lowers an existing level, so a moderator who also happens to
-run a storefront does not get demoted to level 2.
+Promotion never lowers an existing level, so a moderator who also runs a
+storefront does not get demoted to level 3, and un-verifying a storefront takes
+the *badge* away (the model field) without silently stripping a person's rank.
 """
 
 from django.contrib.auth import get_user_model
@@ -15,7 +21,13 @@ from django.db import transaction
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 
-from .models import Order, Shipment, ShipmentTrackingEvent, Storefront, UserAccount
+from .models import (
+    Order,
+    Shipment,
+    ShipmentTrackingEvent,
+    Storefront,
+    UserAccount,
+)
 
 User = get_user_model()
 
@@ -29,13 +41,25 @@ def ensure_user_account(sender, instance, created, **kwargs):
     UserAccount.objects.get_or_create(user=instance, defaults={'phone': '', 'level': level})
 
 
+@receiver(post_save, sender=UserAccount, dispatch_uid='shop_promote_verified_phone')
+def promote_verified_buyer(sender, instance, created, **kwargs):
+    """A confirmed phone number is the difference between level 1 and level 2."""
+    if created or instance.phone_verified_at is None:
+        return
+    if instance.level < UserAccount.LEVEL_VERIFIED_BUYER:
+        instance.promote_to(UserAccount.LEVEL_VERIFIED_BUYER)
+
+
 @receiver(post_save, sender=Storefront, dispatch_uid='shop_promote_storefront_owner')
 def promote_storefront_owner(sender, instance, created, **kwargs):
-    """A user who opens a storefront becomes a level-2 seller."""
-    if not created:
-        return
-    account, _ = UserAccount.objects.get_or_create(user=instance.user, defaults={'phone': ''})
-    account.promote_to(UserAccount.LEVEL_SELLER)
+    """A user who opens a storefront becomes a seller; a verified storefront
+    makes them a *verified* seller."""
+    target = UserAccount.LEVEL_VERIFIED_SELLER if instance.is_verified else UserAccount.LEVEL_SELLER
+    account = getattr(instance.user, 'account', None)
+    if account is None:
+        account, _ = UserAccount.objects.get_or_create(user=instance.user, defaults={'phone': ''})
+    if account.level < target:
+        account.promote_to(target)
 
 
 @receiver(pre_save, sender=Order, dispatch_uid='shop_capture_order_notification_state')

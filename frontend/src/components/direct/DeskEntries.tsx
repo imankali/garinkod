@@ -43,10 +43,16 @@ const PRESENCE_REFRESH_MS = 30000;
 export default function DeskEntries({
   conversations,
   onOpen,
+  onFilterChannel,
   className,
 }: {
   conversations: StorefrontConversation[];
   onOpen: (conversationId: number) => void;
+  /**
+   * Where the queue for one channel is shown. A staff member is refused as a
+   * *customer* of a desk, so their card sends them to the queue instead.
+   */
+  onFilterChannel?: (channel: 'consulting' | 'support') => void;
   className?: string;
 }) {
   const [states, setStates] = useState<Partial<Record<'consulting' | 'support', DeskState>>>({});
@@ -76,6 +82,18 @@ export default function DeskEntries({
       onOpen(existing.id);
       return;
     }
+    // The server already said who may be a customer of this desk; honouring it
+    // here is what keeps the card from offering a chat that would be refused.
+    if (states[channel] && !states[channel]!.customer_allowed) {
+      const reason = states[channel]!.customer_denied_reason;
+      if (onFilterChannel) {
+        onFilterChannel(channel);
+        if (reason) toast(reason);
+      } else if (reason) {
+        toast.error(reason);
+      }
+      return;
+    }
     setBusy(channel);
     try {
       const response = await messagesApi.openServiceConversation(channel);
@@ -94,6 +112,8 @@ export default function DeskEntries({
         const thread = conversations.find((conversation) => conversation.channel === desk.channel);
         const unread = thread?.unread_count ?? 0;
         const closed = thread?.status === 'closed';
+        // A staff viewer sees this card as their queue, not as a ticket to themselves.
+        const blocked = Boolean(state && !state.customer_allowed);
         const unassigned = state?.viewer_is_staff
           ? conversations.filter(
               (conversation) => conversation.channel === desk.channel && conversation.agent === null,
@@ -154,8 +174,13 @@ export default function DeskEntries({
                 )}
               </span>
 
-              <span className="mt-1 block truncate text-fluid-2xs leading-5 text-slate-500 dark:text-emerald-200">
-                {thread ? thread.last_message?.body || desk.hint : desk.hint}
+              <span
+                className={cn(
+                  'mt-1 block text-fluid-2xs leading-5 text-slate-500 dark:text-emerald-200',
+                  blocked ? 'line-clamp-3' : 'truncate',
+                )}
+              >
+                {blocked && !thread ? state!.customer_denied_reason : thread ? thread.last_message?.body || desk.hint : desk.hint}
               </span>
 
               <span className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-bold">
@@ -175,8 +200,8 @@ export default function DeskEntries({
               </span>
             </span>
 
-            <span className="shrink-0 self-center rounded-full bg-emerald-50 px-2 py-1 text-fluid-2xs font-extrabold text-emerald-700 dark:bg-emerald-900 dark:text-lime-300">
-              {thread ? 'ادامه' : 'شروع'}
+            <span className="shrink-0 self-center whitespace-nowrap rounded-full bg-emerald-50 px-2 py-1 text-fluid-2xs font-extrabold text-emerald-700 dark:bg-emerald-900 dark:text-lime-300">
+              {thread ? 'ادامه' : blocked ? 'صف میز' : 'شروع'}
             </span>
           </button>
         );

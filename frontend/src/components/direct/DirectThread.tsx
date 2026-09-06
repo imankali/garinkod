@@ -14,6 +14,7 @@ import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   ArrowRight,
+  BadgeCheck,
   Ban,
   Check,
   Copy,
@@ -25,7 +26,7 @@ import {
   Reply,
   Send,
   Trash2,
-  X,
+  X
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -1042,6 +1043,13 @@ function MessageBubble({
           )}
         >
           <span>{mine ? t('direct.you') : message.sender_name}</span>
+          {!mine && message.sender_verified && (
+            <BadgeCheck
+              size={13}
+              className="shrink-0 text-emerald-500 dark:text-lime-300"
+              aria-label="حساب تأییدشده"
+            />
+          )}
           {!mine && message.sender_role_label && (
             <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 font-bold text-emerald-700 dark:bg-emerald-900 dark:text-lime-300">
               {message.sender_role_label}

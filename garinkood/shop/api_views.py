@@ -14,7 +14,7 @@ from rest_framework.decorators import action, api_view, permission_classes, thro
 from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.models import Group, User
+from django.contrib.auth.models import Group, Permission, User
 from django.db import IntegrityError, connection, transaction
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
@@ -84,6 +84,16 @@ from .messaging.otp import (
     issue_login_otp,
     otp_public_payload,
     verify_login_otp,
+)
+from .levels import (
+    CAPABILITIES,
+    MAXIMUM_LEVEL,
+    MINIMUM_LEVEL,
+    capabilities_for,
+    is_staff_level,
+    level_for,
+    matrix as level_matrix,
+    next_step,
 )
 from .permissions import IsModerator, IsAdminLevel, IsOwnerLevel
 from .phone_numbers import normalize_iranian_mobile
@@ -2197,6 +2207,7 @@ def management_dashboard(request):
             ).data if _can_manage(request.user, 'view_storefrontpost') else [],
         },
         'viewer_level': account_level(request.user),
+        'viewer_capabilities': capabilities_for(request.user),
         'alerts': [
             {'type': 'complaint', 'count': open_complaints, 'label': 'شکایت باز'},
             {'type': 'posts', 'count': pending_posts, 'label': 'پست/استوری در انتظار بررسی'},
@@ -2204,6 +2215,75 @@ def management_dashboard(request):
             {'type': 'stock', 'count': low_stock, 'label': 'محصول با موجودی کم'},
         ],
     })
+
+
+@documented_api
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def access_levels(request):
+    """The access ladder, what each step unlocks, and where the viewer stands.
+
+    One endpoint so the profile chip, the support page's refusal and the
+    management console all read the same numbers instead of each keeping a copy
+    that can go stale. Public by design: the ladder itself is not a secret, and
+    a person deciding whether to verify their phone should be able to read what
+    it buys them.
+    """
+    viewer = request.user if getattr(request.user, 'is_authenticated', False) else None
+    rank = None
+    level = level_for(viewer) if viewer is not None else 0
+    if viewer is not None:
+        from .levels import rank_for
+
+        row = rank_for(level)
+        if row is not None:
+            rank = {'value': row.value, 'label': row.label, 'short_label': row.short, 'promise': row.promise}
+    return Response({
+        'ladder': level_matrix(),
+        'capabilities': {
+            key: {'label': label, 'minimum_level': floor}
+            for key, (label, floor) in CAPABILITIES.items()
+        },
+        'level_range': {'min': MINIMUM_LEVEL, 'max': MAXIMUM_LEVEL},
+        'viewer_level': level,
+        'viewer_rank': rank,
+        'viewer_is_staff': bool(viewer is not None and (is_staff_level(level) or viewer.is_superuser)),
+        'viewer_capabilities': capabilities_for(viewer) if viewer is not None else {},
+        'next_step': next_step(viewer) if viewer is not None else None,
+    })
+
+
+#: The two permissions the service queues are gated on. Granting the desk-agent
+#: rank means granting exactly these — not a group, which would also decide
+#: *what else* this person may change. The scope stays the operator's own call
+#: in the staff screen; the rank only opens the queue it promises.
+DESK_QUEUE_PERMISSIONS = (
+    'view_platformfeedback',
+    'view_farmconsultationrequest',
+)
+
+
+def _sync_desk_permissions(member, level: int) -> None:
+    """Give a desk agent their queue, and take it back when they leave the post."""
+    from .models import UserAccount
+
+    should_have = level >= UserAccount.LEVEL_DESK_AGENT
+    permissions = Permission.objects.filter(
+        codename__in=DESK_QUEUE_PERMISSIONS, content_type__app_label='shop',
+    )
+    held = set(member.user_permissions.values_list('codename', flat=True))
+    for permission in permissions:
+        if should_have and permission.codename not in held:
+            member.user_permissions.add(permission)
+        elif not should_have and permission.codename in held:
+            member.user_permissions.remove(permission)
+
+
+def _level_range_message() -> str:
+    """«بین ۱ تا ۸» derived from the ladder, so it cannot go stale on a new step."""
+    from .persian import fa_digits
+
+    return f'سطح باید عددی بین {fa_digits(str(MINIMUM_LEVEL))} تا {fa_digits(str(MAXIMUM_LEVEL))} باشد.'
 
 
 @documented_api
@@ -2615,6 +2695,7 @@ def management_users(request):
             'total_pages': (total + page_size - 1) // page_size or 1,
             'presence_window_minutes': capacity.activity_window_minutes,
             'levels': [{'value': value, 'label': label} for value, label in UserAccount.LEVEL_CHOICES],
+            'ladder': level_matrix(),
             'results': [
                 {
                     'id': member.id,
@@ -2660,12 +2741,12 @@ def management_users(request):
             new_level = int(new_level)
         except (TypeError, ValueError):
             return Response(
-                {'error': 'سطح دسترسی نامعتبر است.', 'fields': {'level': ['سطح باید عددی بین ۱ تا ۵ باشد.']}},
+                {'error': 'سطح دسترسی نامعتبر است.', 'fields': {'level': [_level_range_message()]}},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         if new_level not in dict(UserAccount.LEVEL_CHOICES):
             return Response(
-                {'error': 'سطح دسترسی نامعتبر است.', 'fields': {'level': ['سطح باید عددی بین ۱ تا ۵ باشد.']}},
+                {'error': 'سطح دسترسی نامعتبر است.', 'fields': {'level': [_level_range_message()]}},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         if new_level >= UserAccount.LEVEL_OWNER and actor_level < UserAccount.LEVEL_OWNER:
@@ -2689,6 +2770,7 @@ def management_users(request):
             if new_level >= UserAccount.LEVEL_OWNER:
                 member.is_superuser = True
             member.save(update_fields=['is_staff', 'is_superuser'])
+            _sync_desk_permissions(member, new_level)
         _audit(request.user, 'user_level_changed', member, f'سطح {member.username} به {new_level} تغییر کرد.', {'level': new_level})
 
     if 'is_active' in request.data:

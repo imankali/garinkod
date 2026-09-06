@@ -21,6 +21,8 @@ export type ApiErrorCode =
   | 'payload_too_large'
   | 'throttled'
   | 'shop_overloaded'
+  /** A staff member tried to stand in the customer queue of a desk they staff. */
+  | 'staff_not_a_desk_customer'
   | 'server_error'
   | 'service_unavailable'
   | 'network_error'

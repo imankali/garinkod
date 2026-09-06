@@ -31,6 +31,7 @@ const MESSAGES: Record<Locale, CodeMessages> = {
     service_unavailable: 'سرویس ارسال پیام موقتاً در دسترس نیست. کمی بعد تلاش کنید.',
     // The shop is holding its door because it is busy, not because it is broken.
     shop_overloaded: 'سایت در این لحظه شلوغ است. جایتان در صف نگه داشته شده و به ترتیب ورود وارد می‌شوید.',
+    staff_not_a_desk_customer: 'تیم گرین کود با میز خدمات خودش گفتگو نمی‌کند؛ مورد را از همان صف پیگیری کنید.',
     network_error: 'اتصال به سرور برقرار نشد. لطفاً اتصال اینترنت خود را بررسی کنید.',
     timeout: 'زمان اتصال به سرور به پایان رسید. لطفاً اینترنت خود را بررسی کنید.',
     error: 'خطایی رخ داد. لطفاً دوباره تلاش کنید.',
@@ -47,6 +48,7 @@ const MESSAGES: Record<Locale, CodeMessages> = {
     server_error: 'Something unexpected went wrong. Our team has been notified.',
     service_unavailable: 'The messaging service is temporarily unavailable. Please try again shortly.',
     shop_overloaded: 'The shop is busy right now. Your place in the queue is held and you are let in by order of arrival.',
+    staff_not_a_desk_customer: 'The Garinkood team does not open a ticket with the desk it staffs — follow the matter up in that queue instead.',
     network_error: 'Could not reach the server. Please check your internet connection.',
     timeout: 'The server took too long to respond. Please check your connection.',
     error: 'Something went wrong. Please try again.',
@@ -63,6 +65,7 @@ const MESSAGES: Record<Locale, CodeMessages> = {
     server_error: 'حدث خطأ غير متوقع. تم إبلاغ الفريق الفني.',
     service_unavailable: 'خدمة الرسائل غير متاحة مؤقتاً. يرجى المحاولة لاحقاً.',
     shop_overloaded: 'المتجر مزدحم الآن. مكانك في قائمة الانتظار محفوظ وستدخل حسب ترتيب الوصول.',
+    staff_not_a_desk_customer: 'فريق غرين كود لا يفتح تذكرة مع المكتب الذي يعمل فيه؛ تابع الأمر من نفس قائمة الانتظار.',
     network_error: 'تعذر الاتصال بالخادم. يرجى التحقق من الإنترنت.',
     timeout: 'انتهت مهلة الاتصال بالخادم. يرجى التحقق من الإنترنت.',
     error: 'حدث خطأ. يرجى المحاولة مرة أخرى.',

@@ -8,6 +8,7 @@ import type {
   CatalogLanding,
   LegalDocument,
   LegalIndex,
+  LevelRank,
   SitePolicies,
   Product,
   ProductList,
@@ -70,7 +71,7 @@ import type {
   FarmService,
   SitePage,
   AboutResponse,
-  SiteContactInfo,
+  SiteContactInfo, LevelsSnapshot,
 } from '../types';
 
 // ========================================
@@ -583,6 +584,20 @@ export const rewardsApi = {
 // ========================================
 // Direct messages (DM) between buyers and storefronts
 // ========================================
+// Levels (نردبان دسترسی)
+// ========================================
+/**
+ * The access ladder: every rank, what it unlocks, and where the viewer stands.
+ *
+ * The UI mirrors the eight numbers in `types/index.ts` for gating, but the
+ * wording and the matrix are read from here so a description can never claim a
+ * permission the server would refuse.
+ */
+export const levelsApi = {
+  snapshot: () => apiClient.get<LevelsSnapshot>('/levels/'),
+};
+
+// ========================================
 export const messagesApi = {
   /** The caller's whole inbox, optionally narrowed to one channel. */
   conversations: (channel?: MessageChannel) =>
@@ -899,6 +914,8 @@ export const managementApi = {
       levels: { value: number; label: string }[];
       results: ManagedUser[];
       presence_window_minutes?: number;
+      /** The ladder with what each step unlocks, so the console explains itself. */
+      ladder?: LevelRank[];
     }>('/management/users/', { params }),
   updateUser: (username: string, data: { level?: number; is_active?: boolean }) =>
     apiClient.patch<{ username: string; level: number; is_active: boolean; is_staff: boolean }>(

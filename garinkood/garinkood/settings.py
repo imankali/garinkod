@@ -231,6 +231,7 @@ REST_FRAMEWORK = {
         "otp_request": config("THROTTLE_OTP_REQUEST", default="30/hour"),
         "otp_verify": config("THROTTLE_OTP_VERIFY", default="60/hour"),
         "search": config("THROTTLE_SEARCH", default="60/min"),
+        "inbox": config("THROTTLE_INBOX", default="60/min"),
         "checkout": config("THROTTLE_CHECKOUT", default="12/hour"),
         "upload": config("THROTTLE_UPLOAD", default="20/hour"),
         "feedback": config("THROTTLE_FEEDBACK", default="10/hour"),

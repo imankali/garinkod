@@ -17,6 +17,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Camera, Inbox, LifeBuoy, MessageCircle, Phone, Sprout, X } from 'lucide-react';
 
 import { messagesApi } from '../api/services';
+import { parseApiError } from '../api/errors';
+import { useBackgroundPolling } from '../hooks/useBackgroundPolling';
 import { useAuthStore } from '../store/authStore';
 import { useDirectStore } from '../store/directStore';
 import { cn } from '../utils/cn';
@@ -55,17 +57,14 @@ export default function GlobalMessengerButton() {
     try {
       const response = await messagesApi.conversations();
       setUnreadTotal(response.data.unread_total || 0);
-    } catch {
-      // Signed-out or offline: leave the last known count alone.
+    } catch (caught) {
+      // Signed-out or offline: leave the last known count alone. A rate limit is
+      // rethrown so the shared poll hook pauses rather than stacking errors.
+      if (parseApiError(caught).code === 'throttled') throw caught;
     }
   }, [setUnreadTotal]);
 
-  useEffect(() => {
-    if (hidden || !isSessionChecked || !isAuthenticated) return undefined;
-    void refreshUnread();
-    const interval = setInterval(() => void refreshUnread(), UNREAD_POLL_MS);
-    return () => clearInterval(interval);
-  }, [hidden, isSessionChecked, isAuthenticated, refreshUnread]);
+  useBackgroundPolling(refreshUnread, UNREAD_POLL_MS, !hidden && isSessionChecked && isAuthenticated);
 
   // The sheet is a chooser for the drawer; never leave both stacked open.
   useEffect(() => {

@@ -82,6 +82,19 @@ class OtpVerifyRateThrottle(IPRateThrottle):
     scope = 'otp_verify'
 
 
+class InboxRateThrottle(UserOrIPRateThrottle):
+    """The messenger's poll budget, kept apart from everything else.
+
+    An open chat window refreshes its inbox every few seconds; metering that
+    against the same 600/hour the rest of the site gets means the thread
+    "breaks" a minute after it is opened and the farmer sees an error where
+    their messages should be. Reads of the inbox are cheap and predictable, so
+    they get their own, honest ceiling instead of a shared one.
+    """
+
+    scope = 'inbox'
+
+
 class SearchRateThrottle(UserOrIPRateThrottle):
     scope = 'search'
 

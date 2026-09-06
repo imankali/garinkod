@@ -378,6 +378,9 @@ class UserAccountSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
     avatar_url = serializers.SerializerMethodField()
     level_label = serializers.CharField(source='get_level_display', read_only=True)
+    level_short_label = serializers.SerializerMethodField()
+    capabilities = serializers.SerializerMethodField()
+    next_level = serializers.SerializerMethodField()
     has_storefront = serializers.SerializerMethodField()
 
     class Meta:
@@ -385,14 +388,35 @@ class UserAccountSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'username', 'email', 'full_name', 'phone', 'phone_verified_at',
             'gender', 'address', 'avatar', 'avatar_url', 'level', 'level_label',
+            'level_short_label', 'capabilities', 'next_level',
             'has_storefront', 'created', 'updated'
         ]
         # `level` is derived from what the user owns and may only be changed
         # through the management API, never by the profile endpoint.
         read_only_fields = [
             'created', 'updated', 'level', 'level_label', 'avatar_url',
+            'level_short_label', 'capabilities', 'next_level',
             'has_storefront', 'phone_verified_at',
         ]
+
+    def get_level_short_label(self, obj) -> str:
+        """«غرفه‌دار» without the «سطح ۳ — » prefix, for chips."""
+        from .levels import label as level_label_for
+
+        value = level_label_for(obj.level)
+        return value.split('—', 1)[1].strip() if '—' in value else value
+
+    def get_capabilities(self, obj) -> dict:
+        """What this account may do, straight from the ladder module."""
+        from .levels import capabilities_for
+
+        return capabilities_for(obj.user)
+
+    def get_next_level(self, obj):
+        """The rank one step up and how to reach it, or None at the top."""
+        from .levels import next_step
+
+        return next_step(obj.user)
 
     def get_full_name(self, obj):
         return obj.user.get_full_name()
@@ -1308,6 +1332,7 @@ class StorefrontMessageSerializer(serializers.ModelSerializer):
     sender_name = serializers.SerializerMethodField()
     sender_avatar_url = serializers.SerializerMethodField()
     sender_role_label = serializers.SerializerMethodField()
+    sender_verified = serializers.SerializerMethodField()
     is_mine = serializers.SerializerMethodField()
     listing = serializers.SerializerMethodField()
     land = serializers.SerializerMethodField()
@@ -1324,7 +1349,7 @@ class StorefrontMessageSerializer(serializers.ModelSerializer):
         model = StorefrontMessage
         fields = [
             'id', 'conversation', 'sender', 'sender_name', 'sender_avatar_url', 'sender_role_label',
-            'is_mine', 'is_system', 'body',
+            'sender_verified', 'is_mine', 'is_system', 'body',
             'listing', 'land', 'link',
             'attachment', 'attachment_url', 'attachment_type', 'attachment_duration',
             'reply_to', 'is_edited', 'edited_at', 'is_deleted', 'deleted_at',
@@ -1332,7 +1357,7 @@ class StorefrontMessageSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             'id', 'conversation', 'sender', 'sender_name', 'sender_avatar_url', 'sender_role_label',
-            'is_system', 'attachment_url', 'reply_to', 'is_edited', 'edited_at', 'is_deleted',
+            'sender_verified', 'is_system', 'attachment_url', 'reply_to', 'is_edited', 'edited_at', 'is_deleted',
             'deleted_at', 'can_edit', 'can_delete', 'is_read', 'created_at',
             'link', 'land',
         ]
@@ -1405,6 +1430,14 @@ class StorefrontMessageSerializer(serializers.ModelSerializer):
                 return agent.photo_url
         account = getattr(obj.sender, 'account', None)
         return account.avatar_url if account else ''
+
+    def get_sender_verified(self, obj) -> bool:
+        """Level 2+ (verified phone) or staff: the name carries the verified mark."""
+        from .levels import LEVEL_VERIFIED_BUYER, level_for
+
+        if obj.sender_id is None:
+            return False
+        return level_for(obj.sender) >= LEVEL_VERIFIED_BUYER
 
     def get_sender_role_label(self, obj) -> str:
         """«مشاور کشاورزی» under the name, so the title travels with the reply."""

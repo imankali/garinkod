@@ -28,6 +28,7 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
+from .levels import may_contact_desk
 from .models import DeskAgent, DeskSettings, QuickReply, StorefrontConversation, StorefrontMessage
 from .persian import datetime_label
 
@@ -149,8 +150,19 @@ def desk_state(channel: str, *, user=None) -> dict:
 
     viewer_is_staff = bool(user and role and (user.is_superuser or _is_operator(user, channel)))
 
+    # Whether this viewer may be a *customer* of this desk at all. The chat entry
+    # points read this instead of discovering the refusal on submit.
+    if user is not None and role:
+        contact_allowed, contact_reason = may_contact_desk(
+            user, channel, staff_of_desk=bool(_is_operator(user, channel) or user.is_superuser),
+        )
+    else:
+        contact_allowed, contact_reason = True, ''
+
     return {
         'channel': channel,
+        'customer_allowed': contact_allowed,
+        'customer_denied_reason': contact_reason,
         'channel_label': CHANNEL_LABELS.get(channel, ''),
         'is_open': is_open,
         'tracked': bool(settings_row.is_active and role),

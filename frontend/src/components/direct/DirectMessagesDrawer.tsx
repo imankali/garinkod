@@ -13,6 +13,8 @@ import { MessageCircle, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 import { messagesApi } from '../../api/services';
+import { parseApiError } from '../../api/errors';
+import { useBackgroundPolling } from '../../hooks/useBackgroundPolling';
 import { useDirectStore } from '../../store/directStore';
 import { useTranslation } from '../../i18n';
 import type { MessageChannel, StorefrontConversation } from '../../types';
@@ -21,7 +23,7 @@ import ConversationRow from './ConversationRow';
 import DeskEntries from './DeskEntries';
 import DirectThread from './DirectThread';
 
-const LIST_POLL_MS = 6000;
+const LIST_POLL_MS = 10000;
 
 export default function DirectMessagesDrawer() {
   const { t, dir } = useTranslation();
@@ -51,8 +53,10 @@ export default function DirectMessagesDrawer() {
       setChannels(response.data.channels || []);
       setUnreadByChannel(response.data.unread_by_channel || {});
       setUnreadTotal(response.data.unread_total || 0);
-    } catch {
-      // Signed-out viewers simply get an empty list.
+    } catch (caught) {
+      // Signed-out viewers simply get an empty list; only a rate limit is
+      // rethrown, so the polling hook can pause instead of retrying on the nose.
+      if (parseApiError(caught).code === 'throttled') throw caught;
     }
   }, [setUnreadTotal]);
 
@@ -64,13 +68,14 @@ export default function DirectMessagesDrawer() {
     [conversations, filter],
   );
 
-  // Opening with a storefront slug resolves (or creates) that thread.
   useEffect(() => {
-    if (!open) return;
+    if (!open) return undefined;
     void loadList();
-    const interval = setInterval(() => void loadList(), LIST_POLL_MS);
-    return () => clearInterval(interval);
   }, [open, loadList]);
+
+  // While the drawer is open the list follows the same rule as the messaging
+  // page: foreground only, and pause when the server asks for a break.
+  useBackgroundPolling(loadList, LIST_POLL_MS, open);
 
   useEffect(() => {
     if (!open || !storefrontSlug || conversationId) return;

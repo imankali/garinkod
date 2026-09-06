@@ -35,6 +35,7 @@ urlpatterns = [
     path('auth/otp/verify/', api_views.verify_login_otp_view, name='api_otp_verify'),
     path('auth/logout/', api_views.logout_view, name='api_logout'),
     path('auth/session/', api_views.auth_session, name='api_auth_session'),
+    path('levels/', api_views.access_levels, name='api_levels'),
 
     # Signed official-provider callbacks (no browser/session authentication).
     path('messaging/webhooks/whatsapp/', whatsapp_webhook, name='api_whatsapp_webhook'),

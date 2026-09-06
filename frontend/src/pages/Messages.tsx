@@ -13,9 +13,15 @@ import ChannelChips, { type ChannelFilter } from '../components/direct/ChannelCh
 import ConversationRow from '../components/direct/ConversationRow';
 import DeskEntries from '../components/direct/DeskEntries';
 import DirectThread from '../components/direct/DirectThread';
+import { parseApiError } from '../api/errors';
+import { useBackgroundPolling } from '../hooks/useBackgroundPolling';
 import { useAuthStore } from '../store/authStore';
+import toast from 'react-hot-toast';
 import { useTranslation } from '../i18n';
 import type { MessageChannel, StorefrontConversation } from '../types';
+
+/** Ten seconds: honest for a chat list, cheap enough that a rate limit is not the first thing a farmer meets. */
+const INBOX_POLL_MS = 10000;
 
 export default function Messages() {
   const { t } = useTranslation();
@@ -42,23 +48,26 @@ export default function Messages() {
       if (window.matchMedia('(min-width: 1024px)').matches) {
         setActiveId((current) => current ?? response.data.results?.[0]?.id ?? null);
       }
-    } catch {
+    } catch (caught) {
+      // A rate limit is rethrown on purpose: the polling hook reads it and backs
+      // off for the server's own retry window instead of erroring every 10s.
       setConversations([]);
+      if (parseApiError(caught).code === 'throttled') throw caught;
     } finally {
       setLoading(false);
     }
   }, []);
 
+  // The inbox refreshes while the tab is in the foreground; an open thread is
+  // kept live by its own event stream, so the list does not need to be faster.
+  useBackgroundPolling(load, INBOX_POLL_MS, isAuthenticated && isSessionChecked);
+
   useEffect(() => {
     if (!isSessionChecked) return;
-    if (isAuthenticated) {
-      void load();
-      const interval = setInterval(() => void load(), 6000);
-      return () => clearInterval(interval);
-    }
+    if (isAuthenticated) return undefined;
     setLoading(false);
     return undefined;
-  }, [isAuthenticated, isSessionChecked, load]);
+  }, [isAuthenticated, isSessionChecked]);
 
   /*
     A link that says «ادامه گفتگو در مشاوره کشاورزی» — written by the support desk
@@ -78,8 +87,15 @@ export default function Messages() {
         if (cancelled) return;
         setActiveId(response.data.id);
         setFilter('all');
-      } catch {
-        // The inbox is still there; the deep link simply did nothing extra.
+      } catch (caught) {
+        // A staff member is refused as a customer of the desk they staff — for
+        // them the same deep link means "show me that queue", and the server's
+        // own sentence explains the difference instead of a silent no-op.
+        const parsed = parseApiError(caught);
+        if (!cancelled && parsed.code === 'staff_not_a_desk_customer') {
+          setFilter(requestedChannel);
+          toast(parsed.message);
+        }
       } finally {
         if (!cancelled) setSearchParams({}, { replace: true });
       }
@@ -172,6 +188,7 @@ export default function Messages() {
             <DeskEntries
               conversations={conversations}
               onOpen={setActiveId}
+              onFilterChannel={setFilter}
               className="mb-3"
             />
 
