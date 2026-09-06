@@ -408,7 +408,7 @@ export default function Checkout() {
           <ul className="mt-4 space-y-3 border-b border-emerald-100 pb-4 dark:border-emerald-800">
             {cart?.items.map((item) => (
               <li key={item.id} className="flex items-start justify-between gap-3 text-sm">
-                <span className="line-clamp-2 text-slate-600 dark:text-emerald-100">
+                <span className="line-clamp-2 min-w-0 text-slate-600 dark:text-emerald-100">
                   {item.quantity} × {item.title}
                   {/* Marketplace lines name their storefront so the buyer knows
                       who is actually shipping each part of the order. */}
@@ -418,7 +418,7 @@ export default function Checkout() {
                     </span>
                   )}
                 </span>
-                <strong className="whitespace-nowrap text-slate-800 dark:text-white">
+                <strong className="shrink-0 whitespace-nowrap text-slate-800 dark:text-white">
                   {formatPrice(item.total_price)}
                 </strong>
               </li>

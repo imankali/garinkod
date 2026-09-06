@@ -147,7 +147,7 @@ export default function Marketplace() {
         <div className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
           <div>
             <p className="text-sm font-bold text-lime-200">بازار مستقیم کشاورزی</p>
-            <h1 className="mt-2 text-2xl font-extrabold md:text-3xl">
+            <h1 className="mt-2 text-fluid-2xl font-extrabold md:text-fluid-3xl">
               غرفه کشاورزان، تعاونی‌ها و تأمین‌کنندگان
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-emerald-50">
@@ -483,11 +483,11 @@ function ListingCard({ listing }: { listing: MarketplaceListing }) {
         <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-sm dark:border-emerald-900">
           <Link
             to={`/storefronts/${listing.storefront.slug}`}
-            className="inline-flex min-h-11 items-center truncate font-semibold text-slate-600 underline-offset-2 hover:underline dark:text-emerald-100"
+            className="inline-flex min-h-11 min-w-0 items-center truncate font-semibold text-slate-600 underline-offset-2 hover:underline dark:text-emerald-100"
           >
             {listing.storefront.name}
           </Link>
-          <strong className="whitespace-nowrap text-emerald-700 dark:text-lime-300">
+          <strong className="shrink-0 whitespace-nowrap text-emerald-700 dark:text-lime-300">
             {formatPrice(listing.price)} / {listing.unit}
           </strong>
         </div>
