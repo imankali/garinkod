@@ -375,9 +375,23 @@ class ProductFacetAndLandingTests(TestCase):
         self.assertEqual(landing['facets']['price']['min'], 100_000)
         self.assertEqual({row['slug'] for row in landing['facets']['brands']}, {'دانو', 'رویال'})
 
+    def test_brand_page_links_to_the_other_brands_of_the_shelf(self):
+        landing = self.client.get('/api/catalog/landing/brand/رویال/').data
+        # A page for one maker is a dead end unless the next maker is one hop away.
+        self.assertEqual({row['slug'] for row in landing['siblings']}, {'دانو'})
+        self.assertEqual(landing['siblings'][0]['url'], '/brand/دانو')
+        self.assertEqual(landing['siblings'][0]['count'], 2)
+
     def test_catalog_index_groups_only_what_the_database_holds(self):
         data = self.client.get('/api/catalog/index/').data
         self.assertEqual({row['slug'] for row in data['brands']}, {'دانو', 'رویال'})
+        # One card shape for every group, so one renderer serves all of them.
+        for group in ('categories', 'tags', 'brands'):
+            for row in data[group]:
+                self.assertEqual(
+                    sorted(row),
+                    sorted(['kind', 'title', 'slug', 'image_url', 'description', 'count', 'url']),
+                )
         self.assertEqual(data['brands'][0]['count'], 2, 'the busiest brand leads')
         self.assertEqual({row['slug'] for row in data['tags']}, {'مینای-آب'})
         self.assertEqual({row['slug'] for row in data['categories']}, {'fertilizer', 'pesticide'})

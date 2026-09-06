@@ -211,7 +211,27 @@ def _landing_for_brand(slug: str) -> dict | None:
         'breadcrumb': _crumbs(('برندها', '/brands'), (name, f'/brand/{slug}')),
         'filters': {'brand_slug': slug},
         'children': [],
-        'siblings': [],
+        # Other brands of the same catalogue, so a brand page is a shelf and not a
+        # dead end: a buyer comparing two suppliers hops between them here.
+        'siblings': [
+            {
+                'kind': 'brand',
+                'title': row['brand'],
+                'slug': row['brand_slug'],
+                'image_url': '',
+                'description': '',
+                'count': row['total'],
+                'url': f'/brand/{row["brand_slug"]}',
+            }
+            for row in (
+                Product.objects.filter(status='published')
+                .exclude(brand_slug='')
+                .exclude(brand_slug=slug)
+                .values('brand', 'brand_slug')
+                .annotate(total=Count('id'))
+                .order_by('-total', 'brand')[:12]
+            )
+        ],
         'count': products.count(),
         'avg_rating': _rating_of(products),
         'facets': _facet_block(products),
@@ -314,11 +334,15 @@ def catalog_index(request):
         .order_by('-total', 'brand')[:60]
     )
     return Response({
+        # One card shape for every group in the site, so a footer tile, a landing
+        # page and the brand index can share one renderer.
         'categories': [
             {
+                'kind': 'category',
                 'title': row.name,
                 'slug': row.slug,
                 'image_url': row.image.url if row.image else '',
+                'description': (row.description or '')[:300],
                 'count': row.product_count,
                 'url': f'/c/{row.slug}',
             }
@@ -326,16 +350,26 @@ def catalog_index(request):
         ],
         'tags': [
             {
+                'kind': 'tag',
                 'title': row.name,
                 'slug': row.slug,
+                'image_url': '',
+                'description': (row.description or '')[:300],
                 'count': row.products.filter(status='published').count(),
                 'url': f'/tag/{row.slug}',
             }
             for row in Tag.objects.all()[:60]
         ],
         'brands': [
-            {'title': row['brand'], 'slug': row['brand_slug'], 'count': row['total'],
-             'url': f'/brand/{row["brand_slug"]}'}
+            {
+                'kind': 'brand',
+                'title': row['brand'],
+                'slug': row['brand_slug'],
+                'image_url': '',
+                'description': '',
+                'count': row['total'],
+                'url': f'/brand/{row["brand_slug"]}',
+            }
             for row in brands
         ],
     })

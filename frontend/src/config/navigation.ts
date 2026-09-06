@@ -314,6 +314,13 @@ export const KNOWLEDGE_ITEMS: NavItem[] = [
     icon: Users,
   },
   {
+    id: 'brands',
+    label: 'برندها و گروه‌های کالا',
+    description: 'صفحه هر برند، دسته و برچسب با همان قیمت‌های فهرست',
+    to: '/brands',
+    icon: Building2,
+  },
+  {
     id: 'faq',
     label: 'سؤالات متداول',
     description: 'خرید مهمان، ارسال، پرداخت ناموفق و بازگشت کالا',

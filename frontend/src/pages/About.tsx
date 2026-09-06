@@ -188,8 +188,17 @@ export default function About() {
             {data.brands.map((brand) => (
               <li
                 key={brand.id}
-                className="flex flex-col items-center gap-2 rounded-2xl bg-slate-50 p-4 text-center transition hover:bg-emerald-50 dark:bg-emerald-900/40 dark:hover:bg-emerald-900"
+                className="relative flex flex-col items-center gap-2 rounded-2xl bg-slate-50 p-4 text-center transition hover:bg-emerald-50 dark:bg-emerald-900/40 dark:hover:bg-emerald-900"
               >
+                {/* The logo used to be decoration; the useful click is the list of
+                    what that maker actually ships today. */}
+                {brand.slug && (
+                  <Link
+                    to={`/brand/${brand.slug}`}
+                    aria-label={`محصولات ${brand.name}`}
+                    className="absolute inset-0"
+                  />
+                )}
                 {brand.logo_url ? (
                   <img src={brand.logo_url} alt={brand.name} className="h-12 w-full object-contain" loading="lazy" />
                 ) : (

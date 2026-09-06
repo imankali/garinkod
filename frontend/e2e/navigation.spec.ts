@@ -19,6 +19,7 @@ const PUBLIC_DESTINATIONS = [
   '/orders',
   // Guide and trust pages are part of the furniture too: they used to be reachable
   // only by typing the address.
+  '/brands',
   '/faq',
   '/customers',
 ];

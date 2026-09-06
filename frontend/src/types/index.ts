@@ -240,7 +240,7 @@ export interface CatalogLanding {
 export interface CatalogIndex {
   categories: CatalogCard[];
   tags: CatalogCard[];
-  brands: Array<{ title: string; slug: string; count: number; url: string }>;
+  brands: CatalogCard[];
 }
 
 /** A review picked (or simply rated) for «تجربه خرید مشتریان». */
@@ -440,6 +440,8 @@ export interface TeamMember {
 export interface BrandPartner {
   id: number;
   name: string;
+  /** The brand page of the catalogue; a partner without products still has one. */
+  slug: string;
   logo: string | null;
   logo_url: string;
   website: string;

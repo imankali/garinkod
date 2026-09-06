@@ -60,6 +60,7 @@ const Farmers = lazy(() => import("./pages/Farmers"));
 const Legal = lazy(() => import("./pages/Legal"));
 const LegalHub = lazy(() => import("./pages/LegalHub"));
 const CatalogLanding = lazy(() => import("./pages/CatalogLanding"));
+const Brands = lazy(() => import("./pages/Brands"));
 const Faq = lazy(() => import("./pages/Faq"));
 const Customers = lazy(() => import("./pages/Customers"));
 const Blog = lazy(() => import("./pages/Blog"));
@@ -415,6 +416,7 @@ export default function App() {
               <Route path="/c/:slug" element={<CatalogLanding kind="category" />} />
               <Route path="/sc/:slug" element={<CatalogLanding kind="subcategory" />} />
               <Route path="/brand/:slug" element={<CatalogLanding kind="brand" />} />
+              <Route path="/brands" element={<Brands />} />
               <Route path="/tag/:slug" element={<CatalogLanding kind="tag" />} />
               <Route path="/faq" element={<Faq />} />
               <Route path="/customers" element={<Customers />} />

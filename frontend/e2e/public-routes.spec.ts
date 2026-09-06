@@ -11,6 +11,7 @@ const publicRoutes = [
   '/marketplace',
   '/support',
   '/legal',
+  '/brands',
   '/faq',
   '/customers',
   // A group page that does not exist must still answer with its own empty state,

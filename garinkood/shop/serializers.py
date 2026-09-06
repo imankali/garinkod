@@ -1956,7 +1956,9 @@ class BrandPartnerSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = BrandPartner
-        fields = ['id', 'name', 'logo', 'logo_url', 'website', 'description', 'since_year', 'order']
+        # ``slug`` is the brand page's address: a logo that only decorates the
+        # about page wastes the one thing a buyer wants from it — the product list.
+        fields = ['id', 'name', 'slug', 'logo', 'logo_url', 'website', 'description', 'since_year', 'order']
 
     def get_logo_url(self, obj) -> str:
         return obj.logo_url
