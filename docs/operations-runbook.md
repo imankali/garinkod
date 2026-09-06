@@ -198,3 +198,56 @@ must include:
 Changing `SECRET_KEY` invalidates signed values/sessions; schedule accordingly.
 Changing VAPID keys invalidates existing Push subscriptions and needs explicit
 customer re-enrolment planning.
+
+## 12. Capacity, the waiting room and the error notebook
+
+The shop measures its own box and can hold the door when the line gets long.
+Both halves are off or inert until an operator says otherwise.
+
+**Where the numbers come from.** `shop/capacity.py` reads `/proc/meminfo`, the
+cgroup memory ceiling (`memory.max`, else `memory.limit_in_bytes`), the CPU
+allowance (`sched_getaffinity` intersected with `cpu.max`), load average and
+`shutil.disk_usage`. A GPU label is shown only if
+`/proc/driver/nvidia/gpus/*/information` exists; nothing is invented as a zero.
+`python manage.py shell -c "from shop.capacity import measure_server, effective_limit; print(measure_server().as_dict()); print(effective_limit())"`
+prints the same reading the console prints, with the sentence that explains it.
+
+**Raising or lowering the ceiling.** In `/admin/shop/capacitysettings/`:
+`users_per_cpu_core` and `users_per_gb_ram` are the weights, `safety_percent`
+the headroom, `derate_load_percent` the point where a strained processor starts
+shrinking the number, and `activity_window_minutes` how long an idle tab counts
+as a visitor. `strategy = fixed` + `fixed_limit` overrides the measurement
+entirely — the console and the samples keep saying «عدد دستی پنل» so nobody
+mistakes a hand-picked number for a measurement.
+
+**Opening the queue.** `queue_enabled` defaults to **off** and nothing is held
+while it is off, whatever the utilisation says. When it is on:
+
+- page requests from a visitor who is not admitted render a self-refreshing
+  waiting page from the API process itself (no bundle, no redirect, `noindex`);
+- API requests answer `503` with `Retry-After` and `code: "shop_overloaded"`;
+  the SPA replaces itself with a queue screen and polls `GET /api/ops/admission/`
+  only, which is why a waiting room cannot turn into a stampede;
+- `POST`/`PUT`/`DELETE` are never held, `/admin/`, `/media/`, `/static/`,
+  `/health`, `/ops/metrics` and the waiting page are never held, and staff are
+  never held while `bypass_staff` is on;
+- after `queue_max_minutes` a waiting visitor is admitted even if the hall is
+  still full. The line delays people; it does not abandon them.
+
+Every branch of the door fails open: an exception inside admission is logged and
+the request is served. If the queue ever misbehaves, switch it off in the admin —
+no deploy, and nobody inside the shop is asked to leave.
+
+**The notebook.** `SystemLogEntry` receives every `>=500` response (and `429` as
+a `notice`), automatic or client-reported, grouped by source + title with a
+counter. Bodies are scrubbed before they are stored: password/token/cookie/card/
+cvv/otp keys are masked and long values are cut. `GET /api/ops/logs/` and the
+console tab read it; `POST /api/ops/logs/<id>/resolve/` marks it fixed, and a
+resolved group that fires again reopens on its own.
+
+**If it fills up in production.** Check in this order: the basis sentence in the
+console (is the ceiling the box's fault or a fixed number?), the load and free
+memory facts, whether one `source` in the log is dominating (one bad view is
+cheaper to fix than a bigger server), and only then the plan's size. Presence
+and sample tables prune themselves — a day of samples and two days of beats is
+kept — so the feature that watches the disk cannot become the thing that fills it.

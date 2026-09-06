@@ -307,6 +307,7 @@ def admission_answer(request) -> dict:
         'refresh_seconds': REFRESH_SECONDS,
         'capacity': limit,
         'capacity_basis': basis,
+        'max_wait_minutes': row.queue_max_minutes,
         'inside_now': snapshot['inside_now'],
         'waiting_now': snapshot['waiting_now'],
         'message': (row.queue_message or '').strip(),

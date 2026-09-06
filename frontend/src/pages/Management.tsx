@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Activity, BadgeDollarSign, ClipboardCheck, FileClock, Landmark, ShieldAlert, UserCog, UsersRound, Warehouse } from "lucide-react";
+import { Activity, BadgeDollarSign, ClipboardCheck, FileClock, Gauge, Landmark, ShieldAlert, UserCog, UsersRound, Warehouse } from "lucide-react";
 import toast from "react-hot-toast";
 
 import { managementApi } from "../api/services";
+import HealthPanel from "../components/management/HealthPanel";
 import ModerationQueue from "../components/management/ModerationQueue";
 import UserLevels from "../components/management/UserLevels";
 import { USER_LEVEL } from "../types";
 import type { ManagementAuditLog, ManagementDashboard, ManagementStaffMember, Order } from "../types";
 import { formatPrice } from "../utils/formatPrice";
 
-type Tab = 'overview' | 'moderation' | 'orders' | 'users' | 'team' | 'audit';
+type Tab = 'overview' | 'moderation' | 'orders' | 'users' | 'health' | 'team' | 'audit';
 
 export default function Management() {
   const [tab, setTab] = useState<Tab>('overview');
@@ -64,10 +65,13 @@ export default function Management() {
     ...(viewerLevel >= USER_LEVEL.ADMIN
       ? [{ id: 'users' as Tab, label: 'کاربران و سطوح', icon: UserCog }]
       : []),
+    // Health is the owner/manager screen: measured capacity, who is inside right
+    // now, and the log of everything that went wrong while they were here.
+    { id: 'health' as Tab, label: 'سلامت و ظرفیت', icon: Gauge },
     { id: 'team' as Tab, label: 'کارمندان و نقش‌ها', icon: UsersRound },
     { id: 'audit' as Tab, label: 'لاگ مدیریتی', icon: FileClock },
   ];
-  return <main className="min-h-screen bg-slate-50 px-4 py-8 dark:bg-[#052e22]"><div className="mx-auto max-w-7xl"><section className="rounded-3xl bg-gradient-to-l from-slate-950 via-emerald-950 to-emerald-700 p-7 text-white shadow-xl"><div className="flex flex-col justify-between gap-4 md:flex-row md:items-end"><div><p className="text-sm font-bold text-lime-300">مرکز فرماندهی گرین کود</p><h1 className="mt-2 text-3xl font-extrabold">مدیریت عملیات، مالی و اعتماد</h1><p className="mt-3 text-sm text-emerald-100">کاربر فعلی: {data.viewer.username} · نقش‌ها: {data.viewer.is_superuser ? 'مالک سیستم' : data.viewer.groups.join('، ') || 'کارمند'}</p></div><button onClick={() => refetch()} className="rounded-xl bg-white/15 px-4 py-2.5 text-sm font-bold hover:bg-white/25">به‌روزرسانی داده‌ها</button></div></section><div className="mt-6 grid gap-6 lg:grid-cols-[230px_1fr]"><aside className="h-fit rounded-3xl border border-slate-200 bg-white p-3 shadow-sm dark:border-emerald-900 dark:bg-emerald-950 lg:sticky lg:top-5"><nav className="flex gap-2 overflow-x-auto lg:flex-col">{nav.map(({ id, label, icon: Icon }) => <button key={id} onClick={() => setTab(id)} className={`flex shrink-0 items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold transition ${tab === id ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:bg-emerald-50 dark:text-emerald-100 dark:hover:bg-emerald-900/50'}`}><Icon size={18} />{label}</button>)}</nav></aside><section>{tab === 'overview' && <Overview data={data} onOpenModeration={() => setTab('moderation')} />}{tab === 'moderation' && <ModerationQueue />}{tab === 'orders' && <Orders data={data.recent_orders} onMarkPaid={markPaid} />}{tab === 'users' && <UserLevels viewerLevel={viewerLevel} />}{tab === 'team' && <Team owner={data.viewer.is_superuser} staff={staff} roles={roles} loading={loadingTeam} onSave={saveStaff} />}{tab === 'audit' && <Audit audit={audit} loading={loadingAudit} />}</section></div></div></main>;
+  return <main className="min-h-screen bg-slate-50 px-4 py-8 dark:bg-[#052e22]"><div className="mx-auto max-w-7xl"><section className="rounded-3xl bg-gradient-to-l from-slate-950 via-emerald-950 to-emerald-700 p-7 text-white shadow-xl"><div className="flex flex-col justify-between gap-4 md:flex-row md:items-end"><div><p className="text-sm font-bold text-lime-300">مرکز فرماندهی گرین کود</p><h1 className="mt-2 text-3xl font-extrabold">مدیریت عملیات، مالی و اعتماد</h1><p className="mt-3 text-sm text-emerald-100">کاربر فعلی: {data.viewer.username} · نقش‌ها: {data.viewer.is_superuser ? 'مالک سیستم' : data.viewer.groups.join('، ') || 'کارمند'}</p></div><button onClick={() => refetch()} className="rounded-xl bg-white/15 px-4 py-2.5 text-sm font-bold hover:bg-white/25">به‌روزرسانی داده‌ها</button></div></section><div className="mt-6 grid gap-6 lg:grid-cols-[230px_1fr]"><aside className="h-fit rounded-3xl border border-slate-200 bg-white p-3 shadow-sm dark:border-emerald-900 dark:bg-emerald-950 lg:sticky lg:top-5"><nav className="flex gap-2 overflow-x-auto lg:flex-col">{nav.map(({ id, label, icon: Icon }) => <button key={id} onClick={() => setTab(id)} className={`flex shrink-0 items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold transition ${tab === id ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:bg-emerald-50 dark:text-emerald-100 dark:hover:bg-emerald-900/50'}`}><Icon size={18} />{label}</button>)}</nav></aside><section>{tab === 'overview' && <Overview data={data} onOpenModeration={() => setTab('moderation')} />}{tab === 'moderation' && <ModerationQueue />}{tab === 'orders' && <Orders data={data.recent_orders} onMarkPaid={markPaid} />}{tab === 'users' && <UserLevels viewerLevel={viewerLevel} />}{tab === 'health' && <HealthPanel />}{tab === 'team' && <Team owner={data.viewer.is_superuser} staff={staff} roles={roles} loading={loadingTeam} onSave={saveStaff} />}{tab === 'audit' && <Audit audit={audit} loading={loadingAudit} />}</section></div></div></main>;
 }
 
 function Overview({ data, onOpenModeration }: { data: ManagementDashboard; onOpenModeration: () => void }) {

@@ -3,6 +3,7 @@
 import axios, { AxiosError, AxiosInstance } from 'axios';
 import toast from 'react-hot-toast';
 
+import { markWaiting } from './admission';
 import { parseApiError } from './errors';
 
 // Relative URL: the Vite proxy (dev) and the reverse proxy (production) both
@@ -81,6 +82,13 @@ apiClient.interceptors.response.use(
           window.location.href = '/login';
         }
       }
+    } else if (parsed.code === 'shop_overloaded') {
+      // The shop is holding its own door because it is busy, which is not an
+      // error to shout about: the waiting screen says it better, in full
+      // sentences, with the place in line. Silence the toast either way.
+      const queue = (error.response?.data as { queue?: unknown } | undefined)?.queue;
+      markWaiting(queue);
+      (error as { __handled?: boolean }).__handled = true;
     } else if (parsed.code === 'throttled') {
       const now = Date.now();
       if (!silent && now - lastThrottleToastAt > 3000) {

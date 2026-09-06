@@ -285,7 +285,6 @@ def pressure(settings=None) -> dict:
         'waiting_now': waiting,
         'spare_places': max(limit - inside, 0),
         'utilisation_percent': min(int(inside * 100 / max(limit, 1)), 100) if limit else 100,
-        'window_minutes': window,
         'queue_enabled': row.queue_enabled,
         'queue_max_minutes': row.queue_max_minutes,
         'activity_window_minutes': window,

@@ -645,3 +645,145 @@ class WaitingRoomTests(TestCase):
         make_capacity_row(strategy=CapacitySettings.STRATEGY_FIXED, fixed_limit=None, queue_enabled=True)
         client = visitor_client('unconfigured')
         self.assertEqual(client.get('/robots.txt').status_code, 200)
+
+
+ADMIN_STORAGES = {
+    'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+    # The manifest backend wants collectstatic to have run, and a test suite has
+    # no reason to have built a static bundle: without this every admin page
+    # would fail on {% static %} rather than on anything being tested.
+    'staticfiles': {'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage'},
+}
+
+
+@override_settings(STORAGES=ADMIN_STORAGES)
+class AdminOpsScreensTests(TestCase):
+    """The panels behind the API, because a broken admin page is how a shop ends up
+    fixing nothing at 2 a.m.
+
+    Assertions here look for one phrase at a time: an admin page is enormous, and
+    a failure that dumps it is a failure nobody reads.
+    """
+
+    def setUp(self):
+        self.owner = User.objects.create_user('ops-owner', password='x', is_staff=True, is_superuser=True)
+        self.client.force_login(self.owner)
+        make_capacity_row(strategy=CapacitySettings.STRATEGY_AUTO, queue_enabled=False)
+
+    def test_the_capacity_form_shows_the_live_measurement_next_to_the_fields(self):
+        body = self.client.get('/admin/shop/capacitysettings/1/change/').content.decode()
+        self.assertIn('آنچه از سرور خوانده می‌شود', body)
+        self.assertIn('هسته پردازنده در دسترس', body)
+        self.assertIn('نحوه محاسبه', body)  # the sentence, not only the number
+        self.assertIn('این اعداد همین حالا از هسته‌ی لینوکس', body)
+
+    def test_the_list_shows_the_limit_in_effect_not_only_the_settings(self):
+        body = self.client.get('/admin/shop/capacitysettings/').content.decode()
+        self.assertIn('سقف همین لحظه', body)
+
+    def test_the_singleton_is_created_once_and_never_deleted(self):
+        from django.contrib import admin as dj_admin
+        from django.test import RequestFactory
+
+        from .admin import AdminCapacitySettings
+
+        model_admin = dj_admin.site._registry[CapacitySettings]
+        request = RequestFactory().get('/admin/shop/capacitysettings/')
+        request.user = self.owner
+        self.assertIsInstance(model_admin, AdminCapacitySettings)
+        self.assertFalse(model_admin.has_add_permission(request))  # the row exists now
+        self.assertFalse(model_admin.has_delete_permission(request))
+
+    def test_the_measurement_history_is_viewable_and_immutable(self):
+        ResourceSample.objects.create(online_users=1, online_guests=2, queue_waiting=3, capacity_limit=50, capacity_basis='آزمون')
+        listing = self.client.get('/admin/shop/resourcesample/')
+        self.assertEqual(listing.status_code, 200)
+        self.assertIn('>50<', listing.content.decode())
+        # Editing a measurement would mean editing history. Nothing can be added,
+        # and the detail page is the read-only view Django renders for a staff user
+        # who may look but may not change — so no save control exists at all.
+        self.assertEqual(self.client.get('/admin/shop/resourcesample/add/').status_code, 403)
+        detail = self.client.get('/admin/shop/resourcesample/1/change/').content.decode()
+        self.assertIn('مشاهده نمونه وضعیت سرور', detail)
+        self.assertNotIn('name="_save"', detail)
+        self.assertNotIn('name="_addanother"', detail)
+
+    def test_presence_rows_are_readable_but_not_editable(self):
+        park_visitor('g:11112222')
+        listing = self.client.get('/admin/shop/presencebeat/?q=11112222')
+        self.assertEqual(listing.status_code, 200)
+        self.assertIn('مهمان', listing.content.decode())  # found by hash, shown as a guest
+        self.assertEqual(self.client.get('/admin/shop/presencebeat/add/').status_code, 403)
+
+    def test_the_waiting_list_can_be_let_in_and_let_go_from_the_admin(self):
+        first = QueueTicket.objects.create(key='aaa', path='/products/')
+        second = QueueTicket.objects.create(key='bbb', path='/cart/')
+
+        self.client.post(
+            '/admin/shop/queueticket/',
+            {'action': 'admit_tickets', '_selected_action': [first.pk], 'index': 0},
+        )
+        first.refresh_from_db()
+        second.refresh_from_db()
+        self.assertEqual(first.status, QueueTicket.STATUS_ADMITTED)
+        self.assertEqual(second.status, QueueTicket.STATUS_WAITING)  # only the ticked row
+
+        self.client.post(
+            '/admin/shop/queueticket/',
+            {'action': 'release_tickets', '_selected_action': [first.pk], 'index': 0},
+        )
+        first.refresh_from_db()
+        self.assertEqual(first.status, QueueTicket.STATUS_WAITING)
+        self.assertIsNone(first.admitted_at)
+
+    def test_a_queue_action_says_how_many_it_moved(self):
+        row = QueueTicket.objects.create(key='ccc', path='/products/')
+        response = self.client.post(
+            '/admin/shop/queueticket/',
+            {'action': 'admit_tickets', '_selected_action': [row.pk], 'index': 0},
+            follow=True,
+        )
+        notes = ''.join(str(message) for message in response.context['messages'])
+        self.assertIn('1 نفر وارد شدند', notes)  # it counted the rows it moved
+
+    def test_the_notebook_groups_and_the_status_filter_splits_open_from_fixed(self):
+        SystemLogEntry.record(source='api', title='Boom in a.py', level=SystemLogEntry.LEVEL_ERROR)
+        fixed = SystemLogEntry.record(source='api', title='Fixed in b.py')
+        SystemLogEntry.objects.filter(pk=fixed.pk).update(resolved_at=timezone.now())
+
+        body = self.client.get('/admin/shop/systemlogentry/').content.decode()
+        self.assertIn('Boom in a.py', body)
+
+        opened = self.client.get('/admin/shop/systemlogentry/?state=open').content.decode()
+        self.assertIn('Boom in a.py', opened)
+        self.assertNotIn('Fixed in b.py', opened)
+
+        closed = self.client.get('/admin/shop/systemlogentry/?state=resolved').content.decode()
+        self.assertIn('Fixed in b.py', closed)
+        self.assertNotIn('Boom in a.py', closed)
+
+    def test_a_search_in_the_notebook_answers_the_way_a_farmer_would_type_it(self):
+        SystemLogEntry.record(source='checkout', title='Boom in a.py', path='/api/orders/checkout/')
+        SystemLogEntry.record(source='catalogue', title='Zoom in b.py', path='/api/products/')
+        body = self.client.get('/admin/shop/systemlogentry/?q=checkout').content.decode()
+        self.assertIn('Boom in a.py', body)
+        self.assertNotIn('Zoom in b.py', body)
+
+    def test_marking_logs_resolved_from_the_list_stamps_who_did_it(self):
+        row = SystemLogEntry.record(source='api', title='Boom in a.py')
+        self.client.post(
+            '/admin/shop/systemlogentry/',
+            {'action': 'mark_logs_resolved', '_selected_action': [row.pk], 'index': 0},
+        )
+        row.refresh_from_db()
+        self.assertIsNotNone(row.resolved_at)
+        self.assertEqual(row.resolved_by, self.owner)
+
+        self.client.post(
+            '/admin/shop/systemlogentry/',
+            {'action': 'reopen_logs', '_selected_action': [row.pk], 'index': 0},
+        )
+        row.refresh_from_db()
+        self.assertIsNone(row.resolved_at)
+        self.assertIsNone(row.resolved_by)
+

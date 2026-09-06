@@ -9,6 +9,8 @@ import * as Sentry from "@sentry/react";
 import { HelmetProvider } from "react-helmet-async";
 import { registerSW } from "virtual:pwa-register";
 import App from "./App";
+import { reportClientError } from "./api/admission";
+import ShopQueueGate from "./components/ShopQueueGate";
 import { I18nProvider } from "./i18n";
 import "./index.css";
 
@@ -58,13 +60,18 @@ const queryClient = new QueryClient({
 // ========================================
 // Error Boundary برای جلوگیری از crash کامل اپ
 // ========================================
+// One report per crash, however many times React decides to re-render the broken
+// tree: the shop's own error notebook wants «this happened, ۳ بار» not three
+// separate cries.
+let crashReported = false;
+
 class ErrorBoundary extends (await import("react")).Component<
   { children: React.ReactNode },
-  { hasError: boolean; error: Error | null }
+  { hasError: boolean; error: Error | null; reported: boolean }
 > {
   constructor(props: { children: React.ReactNode }) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false, error: null, reported: false };
   }
 
   static getDerivedStateFromError(error: Error) {
@@ -74,24 +81,57 @@ class ErrorBoundary extends (await import("react")).Component<
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error("React Error Boundary caught:", error, errorInfo);
     if (sentryDsn) Sentry.captureException(error, { extra: { componentStack: errorInfo.componentStack } });
+
+    if (crashReported) return;
+    crashReported = true;
+    // The same endpoint the «اینجا خطا داد» button uses, so a screen that dies on
+    // its own is recorded exactly like a screen whose visitor chose to complain —
+    // in one list, grouped, and read by whoever runs the shop.
+    reportClientError({
+      title: 'صفحهٔ گرین کود از کار افتاد',
+      message: `${error?.name ?? 'Error'}: ${error?.message ?? ''}`.slice(0, 4000),
+      source: 'client',
+      path: typeof window === 'undefined' ? '' : window.location.pathname,
+      context: { component_stack: (errorInfo.componentStack || '').slice(-2000) },
+    }).then((result) => {
+      if (result.reported) this.setState({ reported: true });
+    });
   }
 
   render() {
     if (this.state.hasError) {
+      const detail = this.state.error?.message ? String(this.state.error.message).slice(0, 300) : '';
       return (
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-lime-50 p-4" dir="rtl">
           <div className="max-w-md text-center bg-white rounded-3xl p-8 shadow-2xl">
-            <div className="text-6xl mb-4">️</div>
-            <h1 className="text-xl font-bold text-slate-800 mb-2">خطای غیرمنتظره</h1>
-            <p className="text-sm text-slate-500 mb-6">
-              متأسفانه خطایی در برنامه رخ داد. لطفاً صفحه را refresh کنید.
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-2xl font-black text-emerald-700">!</div>
+            <h1 className="text-xl font-bold text-slate-800 mb-2">همین لحظه صفحهٔ سایت از کار افتاد</h1>
+            <p className="text-sm text-slate-500 leading-7 mb-5">
+              چیزی که وارد کرده بودید از بین نرفته است. یک‌بار صفحه را باز کنید؛ اگر باز هم همین‌جا بود،
+              با شمارهٔ پشتیبانی تماس بگیرید — ما همین خطا را در لاگ سیستم می‌بینیم.
             </p>
-            <button
-              onClick={() => window.location.reload()}
-              className="rounded-xl bg-gradient-to-r from-emerald-600 to-lime-500 px-6 py-3 text-sm font-bold text-white shadow-lg"
-            >
-              refresh صفحه
-            </button>
+            {detail ? (
+              <p dir="ltr" className="mb-5 rounded-2xl bg-slate-50 p-3 text-left text-[11px] leading-5 text-slate-400">
+                {detail}
+              </p>
+            ) : null}
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <button
+                onClick={() => window.location.reload()}
+                className="rounded-xl bg-gradient-to-r from-emerald-600 to-lime-500 px-6 py-3 text-sm font-bold text-white shadow-lg"
+              >
+                بازخوانی صفحه
+              </button>
+              <a
+                href="/"
+                className="rounded-xl bg-slate-100 px-5 py-3 text-sm font-bold text-slate-600 hover:bg-slate-200"
+              >
+                رفتن به خانه
+              </a>
+            </div>
+            <p className="mt-5 text-[11px] text-slate-400">
+              {this.state.reported ? 'گزارش این خطا به تیم فنی ارسال شد.' : 'اگر اینترنت ندارید، پس از اتصال دوباره همین پیام را می‌فرستیم.'}
+            </p>
           </div>
         </div>
       );
@@ -124,15 +164,19 @@ if (!rootElement) {
 createRoot(rootElement).render(
   <StrictMode>
     <ErrorBoundary>
-      <HelmetProvider>
-        <I18nProvider>
-          <QueryClientProvider client={queryClient}>
-            <App />
+      {/* The gate has to sit above the providers: while the shop is holding its
+          door there must be no query client left to keep asking it for data. */}
+      <ShopQueueGate>
+        <HelmetProvider>
+          <I18nProvider>
+            <QueryClientProvider client={queryClient}>
+              <App />
             {/* React Query DevTools - فقط در حالت development */}
-            {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
-          </QueryClientProvider>
-        </I18nProvider>
-      </HelmetProvider>
+              {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
+            </QueryClientProvider>
+          </I18nProvider>
+        </HelmetProvider>
+      </ShopQueueGate>
     </ErrorBoundary>
   </StrictMode>
 );

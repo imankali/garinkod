@@ -20,6 +20,7 @@ export type ApiErrorCode =
   | 'conflict'
   | 'payload_too_large'
   | 'throttled'
+  | 'shop_overloaded'
   | 'server_error'
   | 'service_unavailable'
   | 'network_error'

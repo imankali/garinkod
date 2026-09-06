@@ -176,7 +176,6 @@ def health(request):
     open_logs = SystemLogEntry.objects.filter(resolved_at__isnull=True)
     payload = {
         **snapshot,
-        'limit': snapshot['capacity'],
         'uptime': {
             'process_seconds': int((timezone.now() - PROCESS_STARTED_AT).total_seconds()),
             'label': _human_duration(int((timezone.now() - PROCESS_STARTED_AT).total_seconds())),
