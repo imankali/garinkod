@@ -113,7 +113,7 @@ function OrderTimelineStepper({ status }: { status: string }) {
                 {isDone ? <Check size={14} /> : <Icon size={14} />}
               </div>
               <span
-                className={`mt-1.5 text-center text-[11px] font-bold sm:text-xs ${
+                className={`mt-1.5 text-center text-fluid-2xs font-bold sm:text-fluid-xs ${
                   isCurrent
                     ? 'text-emerald-700 dark:text-lime-300'
                     : isDone
