@@ -10,6 +10,7 @@ import { HelmetProvider } from "react-helmet-async";
 import { registerSW } from "virtual:pwa-register";
 import App from "./App";
 import { reportClientError } from "./api/admission";
+import { adoptPreviewTokenFromUrl } from "./api/previewSession";
 import ShopQueueGate from "./components/ShopQueueGate";
 import { I18nProvider } from "./i18n";
 import "./index.css";
@@ -151,6 +152,11 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
     onOfflineReady: () => console.info('GarinKood is ready for offline reference use.'),
   });
 }
+
+// A preview whose browser denies storage recovers its sign-in from the address, and the
+// parameter is dropped before the router ever sees it. Dev-only in effect: no production
+// response carries the token this reads.
+adoptPreviewTokenFromUrl();
 
 // ========================================
 // Render App

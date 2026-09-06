@@ -278,12 +278,24 @@ Three things cover it:
   the lookup the console would answer its own signed-in operator with a 404. Neither half
   of this exists in production: with the switch off the response has no token field, so the
   cookie remains the only credential JavaScript cannot read.
+- **Three tiers of keeping it.** The credential is held in memory first (so it survives a
+  frame that denies every API of `localStorage`), then in that storage when it answers, and
+  only when storage throws as well it is written into the address as `?gk_preview_token=…`
+  and read back by `adoptPreviewTokenFromUrl()` before the router runs — which is what lets a
+  reload in a storage-less frame still know who it is. The parameter is removed from the
+  address as it is read, and nothing trusts it: an unknown key leaves the visitor a visitor.
+  With no cookie at all, `AdmissionMiddleware` recognises the header too, so a signed-in
+  operator is tallied as a user and is not queued behind their own shop.
 - **`CookieJarNotice`** in the SPA verifies a sign-in actually stuck: after every password,
   OTP and registration success the store probes `/api/auth/session/` once, and if the
   session is anonymous — cookie and stored token both refused — it clears the half-logged
   state, keeps the visitor on the form, and says what to do (open the preview in its own
   tab, unblock third-party cookies for the address, leave strict private mode) instead of
   letting them repeat a correct password.
+
+A sandboxed frame usually refuses `window.open` as well, so the notice does not rely on it:
+when the call returns nothing, it reveals the address to copy instead of pretending the click
+worked.
 
 Two things are worth reading from the server log before blaming the shop: a `POST
 /api/auth/login/` returning 200 followed one second later by `GET /api/auth/session/`

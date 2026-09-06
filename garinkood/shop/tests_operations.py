@@ -14,6 +14,7 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.cache import cache
 from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.authtoken.models import Token
@@ -896,6 +897,35 @@ class PreviewCookieFlagTests(TestCase):
         # The 404 is the point: a stranger learns nothing about the console's shape.
         response = self.client.get('/api/ops/health/', HTTP_AUTHORIZATION='Token ' + '0' * 40)
         self.assertEqual(response.status_code, 404)
+
+    def test_a_header_signed_in_operator_is_not_tallied_as_a_guest(self):
+        """Presence and the staff bypass read ``request.user`` before DRF does.
+
+        In a frame with no cookie the header is the whole sign-in, so the middleware has
+        to know that too — otherwise the owner of the shop would be counted among the
+        passing guests and could be held in a waiting room they themselves opened.
+        """
+        # The write throttle is process-wide and the test user keeps the same pk, so a
+        # previous test can have touched the beat already; clear it, as the row below is
+        # what is being asserted.
+        capacity._written_recently.clear()
+        with override_settings(DEBUG=True, PREVIEW_IFRAME_COOKIES=True):
+            token, _created = Token.objects.get_or_create(user=self.user)
+            cache.clear()
+            response = self.client.get(
+                '/api/products/', HTTP_AUTHORIZATION=f'Token {token.key}'
+            )
+        self.assertEqual(response.status_code, 200)
+        beat = PresenceBeat.objects.filter(user=self.user).first()
+        self.assertIsNotNone(beat, 'the request should be tallied to the operator, not a guest')
+
+    def test_without_the_preview_switch_the_header_is_no_identity_to_the_middleware(self):
+        capacity._written_recently.clear()
+        with override_settings(DEBUG=True, PREVIEW_IFRAME_COOKIES=False):
+            token, _created = Token.objects.get_or_create(user=self.user)
+            cache.clear()
+            self.client.get('/api/products/', HTTP_AUTHORIZATION=f'Token {token.key}')
+        self.assertFalse(PresenceBeat.objects.filter(user=self.user).exists())
 
     def test_debug_off_does_not_release_the_token(self):
         with override_settings(DEBUG=False, PREVIEW_IFRAME_COOKIES=True):

@@ -184,6 +184,31 @@ def state_for(request, row=None, limit: int | None = None) -> dict:
     }
 
 
+def recognise_preview_user(request) -> None:
+    """Let a header-authenticated preview count as the person it is.
+
+    Presence and the staff bypass read ``request.user``, which Django fills from the
+    session — and an embedded preview has no session, because its browser keeps no
+    cookie. DRF authenticates the ``Authorization: Token`` header later in the stack, so
+    without this the operator who is genuinely signed in would be tallied as a passing
+    guest and, worse, could be held in the waiting room behind their own shop. It only
+    ever looks while the preview switch is on under DEBUG, which is where that header is
+    offered at all; the credential itself is checked by the same lookup DRF uses.
+    """
+    from django.conf import settings
+
+    from .operational import user_from_token_header
+
+    if not (getattr(settings, 'PREVIEW_IFRAME_COOKIES', False) and settings.DEBUG):
+        return
+    user = getattr(request, 'user', None)
+    if user is None or getattr(user, 'is_authenticated', False):
+        return
+    identified = user_from_token_header(request)
+    if identified is not None:
+        request.user = identified
+
+
 class AdmissionMiddleware:
     """Record who is here, sample the machine, and hold the line when told to."""
 
@@ -192,6 +217,7 @@ class AdmissionMiddleware:
 
     def __call__(self, request):
         try:
+            recognise_preview_user(request)
             record_activity(request)
             sample_if_due()
             held = self.hold(request)
