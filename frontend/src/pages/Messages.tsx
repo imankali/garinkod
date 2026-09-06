@@ -140,9 +140,14 @@ export default function Messages() {
         and the fixed bottom bar, so the composer sits just above the bar
         instead of being pushed off-screen by a fixed 70vh. Desktop keeps a
         comfortable fixed height.
+
+        No minimum on a phone, deliberately: a floor in rem is the one thing that
+        can make this panel taller than the space it was measured out, and what
+        slid off the bottom of it was the composer — the canned replies first,
+        since they are the last rows before the edge.
       */}
       <div
-        className="chat-shell mt-4 grid min-h-[24rem] overflow-hidden rounded-3xl border border-emerald-100 bg-white shadow-sm dark:border-emerald-800 dark:bg-emerald-950 lg:mt-5 lg:grid-cols-[320px_minmax(0,1fr)]"
+        className="chat-shell mt-4 grid overflow-hidden rounded-3xl border border-emerald-100 bg-white shadow-sm dark:border-emerald-800 dark:bg-emerald-950 lg:mt-5 lg:min-h-[24rem] lg:grid-cols-[320px_minmax(0,1fr)]"
       >
         {/* Conversation list */}
         <aside className={`${activeId ? 'hidden' : ''} flex h-full min-h-0 flex-col overflow-hidden lg:flex`}>

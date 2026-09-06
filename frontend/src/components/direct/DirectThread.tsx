@@ -607,11 +607,16 @@ export default function DirectThread({
         )}
       </div>
 
-      {/* Composer */}
+      {/* Composer.
+          Able to give way, and scrollable inside what it kept: a conversation with a quoted
+          reply, a photo waiting, the out-of-hours note and the desk's canned lines is a
+          taller block than a phone screen, and a plain `shrink-0` let it run past the
+          shell — whose `overflow-hidden` then cut the input off. The composer yields
+          instead, and the input row is pinned to its bottom, so what a person is about to
+          press is never the part that disappears. */}
       <form
         onSubmit={send}
-        className="shrink-0 border-t border-emerald-100 bg-white p-2.5 dark:border-emerald-800 dark:bg-emerald-950 sm:p-3"
-        style={{ paddingBottom: 'max(0.625rem, env(safe-area-inset-bottom, 0px))' }}
+        className="min-h-[5rem] overflow-y-auto overscroll-contain border-t border-emerald-100 bg-white p-2.5 pb-0 dark:border-emerald-800 dark:bg-emerald-950 sm:p-3 sm:pb-0"
       >
         {/* Quoted message / edit banner above the input, like Telegram. */}
         <AnimatePresence initial={false}>
@@ -711,7 +716,10 @@ export default function DirectThread({
           aria-label="انتخاب تصویر یا ویدیو"
         />
 
-        <div className="flex items-end gap-1.5">
+        <div
+          className="sticky bottom-0 -mx-2.5 flex items-end gap-1.5 bg-white px-2.5 pt-1 sm:-mx-3 sm:px-3 dark:bg-emerald-950"
+          style={{ paddingBottom: 'max(0.625rem, env(safe-area-inset-bottom, 0px))' }}
+        >
           {/* Media and voice make no sense while rewriting a text message. */}
           {!editing && (
             <>
