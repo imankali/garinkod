@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { MapPin } from 'lucide-react';
 
 import { locationsApi } from '../api/services';
-import type { Location } from '../types';
+import type { Location } from '@/types/farming';
 
 interface LocationPickerProps {
   province: string;

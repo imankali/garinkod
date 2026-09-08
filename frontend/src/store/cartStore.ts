@@ -4,7 +4,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import toast from 'react-hot-toast';
 
-import type { Cart } from '../types';
+import type { Cart } from '@/types/commerce';
 import { cartApi } from '../api/services';
 import { parseApiError } from '../api/errors';
 

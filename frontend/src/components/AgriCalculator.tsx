@@ -17,7 +17,8 @@ import { agriApi, productsApi } from '../api/services';
 import { parseApiError } from '../api/errors';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { normalizeNumericInput } from '../utils/normalizeDigits';
-import type { AgriInput, AreaUnit, DoseCalculation, MockProduct, ProductList } from '../types';
+import type { MockProduct, ProductList } from '@/types/shop';
+import type { AgriInput, AreaUnit, DoseCalculation } from '@/types/farming';
 
 interface AgriCalculatorProps {
   onAddToCart: (product: MockProduct, qty: number) => void;

@@ -6,7 +6,7 @@
 // exact product being discussed instead of the storefront's front door.
 
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import {
   BadgeCheck,
   CalendarDays,
@@ -22,7 +22,7 @@ import { parseApiError } from '../../api/errors';
 import { useCartStore } from '../../store/cartStore';
 import { useDirectStore } from '../../store/directStore';
 import { useTranslation } from '../../i18n';
-import type { MarketplaceListing } from '../../types';
+import type { MarketplaceListing } from '@/types/storefront';
 import { formatPrice } from '../../utils/formatPrice';
 import { cn } from '../../utils/cn';
 import Modal from '../ui/Modal';

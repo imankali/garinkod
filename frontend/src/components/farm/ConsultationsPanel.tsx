@@ -11,7 +11,7 @@ import { farmApi } from '../../api/services';
 import { parseApiError } from '../../api/errors';
 import { useTranslation } from '../../i18n';
 import { cn } from '../../utils/cn';
-import type { FarmConsultationRequest, FarmLand } from '../../types';
+import type { FarmConsultationRequest, FarmLand } from '@/types/farming';
 import { CONSULTATION_SUBJECTS, formatFaDate } from './farmOptions';
 
 export default function ConsultationsPanel({

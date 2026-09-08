@@ -19,7 +19,7 @@ import { ChevronDown, Zap } from 'lucide-react';
 
 import { DeskOutOfHoursNote } from './DeskOutOfHours';
 import { cn } from '../../utils/cn';
-import type { DeskQuickReply, DeskState } from '../../types';
+import type { DeskQuickReply, DeskState } from '@/types/messaging';
 
 /**
  * Which lines are still worth offering.

@@ -32,6 +32,7 @@ import {
   PhoneCall,
   Camera,
   ShieldCheck,
+  Ship,
   Scale,
   Sprout,
   Store,
@@ -40,7 +41,8 @@ import {
   Users,
 } from 'lucide-react';
 
-import { USER_LEVEL, type UserLevel } from '../types';
+import { USER_LEVEL } from '@/types/user';
+import type { UserLevel } from '@/types/user';
 
 export interface NavItem {
   /** Stable key, also used as the React key. */
@@ -165,6 +167,14 @@ export const ACCOUNT_ITEMS: NavItem[] = [
     description: 'پیگیری و تاریخچه خرید',
     to: '/orders',
     icon: Package,
+  },
+  {
+    id: 'export',
+    label: 'پرونده‌های صادراتی',
+    description: 'وضعیت پرونده و دانلود اسناد گمرکی',
+    to: '/export',
+    icon: Ship,
+    requiresAuth: true,
   },
   {
     id: 'rewards',

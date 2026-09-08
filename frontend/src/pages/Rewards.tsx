@@ -4,7 +4,7 @@ import toast from "react-hot-toast";
 
 import { rewardsApi } from "../api/services";
 import { useAuthStore } from "../store/authStore";
-import type { Coupon, Wallet } from "../types";
+import type { Coupon, Wallet } from '@/types/commerce';
 import { formatPrice } from "../utils/formatPrice";
 import { copyText } from "../utils/copyText";
 

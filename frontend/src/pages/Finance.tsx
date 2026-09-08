@@ -8,7 +8,8 @@ import { financeApi } from '../api/services';
 import { parseApiError } from '../api/errors';
 import { useAuthStore } from '../store/authStore';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
-import type { FinancialLedgerEntry, Storefront } from '../types';
+import type { FinancialLedgerEntry } from '@/types/commerce';
+import type { Storefront } from '@/types/storefront';
 import { formatPrice } from '../utils/formatPrice';
 
 interface Option {

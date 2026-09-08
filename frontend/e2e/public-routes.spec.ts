@@ -55,7 +55,7 @@ test('a brand page that does not exist offers the catalogue instead of a blank p
   await expect(page.getByRole('link', { name: /همه محصولات/ })).toBeVisible();
 });
 
-test('the buyers' page says where its quotes came from', async ({ page }) => {
+test("the buyers' page says where its quotes came from", async ({ page }) => {
   await page.goto('/customers');
   // Whichever tier the server is on, the page has to name it.
   await expect(page.getByText(/منتخب تیم گرین کود|دیدگاه خریداران با پرداخت تأییدشده|بازخوردهای امتیازدار/)).toBeVisible();

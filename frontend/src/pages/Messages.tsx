@@ -5,7 +5,7 @@
 // are two stacked views, on desktop a two-pane layout.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router';
 import { MessageCircle } from 'lucide-react';
 
 import { messagesApi } from '../api/services';
@@ -18,7 +18,7 @@ import { useBackgroundPolling } from '../hooks/useBackgroundPolling';
 import { useAuthStore } from '../store/authStore';
 import toast from 'react-hot-toast';
 import { useTranslation } from '../i18n';
-import type { MessageChannel, StorefrontConversation } from '../types';
+import type { MessageChannel, StorefrontConversation } from '@/types/messaging';
 
 /** Ten seconds: honest for a chat list, cheap enough that a rate limit is not the first thing a farmer meets. */
 const INBOX_POLL_MS = 10000;

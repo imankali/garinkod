@@ -1,11 +1,11 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from 'react-router';
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, CheckCircle2, Droplets, Leaf, Loader2, MessageCircle, Sprout, Tractor, Wrench } from "lucide-react";
 import toast from "react-hot-toast";
 
 import { agricultureApi, farmServicesApi } from "../api/services";
-import type { ServiceRequestPayload } from "../types";
+import type { ServiceRequestPayload } from '@/types/commerce';
 import { normalizePhoneNumber, normalizeNumericInput } from "../utils/normalizeDigits";
 
 // Local fallback so the form still works if the admin has not published any

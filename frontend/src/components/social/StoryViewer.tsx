@@ -5,12 +5,12 @@
 // is displayed, which is what turns its ring grey in the strip.
 
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { motion } from 'framer-motion';
 import { X } from 'lucide-react';
 
 import { useTranslation } from '../../i18n';
-import type { StorefrontPost } from '../../types';
+import type { StorefrontPost } from '@/types/storefront';
 
 export default function StoryViewer({
   stories,

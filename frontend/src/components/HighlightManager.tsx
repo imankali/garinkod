@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 
 import { storefrontsApi } from '../api/services';
 import { parseApiError } from '../api/errors';
-import type { StorefrontHighlight, StorefrontPost } from '../types';
+import type { StorefrontHighlight, StorefrontPost } from '@/types/storefront';
 
 interface HighlightManagerProps {
   storefrontSlug: string;

@@ -4,10 +4,10 @@
 // related-articles strip on a guide, so the date format, the kind chip and the
 // reading time stay identical everywhere.
 
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { CalendarDays, Clock3, Sprout } from 'lucide-react';
 
-import type { SiteArticleCard } from '../../types';
+import type { SiteArticleCard } from '@/types/content';
 import { cn } from '../../utils/cn';
 
 const FALLBACK_IMAGE = '/images/hero-farm.jpg';

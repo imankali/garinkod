@@ -10,7 +10,7 @@
 // lives inside the section, not in App.
 
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from 'react-router';
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 
@@ -18,7 +18,7 @@ import { categoriesApi, productsApi } from "../../api/services";
 import FilterSortBar, { type SortOption } from "../FilterSortBar";
 import ProductCard from "../ProductCard";
 import { useTranslation } from "../../i18n";
-import type { Category, MockProduct, ProductQueryParams } from "../../types";
+import type { Category, MockProduct, ProductQueryParams } from '@/types/shop';
 import { convertToMockProduct } from "../../utils/convertProduct";
 
 /** How many products each department shows before "show more". */

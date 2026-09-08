@@ -5,7 +5,7 @@
 // crop index, mirroring how a nursery site organises its plant advice.
 
 import { useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { BookOpen, Search, Sprout, X } from 'lucide-react';
 

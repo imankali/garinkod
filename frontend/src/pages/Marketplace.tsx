@@ -1,7 +1,7 @@
 // frontend/src/pages/Marketplace.tsx
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import {
   BadgeCheck,
   CheckCircle2,
@@ -26,13 +26,7 @@ import LocationPicker from '../components/LocationPicker';
 import PostCard from '../components/social/PostCard';
 import StoriesRow from '../components/social/StoriesRow';
 import { StorefrontCard } from './Storefronts';
-import type {
-  MarketplaceListing,
-  SellerType,
-  Storefront,
-  StorefrontAvailability,
-  StorefrontPost,
-} from '../types';
+import type { MarketplaceListing, SellerType, Storefront, StorefrontAvailability, StorefrontPost } from '@/types/storefront';
 import { formatPrice } from '../utils/formatPrice';
 
 const DEFAULT_FILTERS = {

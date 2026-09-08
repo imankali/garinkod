@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pause, Play, Volume2 } from 'lucide-react';
 
-import type { StorefrontMessage } from '../../types';
+import type { StorefrontMessage } from '@/types/messaging';
 import { cn } from '../../utils/cn';
 
 /** mm:ss — a duration is far easier to read than a raw second count. */

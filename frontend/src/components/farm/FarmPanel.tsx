@@ -10,7 +10,7 @@ import { CalendarDays, Plus, Sprout } from 'lucide-react';
 
 import { farmApi } from '../../api/services';
 import { useTranslation } from '../../i18n';
-import type { FarmLand } from '../../types';
+import type { FarmLand } from '@/types/farming';
 import ConsultationsPanel from './ConsultationsPanel';
 import LandDetailDrawer from './LandDetailDrawer';
 import LandFormModal from './LandFormModal';

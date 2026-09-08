@@ -19,7 +19,7 @@ import Modal from '../ui/Modal';
 import { messagesApi } from '../../api/services';
 import { parseApiError } from '../../api/errors';
 import { cn } from '../../utils/cn';
-import type { StorefrontConversation } from '../../types';
+import type { StorefrontConversation } from '@/types/messaging';
 
 export function CloseThreadButton({
   conversation,

@@ -6,7 +6,7 @@
 // phone call. The copy makes no promise the platform cannot keep: it says the
 // request is answered in the inbox, not "within 10 minutes".
 
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { MessageCircle, Phone, Send, Headset } from 'lucide-react';
 
 import { useDirectStore } from '../../store/directStore';

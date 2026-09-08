@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from 'react-router';
 import {
   AlertTriangle, ArrowLeft, BadgeCheck, BarChart3, Bell, BellOff, Building2, ClipboardList, Edit3, ExternalLink,
   Leaf, LogOut, Moon, Package, Plus, Save, Settings2, ShoppingBag, Sprout,
@@ -15,7 +15,8 @@ import LocationPicker from "../components/LocationPicker";
 import { LANGUAGES, useTranslation } from "../i18n";
 import { useAuthStore, useUserLevel } from "../store/authStore";
 import { useThemeStore } from "../store/themeStore";
-import type { MarketplaceListing, Order, Storefront } from "../types";
+import type { Order } from '@/types/commerce';
+import type { MarketplaceListing, Storefront } from '@/types/storefront';
 import { formatPrice } from "../utils/formatPrice";
 import { cn } from "../utils/cn";
 import { normalizePhoneNumber } from "../utils/normalizeDigits";

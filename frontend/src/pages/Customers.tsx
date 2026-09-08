@@ -12,7 +12,7 @@
 // only honest number would be the count of reviews, and that is what is shown.
 
 import { Helmet } from 'react-helmet-async';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { BadgeCheck, MessageSquareQuote, Quote, ThumbsUp } from 'lucide-react';
 

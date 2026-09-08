@@ -13,12 +13,12 @@
 // Only operators can attach a link (the API refuses it from anyone else), so the
 // target is a page the platform itself owns.
 
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { ArrowUpLeft, Headphones, MessageSquareText, Sprout } from 'lucide-react';
 
 import { cn } from '../../utils/cn';
 import { useDirectStore } from '../../store/directStore';
-import type { MessageLink as MessageLinkData } from '../../types';
+import type { MessageLink as MessageLinkData } from '@/types/messaging';
 
 /**
  * A hand-off is the moment a farmer is most likely to give up, so it must not

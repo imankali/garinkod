@@ -385,6 +385,11 @@ class ProductViewSet(viewsets.ReadOnlyModelViewSet):
                 Prefetch('images', queryset=ProductImage.objects.only('image', 'caption', 'order')),
                 'packages', 'tags', 'attributes',
             )
+        else:
+            # The LIST serializer embeds each card's tags
+            # (ProductListSerializer.tags) — without this prefetch that is
+            # one M2M query PER ROW on every catalogue page.
+            queryset = queryset.prefetch_related('tags')
         return queryset
 
     def get_serializer_class(self):
@@ -935,15 +940,18 @@ def checkout(request):
 
             # Rows are locked in a stable order (products, then listings, each
             # by ascending id) so two concurrent checkouts can never deadlock.
+            # ``of=('self',)`` pins the FOR UPDATE clause to THIS model's rows
+            # only (MySQL 8/PostgreSQL): a checkout never holds locks on
+            # joined catalog rows it will not touch. No-op on SQLite dev.
             product_ids = [item.product_id for item in product_items]
             locked_products = {
                 product.id: product
-                for product in Product.objects.select_for_update().filter(id__in=product_ids).order_by('id')
+                for product in Product.objects.select_for_update(of=('self',)).filter(id__in=product_ids).order_by('id')
             }
             package_ids = [item.product_package_id for item in product_items if item.product_package_id]
             locked_packages = {
                 package.id: package
-                for package in ProductPackage.objects.select_for_update().filter(
+                for package in ProductPackage.objects.select_for_update(of=('self',)).filter(
                     id__in=package_ids
                 ).order_by('id')
             }
@@ -1032,6 +1040,23 @@ def checkout(request):
                 affiliate = AffiliateProfile.objects.filter(code=affiliate_code, status='active').first()
                 if not affiliate:
                     return Response({'error': 'کد همکاری در فروش معتبر یا فعال نیست.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Loyalty redemption: the flag is only permission — every number is
+            # recomputed here against the SAME locked rows as the stock check.
+            # Guests may set the flag harmlessly; without a login there is no
+            # wallet to redeem from.
+            payable_before_loyalty = subtotal - discount_amount + shipping_price
+            loyalty_discount = 0
+            loyalty_points_used = 0
+            if details.get('use_loyalty_points') and request.user.is_authenticated:
+                wallet, _ = Wallet.objects.select_for_update().get_or_create(user=request.user)
+                loyalty_discount = wallet.redeem_loyalty(
+                    wallet.loyalty_discount_for(payable_before_loyalty)
+                )
+                loyalty_points_used = (
+                    loyalty_discount // Wallet.LOYALTY_UNIT_VALUE
+                ) * Wallet.LOYALTY_POINTS_UNIT
+
             order = Order.objects.create(
                 user=request.user if request.user.is_authenticated else None,
                 customer_name=details['customer_name'],
@@ -1047,10 +1072,12 @@ def checkout(request):
                 subtotal=subtotal,
                 discount_amount=discount_amount,
                 coupon_code=coupon_code,
+                loyalty_discount=loyalty_discount,
+                loyalty_points_used=loyalty_points_used,
                 shipping_price=shipping_price,
                 shipping_provider=shipping_quote.provider,
                 shipping_service=shipping_quote.service,
-                total_price=subtotal - discount_amount + shipping_price,
+                total_price=payable_before_loyalty - loyalty_discount,
                 payment_method=details['payment_method'],
                 affiliate_code=affiliate_code,
                 payment_status='unpaid',
@@ -1172,6 +1199,11 @@ def checkout(request):
             'payment': payment_data,
             'payment_error': payment_error,
             'message': message,
+            # Flat math receipt mirroring the order fields — handy for the
+            # client to confirm the loyalty path without re-parsing items.
+            'original_total': payable_before_loyalty,
+            'loyalty_discount': loyalty_discount,
+            'final_total': order.total_price,
         },
         status=status.HTTP_201_CREATED,
     )
@@ -1212,7 +1244,13 @@ def cancel_order(request):
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def my_orders(request):
-    orders = Order.objects.filter(user=request.user).prefetch_related('items', 'shipments__events')
+    orders = (
+        Order.objects
+        .filter(user=request.user)
+        # items' nested serializer dereferences item.seller per row — without
+        # items__seller that is one extra query per item on the account page.
+        .prefetch_related('items', 'items__seller', 'shipments__events')
+    )
     return Response(OrderSerializer(orders, many=True).data)
 
 

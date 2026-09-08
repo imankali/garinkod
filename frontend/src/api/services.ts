@@ -1,78 +1,14 @@
 // frontend/src/api/services.ts
 
 import apiClient from './client';
-import type {
-  BuyerExperiencesResponse,
-  CatalogIndex,
-  CatalogKind,
-  CatalogLanding,
-  LegalDocument,
-  LegalIndex,
-  LevelRank,
-  SitePolicies,
-  Product,
-  ProductList,
-  Category,
-  Cart,
-  Comment,
-  PaginatedResponse,
-  AuthResponse,
-  OtpRequestResponse,
-  ProfileResponse,
-  ProductQueryParams,
-  Order,
-  CheckoutPayload,
-  ServiceRequestPayload,
-  ProcurementRequestPayload,
-  Storefront,
-  MarketplaceListing,
-  PaymentProviderOption,
-  PaymentAttempt,
-  ShippingQuote,
-  WebPushSubscriptionSummary,
-  AffiliateProfile,
-  AffiliateConversion,
-  FinancialLedgerEntry,
-  PlatformFeedbackPayload,
-  StorefrontComplaintPayload,
-  VisualSearchResponse,
-  Coupon,
-  Wallet,
-  StorefrontPost,
-  StorefrontPostComment,
-  DeskState,
-  DeskRatingReport,
-  ServiceConversationResponse,
-  ManagementDashboard,
-  ManagementStaffMember,
-  ManagementAuditLog,
-  Location,
-  AgriInput,
-  DoseCalculation,
-  AreaUnit,
-  StorefrontProfile,
-  StorefrontAvailability,
-  StorefrontHighlight,
-  FollowedStorefront,
-  StorefrontConversation,
-  StorefrontMessage,
-  MessageChannel,
-  InboxResponse,
-  FarmLand,
-  FarmCalendarEvent,
-  FarmConsultationRequest,
-  ConsultantFarmerSummary,
-  ConsultantFarmerDossier,
-  UserAccount,
-  ProductFacets,
-  RatingSummary,
-  SiteArticleCard,
-  SiteArticleDetail,
-  FarmService,
-  SitePage,
-  AboutResponse,
-  SiteContactInfo, LevelsSnapshot,
-} from '../types';
+import type { PaginatedResponse } from '@/types/common';
+import type { LevelRank, AuthResponse, OtpRequestResponse, ProfileResponse, WebPushSubscriptionSummary, ManagementDashboard, ManagementStaffMember, ManagementAuditLog, UserAccount, LevelsSnapshot } from '@/types/user';
+import type { BuyerExperiencesResponse, CatalogIndex, CatalogKind, CatalogLanding, SitePolicies, Product, ProductList, Category, ProductQueryParams, ProductFacets, RatingSummary } from '@/types/shop';
+import type { LegalDocument, LegalIndex, Comment, PlatformFeedbackPayload, StorefrontComplaintPayload, VisualSearchResponse, SiteArticleCard, SiteArticleDetail, FarmService, SitePage, AboutResponse, SiteContactInfo } from '@/types/content';
+import type { Cart, Order, CheckoutPayload, ServiceRequestPayload, ProcurementRequestPayload, PaymentProviderOption, PaymentAttempt, ShippingQuote, AffiliateProfile, AffiliateConversion, FinancialLedgerEntry, Coupon, Wallet } from '@/types/commerce';
+import type { Storefront, MarketplaceListing, StorefrontPost, StorefrontPostComment, StorefrontProfile, StorefrontAvailability, StorefrontHighlight, FollowedStorefront } from '@/types/storefront';
+import type { DeskState, DeskRatingReport, ServiceConversationResponse, StorefrontConversation, StorefrontMessage, MessageChannel, InboxResponse } from '@/types/messaging';
+import type { Location, AgriInput, DoseCalculation, AreaUnit, FarmLand, FarmCalendarEvent, FarmConsultationRequest, ConsultantFarmerSummary, ConsultantFarmerDossier } from '@/types/farming';
 
 // ========================================
 // Products API
@@ -368,6 +304,11 @@ export const ordersApi = {
       payment: PaymentAttempt | null;
       payment_error: string;
       message: string;
+      /** Flat math receipt mirroring the order: payable before loyalty, the
+          discount actually applied, and the final charged total. */
+      original_total?: number;
+      loyalty_discount?: number;
+      final_total?: number;
     }>('/orders/checkout/', data),
   lookup: (code: string, phone: string) =>
     apiClient.get<Order>('/orders/lookup/', { params: { code, phone } }),

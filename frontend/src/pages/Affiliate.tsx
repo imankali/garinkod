@@ -4,7 +4,7 @@ import toast from "react-hot-toast";
 
 import { affiliateApi } from "../api/services";
 import { useAuthStore } from "../store/authStore";
-import type { AffiliateConversion, AffiliateProfile, FinancialLedgerEntry } from "../types";
+import type { AffiliateConversion, AffiliateProfile, FinancialLedgerEntry } from '@/types/commerce';
 import { formatPrice } from "../utils/formatPrice";
 import { copyText } from "../utils/copyText";
 

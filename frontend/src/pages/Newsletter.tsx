@@ -6,7 +6,7 @@
 // manager exports from the admin.
 
 import { FormEvent, useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router';
 import { CheckCircle2, Loader2, Mail, Newspaper, Smartphone } from 'lucide-react';
 import toast from 'react-hot-toast';
 

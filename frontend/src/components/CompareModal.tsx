@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useFocusTrap } from "../hooks/useFocusTrap";
 import { CheckCircle2, ShoppingCart, Star, X, XCircle } from "lucide-react";
 import { formatPrice } from "../utils/formatPrice";
-import type { MockProduct } from "../types";
+import type { MockProduct } from '@/types/shop';
 
 // ========================================
 // Types

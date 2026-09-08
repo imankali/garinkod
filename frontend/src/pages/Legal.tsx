@@ -14,7 +14,7 @@
 // the team wrote, not a second copy kept in the frontend that would quietly
 // drift away from the one the checkout asked them to accept.
 
-import { Link, useLocation, useParams } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { Helmet } from 'react-helmet-async';
 import {
@@ -36,7 +36,7 @@ import ArticleBody from '../components/article/ArticleBody';
 import { legalApi } from '../api/services';
 import { copyText } from '../utils/copyText';
 import { cn } from '../utils/cn';
-import type { LegalDocument } from '../types';
+import type { LegalDocument } from '@/types/content';
 
 /** The registry names an icon; the component is chosen here. */
 const ICONS: Record<string, typeof FileText> = {

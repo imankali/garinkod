@@ -203,7 +203,7 @@ export default defineConfig({
       output: {
         manualChunks: {
           // ✅ جدا کردن vendor libraries برای cache بهتر
-          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-react': ['react', 'react-dom', 'react-router'],
           'vendor-query': ['@tanstack/react-query'],
           'vendor-motion': ['framer-motion'],
           'vendor-utils': ['axios', 'zustand', 'clsx', 'tailwind-merge'],

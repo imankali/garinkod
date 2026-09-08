@@ -5,10 +5,10 @@ import { BadgeCheck, ChevronDown, Loader2, ShieldCheck, UserCog } from 'lucide-r
 import toast from 'react-hot-toast';
 
 import { managementApi, type ManagedUser } from '../../api/services';
-import type { LevelRank } from '../../types';
+import type { LevelRank } from '@/types/user';
 import { parseApiError } from '../../api/errors';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
-import { USER_LEVEL } from '../../types';
+import { USER_LEVEL } from '@/types/user';
 
 const PAGE_SIZE = 20;
 

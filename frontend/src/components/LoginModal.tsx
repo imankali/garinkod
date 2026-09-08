@@ -9,14 +9,14 @@
 // and anyone who wants the full-page experience with registration.
 
 import { useEffect, useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { ArrowLeft, KeyRound, Loader2, LogIn, Phone, ShieldCheck } from 'lucide-react';
 
 import { parseApiError } from '../api/errors';
 import Modal from './ui/Modal';
 import { useAuthModalStore } from '../store/authModalStore';
 import { useAuthStore } from '../store/authStore';
-import type { OtpRequestResponse } from '../types';
+import type { OtpRequestResponse } from '@/types/user';
 import { normalizePhoneNumber, toEnglishDigits } from '../utils/normalizeDigits';
 
 const INPUT =

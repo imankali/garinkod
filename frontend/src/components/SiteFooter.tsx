@@ -1,6 +1,6 @@
 // frontend/src/components/SiteFooter.tsx
 
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { LEGAL_CORE_LINKS, LEGAL_HUB_LINK } from '../config/legal';
 import { Instagram, Mail, MapPin, MessageCircle, Phone, Send, ShieldCheck } from 'lucide-react';
 

@@ -1,5 +1,5 @@
 import { Helmet } from 'react-helmet-async';
-import { useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router';
 
 const SITE_NAME = 'گرین کود';
 const DEFAULT_DESCRIPTION = 'خرید کود، سم، بذر و تجهیزات کشاورزی، خدمات مزرعه و بازار غرفه‌های بررسی‌شده.';

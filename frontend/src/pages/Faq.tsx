@@ -13,14 +13,14 @@
 // reads are the answers a person reads.
 
 import { Helmet } from 'react-helmet-async';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { LifeBuoy, Scale } from 'lucide-react';
 
 import { sitePagesApi } from '../api/services';
 import { LEGAL_CORE_LINKS } from '../config/legal';
 import FaqList, { faqPairsOfBlock } from '../components/FaqList';
-import type { SitePageBlock } from '../types';
+import type { SitePageBlock } from '@/types/content';
 
 const FAQ_SLUG = 'faq';
 

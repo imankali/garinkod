@@ -7,8 +7,9 @@ import { managementApi } from "../api/services";
 import HealthPanel from "../components/management/HealthPanel";
 import ModerationQueue from "../components/management/ModerationQueue";
 import UserLevels from "../components/management/UserLevels";
-import { USER_LEVEL } from "../types";
-import type { ManagementAuditLog, ManagementDashboard, ManagementStaffMember, Order } from "../types";
+import { USER_LEVEL } from '@/types/user';
+import type { ManagementAuditLog, ManagementDashboard, ManagementStaffMember } from '@/types/user';
+import type { Order } from '@/types/commerce';
 import { formatPrice } from "../utils/formatPrice";
 
 type Tab = 'overview' | 'moderation' | 'orders' | 'users' | 'health' | 'team' | 'audit';

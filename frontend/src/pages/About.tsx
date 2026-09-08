@@ -5,7 +5,7 @@
 // Every number on this page is counted from the database by /api/site/about/,
 // so nothing here is a marketing figure the deployment cannot back up.
 
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import {
   Award,

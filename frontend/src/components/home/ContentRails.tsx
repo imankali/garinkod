@@ -8,7 +8,7 @@
 // farmers rated) and what should I read before I buy. Each rail is one request
 // to the existing product API; nothing here is a hard-coded promotion.
 
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Newspaper, Sparkles } from 'lucide-react';
 
@@ -16,7 +16,7 @@ import ProductCard from '../ProductCard';
 import ArticleCard from '../article/ArticleCard';
 import { articlesApi, productsApi } from '../../api/services';
 import { convertToMockProduct } from '../../utils/convertProduct';
-import type { MockProduct, ProductList } from '../../types';
+import type { MockProduct, ProductList } from '@/types/shop';
 
 interface RailProps {
   wishlistIds: Set<number>;

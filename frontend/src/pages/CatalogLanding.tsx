@@ -12,7 +12,7 @@
 // published product is a real state of a catalogue, and the page says so and
 // offers the desk instead of inventing stock.
 
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { Helmet } from 'react-helmet-async';
 import { ArrowLeft, ChevronLeft, PackageSearch, Star } from 'lucide-react';
@@ -20,7 +20,7 @@ import { ArrowLeft, ChevronLeft, PackageSearch, Star } from 'lucide-react';
 import { catalogApi, productsApi } from '../api/services';
 import { formatPrice } from '../utils/formatPrice';
 import { cn } from '../utils/cn';
-import type { CatalogKind, MockProduct, ProductList } from '../types';
+import type { CatalogKind, MockProduct, ProductList } from '@/types/shop';
 import { convertToMockProduct } from '../utils/convertProduct';
 import ProductCard from '../components/ProductCard';
 import { useCartStore } from '../store/cartStore';

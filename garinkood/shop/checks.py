@@ -165,3 +165,36 @@ def integration_configuration_check(app_configs, **kwargs):
             )
         )
     return errors
+
+
+@checks.register(checks.Tags.files)
+def media_layout_check(app_configs, **kwargs):
+    """Sentinel against re-introducing the products/products/ anomaly: no
+    FileField's upload_to may begin with the basename of MEDIA_ROOT."""
+    from pathlib import Path
+
+    from django.apps import apps as django_apps
+    from django.db import models as dj_models
+
+    root_name = Path(getattr(settings, "MEDIA_ROOT", "")).name
+    if not root_name:
+        return []
+    registry = app_configs if app_configs is not None else django_apps
+    collisions = []
+    for model in registry.get_models():
+        for field in model._meta.get_fields():
+            if not isinstance(field, dj_models.FileField):
+                continue
+            upload_to = field.upload_to
+            if isinstance(upload_to, str) and upload_to.split("/")[0] == root_name:
+                collisions.append(f"{model._meta.label}.{field.name}")
+    if collisions:
+        return [
+            checks.Warning(
+                f"upload_to این فیلدها با نام MEDIA_ROOT ('{root_name}/') شروع می‌شود؛ "
+                f"این ترکیب مسیر دوتایی {root_name}/{root_name}/… می‌سازد: {', '.join(sorted(collisions))}",
+                id="shop.W200",
+                hint="برای MEDIA_ROOT نامی بدون نام دامنه انتخاب کنید (مثل 'media') یا پیشوند تکراری upload_to را حذف کنید.",
+            )
+        ]
+    return []

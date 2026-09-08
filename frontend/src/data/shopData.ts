@@ -4,7 +4,7 @@
 
 import type { LucideIcon } from "lucide-react";
 import { Bug, Sprout, Wheat, Tractor, Droplets, Shovel } from "lucide-react";
-import type { MockProduct } from "../types";
+import type { MockProduct } from '@/types/shop';
 
 // ========================================
 // Categories Data (برای MegaMenu و MobileMenu)

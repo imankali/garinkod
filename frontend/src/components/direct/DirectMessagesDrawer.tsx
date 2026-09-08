@@ -17,7 +17,7 @@ import { parseApiError } from '../../api/errors';
 import { useBackgroundPolling } from '../../hooks/useBackgroundPolling';
 import { useDirectStore } from '../../store/directStore';
 import { useTranslation } from '../../i18n';
-import type { MessageChannel, StorefrontConversation } from '../../types';
+import type { MessageChannel, StorefrontConversation } from '@/types/messaging';
 import ChannelChips, { type ChannelFilter } from './ChannelChips';
 import ConversationRow from './ConversationRow';
 import DeskEntries from './DeskEntries';

@@ -6,20 +6,40 @@
 // buyer can ask for advice about that exact product.
 
 import { motion } from 'framer-motion';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { MessageCircle, ShoppingCart } from 'lucide-react';
 
 import { useCartStore } from '../store/cartStore';
 import { useDirectStore } from '../store/directStore';
 import { useTranslation } from '../i18n';
-import type { MarketplaceListing } from '../types';
+import type { MarketplaceListing } from '@/types/storefront';
 import { formatPrice } from '../utils/formatPrice';
 import { listingHref } from '../utils/listingHref';
+import SkeletonCard from './ui/SkeletonCard';
 
-export default function MarketplaceListingCard({ listing, index = 0 }: { listing: MarketplaceListing; index?: number }) {
+// Shared press physics with ProductCard: crisp 0.2s, soft in-out, and only
+// ever on controls that are actually enabled.
+const TACTILE = { duration: 0.2, ease: 'easeInOut' } as const;
+
+export default function MarketplaceListingCard({
+  listing,
+  index = 0,
+  isLoading = false,
+}: {
+  listing: MarketplaceListing;
+  index?: number;
+  /** Swaps the card for its geometry-exact shimmer (see SkeletonCard). */
+  isLoading?: boolean;
+}) {
   const { t } = useTranslation();
   const addListingToCart = useCartStore((state) => state.addListingToCart);
   const openDirect = useDirectStore((state) => state.openDirect);
+
+  // Hooks above stay unconditional; the skeleton short-circuit lives after
+  // them, keeping the call order identical on every render.
+  if (isLoading) {
+    return <SkeletonCard variant="listing" />;
+  }
 
   async function addToCart() {
     try {
@@ -54,17 +74,37 @@ export default function MarketplaceListingCard({ listing, index = 0 }: { listing
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: '-60px' }}
       transition={{ delay: (index % 4) * 0.05, duration: 0.35 }}
-      className="group flex flex-col overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-sm transition hover:shadow-lg hover:shadow-emerald-900/5 dark:border-emerald-900 dark:bg-[#08392a]"
+      whileHover={{ y: -4 }}
+      className="group flex flex-col overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-sm transition-shadow duration-300 hover:shadow-lg hover:shadow-emerald-900/5 dark:border-emerald-900 dark:bg-[#08392a]"
     >
       <Link to={listingHref(listing)} className="relative block aspect-[4/3] overflow-hidden bg-emerald-50 dark:bg-emerald-950">
-        <img
-          src={listing.image_url || '/images/hero-farm.jpg'}
-          alt={listing.title}
-          width={320}
-          height={240}
-          loading="lazy"
-          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-        />
+        {/* Same <picture> contract as ProductCard: API-provided AVIF/WebP
+            variants when the listing image went through the backend pipeline. */}
+        <picture>
+          {listing.image_srcset?.avif ? (
+            <source
+              type="image/avif"
+              srcSet={listing.image_srcset.avif}
+              sizes="(max-width: 640px) 50vw, (max-width: 1280px) 33vw, 320px"
+            />
+          ) : null}
+          {listing.image_srcset?.webp ? (
+            <source
+              type="image/webp"
+              srcSet={listing.image_srcset.webp}
+              sizes="(max-width: 640px) 50vw, (max-width: 1280px) 33vw, 320px"
+            />
+          ) : null}
+          <img
+            src={listing.image_srcset?.fallback || listing.image_url || '/images/hero-farm.jpg'}
+            alt={listing.title}
+            width={320}
+            height={240}
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+        </picture>
         {discount > 0 && (
           <span className="absolute start-2.5 top-2.5 rounded-full bg-brand-orange px-2.5 py-1 text-fluid-2xs font-bold text-white shadow-md">
             {discount.toLocaleString('fa-IR')}{t('shop.discount')}
@@ -99,25 +139,34 @@ export default function MarketplaceListingCard({ listing, index = 0 }: { listing
         </div>
 
         <div className="mt-3 flex gap-2">
-          <button
+          {/* Buy — the primary CTA. The 0.97 press sells the click; it is
+              gated off when the listing cannot be purchased. */}
+          <motion.button
             type="button"
             onClick={() => void addToCart()}
             disabled={!listing.is_purchasable}
-            className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-2 text-fluid-xs font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-45"
+            whileHover={listing.is_purchasable ? { scale: 1.03 } : {}}
+            whileTap={listing.is_purchasable ? { scale: 0.97 } : {}}
+            transition={TACTILE}
+            className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-2 text-fluid-xs font-bold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-45"
             aria-label={t('shop.buy')}
           >
             <ShoppingCart size={14} aria-hidden="true" />
             {t('shop.buy')}
-          </button>
-          <button
+          </motion.button>
+          {/* Direct message — always enabled, always tactile. */}
+          <motion.button
             type="button"
             onClick={sendToDirect}
+            whileHover={{ scale: 1.06 }}
+            whileTap={{ scale: 0.94 }}
+            transition={TACTILE}
             title={t('storefront.sendToDirectHint')}
-            className="flex min-h-10 w-10 items-center justify-center rounded-xl border border-emerald-200 text-emerald-700 transition hover:bg-emerald-50 dark:border-emerald-700 dark:text-lime-300 dark:hover:bg-emerald-900"
+            className="flex min-h-10 w-10 items-center justify-center rounded-xl border border-emerald-200 text-emerald-700 transition-colors hover:bg-emerald-50 dark:border-emerald-700 dark:text-lime-300 dark:hover:bg-emerald-900"
             aria-label={t('storefront.sendToDirect')}
           >
             <MessageCircle size={15} aria-hidden="true" />
-          </button>
+          </motion.button>
         </div>
       </div>
     </motion.article>

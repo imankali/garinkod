@@ -10,7 +10,7 @@
 // delete leaves a "پیام حذف شد" placeholder so quotes still make sense.
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   ArrowRight,
@@ -33,14 +33,9 @@ import toast from 'react-hot-toast';
 import { deskApi, messagesApi } from '../../api/services';
 import { useDirectStore } from '../../store/directStore';
 import { useTranslation } from '../../i18n';
-import type {
-  AttachedListing,
-  DeskState,
-  FarmLand,
-  QuotedMessage,
-  StorefrontConversation,
-  StorefrontMessage,
-} from '../../types';
+import type { AttachedListing } from '@/types/storefront';
+import type { DeskState, QuotedMessage, StorefrontConversation, StorefrontMessage } from '@/types/messaging';
+import type { FarmLand } from '@/types/farming';
 import { formatPrice } from '../../utils/formatPrice';
 import { cn } from '../../utils/cn';
 import { copyText } from '../../utils/copyText';

@@ -13,7 +13,7 @@ import { CalendarClock, Package, Scale, TriangleAlert } from 'lucide-react';
 
 import { formatPrice } from '../../utils/formatPrice';
 import { cn } from '../../utils/cn';
-import type { ProductPackage } from '../../types';
+import type { ProductPackage } from '@/types/shop';
 
 function fa(value: number) {
   return value.toLocaleString('fa-IR');

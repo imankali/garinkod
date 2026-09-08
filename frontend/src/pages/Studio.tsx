@@ -1,12 +1,12 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from 'react-router';
 import { Camera, ImagePlus, Send, Sparkles } from "lucide-react";
 import toast from "react-hot-toast";
 
 import { agricultureApi, storefrontPostsApi } from "../api/services";
 import HighlightManager from "../components/HighlightManager";
 import { useAuthStore } from "../store/authStore";
-import type { MarketplaceListing, Storefront, StorefrontPost } from "../types";
+import type { MarketplaceListing, Storefront, StorefrontPost } from '@/types/storefront';
 
 export default function Studio() {
   const { isAuthenticated } = useAuthStore();

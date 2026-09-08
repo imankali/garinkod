@@ -1,7 +1,7 @@
 // frontend/src/pages/Orders.tsx
 
 import { FormEvent, useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router';
 import {
   AlertTriangle,
   Check,
@@ -20,9 +20,10 @@ import toast from 'react-hot-toast';
 
 import { ordersApi, paymentsApi } from '../api/services';
 import { parseApiError, type FieldErrors } from '../api/errors';
+import { getMyShipments } from '../services/logistics';
 import { useAuthStore } from '../store/authStore';
 import Button from '../components/ui/Button';
-import type { Order } from '../types';
+import type { Order } from '@/types/commerce';
 import { formatPrice } from '../utils/formatPrice';
 import { toEnglishDigits, normalizePhoneNumber } from '../utils/normalizeDigits';
 
@@ -142,12 +143,25 @@ export default function Orders() {
   const [restartingOrderId, setRestartingOrderId] = useState<number | null>(null);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [lookupError, setLookupError] = useState('');
+  // order_code -> logistics tracking code, so a shipped order can offer a
+  // direct jump to the tracking page. Optional by design: if it fails, the
+  // orders list must still work exactly as before.
+  const [trackingByOrderCode, setTrackingByOrderCode] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!isAuthenticated) return;
     ordersApi
       .mine()
       .then((response) => setMyOrders(response.data))
+      .catch(() => undefined);
+    getMyShipments()
+      .then((shipments) =>
+        setTrackingByOrderCode(
+          Object.fromEntries(
+            shipments.map((shipment) => [shipment.order_code, shipment.tracking_code]),
+          ),
+        ),
+      )
       .catch(() => undefined);
   }, [isAuthenticated]);
 
@@ -338,7 +352,7 @@ export default function Orders() {
           {myOrders.length ? (
             <div className="space-y-4">
               {myOrders.map((order) => (
-                <OrderCard key={order.id} order={order} onCancel={cancel} onRestartPayment={restartPayment} restarting={restartingOrderId === order.id} />
+                <OrderCard key={order.id} order={order} onCancel={cancel} onRestartPayment={restartPayment} restarting={restartingOrderId === order.id} trackingCode={trackingByOrderCode[order.code]} />
               ))}
             </div>
           ) : (
@@ -358,12 +372,15 @@ function OrderCard({
   onCancel,
   onRestartPayment,
   restarting = false,
+  trackingCode,
 }: {
   order: Order;
   className?: string;
   onCancel?: (order: Order) => void;
   onRestartPayment?: (order: Order) => void;
   restarting?: boolean;
+  /** Logistics tracking code when this order has a registered parcel. */
+  trackingCode?: string;
 }) {
   const cancellable = order.status === 'awaiting_review' && order.payment_status === 'unpaid';
   const canPay = order.payment_method === 'zarinpal'
@@ -483,6 +500,16 @@ function OrderCard({
           <Truck size={13} aria-hidden="true" />
           {order.province}، {order.city}
         </span>
+        {trackingCode && (
+          <Button
+            size="sm"
+            variant="secondary"
+            icon={PackageSearch}
+            to={`/tracking/${encodeURIComponent(trackingCode)}`}
+          >
+            رهگیری مرسوله
+          </Button>
+        )}
         {canPay && onRestartPayment && (
           <Button
             size="sm"

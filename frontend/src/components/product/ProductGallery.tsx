@@ -13,7 +13,7 @@ import { useState } from 'react';
 import { ImageOff } from 'lucide-react';
 
 import { cn } from '../../utils/cn';
-import type { GalleryShot } from '../../types';
+import type { GalleryShot } from '@/types/shop';
 
 const FALLBACK = '/images/hero-farm.jpg';
 
@@ -45,14 +45,28 @@ export default function ProductGallery({
         onMouseEnter={() => setPeeking(true)}
         onMouseLeave={() => setPeeking(false)}
       >
-        <img
-          src={shown.url}
-          alt={shown.caption ? `${title} — ${shown.caption}` : title}
-          className="aspect-square h-full w-full object-cover"
-          onError={(event) => {
-            event.currentTarget.src = FALLBACK;
-          }}
-        />
+        {/* Main gallery image: near-LCP on the product page, so it loads
+            eagerly like the home hero — variants come from the same pipeline. */}
+        <picture>
+          {shown.srcset?.avif ? (
+            <source type="image/avif" srcSet={shown.srcset.avif} sizes="(max-width: 768px) 100vw, 60vw" />
+          ) : null}
+          {shown.srcset?.webp ? (
+            <source type="image/webp" srcSet={shown.srcset.webp} sizes="(max-width: 768px) 100vw, 60vw" />
+          ) : null}
+          <img
+            src={shown.srcset?.fallback || shown.url}
+            alt={shown.caption ? `${title} — ${shown.caption}` : title}
+            width={600}
+            height={600}
+            decoding="async"
+            fetchPriority="high"
+            className="aspect-square h-full w-full object-cover"
+            onError={(event) => {
+              event.currentTarget.src = FALLBACK;
+            }}
+          />
+        </picture>
         {multiple && (
           <span className="pointer-events-none absolute bottom-3 start-3 rounded-full bg-black/45 px-2.5 py-1 text-fluid-2xs font-bold text-white backdrop-blur">
             {(active + 1).toLocaleString('fa-IR')} از {list.length.toLocaleString('fa-IR')}
@@ -76,7 +90,7 @@ export default function ProductGallery({
                   : 'border-transparent opacity-75 hover:opacity-100',
               )}
             >
-              <img src={shot.url} alt="" className="h-full w-full object-cover" loading="lazy" />
+              <img src={shot.url} alt="" className="h-full w-full object-cover" loading="lazy" decoding="async" />
             </button>
           ))}
         </div>

@@ -1,7 +1,7 @@
 // frontend/src/components/ProductDetailModal.tsx
 
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from 'react-router';
 import { useQuery } from "@tanstack/react-query";
 import { useFocusTrap } from "../hooks/useFocusTrap";
 import { AnimatePresence, motion } from "framer-motion";
@@ -23,7 +23,7 @@ import { BadgeCheck, MessageCircle } from "lucide-react";
 import { formatPrice } from "../utils/formatPrice";
 import { productsApi } from "../api/services";
 import SpecTable from "./SpecTable";
-import type { MockProduct } from "../types";
+import type { MockProduct } from '@/types/shop';
 
 // ========================================
 // Types

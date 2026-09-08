@@ -9,7 +9,7 @@
 // rather than a thumbnail lives here.
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { BadgeCheck, Heart, MessageCircle, Pencil, Send, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -17,7 +17,7 @@ import { storefrontPostsApi } from '../../api/services';
 import { parseApiError } from '../../api/errors';
 import { useAuthStore } from '../../store/authStore';
 import { useDirectStore } from '../../store/directStore';
-import type { StorefrontPost, StorefrontPostComment } from '../../types';
+import type { StorefrontPost, StorefrontPostComment } from '@/types/storefront';
 import { cn } from '../../utils/cn';
 
 /** Relative time in Persian, e.g. «۳ ساعت پیش». Older than a week: a date. */

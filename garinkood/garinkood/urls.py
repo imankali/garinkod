@@ -19,6 +19,11 @@ urlpatterns = [
     # out of a slow site must still be able to load the page that lets them in.
     path("queue/", ops_views.queue_view, name="queue"),
     path("api/", include("shop.api_urls")),
+    # Holding modules (DDD): agri inputs live on their own router mount.
+    path("api/inputs/", include("agri_inputs.api_urls")),
+    path("api/machinery/", include("machinery.api_urls")),
+    path("api/logistics/", include("logistics.api_urls")),
+    path("api/export/", include("export.api_urls")),
     path("robots.txt", seo_views.robots_txt, name="robots"),
     path("sitemap.xml", seo_views.sitemap_xml, name="sitemap"),
     path("llms.txt", seo_views.llms_txt, name="llms"),

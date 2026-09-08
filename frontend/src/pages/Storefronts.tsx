@@ -1,7 +1,7 @@
 // frontend/src/pages/Storefronts.tsx
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { BadgeCheck, MapPin, Search, SlidersHorizontal, Sparkles, Star, Store, TrendingUp, Users, X } from 'lucide-react';
 
 import { agricultureApi, locationsApi, storefrontsApi } from '../api/services';
@@ -9,9 +9,11 @@ import { parseApiError } from '../api/errors';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { useUrlFilters } from '../hooks/useUrlFilters';
 import MarketplaceListingCard from '../components/MarketplaceListingCard';
+import SkeletonCard from '../components/ui/SkeletonCard';
 import { useTranslation } from '../i18n';
 import { cn } from '../utils/cn';
-import type { Location, MarketplaceListing, Storefront } from '../types';
+import type { MarketplaceListing, Storefront } from '@/types/storefront';
+import type { Location } from '@/types/farming';
 
 const DEFAULT_FILTERS = {
   search: '',
@@ -414,11 +416,9 @@ function ListingSection({
       {loading ? (
         <ul className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-5">
           {Array.from({ length: SECTION_SIZE }).map((_, index) => (
-            <li
-              key={index}
-              className="h-64 animate-pulse rounded-2xl bg-emerald-100/60 dark:bg-emerald-900/40"
-              aria-label={t('common.loading')}
-            />
+            <li key={index} aria-label={t('common.loading')}>
+              <SkeletonCard variant="listing" />
+            </li>
           ))}
         </ul>
       ) : (

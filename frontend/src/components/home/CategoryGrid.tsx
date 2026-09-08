@@ -1,11 +1,11 @@
 // frontend/src/components/home/CategoryGrid.tsx
 
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { ArrowLeft, LayoutGrid } from 'lucide-react';
 
 import { categoriesApi } from '../../api/services';
-import type { Category } from '../../types';
+import type { Category } from '@/types/shop';
 
 /** Fallback tiles so the section is still useful before categories exist. */
 const FALLBACK = [

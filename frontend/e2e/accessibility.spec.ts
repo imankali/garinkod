@@ -12,6 +12,8 @@ import { expect, test } from '@playwright/test';
 const PAGES = [
   { path: '/', name: 'home' },
   { path: '/marketplace', name: 'marketplace' },
+  { path: '/products', name: 'products catalogue' },
+  { path: '/products/image-pipeline-demo/', name: 'product detail (gallery)' },
   { path: '/storefronts', name: 'storefront directory' },
   { path: '/checkout', name: 'checkout' },
   { path: '/login', name: 'login' },

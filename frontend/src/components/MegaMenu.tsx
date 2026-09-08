@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, LayoutGrid } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { categoriesApi } from "../api/services";
-import type { Category } from "../types";
+import type { Category } from '@/types/shop';
 
 // ========================================
 // Types

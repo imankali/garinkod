@@ -5,7 +5,7 @@
 // request that arrives pre-tagged with the right service code.
 
 import { useEffect, useState } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { Helmet } from 'react-helmet-async';
 import { ArrowRight, CalendarClock, CheckCircle2, MessageCircle, PhoneCall } from 'lucide-react';

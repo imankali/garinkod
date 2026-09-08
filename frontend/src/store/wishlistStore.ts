@@ -5,7 +5,7 @@
 
 import { create } from 'zustand';
 
-import type { MockProduct } from '../types';
+import type { MockProduct } from '@/types/shop';
 
 function load(): MockProduct[] {
   try {

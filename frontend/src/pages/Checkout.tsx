@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { CheckCircle2, ClipboardCheck, LocateFixed, PackageCheck, Phone, ShieldCheck } from "lucide-react";
+import { Link } from 'react-router';
+import { AnimatePresence, motion } from "framer-motion";
+import { CheckCircle2, ClipboardCheck, LocateFixed, PackageCheck, Phone, ShieldCheck, Sparkles } from "lucide-react";
 import toast from "react-hot-toast";
 
 import { LEGAL_CORE_LINKS } from "../config/legal";
@@ -10,9 +11,16 @@ import LocationPicker from "../components/LocationPicker";
 import PurchaseSteps from "../components/PurchaseSteps";
 import { useAuthStore } from "../store/authStore";
 import { useCartStore } from "../store/cartStore";
-import type { CheckoutPayload, Order, PaymentProviderOption, ShippingQuote } from "../types";
+import type { CheckoutPayload, Order, PaymentProviderOption, ShippingQuote } from '@/types/commerce';
 import { formatPrice } from "../utils/formatPrice";
 import { toEnglishDigits, normalizePhoneNumber, normalizeNumericInput } from "../utils/normalizeDigits";
+
+// Mirror of Wallet.LOYALTY_* on the backend — the server recomputes every
+// number inside a locked transaction; these constants only *display* the
+// expected discount. Both sides must agree for the preview to be truthful.
+const LOYALTY_POINTS_UNIT = 100;
+const LOYALTY_UNIT_VALUE = 10_000;
+const TACTILE = { duration: 0.2, ease: "easeInOut" } as const;
 
 const EMPTY_FORM: CheckoutPayload = {
   customer_name: "",
@@ -25,6 +33,7 @@ const EMPTY_FORM: CheckoutPayload = {
   notes: "",
   payment_method: "coordination",
   coupon_code: "",
+  use_loyalty_points: false,
   terms_accepted: false,
 };
 
@@ -94,6 +103,19 @@ export default function Checkout() {
   const selectedQuote = quotes.find((quote) => quote.service === (form.shipping_service || 'standard'));
   const shippingPrice = subtotal === 0 ? 0 : (selectedQuote?.amount ?? quotes[0]?.amount ?? null);
   const total = shippingPrice === null ? subtotal : subtotal + shippingPrice;
+
+  // Loyalty preview, mirroring Wallet.loyalty_discount_for exactly:
+  // whole 100-point units, clamped to the payable, floored to whole-unit
+  // discount (a residual below one unit can never be redeemed for free).
+  // Note: the server applies this AFTER any coupon — see its own receipt.
+  const loyaltyPoints = account?.loyalty_points ?? 0;
+  const loyaltyCandidate = Math.min(
+    Math.floor(loyaltyPoints / LOYALTY_POINTS_UNIT) * LOYALTY_UNIT_VALUE,
+    total,
+  );
+  const loyaltyDiscount = Math.floor(loyaltyCandidate / LOYALTY_UNIT_VALUE) * LOYALTY_UNIT_VALUE;
+  const loyaltyActive = Boolean(form.use_loyalty_points) && loyaltyDiscount > 0;
+  const finalTotal = loyaltyActive ? total - loyaltyDiscount : total;
 
   function updateField<Key extends keyof CheckoutPayload>(key: Key, value: CheckoutPayload[Key]) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -214,6 +236,11 @@ export default function Checkout() {
             <p className="text-xs text-slate-500 dark:text-emerald-300">کد پیگیری سفارش</p>
             <p className="mt-1 text-xl font-extrabold tracking-wider text-emerald-700 dark:text-lime-300" dir="ltr">{order.code}</p>
             {order.discount_amount > 0 && <p className="mt-3 text-sm font-bold text-emerald-700 dark:text-lime-300">تخفیف اعمال‌شده: {formatPrice(order.discount_amount)}</p>}
+            {order.loyalty_discount > 0 && (
+              <p className="mt-3 text-sm font-bold text-emerald-700 dark:text-lime-300">
+                صرفه‌جویی با امتیاز وفاداری: {formatPrice(order.loyalty_discount)}
+              </p>
+            )}
             <p className="mt-3 text-sm font-bold text-slate-700 dark:text-white">مبلغ ثبت‌شده: {formatPrice(order.total_price)}</p>
             {/*
               The acceptance is written on the order, so the receipt says what it
@@ -405,6 +432,57 @@ export default function Checkout() {
 
         <aside className="h-fit rounded-3xl border border-emerald-100 bg-emerald-50/70 p-5 dark:border-emerald-900 dark:bg-emerald-900/30 lg:sticky lg:top-5">
           <h2 className="text-lg font-extrabold text-slate-800 dark:text-white">خلاصه سفارش</h2>
+
+          {/* Loyalty redemption — only for signed-in buyers with a wallet;
+              every displayed number mirrors Wallet.loyalty_discount_for on
+              the server, which stays authoritative at submit time. */}
+          {account && (
+            <div className="mt-4 rounded-2xl border border-emerald-200/70 bg-white/80 p-3.5 dark:border-emerald-800 dark:bg-emerald-950/60">
+              <div className="flex items-center gap-2 text-sm font-extrabold text-slate-800 dark:text-white">
+                <Sparkles size={16} className="text-emerald-600 dark:text-lime-300" />
+                امتیاز وفاداری
+                <span className="ms-auto rounded-full bg-emerald-100 px-2 py-0.5 text-fluid-2xs font-bold text-emerald-700 dark:bg-emerald-900 dark:text-lime-300">
+                  {loyaltyPoints.toLocaleString("fa-IR")} امتیاز
+                </span>
+              </div>
+              <p className="mt-1.5 text-fluid-2xs leading-5 text-slate-500 dark:text-emerald-200">
+                هر {LOYALTY_POINTS_UNIT.toLocaleString("fa-IR")} امتیاز، {formatPrice(LOYALTY_UNIT_VALUE)} تومان از مبلغ قابل پرداخت کم می‌کند
+                {loyaltyPoints < LOYALTY_POINTS_UNIT && " — برای استفاده، حداقل یک واحد کامل لازم است."}
+              </p>
+              <div className="mt-2.5 flex items-center justify-between gap-3">
+                <span className="text-xs font-bold leading-5 text-slate-700 dark:text-emerald-50">
+                  استفاده از امتیازها در همین سفارش
+                  {loyaltyDiscount > 0 && (
+                    <span className="block text-fluid-2xs font-normal text-emerald-600 dark:text-lime-300">
+                      معادل {formatPrice(loyaltyDiscount)} تخفیف
+                    </span>
+                  )}
+                </span>
+                <motion.button
+                  type="button"
+                  role="switch"
+                  aria-checked={Boolean(form.use_loyalty_points)}
+                  aria-label="استفاده از امتیاز وفاداری"
+                  disabled={loyaltyDiscount === 0}
+                  onClick={() => updateField("use_loyalty_points", !form.use_loyalty_points)}
+                  whileTap={loyaltyDiscount > 0 ? { scale: 0.97 } : {}}
+                  transition={TACTILE}
+                  className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                    form.use_loyalty_points ? "bg-emerald-600" : "bg-slate-300 dark:bg-emerald-800"
+                  }`}
+                >
+                  {/* dir=ltr keeps the knob physics identical across locales. */}
+                  <span dir="ltr" className="absolute inset-0">
+                    <motion.span
+                      className="absolute start-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow"
+                      animate={{ x: form.use_loyalty_points ? 20 : 0 }}
+                      transition={TACTILE}
+                    />
+                  </span>
+                </motion.button>
+              </div>
+            </div>
+          )}
           <ul className="mt-4 space-y-3 border-b border-emerald-100 pb-4 dark:border-emerald-800">
             {cart?.items.map((item) => (
               <li key={item.id} className="flex items-start justify-between gap-3 text-sm">
@@ -429,7 +507,26 @@ export default function Checkout() {
             label={selectedQuote ? `هزینه ارسال (${selectedQuote.label})` : "هزینه ارسال"}
             value={shippingPrice === null ? "پس از انتخاب شهر" : shippingPrice === 0 ? "رایگان" : formatPrice(shippingPrice)}
           />
-          <div className="mt-3 flex items-center justify-between border-t border-emerald-200 pt-4 text-base font-extrabold text-slate-800 dark:border-emerald-700 dark:text-white"><span>مبلغ قابل پرداخت</span><span className="text-emerald-700 dark:text-lime-300">{formatPrice(total)}</span></div>
+          {/* The discount row breathes in/out instead of popping — the same
+              premium motion language as the Phase-2 polish. */}
+          <AnimatePresence initial={false}>
+            {loyaltyActive && (
+              <motion.div
+                key="loyalty-discount-row"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={TACTILE}
+                className="overflow-hidden"
+              >
+                <div className="mt-3 flex justify-between text-sm font-bold text-emerald-600 dark:text-lime-300">
+                  <span className="inline-flex items-center gap-1"><Sparkles size={13} /> تخفیف امتیاز وفاداری</span>
+                  <span dir="ltr">-{formatPrice(loyaltyDiscount)}</span>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+          <div className="mt-3 flex items-center justify-between border-t border-emerald-200 pt-4 text-base font-extrabold text-slate-800 dark:border-emerald-700 dark:text-white"><span>مبلغ قابل پرداخت</span><span className="text-emerald-700 dark:text-lime-300">{formatPrice(finalTotal)}</span></div>
           <div className="mt-5 flex gap-2 rounded-xl bg-white/70 p-3 text-fluid-xs leading-5 text-slate-500 dark:bg-emerald-950/50 dark:text-emerald-200"><ShieldCheck size={18} className="shrink-0 text-emerald-600" />مبلغ نهایی توسط سرور با قیمت و موجودی لحظه‌ای محاسبه می‌شود.</div>
         </aside>
       </div>

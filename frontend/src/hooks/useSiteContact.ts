@@ -9,7 +9,7 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { siteInfoApi } from '../api/services';
-import type { SiteContactInfo } from '../types';
+import type { SiteContactInfo } from '@/types/content';
 
 const EMPTY: SiteContactInfo = {
   address: '',

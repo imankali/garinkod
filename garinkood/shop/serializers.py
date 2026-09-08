@@ -154,12 +154,17 @@ class ProductPackageSerializer(serializers.ModelSerializer):
 class ProductImageSerializer(serializers.ModelSerializer):
     image_url = serializers.SerializerMethodField()
 
+    image_srcset = serializers.SerializerMethodField()
+
     class Meta:
         model = ProductImage
-        fields = ['id', 'image', 'image_url', 'caption', 'order']
+        fields = ['id', 'image', 'image_url', 'image_srcset', 'caption', 'order']
 
     def get_image_url(self, obj) -> str:
         return obj.image.url if obj.image else ''
+
+    def get_image_srcset(self, obj) -> dict:
+        return obj.get_image_srcset()
 
 
 class ProductSerializer(serializers.ModelSerializer):
@@ -167,6 +172,7 @@ class ProductSerializer(serializers.ModelSerializer):
     subcategory = SubCategorySerializer(read_only=True)
     author = serializers.StringRelatedField(read_only=True)
     image_url = serializers.SerializerMethodField()
+    image_srcset = serializers.SerializerMethodField()
     is_in_stock = serializers.SerializerMethodField()
 
     fertilizer_detail = FertilizerDetailSerializer(read_only=True)
@@ -188,7 +194,7 @@ class ProductSerializer(serializers.ModelSerializer):
             'id', 'title', 'slug', 'author', 'category', 'subcategory',
             'description', 'publish', 'created', 'updated', 'status',
             'price', 'stock', 'available', 'is_featured', 'image', 'image_url',
-            'is_in_stock', 'discount_percent', 'sales_count', 'discounted_price',
+            'image_srcset', 'is_in_stock', 'discount_percent', 'sales_count', 'discounted_price',
             'brand', 'brand_slug', 'sku', 'gtin', 'package_weight', 'price_on_request',
             'seo_title', 'seo_description',
             'shipping_weight_grams', 'shipping_length_cm', 'shipping_width_cm',
@@ -243,6 +249,9 @@ class ProductSerializer(serializers.ModelSerializer):
     def get_image_url(self, obj) -> str:
         return obj.image_url
 
+    def get_image_srcset(self, obj) -> dict:
+        return obj.get_image_srcset()
+
     def get_is_in_stock(self, obj) -> bool:
         return obj.is_in_stock
 
@@ -283,6 +292,7 @@ class ProductListSerializer(serializers.ModelSerializer):
     """Serializer سبک‌تر برای لیست محصولات"""
     category = serializers.StringRelatedField(read_only=True)
     image_url = serializers.SerializerMethodField()
+    image_srcset = serializers.SerializerMethodField()
     is_in_stock = serializers.SerializerMethodField()
 
     discounted_price = serializers.SerializerMethodField()
@@ -296,7 +306,7 @@ class ProductListSerializer(serializers.ModelSerializer):
         model = Product
         fields = [
             'id', 'title', 'slug', 'category', 'price', 'stock',
-            'available', 'is_featured', 'image', 'image_url', 'is_in_stock',
+            'available', 'is_featured', 'image', 'image_url', 'image_srcset', 'is_in_stock',
             'discount_percent', 'sales_count', 'discounted_price', 'brand', 'sku',
             'package_weight', 'price_on_request', 'avg_rating', 'reviews_count',
             'image_alt_url', 'is_expiring_soon', 'views', 'brand_slug', 'tags',
@@ -304,6 +314,9 @@ class ProductListSerializer(serializers.ModelSerializer):
 
     def get_image_url(self, obj) -> str:
         return obj.image_url
+
+    def get_image_srcset(self, obj) -> dict:
+        return obj.get_image_srcset()
 
     def get_is_in_stock(self, obj) -> bool:
         return obj.is_in_stock
@@ -382,6 +395,7 @@ class UserAccountSerializer(serializers.ModelSerializer):
     capabilities = serializers.SerializerMethodField()
     next_level = serializers.SerializerMethodField()
     has_storefront = serializers.SerializerMethodField()
+    loyalty_points = serializers.SerializerMethodField()
 
     class Meta:
         model = UserAccount
@@ -389,15 +403,20 @@ class UserAccountSerializer(serializers.ModelSerializer):
             'id', 'username', 'email', 'full_name', 'phone', 'phone_verified_at',
             'gender', 'address', 'avatar', 'avatar_url', 'level', 'level_label',
             'level_short_label', 'capabilities', 'next_level',
-            'has_storefront', 'created', 'updated'
+            'has_storefront', 'loyalty_points', 'created', 'updated'
         ]
         # `level` is derived from what the user owns and may only be changed
         # through the management API, never by the profile endpoint.
         read_only_fields = [
             'created', 'updated', 'level', 'level_label', 'avatar_url',
             'level_short_label', 'capabilities', 'next_level',
-            'has_storefront', 'phone_verified_at',
+            'has_storefront', 'loyalty_points', 'phone_verified_at',
         ]
+
+    def get_loyalty_points(self, obj) -> int:
+        """Wallet loyalty balance; the wallet row may not exist yet."""
+        wallet = getattr(obj.user, 'wallet', None)
+        return wallet.loyalty_points if wallet else 0
 
     def get_level_short_label(self, obj) -> str:
         """«غرفه‌دار» without the «سطح ۳ — » prefix, for chips."""
@@ -677,7 +696,7 @@ class OrderSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'code', 'customer_name', 'phone', 'email', 'province', 'city',
             'address', 'postal_code', 'latitude', 'longitude', 'notes', 'subtotal', 'discount_amount',
-            'coupon_code', 'shipping_price', 'shipping_provider', 'shipping_service', 'total_price',
+            'coupon_code', 'loyalty_discount', 'loyalty_points_used', 'shipping_price', 'shipping_provider', 'shipping_service', 'total_price',
             'status', 'status_label', 'payment_status', 'payment_status_label', 'payment_method',
             'payment_method_label', 'affiliate_code', 'total_items', 'items', 'shipments',
             'terms_accepted_at', 'legal_version',
@@ -709,6 +728,10 @@ class CheckoutSerializer(serializers.Serializer):
     )
     affiliate_code = serializers.CharField(max_length=32, required=False, allow_blank=True)
     coupon_code = serializers.CharField(max_length=40, required=False, allow_blank=True)
+    # Opt-in spend of the buyer's wallet loyalty points (100 pts = 10,000
+    # toman). The server recomputes the discount against locked rows; the
+    # flag only grants permission to do so. Guests may flip it harmlessly.
+    use_loyalty_points = serializers.BooleanField(required=False, default=False)
     terms_accepted = serializers.BooleanField()
     # Only validated against what the shipping layer currently offers; a frontend
     # cannot invent a service by posting a name.
@@ -920,6 +943,7 @@ class StorefrontHighlightSerializer(serializers.ModelSerializer):
 class MarketplaceListingSerializer(serializers.ModelSerializer):
     storefront = StorefrontSerializer(read_only=True)
     image_url = serializers.SerializerMethodField()
+    image_srcset = serializers.SerializerMethodField()
     status_label = serializers.CharField(source='get_status_display', read_only=True)
 
     is_purchasable = serializers.BooleanField(read_only=True)
@@ -934,7 +958,7 @@ class MarketplaceListingSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'storefront', 'title', 'slug', 'crop_name', 'description',
             'price', 'unit', 'quantity_available', 'min_order_quantity', 'minimum_order',
-            'harvest_date', 'image', 'image_url', 'status', 'status_label',
+            'harvest_date', 'image', 'image_url', 'image_srcset', 'status', 'status_label',
             'is_purchasable', 'discount_percent', 'sales_count', 'discounted_price',
             'rejection_reason', 'reviewed_at', 'attributes',
             'created_at', 'updated_at'
@@ -948,6 +972,9 @@ class MarketplaceListingSerializer(serializers.ModelSerializer):
 
     def get_image_url(self, obj) -> str:
         return obj.image_url
+
+    def get_image_srcset(self, obj) -> dict:
+        return obj.get_image_srcset()
 
     def get_discounted_price(self, obj) -> int:
         return obj.discounted_price
@@ -1197,7 +1224,7 @@ class WalletSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Wallet
-        fields = ['id', 'currency', 'balance', 'updated_at', 'transactions']
+        fields = ['id', 'currency', 'balance', 'loyalty_points', 'updated_at', 'transactions']
         read_only_fields = fields
 
 

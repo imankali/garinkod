@@ -2,7 +2,7 @@
 //
 // Labels and option lists shared by the land form and the calendar UI.
 
-import type { FarmEventKind, LandType } from '../../types';
+import type { FarmEventKind, LandType } from '@/types/farming';
 
 export const LAND_TYPES: { value: LandType; label: string; emoji: string }[] = [
   { value: 'orchard', label: 'باغ', emoji: '🌳' },
