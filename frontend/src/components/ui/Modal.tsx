@@ -123,9 +123,9 @@ export default function Modal({
     ? { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 } }
     : isDrawer
       ? {
-          initial: { x: '100%' },
-          animate: { x: 0 },
-          exit: { x: '100%' },
+          initial: { opacity: 0, y: 24 },
+          animate: { opacity: 1, y: 0 },
+          exit: { opacity: 0, y: 24 },
           transition: { type: 'spring' as const, damping: 30, stiffness: 300 },
         }
       : {
@@ -140,9 +140,9 @@ export default function Modal({
       {open && (
         <div className="fixed inset-0 z-[120] flex" role="presentation">
           <motion.div
-            initial={{ opacity: 0 }}
+            initial={reduceMotion ? false : { opacity: 0 }}
             animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            exit={reduceMotion ? undefined : { opacity: 0 }}
             onClick={onClose}
             className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
             aria-hidden="true"

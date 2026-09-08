@@ -2,7 +2,7 @@
 
 import {useCallback, useEffect, useState} from 'react';
 import {Link, useParams, useSearchParams} from 'react-router';
-import {AnimatePresence} from 'framer-motion';
+import {AnimatePresence, motion, useReducedMotion} from 'framer-motion';
 import {BadgeCheck, Grid3x3, Heart, ImageIcon, MapPin, MessageCircle, Pencil, Plus, Search, Send, ShoppingBasket, Star, Trash2, UserPlus, X} from 'lucide-react';
 import toast from 'react-hot-toast';
 import {Helmet} from 'react-helmet-async';
@@ -55,6 +55,7 @@ const TABS: { key: TabKey; labelKey: string; icon: typeof Grid3x3 }[] = [
  * messages to ask for advice.
  */
 export default function StorefrontPage() {
+  const reduceMotion = useReducedMotion();
   const { slug = '' } = useParams<{ slug: string }>();
   const { t } = useTranslation();
   // `?listing=<slug>` opens one آگهی's detail. Keeping it in the URL means the
@@ -106,6 +107,7 @@ export default function StorefrontPage() {
   const debouncedContentQuery = useDebouncedValue(contentQuery, 350);
   const [contentResults, setContentResults] = useState<StorefrontPost[] | null>(null);
   const [contentBusy, setContentBusy] = useState(false);
+  const [contentError, setContentError] = useState('');
 
   const { isAuthenticated } = useAuthStore();
   const addListingToCart = useCartStore((state) => state.addListingToCart);
@@ -145,30 +147,19 @@ export default function StorefrontPage() {
 
   // Owners see a live unread badge for the storefront inbox.
   // Live content search inside this storefront.
-  useEffect(() => {
+  const searchContent = useCallback(async () => {
     const query = debouncedContentQuery.trim();
-    if (!query) {
-      setContentResults(null);
-      return undefined;
-    }
-    let cancelled = false;
-    setContentBusy(true);
-    storefrontsApi
-      .searchContent(slug, query)
-      .then((response) => {
-        if (cancelled) return;
-        setContentResults([...response.data.posts, ...response.data.stories]);
-      })
-      .catch(() => {
-        if (!cancelled) setContentResults([]);
-      })
-      .finally(() => {
-        if (!cancelled) setContentBusy(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+    if (!query) { setContentResults(null); setContentError(''); return; }
+    setContentBusy(true); setContentError('');
+    try {
+      const response = await storefrontsApi.searchContent(slug, query);
+      setContentResults([...response.data.posts, ...response.data.stories]);
+    } catch (error) {
+      setContentError(parseApiError(error).message);
+    } finally { setContentBusy(false); }
   }, [debouncedContentQuery, slug]);
+
+  useEffect(() => { void searchContent(); }, [searchContent]);
 
   useEffect(() => {
     if (!profile?.storefront.is_owner) return;
@@ -263,15 +254,7 @@ export default function StorefrontPage() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="mx-auto max-w-5xl px-[var(--page-gutter)] py-16 text-center" role="status" aria-live="polite">
-        <p className="text-sm font-semibold text-slate-500 dark:text-emerald-200">
-          در حال بارگذاری غرفه…
-        </p>
-      </div>
-    );
-  }
+  if (loading) return <StorefrontSkeleton />;
 
   if (loadError || !profile) {
     return (
@@ -392,8 +375,10 @@ export default function StorefrontPage() {
         <div className="flex flex-wrap items-center justify-center gap-2">
           {isOwner ? (
             <>
-              <button
+              <motion.button
                 type="button"
+                whileHover={reduceMotion ? undefined : { y: -4 }}
+                whileTap={reduceMotion ? undefined : { scale: 0.97 }}
                 onClick={() => openDirect()}
                 className="relative flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-white px-5 py-2.5 text-sm font-bold text-emerald-700 transition hover:bg-emerald-50 dark:border-emerald-700 dark:bg-emerald-950 dark:text-lime-300"
               >
@@ -404,13 +389,15 @@ export default function StorefrontPage() {
                     {unread.toLocaleString('fa-IR')}
                   </span>
                 )}
-              </button>
+              </motion.button>
               <OwnerEditor storefront={storefront} onSaved={load} />
             </>
           ) : (
             <>
-              <button
+              <motion.button
                 type="button"
+                whileHover={reduceMotion ? undefined : { y: -4 }}
+                whileTap={reduceMotion ? undefined : { scale: 0.97 }}
                 onClick={toggleFollow}
                 disabled={followBusy}
                 aria-pressed={storefront.is_following}
@@ -422,15 +409,17 @@ export default function StorefrontPage() {
               >
                 {storefront.is_following ? <Heart size={15} fill="currentColor" /> : <UserPlus size={15} />}
                 {storefront.is_following ? t('storefront.unfollow') : t('storefront.follow')}
-              </button>
-              <button
+              </motion.button>
+              <motion.button
                 type="button"
+                whileHover={reduceMotion ? undefined : { y: -4 }}
+                whileTap={reduceMotion ? undefined : { scale: 0.97 }}
                 onClick={() => openDirect({ storefrontSlug: storefront.slug })}
                 className="flex items-center gap-1.5 rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-sky-700"
               >
                 <MessageCircle size={15} />
                 {t('storefront.message')}
-              </button>
+              </motion.button>
             </>
           )}
         </div>
@@ -527,13 +516,20 @@ export default function StorefrontPage() {
             <button
               type="button"
               onClick={() => setContentQuery('')}
-              className="absolute end-3 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-emerald-900"
+              className="absolute end-1 top-1/2 flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-emerald-900"
               aria-label={t('common.close')}
             >
               <X size={14} />
             </button>
           )}
         </div>
+
+        {contentError && (
+          <div role="alert" className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-rose-50 p-3 text-fluid-xs font-semibold text-rose-700 dark:bg-rose-950/40 dark:text-rose-200">
+            <span>{contentError}</span>
+            <motion.button type="button" onClick={() => void searchContent()} whileHover={reduceMotion ? undefined : { y: -4 }} whileTap={reduceMotion ? undefined : { scale: 0.97 }} className="rounded-lg border border-rose-200 px-3">تلاش مجدد</motion.button>
+          </div>
+        )}
 
         {contentResults !== null && (
           <div className="mt-3">
@@ -596,9 +592,10 @@ export default function StorefrontPage() {
       {/* Tabs */}
       <div role="tablist" aria-label="محتوای غرفه" className="mt-6 flex border-b border-slate-200 dark:border-emerald-900">
         {TABS.map(({ key, labelKey, icon: Icon }) => (
-          <button
+          <motion.button
             key={key}
             role="tab"
+            whileTap={reduceMotion ? undefined : { scale: 0.97 }}
             id={`tab-${key}`}
             aria-selected={tab === key}
             aria-controls={`panel-${key}`}
@@ -611,7 +608,7 @@ export default function StorefrontPage() {
           >
             <Icon size={15} />
             {t(labelKey)}
-          </button>
+          </motion.button>
         ))}
       </div>
 
@@ -863,3 +860,8 @@ export default function StorefrontPage() {
   );
 }
 
+
+function StorefrontSkeleton() {
+  const block = "animate-pulse rounded-2xl bg-slate-100 dark:bg-emerald-900";
+  return <main className="mx-auto max-w-5xl px-[var(--page-gutter)] py-8" role="status" aria-label="در حال بارگذاری غرفه"><div className={`h-52 w-full ${block}`} /><div className="-mt-10 flex items-end gap-4 px-5"><div className={`h-24 w-24 rounded-full ${block}`} /><div className="flex-1 space-y-3 pb-2"><div className={`h-7 w-52 ${block}`} /><div className={`h-4 w-36 ${block}`} /></div></div><div className="mt-5 grid grid-cols-3 gap-2">{Array.from({length:3}).map((_,i)=><div key={i} className={`h-20 ${block}`} />)}</div><div className={`mt-6 h-12 ${block}`} /><div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{Array.from({length:6}).map((_,i)=><div key={i} className={`h-56 ${block}`} />)}</div><span className="sr-only">در حال بارگذاری</span></main>;
+}

@@ -1,6 +1,6 @@
 """Social domain models for the shop app (split from models.py)."""
 
-from datetime import time
+from datetime import time, timedelta
 
 from django.db import models
 from django.conf import settings
@@ -40,6 +40,15 @@ class StorefrontPost(models.Model):
 
     def __str__(self):
         return f'{self.storefront.name} — {self.get_post_type_display()}'
+
+    def save(self, *args, **kwargs):
+        """Give new stories a 24-hour lifetime unless one was supplied."""
+        if self.post_type == 'story' and self.expires_at is None:
+            self.expires_at = timezone.now() + timedelta(hours=24)
+            update_fields = kwargs.get('update_fields')
+            if update_fields is not None:
+                kwargs['update_fields'] = set(update_fields) | {'expires_at'}
+        super().save(*args, **kwargs)
 
     @property
     def image_url(self):

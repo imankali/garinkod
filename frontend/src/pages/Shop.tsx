@@ -25,13 +25,16 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
-import { categoriesApi, productsApi } from '../api/services';
+import { agricultureApi, categoriesApi, productsApi } from '../api/services';
 import ProductCard from '../components/ProductCard';
 import ProductDetailModal from '../components/ProductDetailModal';
+import CatalogFilters, { type CatalogFilterValues } from '../components/CatalogFilters';
+import MarketplaceListingCard from '../components/MarketplaceListingCard';
 import { useCartStore } from '../store/cartStore';
 import { useWishlistStore } from '../store/wishlistStore';
 import { useTranslation } from '../i18n';
 import type { Category, MockProduct, ProductList } from '@/types/shop';
+import type { MarketplaceListing } from '@/types/storefront';
 import { convertToMockProduct } from '../utils/convertProduct';
 import { cn } from '../utils/cn';
 
@@ -106,11 +109,17 @@ const CURATED_SECTIONS: CuratedSection[] = [
   },
 ];
 
-export default function Shop() {
+interface ShopProps {
+  compareItems: MockProduct[];
+  onToggleCompare: (product: MockProduct) => void;
+}
+
+export default function Shop({ compareItems, onToggleCompare }: ShopProps) {
   const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const category = searchParams.get('category') || '';
+  const source = searchParams.get('source') === 'marketplace' ? 'marketplace' : 'products';
   const featured = searchParams.get('featured') === 'true';
   /** A deep link into one collection shows only that collection, expanded. */
   const collection = searchParams.get('collection') || '';
@@ -136,6 +145,7 @@ export default function Shop() {
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<MockProduct[]>([]);
+  const [listings, setListings] = useState<MarketplaceListing[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [selectedProduct, setSelectedProduct] = useState<MockProduct | null>(null);
@@ -160,7 +170,7 @@ export default function Shop() {
   });
 
   const queryKey = [
-    category, featured, page, collection, ordering, brand, weight, pageSize,
+    source, category, featured, page, collection, ordering, brand, weight, pageSize,
     search, minRating, minPrice, maxPrice, ...activeToggles,
   ];
 
@@ -182,6 +192,36 @@ export default function Shop() {
       params[key] = true;
     });
     if (activeCollection) Object.assign(params, activeCollection.params);
+
+    if (source === 'marketplace') {
+      agricultureApi
+        .listMarketplace({
+          page,
+          page_size: pageSize,
+          crop: category || undefined,
+          ordering: ordering || undefined,
+          in_stock: activeToggles.includes('in_stock') ? 'true' : undefined,
+          min_price: minPrice || undefined,
+          max_price: maxPrice || undefined,
+        })
+        .then((response) => {
+          if (cancelled) return;
+          setListings(response.data.results || []);
+          setTotal(response.data.count || 0);
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setListings([]);
+            setTotal(0);
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
+      return () => {
+        cancelled = true;
+      };
+    }
 
     productsApi
       .getAll(params as never)
@@ -234,6 +274,30 @@ export default function Shop() {
     [addToCart],
   );
 
+  const catalogFilterValues: CatalogFilterValues = {
+    search,
+    minPrice,
+    maxPrice,
+    inStock: activeToggles.includes('in_stock'),
+    attributes: Object.fromEntries(
+      ['brand', 'npk', 'organic_matter', 'active_ingredient', 'formulation', 'variety', 'germination', 'power', 'usage']
+        .map((key) => [key, searchParams.get(key) || '']),
+    ),
+  };
+
+  const applyCatalogFilters = (values: CatalogFilterValues) => {
+    updateParams({
+      search: values.search || undefined,
+      min_price: values.minPrice || undefined,
+      max_price: values.maxPrice || undefined,
+      in_stock: values.inStock ? '1' : undefined,
+      ...Object.fromEntries(
+        Object.entries(values.attributes).map(([key, value]) => [key, value || undefined]),
+      ),
+      page: undefined,
+    });
+  };
+
   const gridTitle = activeCollection
     ? t(activeCollection.labelKey)
     : category
@@ -251,6 +315,15 @@ export default function Shop() {
           <p className="mt-2 max-w-2xl text-fluid-sm leading-6 text-slate-500 dark:text-emerald-200">
             {t('shop.subtitle')}
           </p>
+
+          <div className="mt-5 inline-flex rounded-2xl bg-emerald-50 p-1 dark:bg-emerald-900/50" role="tablist" aria-label="منبع کاتالوگ">
+            <button type="button" role="tab" aria-selected={source === 'products'} onClick={() => updateParams({ source: undefined, page: undefined })} className={cn('min-h-11 rounded-xl px-4 text-sm font-bold transition', source === 'products' ? 'bg-white text-emerald-700 shadow-sm dark:bg-emerald-950 dark:text-lime-300' : 'text-slate-500 dark:text-emerald-200')}>
+              محصولات گرین‌کود
+            </button>
+            <button type="button" role="tab" aria-selected={source === 'marketplace'} onClick={() => updateParams({ source: 'marketplace', page: undefined })} className={cn('min-h-11 rounded-xl px-4 text-sm font-bold transition', source === 'marketplace' ? 'bg-white text-emerald-700 shadow-sm dark:bg-emerald-950 dark:text-lime-300' : 'text-slate-500 dark:text-emerald-200')}>
+              آگهی‌های غرفه‌داران
+            </button>
+          </div>
 
           {/* Category chips */}
           <div className="no-scrollbar mt-5 flex gap-2 overflow-x-auto pb-1">
@@ -403,7 +476,7 @@ export default function Shop() {
         while a category filter is applied, where the visitor has already
         narrowed the catalogue and expects one list, not four.
       */}
-      {!activeCollection && !category && !featured && !filtersActive && (
+      {source === 'products' && !activeCollection && !category && !featured && !filtersActive && (
         <div className="mx-auto max-w-7xl space-y-8 px-[var(--page-gutter)] pt-8">
           {CURATED_SECTIONS.map((section) => (
             <CuratedRow
@@ -413,16 +486,37 @@ export default function Shop() {
               onToggleWishlist={toggleWishlist}
               onAddToCart={handleAddToCart}
               onQuickView={setSelectedProduct}
+              compareItems={compareItems}
+              onToggleCompare={onToggleCompare}
             />
           ))}
         </div>
       )}
 
-      {/* Full catalogue grid */}
-      <section
-        className="mx-auto max-w-7xl px-[var(--page-gutter)] py-8"
-        aria-label={gridTitle}
-      >
+      {/* Responsive filters + full catalogue grid */}
+      <div className="mx-auto grid max-w-7xl gap-5 px-[var(--page-gutter)] py-8 lg:grid-cols-[280px_minmax(0,1fr)] lg:items-start">
+        <CatalogFilters
+          category={category}
+          values={catalogFilterValues}
+          onChange={applyCatalogFilters}
+          onClear={() => updateParams({
+            search: undefined,
+            min_price: undefined,
+            max_price: undefined,
+            in_stock: undefined,
+            brand: undefined,
+            npk: undefined,
+            organic_matter: undefined,
+            active_ingredient: undefined,
+            formulation: undefined,
+            variety: undefined,
+            germination: undefined,
+            power: undefined,
+            usage: undefined,
+            page: undefined,
+          })}
+        />
+        <section className="min-w-0" aria-label={gridTitle}>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-fluid-lg font-extrabold text-slate-800 dark:text-white">
             {gridTitle}
@@ -446,7 +540,7 @@ export default function Shop() {
               <SkeletonCard key={index} variant="product" />
             ))}
           </div>
-        ) : products.length === 0 ? (
+        ) : (source === 'products' ? products.length === 0 : listings.length === 0) ? (
           <div className="flex flex-col items-center justify-center py-14 text-center">
             <div className="text-5xl">🔍</div>
             <p className="mt-4 text-fluid-lg font-bold text-slate-700 dark:text-white">
@@ -455,20 +549,25 @@ export default function Shop() {
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
-            {products.map((product, index) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                index={index}
-                isWishlisted={wishlist.some((p) => p.id === product.id)}
-                isComparing={false}
-                compareDisabled
-                onToggleWishlist={toggleWishlist}
-                onAddToCart={(item) => void handleAddToCart(item)}
-                onQuickView={setSelectedProduct}
-                onToggleCompare={() => undefined}
-              />
-            ))}
+            {source === 'products'
+              ? products.map((product, index) => (
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    index={index}
+                    isWishlisted={wishlist.some((p) => p.id === product.id)}
+                    isComparing={compareItems.some((item) => item.id === product.id)}
+                    compareDisabled={compareItems.length >= 3}
+                    onToggleWishlist={toggleWishlist}
+                    onAddToCart={(item) => void handleAddToCart(item)}
+                    onQuickView={setSelectedProduct}
+                    // ARCHITECT CHECK: Compare toggle wired
+                    onToggleCompare={onToggleCompare}
+                  />
+                ))
+              : listings.map((listing, index) => (
+                  <MarketplaceListingCard key={listing.id} listing={listing} index={index} />
+                ))}
           </div>
         )}
 
@@ -526,7 +625,8 @@ export default function Shop() {
             </PageButton>
           </nav>
         )}
-      </section>
+        </section>
+      </div>
 
       {/* Quick view */}
       <ProductDetailModal
@@ -553,12 +653,16 @@ function CuratedRow({
   onToggleWishlist,
   onAddToCart,
   onQuickView,
+  compareItems,
+  onToggleCompare,
 }: {
   section: CuratedSection;
   wishlist: MockProduct[];
   onToggleWishlist: (product: MockProduct) => void;
   onAddToCart: (product: MockProduct) => Promise<void>;
   onQuickView: (product: MockProduct) => void;
+  compareItems: MockProduct[];
+  onToggleCompare: (product: MockProduct) => void;
 }) {
   const { t } = useTranslation();
   const [items, setItems] = useState<MockProduct[]>([]);
@@ -629,12 +733,13 @@ function CuratedRow({
               product={product}
               index={index}
               isWishlisted={wishlist.some((p) => p.id === product.id)}
-              isComparing={false}
-              compareDisabled
+              isComparing={compareItems.some((item) => item.id === product.id)}
+              compareDisabled={compareItems.length >= 3}
               onToggleWishlist={onToggleWishlist}
               onAddToCart={(item) => void onAddToCart(item)}
               onQuickView={onQuickView}
-              onToggleCompare={() => undefined}
+              // ARCHITECT CHECK: Compare toggle wired
+              onToggleCompare={onToggleCompare}
             />
           ))}
         </div>

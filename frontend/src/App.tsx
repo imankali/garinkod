@@ -1,7 +1,7 @@
 // frontend/src/App.tsx
 // ✅ فایل اصلی اپلیکیشن - نقطه اتصال همه کامپوننت‌ها
 
-import { useEffect, useMemo, useState, lazy, Suspense } from "react";
+import { useEffect, useMemo, useRef, useState, lazy, Suspense } from "react";
 import { BrowserRouter, Navigate, Routes, Route } from 'react-router';
 import RequireLevel from "./components/RequireLevel";
 import { USER_LEVEL } from "./types";
@@ -35,6 +35,9 @@ import RouteSeo from "./components/RouteSeo";
 import LoginModal from "./components/LoginModal";
 import CookieJarNotice from "./components/CookieJarNotice";
 import PrivacyAnalytics from "./components/PrivacyAnalytics";
+import ScrollToTop from "./components/ScrollToTop";
+import BackToTopButton from "./components/BackToTopButton";
+import BackButton from "./components/BackButton";
 
 // ========================================
 // Pages (Lazy Loaded)
@@ -156,8 +159,9 @@ export default function App() {
   // ========================================
   // Stores
   // ========================================
-  const { cart, fetchCart, addToCart: addToCartStore } = useCartStore();
-  const { isAuthenticated, fetchProfile, initializeSession } = useAuthStore();
+  const { cart, fetchCart, addToCart: addToCartStore, reset: resetCart } = useCartStore();
+  const { isAuthenticated, isSessionChecked, fetchProfile, initializeSession } = useAuthStore();
+  const previousAuthenticated = useRef(isAuthenticated);
 
   // Preserve a valid affiliate referral before navigation removes query parameters.
   useEffect(() => {
@@ -175,9 +179,17 @@ export default function App() {
   }, [initializeSession]);
 
   useEffect(() => {
+    if (isSessionChecked && previousAuthenticated.current && !isAuthenticated) {
+      resetCart();
+    }
+    previousAuthenticated.current = isAuthenticated;
+  }, [isAuthenticated, isSessionChecked, resetCart]);
+
+  useEffect(() => {
+    if (!isSessionChecked) return;
     fetchCart();
     if (isAuthenticated) fetchProfile();
-  }, [fetchCart, isAuthenticated, fetchProfile]);
+  }, [fetchCart, isAuthenticated, isSessionChecked, fetchProfile]);
 
   // ========================================
   // Handlers
@@ -237,6 +249,7 @@ export default function App() {
   // ========================================
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <RouteSeo />
       <PrivacyAnalytics />
       {/* ریشهٔ برنامه: بدون `overflow-x` — همان یک کلاس، کل هدر و پنل‌های sticky
@@ -301,6 +314,9 @@ export default function App() {
           className="outline-none"
           style={{ paddingBottom: 'var(--mobile-nav-clearance)' }}
         >
+          <div className="mx-auto w-full max-w-7xl px-[var(--page-gutter)] pt-3">
+            <BackButton />
+          </div>
           <Suspense fallback={<LoadingSpinner />}>
             <Routes>
               {/* ======================================== */}
@@ -344,12 +360,20 @@ export default function App() {
                     {/* Installment Banner */}
                     <InstallmentBanner />
 
-                    {/*
-                      Catalogue: one section per department (سم، کود، بذر، …),
-                      each with its own results/filter/sort bar and grid, so
-                      every category is visible without picking a chip first.
-                    */}
+                    {/* Exact merchandising order: fresh, discounts, four core
+                        departments, verified ratings, then specialist ranges. */}
+                    <ContentRails
+                      railIds={["newest", "discounted"]}
+                      wishlistIds={wishlistIds}
+                      compareIds={compareIds}
+                      compareDisabled={compareItems.length >= 3}
+                      onToggleWishlist={handleToggleWishlist}
+                      onAddToCart={(product, event) => handleAddToCart(product, 1, event)}
+                      onQuickView={setSelectedProduct}
+                      onToggleCompare={handleToggleCompare}
+                    />
                     <CategorySections
+                      group="primary"
                       featuredOnly={featuredOnly}
                       activeCrop={activeCrop}
                       wishlistIds={wishlistIds}
@@ -360,13 +384,21 @@ export default function App() {
                       onQuickView={setSelectedProduct}
                       onToggleCompare={handleToggleCompare}
                     />
-
-                    {/*
-                      Freshness rails (new stock, live discounts, best rated) and
-                      the magazine block: what a returning buyer checks before
-                      they look at a department again.
-                    */}
                     <ContentRails
+                      railIds={["best_rated"]}
+                      showMagazine
+                      wishlistIds={wishlistIds}
+                      compareIds={compareIds}
+                      compareDisabled={compareItems.length >= 3}
+                      onToggleWishlist={handleToggleWishlist}
+                      onAddToCart={(product, event) => handleAddToCart(product, 1, event)}
+                      onQuickView={setSelectedProduct}
+                      onToggleCompare={handleToggleCompare}
+                    />
+                    <CategorySections
+                      group="secondary"
+                      featuredOnly={featuredOnly}
+                      activeCrop={activeCrop}
                       wishlistIds={wishlistIds}
                       compareIds={compareIds}
                       compareDisabled={compareItems.length >= 3}
@@ -384,7 +416,10 @@ export default function App() {
 
               {/* The standalone shop: only the site's own products, with
                   categories, pagination and curated sections. */}
-              <Route path="/products" element={<Shop />} />
+              <Route
+                path="/products"
+                element={<Shop compareItems={compareItems} onToggleCompare={handleToggleCompare} />}
+              />
 
               {/* ======================================== */}
               {/* Platform routes */}
@@ -585,6 +620,9 @@ export default function App() {
           onClose={() => setCompareOpen(false)}
           onAddToCart={(product) => handleAddToCart(product, 1)}
         />
+
+        {/* Global return-to-top control. */}
+        <BackToTopButton />
 
         {/* ======================================== */}
         {/* Consultation Button */}

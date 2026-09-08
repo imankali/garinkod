@@ -1,10 +1,4 @@
-// frontend/src/components/social/StoryViewer.tsx
-//
-// Full-screen story viewer for one غرفه's stories, with progress bars, tap
-// zones and keyboard control. Each story is reported as watched the moment it
-// is displayed, which is what turns its ring grey in the strip.
-
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { motion } from 'framer-motion';
 import { X } from 'lucide-react';
@@ -12,21 +6,31 @@ import { X } from 'lucide-react';
 import { useTranslation } from '../../i18n';
 import type { StorefrontPost } from '@/types/storefront';
 
+const STORY_DURATION_MS = 15_000;
+const SWIPE_THRESHOLD_PX = 50;
+
+interface StoryViewerProps {
+  stories: StorefrontPost[];
+  storefrontName: string;
+  storefrontSlug: string;
+  onSeen: (story: StorefrontPost) => void;
+  onClose: () => void;
+}
+
 export default function StoryViewer({
   stories,
   storefrontName,
   storefrontSlug,
   onSeen,
   onClose,
-}: {
-  stories: StorefrontPost[];
-  storefrontName: string;
-  storefrontSlug: string;
-  onSeen: (story: StorefrontPost) => void;
-  onClose: () => void;
-}) {
+}: StoryViewerProps) {
   const { dir } = useTranslation();
   const [index, setIndex] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const elapsedRef = useRef(0);
+  const previousFrameRef = useRef<number | null>(null);
+  const touchStartXRef = useRef<number | null>(null);
   const current = stories[index];
 
   const advance = useCallback(() => {
@@ -41,18 +45,47 @@ export default function StoryViewer({
     setIndex((position) => Math.max(position - 1, 0));
   }, []);
 
-  // Report each story as watched as it appears, not on close: leaving halfway
-  // through should still grey out the ones actually seen.
   useEffect(() => {
+    elapsedRef.current = 0;
+    previousFrameRef.current = null;
+    setProgress(0);
     if (current) onSeen(current);
+    // onSeen may be recreated when the parent updates its local seen state.
+    // Story identity, not callback identity, controls this effect.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current?.id]);
 
   useEffect(() => {
-    function handleKey(event: KeyboardEvent) {
+    let frameId = 0;
+
+    const tick = (timestamp: number) => {
+      if (previousFrameRef.current === null) previousFrameRef.current = timestamp;
+      const delta = timestamp - previousFrameRef.current;
+      previousFrameRef.current = timestamp;
+
+      if (!isPaused) {
+        elapsedRef.current = Math.min(elapsedRef.current + delta, STORY_DURATION_MS);
+        const nextProgress = elapsedRef.current / STORY_DURATION_MS;
+        setProgress(nextProgress);
+        if (nextProgress >= 1) {
+          advance();
+          return;
+        }
+      }
+      frameId = window.requestAnimationFrame(tick);
+    };
+
+    frameId = window.requestAnimationFrame(tick);
+    return () => window.cancelAnimationFrame(frameId);
+  }, [advance, current?.id, isPaused]);
+
+  useEffect(() => {
+    const handleKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
-      // In RTL, ArrowLeft advances and ArrowRight goes back.
-      // In LTR, ArrowRight advances and ArrowLeft goes back.
+      if (event.code === 'Space') {
+        event.preventDefault();
+        setIsPaused(event.type === 'keydown');
+      }
       if (dir === 'rtl') {
         if (event.key === 'ArrowLeft') advance();
         if (event.key === 'ArrowRight') previous();
@@ -60,12 +93,41 @@ export default function StoryViewer({
         if (event.key === 'ArrowRight') advance();
         if (event.key === 'ArrowLeft') previous();
       }
-    }
+    };
+    const resumeFromKeyboard = (event: KeyboardEvent) => {
+      if (event.code === 'Space') setIsPaused(false);
+    };
+
     window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
+    window.addEventListener('keyup', resumeFromKeyboard);
+    return () => {
+      window.removeEventListener('keydown', handleKey);
+      window.removeEventListener('keyup', resumeFromKeyboard);
+    };
   }, [advance, previous, onClose, dir]);
 
   if (!current) return null;
+
+  const pause = () => setIsPaused(true);
+  const resume = () => setIsPaused(false);
+
+  const handleTouchStart = (event: React.TouchEvent) => {
+    touchStartXRef.current = event.touches[0]?.clientX ?? null;
+    pause();
+  };
+
+  const handleTouchEnd = (event: React.TouchEvent) => {
+    const startX = touchStartXRef.current;
+    const endX = event.changedTouches[0]?.clientX;
+    touchStartXRef.current = null;
+    resume();
+    if (startX === null || endX === undefined) return;
+
+    const distance = endX - startX;
+    if (Math.abs(distance) < SWIPE_THRESHOLD_PX) return;
+    if (distance < 0) advance();
+    else previous();
+  };
 
   return (
     <motion.div
@@ -75,21 +137,34 @@ export default function StoryViewer({
       role="dialog"
       aria-modal="true"
       aria-label={`استوری‌های ${storefrontName}`}
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4"
+      onMouseDown={pause}
+      onMouseUp={resume}
+      onMouseLeave={resume}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={resume}
+      className="fixed inset-0 z-[100] flex select-none items-center justify-center bg-black/90 p-4"
     >
-      <div className="absolute inset-x-4 top-4 flex gap-1">
-        {stories.map((story, position) => (
-          <span
-            key={story.id}
-            className={`h-1 flex-1 rounded-full ${position <= index ? 'bg-white' : 'bg-white/30'}`}
-          />
-        ))}
+      <div className="absolute inset-x-4 top-4 z-20 flex gap-1" aria-label="پیشرفت استوری‌ها">
+        {stories.map((story, position) => {
+          const width = position < index ? 100 : position === index ? progress * 100 : 0;
+          return (
+            <span key={story.id} className="h-1 flex-1 overflow-hidden rounded-full bg-white/30">
+              <span
+                className="block h-full rounded-full bg-white"
+                style={{ width: `${width}%` }}
+              />
+            </span>
+          );
+        })}
       </div>
 
       <Link
         to={`/storefronts/${storefrontSlug}`}
+        onMouseDown={(event) => event.stopPropagation()}
+        onTouchStart={(event) => event.stopPropagation()}
         onClick={onClose}
-        className="absolute start-4 top-8 z-10 flex items-center gap-2 rounded-full bg-white/15 py-1 pe-3 ps-1 text-white backdrop-blur-sm transition hover:bg-white/25"
+        className="absolute start-4 top-8 z-30 flex items-center gap-2 rounded-full bg-white/15 py-1 pe-3 ps-1 text-white backdrop-blur-sm transition hover:bg-white/25"
       >
         <span className="block h-8 w-8 overflow-hidden rounded-full">
           <img
@@ -105,39 +180,43 @@ export default function StoryViewer({
 
       <button
         type="button"
+        onMouseDown={(event) => event.stopPropagation()}
+        onTouchStart={(event) => event.stopPropagation()}
         onClick={onClose}
         aria-label="بستن استوری"
-        className="absolute end-4 top-8 z-10 rounded-full bg-white/15 p-2 text-white hover:bg-white/25"
+        className="absolute end-4 top-8 z-30 rounded-full bg-white/15 p-2 text-white hover:bg-white/25"
       >
         <X size={20} />
       </button>
 
-      <figure className="max-h-full w-full max-w-md">
+      <figure className="pointer-events-none relative z-10 max-h-full w-full max-w-md">
         <img
           src={current.image_url}
           alt={current.caption || 'استوری'}
+          draggable={false}
           className="max-h-[75dvh] w-full rounded-2xl object-contain"
         />
         {current.caption && (
-          <figcaption className="mt-3 text-center text-sm text-white/90">{current.caption}</figcaption>
+          <figcaption className="mt-3 text-center text-sm text-white/90">
+            {current.caption}
+          </figcaption>
         )}
+        {isPaused && <span className="sr-only" aria-live="polite">پخش استوری متوقف شد</span>}
       </figure>
 
-      {/* Tap zones: start zone goes to previous, end zone advances to next */}
       <button
         type="button"
         aria-label="استوری قبلی"
         disabled={index === 0}
         onClick={previous}
-        className="absolute inset-y-0 start-0 w-1/3 cursor-pointer disabled:cursor-default"
+        className="absolute inset-y-0 left-0 z-[5] w-1/2 cursor-pointer disabled:cursor-default"
       />
       <button
         type="button"
         aria-label="استوری بعدی"
         onClick={advance}
-        className="absolute inset-y-0 end-0 w-1/3 cursor-pointer"
+        className="absolute inset-y-0 right-0 z-[5] w-1/2 cursor-pointer"
       />
     </motion.div>
   );
 }
-

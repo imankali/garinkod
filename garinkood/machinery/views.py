@@ -7,13 +7,14 @@ its type/width/tractor compatibility (partial text).
 """
 
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import filters, viewsets
+from rest_framework import filters, permissions, viewsets
 
 from .models import Implement, Tractor
 from .serializers import ImplementSerializer, TractorSerializer
 
 
 class MachineryViewSet(viewsets.ReadOnlyModelViewSet):
+    permission_classes = [permissions.AllowAny]
     """Base for machinery listing endpoints; writes stay in admin/staff flows."""
 
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter, filters.SearchFilter]

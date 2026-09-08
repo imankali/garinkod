@@ -13,4 +13,11 @@ router = DefaultRouter()
 router.register(r"orders", views.ExportOrderViewSet, basename="export-order")
 router.register(r"documents", views.ExportDocumentViewSet, basename="export-document")
 
-urlpatterns = [path("", include(router.urls))]
+urlpatterns = [
+    path(
+        "documents/<int:pk>/download/",
+        views.ExportDocumentDownloadView.as_view(),
+        name="export-document-download",
+    ),
+    path("", include(router.urls)),
+]

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate } from 'react-router';
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -66,6 +66,7 @@ function convertToSuggestion(apiProduct: ProductList, reason: string): Suggested
 // CartDrawer Component
 // ========================================
 export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
+  const reduceMotion = useReducedMotion();
   // Traps Tab inside the drawer, closes on Escape, locks background scrolling
   // and returns focus to the cart button when it closes.
   const drawerRef = useFocusTrap<HTMLElement>(isOpen, { onEscape: onClose });
@@ -188,9 +189,9 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
         <>
           {/* Overlay */}
           <motion.div
-            initial={{ opacity: 0 }}
+            initial={reduceMotion ? false : { opacity: 0 }}
             animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            exit={reduceMotion ? undefined : { opacity: 0 }}
             onClick={onClose}
             className="fixed inset-0 z-[60] bg-slate-900/50 backdrop-blur-sm"
           />
@@ -202,11 +203,11 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
             aria-modal="true"
             aria-label="سبد خرید"
             tabIndex={-1}
-            initial={{ x: "100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "100%" }}
+            initial={reduceMotion ? false : { opacity: 0, y: 80 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={reduceMotion ? undefined : { opacity: 0, y: 80 }}
             transition={{ type: "spring", damping: 30, stiffness: 280 }}
-            className="fixed inset-y-0 end-0 z-[70] flex w-full max-w-md flex-col bg-white shadow-2xl outline-none dark:bg-emerald-950"
+            className="fixed inset-x-0 bottom-0 z-[70] [&_button]:min-h-11 [&_button]:min-w-11 flex max-h-[90vh] w-full flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl outline-none dark:bg-emerald-950 sm:inset-x-auto sm:inset-y-0 sm:end-0 sm:max-h-none sm:max-w-md sm:rounded-none"
           >
             {/* ======================================== */}
             {/* Header */}
@@ -224,9 +225,9 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                 </div>
                 <motion.button
                   onClick={onClose}
-                  whileHover={{ rotate: 90 }}
-                  whileTap={{ scale: 0.9 }}
-                  className="flex h-10 w-10 items-center justify-center rounded-full bg-white/15 transition-colors hover:bg-white/25"
+                  whileHover={reduceMotion ? undefined : { scale: 1.05 }}
+                  whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+                  className="flex min-h-11 min-w-11 items-center justify-center rounded-full bg-white/15 transition-colors hover:bg-white/25"
                 >
                   <X size={20} />
                 </motion.button>
@@ -249,10 +250,11 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                   </div>
                   <div className="relative h-2 overflow-hidden rounded-full bg-white/20">
                     <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${shippingProgress}%` }}
+                      initial={reduceMotion ? false : { scaleX: 0 }}
+                      animate={{ scaleX: shippingProgress / 100 }}
                       transition={{ duration: 0.6, ease: "easeOut" }}
-                      className="absolute inset-y-0 start-0 rounded-full bg-gradient-to-l from-lime-300 to-white"
+                      style={{ transformOrigin: "right center" }}
+                      className="absolute inset-0 rounded-full bg-gradient-to-l from-lime-300 to-white"
                     />
                   </div>
                 </div>
@@ -282,7 +284,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
             {/* ======================================== */}
             {hasPesticide && (
               <motion.div
-                initial={{ opacity: 0, y: -10 }}
+                initial={reduceMotion ? false : { opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="mx-4 mt-3 flex items-start gap-2 rounded-xl bg-orange-50 p-3 text-fluid-xs text-orange-700 dark:bg-orange-950/40 dark:text-orange-300"
               >
@@ -298,7 +300,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
             <div className="flex-1 overflow-y-auto px-4 py-4">
               {items.length === 0 ? (
                 <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
+                  initial={reduceMotion ? false : { opacity: 0, scale: 0.96 }}
                   animate={{ opacity: 1, scale: 1 }}
                   className="flex h-full flex-col items-center justify-center gap-4 text-center"
                 >
@@ -312,8 +314,8 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                       onClose();
                       navigate('/products');
                     }}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
+                    whileHover={reduceMotion ? undefined : { y: -4 }}
+                    whileTap={reduceMotion ? undefined : { scale: 0.97 }}
                     className="rounded-2xl bg-gradient-to-r from-emerald-600 to-lime-500 px-6 py-3 text-sm font-bold text-white shadow-lg"
                   >
                     مشاهده محصولات
@@ -336,10 +338,10 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                       return (
                         <motion.li
                           key={item.id}
-                          layout
-                          initial={{ opacity: 0, x: 24, scale: 0.97 }}
-                          animate={{ opacity: 1, x: 0, scale: 1 }}
-                          exit={{ opacity: 0, x: -100, scale: 0.85, transition: { duration: 0.2 } }}
+                          layout={!reduceMotion}
+                          initial={reduceMotion ? false : { opacity: 0, y: 16, scale: 0.97 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={reduceMotion ? undefined : { opacity: 0, y: -16, scale: 0.9 }}
                           transition={{ type: "spring", stiffness: 260, damping: 26 }}
                           className={cn(
                             "relative overflow-hidden rounded-2xl border bg-white p-3 ps-3.5 shadow-sm transition-colors dark:bg-emerald-900/40",
@@ -425,15 +427,15 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                           </div>
 
                           {/* Quantity and the line total, on one rail. */}
-                          <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-dashed border-slate-200 pt-2.5 dark:border-emerald-800">
-                            <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white shadow-sm dark:border-emerald-700 dark:bg-emerald-900">
+                          <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 border-t border-dashed border-slate-200 pt-2.5 dark:border-emerald-800">
+                            <div className="flex max-w-full shrink-0 items-center gap-1 rounded-xl border border-slate-200 bg-white shadow-sm dark:border-emerald-700 dark:bg-emerald-900">
                               <motion.button
-                                whileTap={{ scale: 0.88 }}
+                                whileTap={reduceMotion ? undefined : { scale: 0.97 }}
                                 type="button"
                                 disabled={busyItem === item.id || item.quantity >= max}
                                 aria-label={`افزایش تعداد ${item.title}`}
                                 onClick={() => void handleUpdateQty(item.id, Math.min(item.quantity + 1, max))}
-                                className="flex h-9 w-9 items-center justify-center rounded-s-xl text-emerald-600 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-35 dark:text-lime-300 dark:hover:bg-emerald-800"
+                                className="flex min-h-11 min-w-11 items-center justify-center rounded-s-xl text-emerald-600 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-35 dark:text-lime-300 dark:hover:bg-emerald-800"
                               >
                                 <Plus size={15} />
                               </motion.button>
@@ -445,17 +447,17 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                                 {unit && <span className="ms-1 text-fluid-2xs font-bold text-slate-400">{unit}</span>}
                               </span>
                               <motion.button
-                                whileTap={{ scale: 0.88 }}
+                                whileTap={reduceMotion ? undefined : { scale: 0.97 }}
                                 type="button"
                                 disabled={busyItem === item.id || item.quantity <= min}
                                 aria-label={`کاهش تعداد ${item.title}`}
                                 onClick={() => void handleUpdateQty(item.id, Math.max(min, item.quantity - 1))}
-                                className="flex h-9 w-9 items-center justify-center rounded-e-xl text-slate-500 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-35 dark:text-emerald-400 dark:hover:bg-emerald-800"
+                                className="flex min-h-11 min-w-11 items-center justify-center rounded-e-xl text-slate-500 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-35 dark:text-emerald-400 dark:hover:bg-emerald-800"
                               >
                                 <Minus size={15} />
                               </motion.button>
                             </div>
-                            <span className="text-sm font-extrabold text-emerald-700 dark:text-lime-300">
+                            <span className="min-w-0 break-words text-sm font-extrabold text-emerald-700 dark:text-lime-300">
                               {formatPrice(item.total_price)}
                             </span>
                           </div>
@@ -498,7 +500,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                   {/* ======================================== */}
                   {suggestion && (
                     <motion.div
-                      initial={{ opacity: 0, y: 15 }}
+                      initial={reduceMotion ? false : { opacity: 0, y: 15 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.15 }}
                       className="mt-4 flex items-center gap-3 rounded-2xl border-2 border-dashed border-lime-200 bg-lime-50/60 p-3 dark:border-emerald-700 dark:bg-emerald-900/30"
@@ -533,7 +535,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                         <button
                           type="button"
                           onClick={() => void handleAddToCart(suggestion.id)}
-                          className="rounded-lg bg-white px-2.5 py-1.5 text-fluid-2xs font-bold text-emerald-600 shadow ring-1 ring-emerald-200 transition hover:bg-emerald-50 dark:bg-emerald-900 dark:text-lime-300 dark:ring-emerald-700 dark:hover:bg-emerald-800"
+                          className="min-h-11 min-w-11 rounded-lg bg-white px-2.5 py-1.5 text-fluid-2xs font-bold text-emerald-600 shadow ring-1 ring-emerald-200 transition hover:bg-emerald-50 dark:bg-emerald-900 dark:text-lime-300 dark:ring-emerald-700 dark:hover:bg-emerald-800"
                         >
                           افزودن
                         </button>
@@ -541,7 +543,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                           type="button"
                           onClick={() => setSuggestion(null)}
                           aria-label="بستن این پیشنهاد"
-                          className="flex h-6 w-6 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white/70 hover:text-slate-600 dark:hover:bg-emerald-800"
+                          className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white/70 hover:text-slate-600 dark:hover:bg-emerald-800"
                         >
                           <X size={13} />
                         </button>
@@ -556,7 +558,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
             {/* Footer - Checkout Section */}
             {/* ======================================== */}
             {items.length > 0 && (
-              <div className="border-t border-slate-100 bg-gradient-to-br from-white to-emerald-50/30 p-5 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] dark:border-emerald-800 dark:from-emerald-950 dark:to-emerald-900/30">
+              <div className="shrink-0 border-t border-slate-100 bg-gradient-to-br from-white to-emerald-50/30 p-4 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] dark:border-emerald-800 dark:from-emerald-950 dark:to-emerald-900/30 sm:p-5">
                 {/* Price Breakdown */}
                 <div className="mb-4 space-y-2 rounded-2xl bg-white/60 p-3 backdrop-blur dark:bg-emerald-900/50">
                   <div className="flex justify-between text-sm text-slate-500 dark:text-emerald-200">
@@ -586,8 +588,8 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                 {/* Checkout Button */}
                 <motion.a
                   href="/checkout"
-                  whileHover={{ scale: 1.02, y: -2 }}
-                  whileTap={{ scale: 0.98 }}
+                  whileHover={reduceMotion ? undefined : { y: -4 }}
+                  whileTap={reduceMotion ? undefined : { scale: 0.97 }}
                   className="group relative block w-full overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-600 to-lime-500 py-4 text-center text-sm font-bold text-white shadow-lg shadow-emerald-200"
                 >
                   <span className="absolute inset-0 -translate-x-full bg-gradient-to-l from-transparent via-white/30 to-transparent transition-transform duration-700 group-hover:translate-x-full" />

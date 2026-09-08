@@ -227,7 +227,7 @@ REST_FRAMEWORK = {
         "shop.authentication.CookieTokenAuthentication",
         "rest_framework.authentication.SessionAuthentication",
     ],
-    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.AllowAny"],
+    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 12,
     # One envelope for every error, with Persian copy and field-level details.
@@ -245,7 +245,10 @@ REST_FRAMEWORK = {
         "register": config("THROTTLE_REGISTER", default="5/hour"),
         "otp_request": config("THROTTLE_OTP_REQUEST", default="30/hour"),
         "otp_verify": config("THROTTLE_OTP_VERIFY", default="60/hour"),
-        "search": config("THROTTLE_SEARCH", default="60/min"),
+        # Public catalogue filters can legitimately issue rapid consecutive requests
+        # (price sliders, facets and pagination), so keep a generous abuse guard
+        # without rate-limiting normal Product/Marketplace browsing.
+        "search": config("THROTTLE_SEARCH", default="3000/min"),
         "inbox": config("THROTTLE_INBOX", default="60/min"),
         "checkout": config("THROTTLE_CHECKOUT", default="12/hour"),
         "upload": config("THROTTLE_UPLOAD", default="20/hour"),
@@ -306,6 +309,8 @@ CORS_ALLOW_HEADERS = [
     "x-requested-with",
 ]
 CSRF_TRUSTED_ORIGINS = config("CSRF_TRUSTED_ORIGINS", default="", cast=Csv())
+# JavaScript reads Django's masked CSRF cookie and echoes it in X-CSRFToken.
+CSRF_COOKIE_HTTPONLY = False
 
 SESSION_ENGINE = "django.contrib.sessions.backends.db"
 # Avoid a database write for every anonymous catalogue request. Django still

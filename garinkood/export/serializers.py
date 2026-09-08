@@ -25,6 +25,8 @@ class ExportDocumentSerializer(serializers.ModelSerializer):
     MAX_UPLOAD_BYTES = 10 * 1024 * 1024
     ALLOWED_EXTENSIONS = frozenset({".pdf", ".jpg", ".jpeg", ".png"})
 
+    file = serializers.FileField(write_only=True)
+    download_url = serializers.SerializerMethodField()
     document_type_label = serializers.CharField(
         source="get_document_type_display", read_only=True
     )
@@ -37,11 +39,15 @@ class ExportDocumentSerializer(serializers.ModelSerializer):
             "document_type",
             "document_type_label",
             "file",
+            "download_url",
             "issue_date",
             "is_verified",
             "created_at",
         ]
-        read_only_fields = ["id", "document_type_label", "created_at"]
+        read_only_fields = ["id", "document_type_label", "download_url", "created_at"]
+
+    def get_download_url(self, obj) -> str:
+        return f"/api/export/documents/{obj.pk}/download/"
 
     def validate_file(self, value):
         extension = Path(value.name).suffix.lower()

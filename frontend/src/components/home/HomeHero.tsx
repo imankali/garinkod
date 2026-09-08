@@ -2,6 +2,7 @@
 
 import { Link } from 'react-router';
 import { ArrowLeft, PackageCheck, ShieldCheck, Truck } from 'lucide-react';
+import { motion, useReducedMotion } from 'framer-motion';
 
 import { useTranslation } from '../../i18n';
 
@@ -25,6 +26,7 @@ import { useTranslation } from '../../i18n';
  * (lazy loading is for below-the-fold imagery).
  */
 export default function HomeHero() {
+  const reduceMotion = useReducedMotion();
   const { t } = useTranslation();
 
   return (
@@ -73,20 +75,24 @@ export default function HomeHero() {
         </p>
 
         <div className="mt-7 flex flex-wrap gap-3">
+          <motion.div whileHover={reduceMotion ? undefined : { y: -4 }} whileTap={reduceMotion ? undefined : { scale: 0.97 }}>
           <Link
             to="/products"
-            className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-white px-6 text-fluid-sm font-extrabold text-emerald-800 shadow-lg transition hover:bg-emerald-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white active:scale-[0.98]"
+            className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-white px-6 text-fluid-sm font-extrabold text-emerald-800 shadow-lg transition hover:bg-emerald-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white "
           >
             {t('home.buyFromShop')}
             <ArrowLeft size={17} aria-hidden="true" />
           </Link>
+          </motion.div>
+          <motion.div whileHover={reduceMotion ? undefined : { y: -4 }} whileTap={reduceMotion ? undefined : { scale: 0.97 }}>
           <Link
             to="/marketplace"
-            className="inline-flex min-h-12 items-center gap-2 rounded-xl border-2 border-white/70 px-6 text-fluid-sm font-extrabold text-white transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white active:scale-[0.98]"
+            className="inline-flex min-h-12 items-center gap-2 rounded-xl border-2 border-white/70 px-6 text-fluid-sm font-extrabold text-white transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white "
           >
             {t('home.farmersMarket')}
             <ArrowLeft size={17} aria-hidden="true" />
           </Link>
+          </motion.div>
         </div>
 
         {/* Trust signals: the three questions a new buyer asks silently. */}

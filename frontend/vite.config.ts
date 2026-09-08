@@ -82,10 +82,53 @@ export default defineConfig({
             },
           },
           {
-            urlPattern: ({ request }) => request.destination === 'image',
+            // User-owned media changes independently of its URL. Network-first
+            // prevents a previous account's avatar/storefront image lingering
+            // on a shared device after logout or profile edits.
+            urlPattern: ({ url, request }) =>
+              request.destination === 'image'
+              && [
+                '/media/avatars/',
+                '/media/storefronts/',
+                '/media/storefront-posts/',
+                '/media/marketplace/',
+                '/media/comments/',
+                '/media/messages/',
+                '/media/desk/',
+                '/media/visual-search/',
+              ].some((path) => url.pathname.startsWith(path)),
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'user-media-v3',
+              networkTimeoutSeconds: 2,
+              expiration: { maxEntries: 40, maxAgeSeconds: 60 * 60 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
+            // Cache-first is reserved for versioned app assets and public
+            // catalogue imagery. Unknown /media paths are deliberately not
+            // matched and therefore remain under normal browser HTTP caching.
+            urlPattern: ({ url, request }) =>
+              request.destination === 'image'
+              && (
+                url.pathname.startsWith('/images/')
+                || url.pathname.startsWith('/static/')
+                || [
+                  '/media/products/',
+                  '/media/categories/',
+                  '/media/tags/',
+                  '/media/articles/',
+                  '/media/services/',
+                  '/media/pages/',
+                  '/media/team/',
+                  '/media/brands/',
+                  '/media/site/',
+                ].some((path) => url.pathname.startsWith(path))
+              ),
             handler: 'CacheFirst',
             options: {
-              cacheName: 'images-v2',
+              cacheName: 'public-images-v3',
               expiration: { maxEntries: 150, maxAgeSeconds: 30 * 24 * 60 * 60 },
               cacheableResponse: { statuses: [0, 200] },
             },

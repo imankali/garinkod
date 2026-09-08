@@ -756,7 +756,7 @@ export const consultingApi = {
 };
 
 export const storefrontPostsApi = {
-  list: (params?: { post_type?: 'post' | 'story'; storefront?: number; page?: number }) =>
+  list: (params?: { post_type?: 'post' | 'story'; storefront?: number | string; page?: number }) =>
     apiClient.get<PaginatedResponse<StorefrontPost>>('/marketplace/posts/', { params }),
   mine: () => apiClient.get<StorefrontPost[]>('/marketplace/posts/mine/'),
 

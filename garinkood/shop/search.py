@@ -5,7 +5,9 @@ import math
 
 from django.conf import settings
 from django.core.cache import cache
-from django.db.models import Case, IntegerField, When
+from django.contrib.postgres.search import SearchQuery, SearchVector
+from django.db import connection
+from django.db.models import Case, IntegerField, Q, When
 from rest_framework.filters import SearchFilter
 from waffle import flag_is_active
 
@@ -55,7 +57,7 @@ class ResilientProductSearchFilter(SearchFilter):
             return queryset
         if not settings.MEILISEARCH_ENABLED or not flag_is_active(request, "external_search"):
             _metric("database", "disabled")
-            return super().filter_queryset(request, queryset, view)
+            return self._database_search(request, queryset, view, terms)
 
         query = " ".join(terms).strip()
         try:
@@ -89,4 +91,20 @@ class ResilientProductSearchFilter(SearchFilter):
             if not cache.get(key):
                 logger.warning("Meilisearch unavailable; using database search", extra={"error": str(exc)[:300]})
                 cache.set(key, True, timeout=60)
+            return self._database_search(request, queryset, view, terms)
+
+    def _database_search(self, request, queryset, view, terms):
+        """Avoid contains scans over long text; PostgreSQL indexes title lexemes."""
+        if connection.vendor != "postgresql":
             return super().filter_queryset(request, queryset, view)
+
+        query_text = " ".join(terms).strip()
+        search_query = SearchQuery(query_text, config="simple", search_type="plain")
+        queryset = queryset.annotate(
+            _title_search=SearchVector("title", config="simple")
+        )
+        condition = Q(_title_search=search_query)
+        for field in self.get_search_fields(view, request):
+            if field != "title":
+                condition |= Q(**{f"{field}__icontains": query_text})
+        return queryset.filter(condition)

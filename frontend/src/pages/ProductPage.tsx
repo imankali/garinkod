@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   ArrowRight,
   BadgeCheck,
@@ -55,6 +56,7 @@ const TABS: Array<{ id: Tab; label: string; icon: typeof Beaker }> = [
 ];
 
 export default function ProductPage() {
+  const reduceMotion = useReducedMotion();
   const { slug = "" } = useParams();
   /*
     `?comment=<id>` is where an inbox notification about an answered review or
@@ -82,6 +84,10 @@ export default function ProductPage() {
   const [starFilter, setStarFilter] = useState<number | null>(null);
   const [tab, setTab] = useState<Tab>(() => (linkedComment ? "reviews" : "description"));
   const imageRef = useRef<HTMLInputElement>(null);
+  const guidesRef = useRef<HTMLDivElement>(null);
+  const similarRef = useRef<HTMLDivElement>(null);
+  const guidesVisible = useIntersectionOnce(guidesRef);
+  const similarVisible = useIntersectionOnce(similarRef);
 
   const { data: product, isLoading, isError } = useQuery({
     queryKey: ["product", slug],
@@ -92,13 +98,13 @@ export default function ProductPage() {
   const { data: comments = [], isFetching: commentsFetching } = useQuery({
     queryKey: ["product-comments", slug],
     queryFn: async () => (await commentsApi.getByProduct(slug)).data,
-    enabled: Boolean(slug),
+    enabled: Boolean(slug) && (tab === "reviews" || Boolean(linkedComment)),
     staleTime: 30_000,
   });
   const { data: similar = [] } = useQuery({
     queryKey: ["similar-products", slug],
     queryFn: async () => (await productsApi.getSimilar(slug)).data,
-    enabled: Boolean(slug),
+    enabled: Boolean(slug) && similarVisible,
     staleTime: 5 * 60 * 1000,
   });
   // The guides written for this product's crop — the "راهنمای کشت گل کلم" idea,
@@ -106,7 +112,7 @@ export default function ProductPage() {
   const { data: guides = [] } = useQuery({
     queryKey: ["product-articles", slug, product?.id],
     queryFn: async () => (await articlesApi.getAll({ product: product?.id, limit: 3 })).data,
-    enabled: Boolean(product?.id),
+    enabled: Boolean(product?.id) && guidesVisible,
     staleTime: 10 * 60 * 1000,
   });
 
@@ -174,7 +180,7 @@ export default function ProductPage() {
     await reviewSubmit.mutateAsync();
   }
 
-  if (isLoading) return <div className="mx-auto flex min-h-[50dvh] max-w-7xl items-center justify-center px-4 text-slate-500">در حال بارگذاری محصول...</div>;
+  if (isLoading) return <ProductPageSkeleton />;
   if (isError || !product) return <><Helmet><title>محصول پیدا نشد | گرین کود</title><meta name="robots" content="noindex,nofollow" /></Helmet><div className="mx-auto flex min-h-[50dvh] max-w-7xl flex-col items-center justify-center px-4 text-center"><h1 className="text-2xl font-extrabold text-slate-800 dark:text-white">محصول مورد نظر یافت نشد</h1><Link to="/" className="mt-5 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white">بازگشت به فروشگاه</Link></div></>;
 
   const category = typeof product.category === "string" ? product.category : product.category?.name;
@@ -284,7 +290,7 @@ export default function ProductPage() {
     <meta name="twitter:description" content={seoDescription} />
     <meta name="twitter:image" content={imageUrl} />
     <script type="application/ld+json">{JSON.stringify(structuredData)}</script>
-  </Helmet><main className="mx-auto max-w-7xl px-[var(--page-gutter)] py-8 md:py-12">
+  </Helmet><main className="mx-auto max-w-7xl px-[var(--page-gutter)] py-8 md:py-12 [&_button]:min-h-11 [&_button]:min-w-11">
     <Link to="/products" className="mb-7 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-emerald-700 hover:text-emerald-900 dark:text-lime-300" aria-label="بازگشت به محصولات"><ArrowRight size={18} /> بازگشت به محصولات</Link>
 
     <div className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -421,8 +427,10 @@ export default function ProductPage() {
                 )}
               </div>
             ) : (
-              <button
+              <motion.button
                 type="button"
+                whileHover={!reduceMotion && product.is_in_stock && packageInStock ? { y: -4 } : undefined}
+                whileTap={!reduceMotion && product.is_in_stock && packageInStock ? { scale: 0.97 } : undefined}
                 onClick={() => void addToCart(
                   product.id,
                   (selectedPackage?.min_order_quantity ?? 1) > 1 ? (selectedPackage?.min_order_quantity ?? 1) : 1,
@@ -433,7 +441,7 @@ export default function ProductPage() {
               >
                 <ShoppingCart size={18} />
                 {product.is_in_stock && packageInStock ? "افزودن به سبد خرید" : "از این بسته‌بندی موجود نیست"}
-              </button>
+              </motion.button>
             )}
             <div className="mt-3 flex items-center justify-between gap-2">
               <SharePanel url={productUrl} title={product.title} text={seoDescription} />
@@ -500,7 +508,7 @@ export default function ProductPage() {
               <p className="mt-2 text-fluid-xs leading-7 text-slate-500 dark:text-emerald-200">
                 دوز و روش مصرف را با «ماشین‌حساب دوز» و بر پایه مساحت زمین خودتان حساب کنید؛ اعداد این صفحه جای برچسب رسمی محصول را نمی‌گیرد.
               </p>
-              <Link to="/#agri-calculator" className="mt-3 inline-flex min-h-10 items-center rounded-xl bg-emerald-600 px-3 text-fluid-2xs font-bold text-white">ماشین‌حساب دوز</Link>
+              <Link to="/#agri-calculator" className="mt-3 inline-flex min-h-11 items-center rounded-xl bg-emerald-600 px-3 text-fluid-2xs font-bold text-white">ماشین‌حساب دوز</Link>
             </div>
           </div>
         )}
@@ -560,7 +568,7 @@ export default function ProductPage() {
               {visibleReviews.length > 0 && (
                 <div className="space-y-3">
                   {starFilter && (
-                    <button type="button" onClick={() => setStarFilter(null)} className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-amber-50 px-3 text-fluid-2xs font-bold text-amber-700 dark:bg-amber-950/50 dark:text-amber-200">
+                    <button type="button" onClick={() => setStarFilter(null)} className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-amber-50 px-3 text-fluid-2xs font-bold text-amber-700 dark:bg-amber-950/50 dark:text-amber-200">
                       نمایش دیدگاه‌های {starFilter.toLocaleString('fa-IR')} ستاره · حذف فیلتر
                     </button>
                   )}
@@ -608,7 +616,7 @@ export default function ProductPage() {
 
         {tab === 'description' && (
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
-            <div className="space-y-4">
+            <div ref={guidesRef} className="space-y-4">
               <div className="prose-emerald rounded-3xl border border-slate-100 bg-white p-5 text-fluid-sm leading-8 text-slate-600 shadow-sm sm:p-6 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-100">
                 {product.description}
               </div>
@@ -634,7 +642,7 @@ export default function ProductPage() {
                     ))}
                   </ul>
                   {specRows.length > 6 && (
-                    <button type="button" onClick={() => setTab('specs')} className="mt-3 inline-flex min-h-9 items-center rounded-lg bg-emerald-50 px-3 text-fluid-2xs font-bold text-emerald-700 dark:bg-emerald-900/60 dark:text-lime-300">
+                    <button type="button" onClick={() => setTab('specs')} className="mt-3 inline-flex min-h-11 items-center rounded-lg bg-emerald-50 px-3 text-fluid-2xs font-bold text-emerald-700 dark:bg-emerald-900/60 dark:text-lime-300">
                       مشاهده جدول کامل ({specRows.length.toLocaleString('fa-IR')} ویژگی)
                     </button>
                   )}
@@ -649,7 +657,7 @@ export default function ProductPage() {
                   <p className="mt-2 text-fluid-xs leading-7 text-slate-600 dark:text-emerald-100">
                     میانگین {summary.average.toLocaleString('fa-IR', { maximumFractionDigits: 1 })} از ۵ بر پایه {summary.reviews_count.toLocaleString('fa-IR')} دیدگاه تأییدشده.
                   </p>
-                  <button type="button" onClick={() => setTab('reviews')} className="mt-3 inline-flex min-h-9 items-center rounded-lg bg-white px-3 text-fluid-2xs font-bold text-emerald-700 dark:bg-emerald-950 dark:text-lime-300">
+                  <button type="button" onClick={() => setTab('reviews')} className="mt-3 inline-flex min-h-11 items-center rounded-lg bg-white px-3 text-fluid-2xs font-bold text-emerald-700 dark:bg-emerald-950 dark:text-lime-300">
                     خواندن دیدگاه‌ها
                   </button>
                 </div>
@@ -660,8 +668,42 @@ export default function ProductPage() {
       </div>
     </div>
 
-    {similar.length > 0 && <section className="mt-10"><h2 className="text-2xl font-extrabold text-slate-800 dark:text-white">محصولات مشابه</h2><div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{similar.map((item) => <SimilarCard key={item.id} product={item} />)}</div></section>}
+    <div ref={similarRef} className="min-h-1">{similar.length > 0 && <section className="mt-10"><h2 className="text-2xl font-extrabold text-slate-800 dark:text-white">محصولات مشابه</h2><div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{similar.map((item) => <SimilarCard key={item.id} product={item} />)}</div></section>}</div>
   </main></>;
+}
+
+function useIntersectionOnce(ref: React.RefObject<Element | null>) {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    if (visible) return;
+    const node = ref.current;
+    if (!node || typeof IntersectionObserver === "undefined") { setVisible(true); return; }
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry?.isIntersecting) { setVisible(true); observer.disconnect(); }
+    }, { rootMargin: "400px 0px" });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [ref, visible]);
+  return visible;
+}
+
+function ProductPageSkeleton() {
+  const block = "animate-pulse rounded-xl bg-slate-100 dark:bg-emerald-900/60";
+  return <main className="mx-auto max-w-7xl px-[var(--page-gutter)] py-8 md:py-12" aria-busy="true" aria-label="در حال بارگذاری محصول">
+    <div className={`mb-7 h-11 w-40 ${block}`} />
+    <div className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <article className="grid gap-8 rounded-3xl border border-slate-100 bg-white p-5 md:grid-cols-2 md:p-8 dark:border-emerald-900 dark:bg-emerald-950">
+        <div className={`aspect-square w-full ${block}`} />
+        <div className="flex min-h-[28rem] flex-col gap-4">
+          <div className={`h-5 w-28 ${block}`} /><div className={`h-10 w-4/5 ${block}`} />
+          <div className={`h-5 w-52 ${block}`} /><div className={`h-24 w-full ${block}`} />
+          <div className="mt-auto space-y-4"><div className={`h-9 w-40 ${block}`} /><div className={`h-14 w-full ${block}`} /></div>
+        </div>
+      </article>
+      <aside className="space-y-4"><div className={`h-64 w-full ${block}`} /><div className={`h-24 w-full ${block}`} /></aside>
+    </div>
+    <div className={`mt-9 h-14 w-full ${block}`} /><div className={`mt-4 h-64 w-full ${block}`} />
+  </main>;
 }
 
 function CommentCard({ comment, onReply, nested = false, highlighted = false }: { comment: Comment; onReply: (comment: Comment) => void; nested?: boolean; /** The comment an inbox notification was about. */ highlighted?: boolean }) {
@@ -720,7 +762,7 @@ function CommentCard({ comment, onReply, nested = false, highlighted = false }: 
         disabled={votes.busy}
         aria-pressed={votes.voted}
         className={cn(
-          "inline-flex min-h-9 items-center gap-1 rounded-lg border px-2.5 text-fluid-2xs font-bold transition",
+          "inline-flex min-h-11 items-center gap-1 rounded-lg border px-2.5 text-fluid-2xs font-bold transition",
           votes.voted
             ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/60 dark:text-lime-300"
             : "border-slate-200 text-slate-500 hover:border-emerald-300 hover:text-emerald-700 dark:border-emerald-800 dark:text-emerald-200",
@@ -735,7 +777,7 @@ function CommentCard({ comment, onReply, nested = false, highlighted = false }: 
         type="button"
         onClick={() => void reportReview()}
         disabled={reported}
-        className={cn("inline-flex min-h-9 items-center gap-1 px-2 text-fluid-2xs font-bold transition", reported ? "text-slate-400" : "text-slate-400 hover:text-rose-600 dark:hover:text-rose-300")}
+        className={cn("inline-flex min-h-11 items-center gap-1 px-2 text-fluid-2xs font-bold transition", reported ? "text-slate-400" : "text-slate-400 hover:text-rose-600 dark:hover:text-rose-300")}
       >
         <Flag size={13} aria-hidden="true" />
         {reported ? 'گزارش‌شده' : 'گزارش'}

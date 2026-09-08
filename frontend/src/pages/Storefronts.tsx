@@ -1,8 +1,7 @@
 // frontend/src/pages/Storefronts.tsx
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router';
-import { BadgeCheck, MapPin, Search, SlidersHorizontal, Sparkles, Star, Store, TrendingUp, Users, X } from 'lucide-react';
+import { Search, SlidersHorizontal, Sparkles, Store, TrendingUp, X } from 'lucide-react';
 
 import { agricultureApi, locationsApi, storefrontsApi } from '../api/services';
 import { parseApiError } from '../api/errors';
@@ -10,6 +9,7 @@ import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { useUrlFilters } from '../hooks/useUrlFilters';
 import MarketplaceListingCard from '../components/MarketplaceListingCard';
 import SkeletonCard from '../components/ui/SkeletonCard';
+import StorefrontCard from '../components/StorefrontCard';
 import { useTranslation } from '../i18n';
 import { cn } from '../utils/cn';
 import type { MarketplaceListing, Storefront } from '@/types/storefront';
@@ -463,56 +463,5 @@ function FilterSelect({
         ))}
       </select>
     </label>
-  );
-}
-
-/** A storefront summary card, reused by the directory and the home page. */
-export function StorefrontCard({ storefront }: { storefront: Storefront }) {
-  return (
-    <Link
-      to={`/storefronts/${storefront.slug}`}
-      className="block h-full rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition hover:border-emerald-300 hover:shadow-md dark:border-emerald-900 dark:bg-emerald-950/40"
-    >
-      <div className="flex items-center gap-3">
-        <span className="h-14 w-14 shrink-0 overflow-hidden rounded-full bg-emerald-100 dark:bg-emerald-900">
-          {storefront.avatar_url ? (
-            <img src={storefront.avatar_url} alt="" loading="lazy" className="h-full w-full object-cover" />
-          ) : (
-            <span className="flex h-full w-full items-center justify-center text-sm font-extrabold text-emerald-700 dark:text-lime-300">
-              {storefront.name.slice(0, 2)}
-            </span>
-          )}
-        </span>
-        <div className="min-w-0 flex-1">
-          <h3 className="flex min-w-0 items-center gap-1 text-sm font-extrabold text-slate-800 dark:text-white">
-            <span className="truncate">{storefront.name}</span>
-            {storefront.is_verified && <BadgeCheck size={14} className="shrink-0 text-emerald-500" />}
-          </h3>
-          <p className="mt-0.5 truncate text-fluid-xs text-slate-500 dark:text-emerald-200">
-            {storefront.seller_type_label}
-            {storefront.city && (
-              <>
-                {' · '}
-                <MapPin size={10} className="inline" /> {storefront.city}
-              </>
-            )}
-          </p>
-        </div>
-      </div>
-
-      <dl className="mt-3 flex items-center gap-3 text-fluid-xs text-slate-500 dark:text-emerald-200">
-        <span className="flex items-center gap-1">
-          <Store size={12} /> {storefront.listing_count} آگهی
-        </span>
-        <span className="flex items-center gap-1">
-          <Users size={12} /> {storefront.followers_count}
-        </span>
-        {Number(storefront.rating) > 0 && (
-          <span className="flex items-center gap-1">
-            <Star size={12} className="text-amber-400" /> {storefront.rating}
-          </span>
-        )}
-      </dl>
-    </Link>
   );
 }

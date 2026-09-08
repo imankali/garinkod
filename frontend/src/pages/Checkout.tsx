@@ -1,6 +1,6 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { Link } from 'react-router';
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { CheckCircle2, ClipboardCheck, LocateFixed, PackageCheck, Phone, ShieldCheck, Sparkles } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -38,6 +38,7 @@ const EMPTY_FORM: CheckoutPayload = {
 };
 
 export default function Checkout() {
+  const reduceMotion = useReducedMotion();
   const { cart, fetchCart, isLoading } = useCartStore();
   const { user, account } = useAuthStore();
   const [form, setForm] = useState<CheckoutPayload>(() => ({
@@ -53,6 +54,9 @@ export default function Checkout() {
   // and express only if the operator enabled it. The buyer never sees a choice
   // that cannot be honoured.
   const [quotes, setQuotes] = useState<ShippingQuote[]>([]);
+  const [shippingLoading, setShippingLoading] = useState(false);
+  const [shippingError, setShippingError] = useState("");
+  const [stockError, setStockError] = useState("");
   const [locating, setLocating] = useState(false);
   // Server-side validation is mapped back onto the individual inputs so the
   // buyer sees which field is wrong instead of a single generic toast.
@@ -74,30 +78,23 @@ export default function Checkout() {
     }));
   }, [user, account]);
 
-  useEffect(() => {
+  const loadShippingQuotes = useCallback(async () => {
     if (!form.province || !form.city || !cart?.items.length) {
-      setQuotes([]);
-      return;
+      setQuotes([]); setShippingError(""); return;
     }
-    let cancelled = false;
-    shippingApi.quote(form.province, form.city)
-      .then((response) => {
-        if (cancelled) return;
-        const available = response.data.quotes || [];
-        setQuotes(available);
-        // A service that disappeared between two quotes must not be sent off, so
-        // the choice is re-checked against what just came back.
-        setForm((current) => {
-          if (!current.shipping_service) return current;
-          if (available.some((quote) => quote.service === current.shipping_service)) return current;
-          return { ...current, shipping_service: undefined };
-        });
-      })
-      .catch(() => {
-        if (!cancelled) setQuotes([]);
-      });
-    return () => { cancelled = true; };
-  }, [form.province, form.city, cart?.items.length, cart?.total_price]);
+    setShippingLoading(true); setShippingError("");
+    try {
+      const response = await shippingApi.quote(form.province, form.city);
+      const available = response.data.quotes || [];
+      setQuotes(available);
+      setForm((current) => !current.shipping_service || available.some((quote) => quote.service === current.shipping_service) ? current : { ...current, shipping_service: undefined });
+    } catch {
+      setQuotes([]);
+      setShippingError("دریافت هزینه و روش ارسال انجام نشد. اتصال خود را بررسی و دوباره تلاش کنید.");
+    } finally { setShippingLoading(false); }
+  }, [form.province, form.city, cart?.items.length]);
+
+  useEffect(() => { void loadShippingQuotes(); }, [loadShippingQuotes]);
 
   const subtotal = cart?.total_price || 0;
   const selectedQuote = quotes.find((quote) => quote.service === (form.shipping_service || 'standard'));
@@ -212,6 +209,10 @@ export default function Checkout() {
       const parsed = parseApiError(error);
       setFieldErrors(parsed.fields);
       setFormError(parsed.message);
+      if (parsed.code === "conflict" || parsed.status === 409 || /موجودی|ناموجود|stock/i.test(parsed.message)) {
+        setStockError(parsed.message);
+        await fetchCart();
+      }
       if (!parsed.handled && Object.keys(parsed.fields).length === 0) toast.error(parsed.message);
     } finally {
       setSubmitting(false);
@@ -291,7 +292,7 @@ export default function Checkout() {
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-[var(--page-gutter)] py-7 md:py-10">
+    <main className="mx-auto max-w-6xl px-[var(--page-gutter)] [&_button]:min-h-11 [&_button]:min-w-11 py-7 md:py-10">
       <Link to="/" className="inline-flex items-center gap-2 text-sm font-bold text-emerald-700 dark:text-lime-300">بازگشت به فروشگاه</Link>
       <PurchaseSteps currentStep="details" className="mt-5" />
       <div className="mt-5 grid gap-6 lg:grid-cols-[1fr_360px]">
@@ -335,16 +336,23 @@ export default function Checkout() {
               className={`mt-2 w-full rounded-xl border bg-white px-3 py-2.5 font-normal outline-none transition focus-visible:ring-2 focus-visible:ring-emerald-500 dark:bg-emerald-900 ${fieldErrors.address ? "border-rose-400" : "border-slate-200 dark:border-emerald-700"}`}
             />
             {fieldErrors.address && <p id="checkout-address-error" role="alert" className="mt-1 text-fluid-xs font-semibold text-rose-600">{fieldErrors.address}</p>}
-            <button type="button" onClick={captureCurrentLocation} disabled={locating} className="mt-3 inline-flex items-center gap-2 rounded-lg border border-emerald-200 px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-50 disabled:opacity-60 dark:border-emerald-700 dark:text-lime-300 dark:hover:bg-emerald-900">
+            <motion.button type="button" onClick={captureCurrentLocation} whileHover={reduceMotion ? undefined : { y: -4 }} whileTap={reduceMotion ? undefined : { scale: 0.97 }} disabled={locating} className="mt-3 inline-flex min-h-11 min-w-11 items-center gap-2 rounded-lg border border-emerald-200 px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-50 disabled:opacity-60 dark:border-emerald-700 dark:text-lime-300 dark:hover:bg-emerald-900">
               <LocateFixed size={15} />
               {locating ? 'در حال دریافت موقعیت…' : form.latitude && form.longitude ? 'موقعیت تحویل ثبت شد' : 'افزودن موقعیت فعلی (اختیاری)'}
-            </button>
+            </motion.button>
             <p className="mt-1 text-fluid-2xs text-slate-400">موقعیت فقط همراه سفارش ذخیره می‌شود و جای نشانی کامل را نمی‌گیرد.</p>
           </div>
           <label className="block text-sm font-bold text-slate-700 dark:text-emerald-50">
             توضیحات برای کارشناس یا ارسال (اختیاری)
             <textarea value={form.notes || ""} onChange={(event) => updateField("notes", event.target.value)} rows={3} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-normal outline-none transition focus:border-emerald-500 dark:border-emerald-700 dark:bg-emerald-900" placeholder="زمان مناسب تماس، نیاز به مشاوره مصرف، مشخصات دسترسی و..." />
           </label>
+
+          {(shippingLoading || shippingError) && (
+            <div className={`rounded-xl p-3 text-sm ${shippingError ? "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-200" : "bg-slate-50 text-slate-500 dark:bg-emerald-900/40 dark:text-emerald-200"}`} role={shippingError ? "alert" : "status"}>
+              <span>{shippingLoading ? "در حال محاسبه هزینه ارسال…" : shippingError}</span>
+              {shippingError && <motion.button type="button" onClick={() => void loadShippingQuotes()} whileHover={reduceMotion ? undefined : { y: -4 }} whileTap={reduceMotion ? undefined : { scale: 0.97 }} className="mt-2 flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-rose-200 px-4 font-bold">تلاش مجدد</motion.button>}
+            </div>
+          )}
 
           {quotes.length > 1 && (
             <fieldset className="rounded-2xl border border-slate-200 p-4 dark:border-emerald-800">
@@ -357,7 +365,7 @@ export default function Checkout() {
                       key={quote.service}
                       type="button"
                       onClick={() => updateField('shipping_service', quote.service as 'standard' | 'express')}
-                      className={`rounded-xl border p-3 text-start transition ${active ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-900' : 'border-slate-200 dark:border-emerald-800'}`}
+                      className={`min-h-11 min-w-11 rounded-xl border p-3 text-start transition ${active ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-900' : 'border-slate-200 dark:border-emerald-800'}`}
                     >
                       <span className="block text-sm font-extrabold text-slate-800 dark:text-white">{quote.label}</span>
                       <span className="mt-1 block text-fluid-2xs text-slate-500 dark:text-emerald-200">
@@ -379,7 +387,7 @@ export default function Checkout() {
             <p className="mt-1">فقط روش‌هایی که سرور با credential، callback verify و تست کامل فعال کرده باشد قابل انتخاب‌اند. روش‌های دیگر صرفاً برای شفافیت نمایش داده می‌شوند.</p>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
               {providers.map((provider) => (
-                <button key={provider.code} type="button" disabled={!provider.enabled} onClick={() => updateField('payment_method', provider.code)} className={`rounded-xl border p-3 text-start text-xs transition ${form.payment_method === provider.code ? 'border-emerald-600 bg-emerald-100 text-emerald-900 dark:bg-emerald-900 dark:text-lime-100' : 'border-amber-200 bg-white/80 dark:border-amber-800 dark:bg-emerald-950'} ${!provider.enabled ? 'cursor-not-allowed opacity-60' : ''}`}>
+                <button key={provider.code} type="button" disabled={!provider.enabled} onClick={() => updateField('payment_method', provider.code)} className={`min-h-11 min-w-11 rounded-xl border p-3 text-start text-xs transition ${form.payment_method === provider.code ? 'border-emerald-600 bg-emerald-100 text-emerald-900 dark:bg-emerald-900 dark:text-lime-100' : 'border-amber-200 bg-white/80 dark:border-amber-800 dark:bg-emerald-950'} ${!provider.enabled ? 'cursor-not-allowed opacity-60' : ''}`}>
                   <span className="block font-extrabold">{provider.label}</span>
                   <span className="mt-1 block text-fluid-2xs">{provider.enabled ? 'فعال' : provider.reason}</span>
                 </button>
@@ -399,7 +407,7 @@ export default function Checkout() {
 
           <div>
             <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-slate-50 p-3 text-xs leading-6 text-slate-600 dark:bg-emerald-900/40 dark:text-emerald-100">
-              <input id="checkout-terms_accepted" type="checkbox" checked={form.terms_accepted} onChange={(event) => updateField("terms_accepted", event.target.checked)} aria-invalid={Boolean(fieldErrors.terms_accepted)} className="mt-1 h-4 w-4 accent-emerald-600" />
+              <input id="checkout-terms_accepted" type="checkbox" checked={form.terms_accepted} onChange={(event) => updateField("terms_accepted", event.target.checked)} aria-invalid={Boolean(fieldErrors.terms_accepted)} className="min-h-11 min-w-11 shrink-0 accent-emerald-600" />
               <span>
                 صحت اطلاعات تحویل و مبلغ را تأیید می‌کنم و می‌پذیرم سفارش فقط پس از تأیید سمت سرور و، برای پرداخت
                 آنلاین، تأیید درگاه پرداخت‌شده تلقی شود.
@@ -425,9 +433,9 @@ export default function Checkout() {
             </p>
           )}
 
-          <button disabled={submitting || !cart?.items.length} className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-l from-emerald-600 to-lime-500 px-5 py-3.5 text-sm font-extrabold text-white shadow-md disabled:cursor-not-allowed disabled:opacity-50">
+          <motion.button disabled={submitting || !cart?.items.length || shippingLoading || Boolean(shippingError)} whileHover={!reduceMotion && !submitting && !shippingError ? { y: -4 } : undefined} whileTap={!reduceMotion && !submitting && !shippingError ? { scale: 0.97 } : undefined} className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-l from-emerald-600 to-lime-500 px-5 py-3.5 text-sm font-extrabold text-white shadow-md disabled:cursor-not-allowed disabled:opacity-50">
             <PackageCheck size={18} /> {submitting ? "در حال ثبت سفارش..." : form.payment_method === 'zarinpal' ? 'ثبت سفارش و رفتن به درگاه' : 'ثبت سفارش و درخواست هماهنگی'}
-          </button>
+          </motion.button>
         </form>
 
         <aside className="h-fit rounded-3xl border border-emerald-100 bg-emerald-50/70 p-5 dark:border-emerald-900 dark:bg-emerald-900/30 lg:sticky lg:top-5">
@@ -465,27 +473,20 @@ export default function Checkout() {
                   aria-label="استفاده از امتیاز وفاداری"
                   disabled={loyaltyDiscount === 0}
                   onClick={() => updateField("use_loyalty_points", !form.use_loyalty_points)}
-                  whileTap={loyaltyDiscount > 0 ? { scale: 0.97 } : {}}
+                  whileTap={!reduceMotion && loyaltyDiscount > 0 ? { scale: 0.97 } : undefined}
                   transition={TACTILE}
-                  className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                  className={`relative min-h-11 min-w-11 shrink-0 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
                     form.use_loyalty_points ? "bg-emerald-600" : "bg-slate-300 dark:bg-emerald-800"
                   }`}
                 >
-                  {/* dir=ltr keeps the knob physics identical across locales. */}
-                  <span dir="ltr" className="absolute inset-0">
-                    <motion.span
-                      className="absolute start-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow"
-                      animate={{ x: form.use_loyalty_points ? 20 : 0 }}
-                      transition={TACTILE}
-                    />
-                  </span>
+                  <motion.span className="absolute inset-2 rounded-full bg-white shadow" animate={{ opacity: 1, scale: form.use_loyalty_points ? 1 : 0.72 }} transition={reduceMotion ? { duration: 0 } : TACTILE} />
                 </motion.button>
               </div>
             </div>
           )}
           <ul className="mt-4 space-y-3 border-b border-emerald-100 pb-4 dark:border-emerald-800">
             {cart?.items.map((item) => (
-              <li key={item.id} className="flex items-start justify-between gap-3 text-sm">
+              <li key={item.id} className={`flex items-start justify-between gap-3 rounded-xl p-2 text-sm ${stockError && (!item.is_in_stock || stockError.includes(item.title)) ? "bg-rose-50 ring-1 ring-rose-200 dark:bg-rose-950/30" : ""}`}>
                 <span className="line-clamp-2 min-w-0 text-slate-600 dark:text-emerald-100">
                   {item.quantity} × {item.title}
                   {/* Marketplace lines name their storefront so the buyer knows
@@ -513,9 +514,9 @@ export default function Checkout() {
             {loyaltyActive && (
               <motion.div
                 key="loyalty-discount-row"
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
+                initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={reduceMotion ? undefined : { opacity: 0, y: -8 }}
                 transition={TACTILE}
                 className="overflow-hidden"
               >

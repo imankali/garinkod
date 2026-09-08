@@ -18,7 +18,8 @@ import {
   Ship,
 } from 'lucide-react';
 
-import { getMyExportOrders, type ExportOrder, type ExportOrderStatus } from '../services/export';
+import { getMyExportOrders } from '../services/export';
+import type { ExportOrder, ExportOrderStatus } from '../types/export';
 import { parseApiError } from '../api/errors';
 import Button from '../components/ui/Button';
 
@@ -136,7 +137,7 @@ function ExportOrderCard({ exportOrder }: { exportOrder: ExportOrder }) {
                 </span>
                 {document.is_verified ? (
                   <a
-                    href={document.file}
+                    href={document.download_url}
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-fluid-2xs font-bold text-white transition-colors hover:bg-emerald-700"
