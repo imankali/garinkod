@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { GitCompare, X } from "lucide-react";
-import type { MockProduct } from "../types";
+import type { MockProduct } from '@/types/shop';
 
 // ========================================
 // Types

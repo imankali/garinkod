@@ -1,6 +1,6 @@
 // frontend/src/components/MobileBottomNav.tsx
 
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ShoppingCart } from 'lucide-react';
 

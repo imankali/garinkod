@@ -21,7 +21,7 @@ import { deskApi, messagesApi } from '../../api/services';
 import { deskPresence } from './DeskOutOfHours';
 import { parseApiError } from '../../api/errors';
 import { cn } from '../../utils/cn';
-import type { DeskState, StorefrontConversation } from '../../types';
+import type { DeskState, StorefrontConversation } from '@/types/messaging';
 
 const DESKS = [
   {

@@ -1,7 +1,7 @@
 // frontend/src/components/CartDrawer.tsx
 
 import { useState, useEffect, useCallback } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from 'react-router';
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,
@@ -20,7 +20,8 @@ import { useFocusTrap } from "../hooks/useFocusTrap";
 import { useCartStore } from "../store/cartStore";
 import PurchaseSteps from "./PurchaseSteps";
 import { productsApi } from "../api/services";
-import type { CartItem, ProductList } from "../types";
+import type { ProductList } from '@/types/shop';
+import type { CartItem } from '@/types/commerce';
 import { formatPrice } from "../utils/formatPrice";
 import { cn } from "../utils/cn";
 

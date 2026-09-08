@@ -12,7 +12,7 @@
 // The phone and WhatsApp links stay as a fallback for signed-out visitors.
 
 import { useCallback, useEffect, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Camera, Inbox, LifeBuoy, MessageCircle, Phone, Sprout, X } from 'lucide-react';
 

@@ -1,7 +1,7 @@
 // frontend/src/components/SearchBar.tsx
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from 'react-router';
 import { AnimatePresence, motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import toast from "react-hot-toast";
@@ -14,7 +14,8 @@ import { categories } from "../data/shopData";
 import { productsApi, trustApi } from "../api/services";
 import { useTranslation } from "../i18n";
 import { formatPrice } from "../utils/formatPrice";
-import type { ProductList, MockProduct, VisualDiagnosis } from "../types";
+import type { ProductList, MockProduct } from '@/types/shop';
+import type { VisualDiagnosis } from '@/types/content';
 
 // ========================================
 // Types

@@ -1,7 +1,7 @@
 // frontend/src/pages/Login.tsx
 
 import { Fragment, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { motion } from 'framer-motion';
 import { LEGAL_CORE_LINKS } from '../config/legal';
 import {
@@ -20,11 +20,11 @@ import {
   User,
   UserPlus,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 
 import { parseApiError } from '../api/errors';
 import { useAuthStore } from '../store/authStore';
-import type { OtpRequestResponse } from '../types';
+import type { OtpRequestResponse } from '@/types/user';
 import { normalizePhoneNumber, toEnglishDigits } from '../utils/normalizeDigits';
 
 type AuthMethod = 'otp' | 'password';

@@ -15,7 +15,7 @@ import toast from 'react-hot-toast';
 import { agricultureApi } from '../../api/services';
 import { parseApiError } from '../../api/errors';
 import { useTranslation } from '../../i18n';
-import type { MarketplaceListing } from '../../types';
+import type { MarketplaceListing } from '@/types/storefront';
 
 interface ListingDraft {
   title: string;

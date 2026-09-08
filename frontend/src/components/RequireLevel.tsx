@@ -1,11 +1,12 @@
 // frontend/src/components/RequireLevel.tsx
 
 import type { ReactNode } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router';
 import { ShieldAlert } from 'lucide-react';
 
 import { useAuthStore, useUserLevel } from '../store/authStore';
-import { USER_LEVEL, type UserLevel } from '../types';
+import { USER_LEVEL } from '@/types/user';
+import type { UserLevel } from '@/types/user';
 
 interface RequireLevelProps {
   level: UserLevel;

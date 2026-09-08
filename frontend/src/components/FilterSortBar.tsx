@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowDownWideNarrow, Check, PackageCheck, SlidersHorizontal, X } from "lucide-react";
 import { categoriesApi } from "../api/services";
-import type { Category } from "../types";
+import type { Category } from '@/types/shop';
 
 // ========================================
 // Types

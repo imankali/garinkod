@@ -11,7 +11,7 @@ import toast from 'react-hot-toast';
 import { farmApi, type FarmLandPayload } from '../../api/services';
 import { parseApiError } from '../../api/errors';
 import { useTranslation } from '../../i18n';
-import type { FarmLand } from '../../types';
+import type { FarmLand } from '@/types/farming';
 import { AREA_UNITS, IRRIGATION_TYPES, LAND_TYPES, SOIL_TYPES } from './farmOptions';
 
 const EMPTY: FarmLandPayload = {

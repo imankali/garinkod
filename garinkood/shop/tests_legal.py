@@ -7,8 +7,10 @@ from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
 from . import legal
+from django.contrib.auth.models import User
+
 from .models import (
-    Category, Order, Product, SitePage, SitePageBlock, User,
+    Category, Order, Product, SitePage, SitePageBlock,
 )
 
 

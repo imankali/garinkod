@@ -10,7 +10,7 @@
 
 import { MoonStar } from 'lucide-react';
 
-import type { DeskState } from '../../types';
+import type { DeskState } from '@/types/messaging';
 
 export type DeskPresence = 'online' | 'open' | 'closed';
 

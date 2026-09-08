@@ -22,7 +22,7 @@ import Modal from '../ui/Modal';
 import LandFormModal from '../farm/LandFormModal';
 import { farmApi } from '../../api/services';
 import { cn } from '../../utils/cn';
-import type { FarmLand } from '../../types';
+import type { FarmLand } from '@/types/farming';
 
 export default function ShareLandSheet({
   open,

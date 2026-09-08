@@ -3,7 +3,17 @@
 import { motion } from "framer-motion";
 import { Eye, GitCompare, Heart, PackageX, ShoppingCart, Star } from "lucide-react";
 import { formatPrice } from "../utils/formatPrice";
-import type { MockProduct } from "../types";
+import SkeletonCard from "./ui/SkeletonCard";
+import type { MockProduct } from '@/types/shop';
+
+// ========================================
+// Shared tactile feedback (Phase-2 polish)
+// ========================================
+// One easing/duration for every pressable part of the card: the press reads
+// instantly (0.2s), returns smoothly (easeInOut), and — via the conditional
+// whileHover/whileTap below — never fires on a disabled control. Kept as a
+// module-local constant so react-refresh sees this file as component-only.
+const TACTILE = { duration: 0.2, ease: "easeInOut" } as const;
 
 // ========================================
 // ProductCard Props Interface
@@ -18,6 +28,11 @@ interface ProductCardProps {
   onAddToCart: (product: MockProduct, e: React.MouseEvent) => void;
   onQuickView: (product: MockProduct) => void;
   onToggleCompare: (product: MockProduct) => void;
+  /** Renders the geometry-exact shimmer instead of real content. Parents
+      driving initial loads usually swap in <SkeletonCard variant="product" />
+      directly; this prop covers in-place refinements (e.g. isFetching with
+      no cached items) without duplicating skeleton markup. */
+  isLoading?: boolean;
 }
 
 // ========================================
@@ -33,12 +48,22 @@ export default function ProductCard({
   onAddToCart,
   onQuickView,
   onToggleCompare,
+  isLoading = false,
 }: ProductCardProps) {
+  // Loading contract: identical outer geometry, zero layout shift on swap-in.
+  // This component holds no hooks, so an early return is safe.
+  if (isLoading) {
+    return <SkeletonCard variant="product" />;
+  }
+
   // محاسبه درصد تخفیف
   const discountPercent = product.oldPrice
     ? Math.round(((product.oldPrice - product.price) / product.oldPrice) * 100)
     : 0;
   const productUrl = product.slug ? `/products/${product.slug}` : undefined;
+  // A disabled control must not *look* pressed either — tactile feedback is
+  // gated on the same condition as the `disabled` attribute.
+  const compareInteractive = isComparing || !compareDisabled;
 
   return (
     <motion.div
@@ -71,11 +96,14 @@ export default function ProductCard({
           )}
         </div>
 
-        {/* Wishlist Toggle Button */}
+        {/* Wishlist Toggle Button — heart keeps a springier personality than
+            the CTAs, but rides the same easing so the card feels like one
+            material, not five. */}
         <motion.button
           onClick={() => onToggleWishlist(product)}
-          whileHover={{ scale: 1.15 }}
-          whileTap={{ scale: 0.85 }}
+          whileHover={{ scale: 1.12 }}
+          whileTap={{ scale: 0.88 }}
+          transition={TACTILE}
           className={`flex h-11 w-11 items-center justify-center rounded-full shadow-md backdrop-blur transition-colors ${
             isWishlisted ? "bg-rose-500 text-white" : "bg-white/90 text-slate-400 hover:text-rose-500"
           }`}
@@ -100,19 +128,46 @@ export default function ProductCard({
           }}
           className="block h-full w-full"
         >
-          <motion.img
-            src={product.image}
-            alt={product.name}
-            width={320}
-            height={240}
-            whileHover={{ scale: 1.1 }}
-            transition={{ duration: 0.4, ease: "easeOut" }}
-            className={`aspect-[4/3] h-full w-full object-cover ${!product.inStock ? "grayscale" : ""}`}
-            loading="lazy"
-            onError={(e) => {
-              (e.target as HTMLImageElement).src = '/images/hero-farm.jpg';
-            }}
-          />
+          {/* Real <picture>: when the backend pipeline has produced variants,
+              the browser picks AVIF → WebP → the JPEG the API still ships. */}
+          <picture>
+            {product.imageSrcset?.avif ? (
+              <source
+                type="image/avif"
+                srcSet={product.imageSrcset.avif}
+                sizes="(max-width: 640px) 50vw, (max-width: 1280px) 33vw, 320px"
+              />
+            ) : null}
+            {product.imageSrcset?.webp ? (
+              <source
+                type="image/webp"
+                srcSet={product.imageSrcset.webp}
+                sizes="(max-width: 640px) 50vw, (max-width: 1280px) 33vw, 320px"
+              />
+            ) : null}
+            <motion.img
+              src={product.imageSrcset?.fallback || product.image}
+              alt={product.name}
+              width={320}
+              height={240}
+              // Grid cards are never the LCP — stay lazy and off the main thread.
+              loading="lazy"
+              decoding="async"
+              whileHover={{ scale: 1.1 }}
+              transition={{ duration: 0.4, ease: "easeOut" }}
+              className={`aspect-[4/3] h-full w-full object-cover ${!product.inStock ? "grayscale" : ""}`}
+              onError={(e) => {
+                // Guard against a fallback that itself fails (loop), and prefer
+                // the 94KB WebP placeholder over the 263KB JPEG.
+                const img = e.currentTarget;
+                if (img.src.endsWith('/images/hero-farm.jpg')) return;
+                img.onerror = null;
+                img.src = img.src.endsWith('/images/hero-farm-768.webp')
+                  ? '/images/hero-farm.jpg'
+                  : '/images/hero-farm-768.webp';
+              }}
+            />
+          </picture>
         </a>
 
         {/* Hover cross-fade to the second photo, the way a paper catalogue
@@ -122,8 +177,11 @@ export default function ProductCard({
           <img
             src={product.secondImage}
             alt=""
+            width={320}
+            height={240}
             aria-hidden="true"
             loading="lazy"
+            decoding="async"
             className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-500 group-hover:opacity-100 [@media(hover:none)]:hidden"
             onError={(event) => {
               event.currentTarget.style.display = 'none';
@@ -219,12 +277,15 @@ export default function ProductCard({
         {/* Actions: Add to Cart & Compare */}
         {/* ======================================== */}
         <div className="relative z-[2] flex items-center gap-2">
-          {/* Add to Cart Button */}
+          {/* Add to Cart Button — the primary CTA. Tactile press (0.97) is
+              the premium touch; it is intentionally absent when the item is
+              out of stock, because a dead button should not pretend to live. */}
           <motion.button
             onClick={(e) => onAddToCart(product, e)}
             disabled={!product.inStock}
             whileHover={product.inStock ? { scale: 1.03 } : {}}
             whileTap={product.inStock ? { scale: 0.97 } : {}}
+            transition={TACTILE}
             className="flex min-h-11 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl bg-brand-gradient-accent px-2 text-fluid-xs font-bold text-white shadow-md transition-shadow hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-40"
           >
             <ShoppingCart size={14} aria-hidden="true" className="shrink-0" />
@@ -242,17 +303,18 @@ export default function ProductCard({
             </span>
           </motion.button>
 
-          {/* Compare Button */}
+          {/* Compare Button — hover/tap only when it can actually respond. */}
           <motion.button
             onClick={() => onToggleCompare(product)}
-            disabled={!isComparing && compareDisabled}
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
+            disabled={!compareInteractive}
+            whileHover={compareInteractive ? { scale: 1.08 } : {}}
+            whileTap={compareInteractive ? { scale: 0.92 } : {}}
+            transition={TACTILE}
             title={isComparing ? "حذف از مقایسه" : "افزودن به مقایسه"}
-            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-colors disabled:cursor-not-allowed disabled:opacity-30 ${
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-colors disabled:cursor-not-allowed disabled:opacity-30 dark:border-emerald-700 ${
               isComparing
-                ? "border-[#0F8A5F] bg-emerald-50 text-[#0F8A5F]"
-                : "border-slate-200 text-slate-400 hover:text-[#0F8A5F]"
+                ? "border-[#0F8A5F] bg-emerald-50 text-[#0F8A5F] dark:bg-emerald-900 dark:text-lime-300"
+                : "border-slate-200 text-slate-400 hover:text-[#0F8A5F] dark:text-emerald-400"
             }`}
           >
             <GitCompare size={15} />

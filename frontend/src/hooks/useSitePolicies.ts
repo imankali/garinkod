@@ -12,7 +12,7 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { policiesApi } from '../api/services';
-import type { SitePolicies } from '../types';
+import type { SitePolicies } from '@/types/shop';
 
 const EMPTY: SitePolicies = {
   return_window_days: null,

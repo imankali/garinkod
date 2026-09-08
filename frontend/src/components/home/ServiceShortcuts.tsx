@@ -1,6 +1,6 @@
 // frontend/src/components/home/ServiceShortcuts.tsx
 
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import {
   Building2,
   ClipboardList,

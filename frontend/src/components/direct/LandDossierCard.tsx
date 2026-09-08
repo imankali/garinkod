@@ -9,11 +9,11 @@
 // later edits the land does not retroactively change what the desk was told.
 
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { CalendarDays, ChevronDown, MapPin, Ruler, Sprout } from 'lucide-react';
 
 import { cn } from '../../utils/cn';
-import type { SharedLandDossier } from '../../types';
+import type { SharedLandDossier } from '@/types/messaging';
 
 const FA_DIGITS = '۰۱۲۳۴۵۶۷۸۹';
 

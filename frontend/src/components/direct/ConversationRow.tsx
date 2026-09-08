@@ -6,7 +6,7 @@
 
 import { ArrowRight, LifeBuoy, MessageSquareReply, Sprout, Store } from 'lucide-react';
 
-import type { MessageChannel, StorefrontConversation } from '../../types';
+import type { MessageChannel, StorefrontConversation } from '@/types/messaging';
 import { cn } from '../../utils/cn';
 import { CHANNEL_TONE, conversationIdentity, conversationPreview } from '../../utils/conversation';
 

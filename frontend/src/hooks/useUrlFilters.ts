@@ -1,7 +1,7 @@
 // frontend/src/hooks/useUrlFilters.ts
 
 import { useCallback, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router';
 
 /**
  * Keep a filter set in the URL query string.

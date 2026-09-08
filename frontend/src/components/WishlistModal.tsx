@@ -3,7 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useFocusTrap } from "../hooks/useFocusTrap";
 import { Heart, ShoppingBag, Trash2, X } from "lucide-react";
-import type { MockProduct } from "../types";
+import type { MockProduct } from '@/types/shop';
 import { formatPrice } from "../utils/formatPrice";
 
 // ========================================

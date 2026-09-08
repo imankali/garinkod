@@ -2,7 +2,7 @@
 // ✅ فایل اصلی اپلیکیشن - نقطه اتصال همه کامپوننت‌ها
 
 import { useEffect, useMemo, useState, lazy, Suspense } from "react";
-import { BrowserRouter, Navigate, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Navigate, Routes, Route } from 'react-router';
 import RequireLevel from "./components/RequireLevel";
 import { USER_LEVEL } from "./types";
 import { Toaster } from "react-hot-toast";
@@ -44,6 +44,8 @@ const Profile = lazy(() => import("./pages/Profile"));
 const ProductPage = lazy(() => import("./pages/ProductPage"));
 const Checkout = lazy(() => import("./pages/Checkout"));
 const Orders = lazy(() => import("./pages/Orders"));
+const OrderTrackingPage = lazy(() => import("./pages/OrderTrackingPage"));
+const ExportDashboard = lazy(() => import("./pages/ExportDashboard"));
 const Services = lazy(() => import("./pages/Services"));
 const FarmerSell = lazy(() => import("./pages/FarmerSell"));
 const Marketplace = lazy(() => import("./pages/Marketplace"));
@@ -389,6 +391,10 @@ export default function App() {
               {/* ======================================== */}
               <Route path="/checkout" element={<Checkout />} />
               <Route path="/orders" element={<Orders />} />
+              {/* Shareable parcel tracking (logistics module): one buyer, one code. */}
+              <Route path="/tracking/:trackingCode" element={<OrderTrackingPage />} />
+              {/* The buyer's export desk (export module): own trade files + papers. */}
+              <Route path="/export" element={<ExportDashboard />} />
               <Route path="/services" element={<Services />} />
               <Route path="/services/:slug" element={<ServiceDetail />} />
 

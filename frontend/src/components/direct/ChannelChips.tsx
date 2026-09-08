@@ -10,7 +10,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-import type { MessageChannel } from '../../types';
+import type { MessageChannel } from '@/types/messaging';
 import { cn } from '../../utils/cn';
 
 export type ChannelFilter = 'all' | MessageChannel;

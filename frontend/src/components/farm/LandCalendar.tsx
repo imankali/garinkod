@@ -12,7 +12,7 @@ import { farmApi, type FarmEventPayload } from '../../api/services';
 import { parseApiError } from '../../api/errors';
 import { useTranslation } from '../../i18n';
 import { cn } from '../../utils/cn';
-import type { FarmCalendarEvent, FarmEventKind } from '../../types';
+import type { FarmCalendarEvent, FarmEventKind } from '@/types/farming';
 import { EVENT_COLORS, EVENT_KINDS, formatFaDate } from './farmOptions';
 
 const KIND_ICONS: Record<FarmEventKind, typeof Sprout> = {

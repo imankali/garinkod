@@ -40,9 +40,11 @@ from rest_framework.throttling import ScopedRateThrottle
 
 from .admission import admit_waiting, admission_answer, queue_page_html, settings_row_safe, state_for
 from .capacity import effective_limit, pressure, redact
+from django.contrib.auth.models import User
+
 from .models import (
     CapacitySettings, Comment, Order, PlatformFeedback, PresenceBeat, Product, QueueTicket,
-    ResourceSample, SystemLogEntry, User,
+    ResourceSample, SystemLogEntry,
 )
 from .operational import has_operations_access
 

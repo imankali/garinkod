@@ -6,7 +6,9 @@
 
 import { create } from 'zustand';
 
-import type { AttachedListing, FarmLand, MessageChannel } from '../types';
+import type { AttachedListing } from '@/types/storefront';
+import type { MessageChannel } from '@/types/messaging';
+import type { FarmLand } from '@/types/farming';
 
 interface OpenDirectOptions {
   /** Open an existing conversation's thread. */

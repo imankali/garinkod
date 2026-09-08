@@ -18,7 +18,7 @@ from django.utils.crypto import salted_hmac
 from shop.models import OneTimePassword, UserAccount
 from shop.phone_numbers import mask_phone, normalize_iranian_mobile
 
-from .providers import ProviderError, send_otp
+from .providers import ProviderError  # noqa: F401 — re-exported for callers that catch it
 
 User = get_user_model()
 
@@ -92,7 +92,12 @@ def _generate_code() -> str:
 
 
 def issue_login_otp(phone_value: object, *, requested_ip: str | None = None, requested_channel: str = 'auto') -> OtpIssueResult:
-    """Create, hash and synchronously deliver a login OTP with fallback."""
+    """Create and hash a login OTP, then defer its delivery to the outbox.
+
+    Budget claims, challenge persistence and hashing happen synchronously
+    (the response needs them). The provider round-trip is queued as an
+    OutboxTask so a slow or failing SMS/Bale provider can never hold the
+    AUTH request thread."""
 
     phone = normalize_iranian_mobile(phone_value)
     _claim_request_budget(phone)
@@ -121,26 +126,18 @@ def issue_login_otp(phone_value: object, *, requested_ip: str | None = None, req
             expires_at=now + timedelta(seconds=settings.OTP_TTL_SECONDS),
         )
 
-    failures: list[ProviderError] = []
-    for channel in channels:
-        try:
-            result = send_otp(channel, phone, raw_code, str(challenge.request_id))
-        except ProviderError as exc:
-            failures.append(exc)
-            continue
-        challenge.delivery_channel = channel
-        challenge.provider_message_id = result.message_id[:200]
-        challenge.save(update_fields=['delivery_channel', 'provider_message_id'])
-        debug_code = raw_code if settings.DEBUG and settings.OTP_RETURN_DEBUG_CODE else ''
-        return OtpIssueResult(challenge, int(settings.OTP_RESEND_COOLDOWN_SECONDS), debug_code)
+    # Non-blocking delivery: provider I/O (SMS/Bale round-trip) must never
+    # hold an auth request thread hostage — this is the availability fix from
+    # the outbox mandate. The challenge above is already persisted and
+    # hashed; only the SEND is deferred. The raw code travels exclusively
+    # through the shared OTP cache (single-flight pop by the worker), keyed
+    # by the public request_id — the challenge row keeps no plaintext code.
+    from shop.task_queue import cache_otp_code_for_delivery, enqueue_otp_delivery
 
-    challenge.status = OneTimePassword.STATUS_FAILED
-    challenge.code_hash = '!'
-    challenge.last_error = ' | '.join(str(error) for error in failures)[:2000]
-    challenge.save(update_fields=['status', 'code_hash', 'last_error'])
-    # The provider details are intentionally not exposed to the endpoint;
-    # operators can diagnose the sanitised reason from admin/system checks.
-    raise OtpDeliveryUnavailable('ارسال کد تأیید در حال حاضر ممکن نیست.') from (failures[-1] if failures else None)
+    cache_otp_code_for_delivery(str(challenge.request_id), raw_code)
+    enqueue_otp_delivery(challenge.pk, channels)
+    debug_code = raw_code if settings.DEBUG and settings.OTP_RETURN_DEBUG_CODE else ''
+    return OtpIssueResult(challenge, int(settings.OTP_RESEND_COOLDOWN_SECONDS), debug_code)
 
 
 def _create_mobile_user(phone: str, first_name: str = '', last_name: str = ''):

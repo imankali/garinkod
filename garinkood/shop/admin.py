@@ -569,9 +569,11 @@ class WalletTransactionInline(admin.TabularInline):
 
 @admin.register(Wallet)
 class AdminWallet(admin.ModelAdmin):
-    list_display = ('user', 'balance', 'currency', 'updated_at')
+    list_display = ('user', 'balance', 'loyalty_points', 'currency', 'updated_at')
     search_fields = ('user__username', 'user__email')
     readonly_fields = ('balance', 'updated_at')
+    # `loyalty_points` stays writable: granting points ("congratulations
+    # program") is a legitimate operator action; the money balance is not.
     inlines = [WalletTransactionInline]
 
 

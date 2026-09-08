@@ -4,16 +4,8 @@ import toast from 'react-hot-toast';
 import { authApi, avatarApi } from '../api/services';
 import { clearPreviewToken, writePreviewToken } from '../api/previewSession';
 import { parseApiError } from '../api/errors';
-import {
-  USER_LEVEL,
-  type OtpRequestResponse,
-  type User,
-  type UserAccount,
-  type UserCapability,
-  type UserCapabilities,
-  type UserLevel,
-  STAFF_LEVEL_FLOOR,
-} from '../types';
+import { USER_LEVEL, STAFF_LEVEL_FLOOR } from '@/types/user';
+import type { OtpRequestResponse, User, UserAccount, UserCapability, UserCapabilities, UserLevel } from '@/types/user';
 
 interface AuthState {
   user: User | null;

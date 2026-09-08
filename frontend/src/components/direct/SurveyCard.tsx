@@ -20,7 +20,7 @@ import { messagesApi } from '../../api/services';
 import { parseApiError } from '../../api/errors';
 import { StarPicker } from '../StarRating';
 import { cn } from '../../utils/cn';
-import type { ConversationSurvey } from '../../types';
+import type { ConversationSurvey } from '@/types/messaging';
 
 const SCORE_HINT = ['', 'خیلی کم', 'کم', 'متوسط', 'خوب', 'عالی'];
 

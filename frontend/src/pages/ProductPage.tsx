@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
 import {
@@ -38,7 +38,8 @@ import { useAuthStore } from "../store/authStore";
 import { useAuthModalStore } from "../store/authModalStore";
 import { useCartStore } from "../store/cartStore";
 import { useSiteContact, whatsappHref } from "../hooks/useSiteContact";
-import type { Comment, ProductList } from "../types";
+import type { ProductList } from '@/types/shop';
+import type { Comment } from '@/types/content';
 import { formatPrice } from "../utils/formatPrice";
 import { cn } from "../utils/cn";
 

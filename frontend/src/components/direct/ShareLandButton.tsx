@@ -16,7 +16,7 @@ import { Sprout, X } from 'lucide-react';
 
 import ShareLandSheet from './ShareLandSheet';
 import { cn } from '../../utils/cn';
-import type { FarmLand } from '../../types';
+import type { FarmLand } from '@/types/farming';
 
 export function AttachLandButton({
   disabled = false,

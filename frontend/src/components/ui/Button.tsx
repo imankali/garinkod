@@ -1,7 +1,7 @@
 // frontend/src/components/ui/Button.tsx
 
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { Loader2, type LucideIcon } from 'lucide-react';
 
 import { cn } from '../../utils/cn';
@@ -77,8 +77,9 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   ref,
 ) {
   const classes = cn(
-    'inline-flex items-center justify-center font-bold transition-colors',
-    'disabled:cursor-not-allowed disabled:opacity-70',
+    'inline-flex items-center justify-center font-bold transition duration-150',
+    'active:scale-[0.97]',
+    'disabled:cursor-not-allowed disabled:opacity-70 disabled:active:scale-100',
     VARIANTS[variant],
     SIZES[size],
     fullWidth && 'w-full',
@@ -146,8 +147,9 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
       aria-label={label}
       title={label}
       className={cn(
-        'tap-target inline-flex shrink-0 items-center justify-center rounded-xl transition-colors',
-        'disabled:cursor-not-allowed disabled:opacity-60',
+        'tap-target inline-flex shrink-0 items-center justify-center rounded-xl transition duration-150',
+        'active:scale-95',
+        'disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100',
         VARIANTS[variant],
         box,
         className,

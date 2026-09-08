@@ -10,7 +10,7 @@
 
 import { ChevronDown } from 'lucide-react';
 
-import type { SitePageBlock } from '../types';
+import type { SitePageBlock } from '@/types/content';
 
 export interface FaqPair {
   question: string;

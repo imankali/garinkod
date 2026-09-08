@@ -47,6 +47,11 @@ INSTALLED_APPS = [
     "django.contrib.humanize",
     "django.contrib.postgres",
     "shop.apps.ShopConfig",
+    # Holding modules (DDD bounded contexts) — each owns models/admin/API.
+    "agri_inputs.apps.AgriInputsConfig",
+    "machinery.apps.MachineryConfig",
+    "logistics.apps.LogisticsConfig",
+    "export.apps.ExportConfig",
 ]
 
 MIDDLEWARE = [
@@ -203,7 +208,17 @@ if MEDIA_STORAGE_BACKEND == "s3":
     }
 
 MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "products"
+# Historically this was BASE_DIR / "products" which — combined with
+# upload_to="products/" on the catalogue models — physically stored files at
+# garinkood/products/products/… (the "double directory" anomaly). Browsers
+# never saw it because MEDIA_URL hides the root's basename, but any operator
+# walking the disk hit the misleading layout. The storage root must carry no
+# domain name; upload_to prefixes own their subdirectories (media/products/…).
+MEDIA_ROOT = BASE_DIR / "media"
+# Transitional: the pre-normalization root, consumed ONLY by the
+# `normalize_media_paths` management command (one-time data migration).
+# Delete this line once legacy files have been moved out of it.
+LEGACY_MEDIA_ROOT = BASE_DIR / "products"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {

@@ -10,9 +10,10 @@
 // its category chips.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
+import SkeletonCard from '../components/ui/SkeletonCard';
 import {
   ArrowLeft,
   ChevronLeft,
@@ -30,7 +31,7 @@ import ProductDetailModal from '../components/ProductDetailModal';
 import { useCartStore } from '../store/cartStore';
 import { useWishlistStore } from '../store/wishlistStore';
 import { useTranslation } from '../i18n';
-import type { Category, MockProduct, ProductList } from '../types';
+import type { Category, MockProduct, ProductList } from '@/types/shop';
 import { convertToMockProduct } from '../utils/convertProduct';
 import { cn } from '../utils/cn';
 
@@ -438,8 +439,12 @@ export default function Shop() {
         </div>
 
         {loading ? (
-          <div className="flex min-h-[40dvh] items-center justify-center">
-            <div className="h-10 w-10 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" />
+          // Geometry-exact shimmers instead of a centered spinner: the grid
+          // takes its final shape immediately and nothing jumps on swap-in.
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
+            {Array.from({ length: 8 }).map((_, index) => (
+              <SkeletonCard key={index} variant="product" />
+            ))}
           </div>
         ) : products.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-14 text-center">
@@ -613,10 +618,7 @@ function CuratedRow({
       {loading ? (
         <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-5">
           {Array.from({ length: SECTION_SIZE }).map((_, index) => (
-            <div
-              key={index}
-              className="h-64 animate-pulse rounded-2xl bg-emerald-100/60 dark:bg-emerald-900/40"
-            />
+            <SkeletonCard key={index} variant="product" />
           ))}
         </div>
       ) : (
@@ -753,12 +755,15 @@ function CategoryChip({
   onClick: () => void;
 }) {
   return (
-    <button
+    <motion.button
       type="button"
       onClick={onClick}
       aria-pressed={active}
+      // Same press physics as the card CTAs — the filter row feels alive.
+      whileTap={{ scale: 0.97 }}
+      transition={{ duration: 0.2, ease: 'easeInOut' }}
       className={cn(
-        'flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-4 text-fluid-xs font-bold transition',
+        'flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-4 text-fluid-xs font-bold transition-colors',
         active
           ? 'border-emerald-600 bg-emerald-600 text-white shadow-sm'
           : 'border-slate-200 bg-white text-slate-500 hover:border-emerald-300 hover:text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200',
@@ -775,7 +780,7 @@ function CategoryChip({
           {count.toLocaleString('fa-IR')}
         </span>
       )}
-    </button>
+    </motion.button>
   );
 }
 

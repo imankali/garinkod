@@ -6,7 +6,7 @@
 
 import { ListChecks } from 'lucide-react';
 
-import type { ProductAttribute } from '../types';
+import type { ProductAttribute } from '@/types/shop';
 
 import { cn } from '../utils/cn';
 

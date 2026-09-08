@@ -1,5 +1,5 @@
 import { FormEvent, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from 'react-router';
 import { AlertTriangle, MessageSquareHeart, Send, ShieldCheck } from "lucide-react";
 import toast from "react-hot-toast";
 

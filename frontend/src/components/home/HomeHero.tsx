@@ -1,6 +1,6 @@
 // frontend/src/components/home/HomeHero.tsx
 
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { ArrowLeft, PackageCheck, ShieldCheck, Truck } from 'lucide-react';
 
 import { useTranslation } from '../../i18n';
@@ -16,6 +16,13 @@ import { useTranslation } from '../../i18n';
  * Two calls to action, not five: the catalogue for buyers and the marketplace
  * for people who came for direct-from-farmer produce. Competing buttons dilute
  * each other.
+ *
+ * Decorative backdrop: a real <picture> element serves AVIF → WebP → JPEG via
+ * responsive srcset (480/768/1024px). Explicit width/height plus the parent
+ * section's fixed gradient keep CLS at zero. The image is the LCP candidate,
+ * so it is loaded EAGERLY with fetchPriority="high" — loading="lazy" on a
+ * hero would delay the largest paint and is intentionally not used here
+ * (lazy loading is for below-the-fold imagery).
  */
 export default function HomeHero() {
   const { t } = useTranslation();
@@ -26,15 +33,28 @@ export default function HomeHero() {
       aria-labelledby="hero-heading"
     >
       {/* Decorative only — hidden from assistive technology. */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 opacity-20"
-        style={{
-          backgroundImage: 'url(/images/hero-farm.jpg)',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-        }}
-      />
+      <picture aria-hidden="true" className="pointer-events-none absolute inset-0">
+        <source
+          type="image/avif"
+          srcSet="/images/hero-farm-480.avif 480w, /images/hero-farm-768.avif 768w, /images/hero-farm-1024.avif 1024w"
+          sizes="100vw"
+        />
+        <source
+          type="image/webp"
+          srcSet="/images/hero-farm-480.webp 480w, /images/hero-farm-768.webp 768w, /images/hero-farm-1024.webp 1024w"
+          sizes="100vw"
+        />
+        <img
+          src="/images/hero-farm.jpg"
+          alt=""
+          width={1024}
+          height={1024}
+          decoding="async"
+          fetchPriority="high"
+          loading="eager"
+          className="h-full w-full object-cover opacity-20"
+        />
+      </picture>
 
       <div className="page-shell relative py-10 sm:py-14">
         <p className="text-fluid-sm font-bold text-lime-200">
@@ -55,14 +75,14 @@ export default function HomeHero() {
         <div className="mt-7 flex flex-wrap gap-3">
           <Link
             to="/products"
-            className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-white px-6 text-fluid-sm font-extrabold text-emerald-800 shadow-lg transition hover:bg-emerald-50"
+            className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-white px-6 text-fluid-sm font-extrabold text-emerald-800 shadow-lg transition hover:bg-emerald-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white active:scale-[0.98]"
           >
             {t('home.buyFromShop')}
             <ArrowLeft size={17} aria-hidden="true" />
           </Link>
           <Link
             to="/marketplace"
-            className="inline-flex min-h-12 items-center gap-2 rounded-xl border-2 border-white/70 px-6 text-fluid-sm font-extrabold text-white transition hover:bg-white/10"
+            className="inline-flex min-h-12 items-center gap-2 rounded-xl border-2 border-white/70 px-6 text-fluid-sm font-extrabold text-white transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white active:scale-[0.98]"
           >
             {t('home.farmersMarket')}
             <ArrowLeft size={17} aria-hidden="true" />

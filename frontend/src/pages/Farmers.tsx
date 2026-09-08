@@ -18,10 +18,7 @@ import { parseApiError } from '../api/errors';
 import { useTranslation } from '../i18n';
 import { cn } from '../utils/cn';
 import { useDirectStore } from '../store/directStore';
-import type {
-  ConsultantFarmerDossier, ConsultantFarmerSummary, FarmCalendarEvent,
-  FarmConsultationRequest, FarmEventKind, FarmLand,
-} from '../types';
+import type { ConsultantFarmerDossier, ConsultantFarmerSummary, FarmCalendarEvent, FarmConsultationRequest, FarmEventKind, FarmLand } from '@/types/farming';
 import { EVENT_KINDS, formatFaDate } from '../components/farm/farmOptions';
 
 type View = 'requests' | 'farmers';

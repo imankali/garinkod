@@ -11,7 +11,7 @@
 // page from becoming a list of past relationships.
 
 import { Helmet } from 'react-helmet-async';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { Building2, Tags, Warehouse } from 'lucide-react';
 

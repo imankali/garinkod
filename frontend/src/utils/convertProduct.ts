@@ -3,7 +3,7 @@
 // Turns an API catalogue product into the UI's MockProduct shape, folding the
 // server-side discount into `oldPrice` so every card can show the same badge.
 
-import type { MockProduct, Product, ProductList } from '../types';
+import type { MockProduct, Product, ProductList } from '@/types/shop';
 
 export function convertToMockProduct(apiProduct: ProductList | Product): MockProduct {
   const discount = apiProduct.discount_percent > 0 ? apiProduct.discount_percent : 0;
@@ -43,6 +43,9 @@ export function convertToMockProduct(apiProduct: ProductList | Product): MockPro
     packageWeight: apiProduct.package_weight || undefined,
     attributes: 'attributes' in apiProduct ? apiProduct.attributes : undefined,
     image: apiProduct.image_url || '/images/hero-farm.jpg',
+    // Server-generated variants power the card's <picture>; absent for rows
+    // whose image has not been processed by the backend pipeline yet.
+    imageSrcset: apiProduct.image_srcset ?? null,
     // The hover photo and the expiry warning only exist on the list payload; a
     // detail product has a full gallery instead.
     secondImage: 'image_alt_url' in apiProduct ? apiProduct.image_alt_url || undefined : undefined,

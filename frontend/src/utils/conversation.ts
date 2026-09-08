@@ -5,7 +5,7 @@
 // used to reach into `conversation.storefront` directly, which broke as soon
 // as threads could also come from support, consulting or comment replies.
 
-import type { DeskAgentPublic, MessageChannel, StorefrontConversation } from '../types';
+import type { DeskAgentPublic, MessageChannel, StorefrontConversation } from '@/types/messaging';
 
 export interface ConversationIdentity {
   /** Display name of the other party. */

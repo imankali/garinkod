@@ -6,7 +6,7 @@
 // tables of prices and specs, a video, and product/article grids that pull live
 // catalogue rows — so a manager can rebuild a campaign page without a deploy.
 
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { Helmet } from 'react-helmet-async';
 import {
@@ -28,7 +28,8 @@ import { articlesApi, productsApi, sitePagesApi } from '../api/services';
 import { useCartStore } from '../store/cartStore';
 import { convertToMockProduct } from '../utils/convertProduct';
 import { formatPrice } from '../utils/formatPrice';
-import type { MockProduct, SitePageBlock } from '../types';
+import type { MockProduct } from '@/types/shop';
+import type { SitePageBlock } from '@/types/content';
 import { cn } from '../utils/cn';
 import FaqList, { faqPairsOfBlock } from '../components/FaqList';
 

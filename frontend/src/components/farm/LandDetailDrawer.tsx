@@ -11,7 +11,7 @@ import toast from 'react-hot-toast';
 
 import { farmApi } from '../../api/services';
 import { useTranslation } from '../../i18n';
-import type { FarmCalendarEvent, FarmLand } from '../../types';
+import type { FarmCalendarEvent, FarmLand } from '@/types/farming';
 import { formatFaDate } from './farmOptions';
 import LandCalendar from './LandCalendar';
 

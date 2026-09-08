@@ -12,7 +12,7 @@
 import { useMemo, useState } from 'react';
 
 import { storefrontPostsApi } from '../../api/services';
-import type { StorefrontPost } from '../../types';
+import type { StorefrontPost } from '@/types/storefront';
 import { cn } from '../../utils/cn';
 import StoryViewer from './StoryViewer';
 

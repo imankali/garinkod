@@ -9,7 +9,7 @@
 // is the number written on every order, and seeing it here is what makes that
 // record mean something to the buyer as well as to us.
 
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { Helmet } from 'react-helmet-async';
 import {
@@ -27,7 +27,7 @@ import {
 
 import { legalApi } from '../api/services';
 import { useSiteContact } from '../hooks/useSiteContact';
-import type { LegalDocumentSummary } from '../types';
+import type { LegalDocumentSummary } from '@/types/content';
 
 const ICONS: Record<string, typeof FileText> = {
   FileText,

@@ -1,11 +1,11 @@
 // frontend/src/components/home/FeaturedStorefronts.tsx
 
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { ArrowLeft, BadgeCheck, MapPin, Star, Store, Users } from 'lucide-react';
 
 import { storefrontsApi } from '../../api/services';
-import type { Storefront, StorefrontPost } from '../../types';
+import type { Storefront, StorefrontPost } from '@/types/storefront';
 import { storefrontPostsApi } from '../../api/services';
 
 /**

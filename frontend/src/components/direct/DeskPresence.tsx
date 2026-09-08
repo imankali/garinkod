@@ -17,7 +17,7 @@
 import { Headphones, Sprout, UserRound } from 'lucide-react';
 
 import { cn } from '../../utils/cn';
-import type { DeskAgentPublic, DeskState } from '../../types';
+import type { DeskAgentPublic, DeskState } from '@/types/messaging';
 
 /** Two letters for the avatar placeholder — Persian names abbreviate the same way. */
 function initials(name: string) {
