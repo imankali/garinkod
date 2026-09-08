@@ -30,10 +30,24 @@ const apiClient: AxiosInstance = axios.create({
  * cover (or any other file) silently failed with a parse error. Deleting the
  * header here makes axios fall back to the correct multipart value.
  */
+function readCookie(name: string): string {
+  const prefix = `${encodeURIComponent(name)}=`;
+  const entry = document.cookie.split(';').map((part) => part.trim()).find((part) => part.startsWith(prefix));
+  return entry ? decodeURIComponent(entry.slice(prefix.length)) : '';
+}
+
+const UNSAFE_METHODS = new Set(['post', 'put', 'patch', 'delete']);
+
 apiClient.interceptors.request.use((config) => {
   if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
     delete config.headers['Content-Type'];
   }
+  const method = config.method?.toLowerCase() ?? 'get';
+  if (UNSAFE_METHODS.has(method)) {
+    const csrfToken = readCookie('csrftoken');
+    if (csrfToken) config.headers['X-CSRFToken'] = csrfToken;
+  }
+
   // Only ever set in a preview whose browser refuses cookies (see previewSession.ts);
   // on the real shop there is no token here, so requests stay cookie-only.
   const previewToken = readPreviewToken();

@@ -3,6 +3,7 @@
 from django.db import models
 from django.conf import settings
 from django.db.models.functions import Lower
+from django.utils import timezone
 
 from .mixins import ImageVariantsMixin
 
@@ -66,6 +67,23 @@ class Storefront(models.Model):
     @property
     def published_listing_count(self) -> int:
         return self.listings.filter(status='published').count()
+
+    @property
+    def has_active_stories(self) -> bool:
+        """Whether this storefront currently has at least one live story.
+
+        Directory querysets annotate this value to avoid an existence query per
+        card; the fallback keeps standalone Storefront instances correct.
+        """
+        annotated = getattr(self, 'active_stories_available', None)
+        if annotated is not None:
+            return bool(annotated)
+        prefetched = getattr(self, 'active_story_rows', None)
+        if prefetched is not None:
+            return bool(prefetched)
+        return self.posts.filter(
+            post_type='story', status='published', expires_at__gt=timezone.now()
+        ).exists()
 
 
 class StorefrontFollow(models.Model):

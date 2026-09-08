@@ -378,7 +378,18 @@ class CommentSerializer(serializers.ModelSerializer):
         ).exists()
 
     def get_replies(self, obj) -> list[dict]:
-        replies = obj.replies.filter(active=True)
+        # ``getattr(obj, 'active_replies', obj.replies.filter(...))`` looks
+        # tempting, but Python evaluates that default eagerly and would execute
+        # the query even when the prefetch exists. Branch explicitly instead.
+        replies = getattr(obj, 'active_replies', None)
+        if replies is None:
+            replies = obj.replies.filter(active=True).select_related('user')
+        else:
+            # Product comments are a two-level thread. Mark prefetched children
+            # as leaves so recursively serialising each reply cannot issue an
+            # otherwise invisible query for replies-of-replies.
+            for reply in replies:
+                reply.active_replies = []
         return CommentSerializer(replies, many=True).data
 
 
@@ -796,6 +807,8 @@ class StorefrontSerializer(serializers.ModelSerializer):
     listing_count = serializers.SerializerMethodField()
     is_following = serializers.SerializerMethodField()
     is_owner = serializers.SerializerMethodField()
+    has_active_stories = serializers.SerializerMethodField()
+    has_unseen_stories = serializers.SerializerMethodField()
 
     class Meta:
         model = Storefront
@@ -804,12 +817,13 @@ class StorefrontSerializer(serializers.ModelSerializer):
             'avatar', 'avatar_url', 'cover', 'cover_url', 'province', 'city',
             'is_verified', 'is_active', 'commission_rate', 'rating', 'sales_count',
             'followers_count', 'listing_count', 'is_following', 'is_owner',
-            'owner_name', 'created_at'
+            'has_active_stories', 'has_unseen_stories', 'owner_name', 'created_at'
         ]
         read_only_fields = [
             'id', 'is_verified', 'is_active', 'commission_rate', 'rating', 'sales_count',
             'owner_name', 'created_at', 'avatar_url', 'cover_url', 'seller_type_label',
             'followers_count', 'listing_count', 'is_following', 'is_owner',
+            'has_active_stories', 'has_unseen_stories',
         ]
 
     def get_owner_name(self, obj) -> str:
@@ -838,6 +852,37 @@ class StorefrontSerializer(serializers.ModelSerializer):
         if not request or not request.user.is_authenticated:
             return False
         return StorefrontFollow.objects.filter(storefront=obj, user=request.user).exists()
+
+    def _is_nested_in_listing(self) -> bool:
+        """Listing cards do not consume story state; never query it per row."""
+        parent = self.parent
+        while parent is not None:
+            if parent.__class__.__name__ == 'MarketplaceListingSerializer':
+                return True
+            parent = getattr(parent, 'parent', None)
+        return False
+
+    def get_has_active_stories(self, obj) -> bool:
+        if self._is_nested_in_listing() and not hasattr(obj, 'active_stories_available'):
+            return False
+        return obj.has_active_stories
+
+    def get_has_unseen_stories(self, obj) -> bool:
+        annotated = getattr(obj, 'unseen_stories_available', None)
+        if annotated is not None:
+            return bool(annotated)
+        if self._is_nested_in_listing():
+            return False
+        prefetched = getattr(obj, 'active_story_rows', None)
+        if prefetched is not None:
+            return any(not bool(getattr(story, 'seen_by_me', False)) for story in prefetched)
+        request = self.context.get('request')
+        live = obj.posts.filter(
+            post_type='story', status='published', expires_at__gt=timezone.now()
+        )
+        if request and request.user.is_authenticated:
+            live = live.exclude(views__user=request.user)
+        return live.exists()
 
     def _validate_storefront_image(self, image, label):
         """Same MIME/size/dimension rules the user avatar uses."""
@@ -940,8 +985,18 @@ class StorefrontHighlightSerializer(serializers.ModelSerializer):
         return post_ids
 
 
+class ListingStorefrontSerializer(StorefrontSerializer):
+    """Compact storefront state for listing rows, where stories are not rendered."""
+
+    def get_has_active_stories(self, obj) -> bool:
+        return False
+
+    def get_has_unseen_stories(self, obj) -> bool:
+        return False
+
+
 class MarketplaceListingSerializer(serializers.ModelSerializer):
-    storefront = StorefrontSerializer(read_only=True)
+    storefront = ListingStorefrontSerializer(read_only=True)
     image_url = serializers.SerializerMethodField()
     image_srcset = serializers.SerializerMethodField()
     status_label = serializers.CharField(source='get_status_display', read_only=True)

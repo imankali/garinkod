@@ -26,6 +26,8 @@ export interface Storefront {
   listing_count: number;
   is_following: boolean;
   is_owner: boolean;
+  has_active_stories: boolean;
+  has_unseen_stories: boolean;
   owner_name: string;
   created_at: string;
 }

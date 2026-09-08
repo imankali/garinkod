@@ -1,7 +1,8 @@
 // frontend/src/components/WeatherWidget.tsx
 
-import { useState } from "react";
-import { AlertTriangle, CloudRain, Droplets, MapPin, Sun, Wind } from "lucide-react";
+import { useCallback, useState } from "react";
+import { AlertTriangle, CloudRain, Droplets, Sun, Wind } from "lucide-react";
+import ClimateSelector, { type ClimateSelection } from "./ClimateSelector";
 
 // ========================================
 // Types
@@ -24,6 +25,21 @@ interface WeatherDataMap {
 // Weather Data Configuration
 // ✅ داده‌های هواشناسی برای استان‌های مختلف
 // ========================================
+const CLIMATE_KEY_BY_PROVINCE_SLUG: Record<string, string> = {
+  fars: "fars",
+  "فارس": "fars",
+  khuzestan: "khozestan",
+  khozestan: "khozestan",
+  "خوزستان": "khozestan",
+  kerman: "kerman",
+  "کرمان": "kerman",
+  mazandaran: "mazandaran",
+  "مازندران": "mazandaran",
+  "khorasan-razavi": "khorasan",
+  khorasan: "khorasan",
+  "خراسان-رضوی": "khorasan",
+};
+
 const weatherData: WeatherDataMap = {
   fars: {
     temp: "۲۴°C",
@@ -77,8 +93,14 @@ const weatherData: WeatherDataMap = {
 // ========================================
 export default function WeatherWidget() {
   const [province, setProvince] = useState<string>("fars");
+  const [city, setCity] = useState("");
   const data: WeatherData = weatherData[province] ?? weatherData.fars!;
   const IconComponent = data.icon;
+
+  const handleClimateChange = useCallback((selection: ClimateSelection) => {
+    setProvince(CLIMATE_KEY_BY_PROVINCE_SLUG[selection.provinceSlug] ?? "fars");
+    setCity(selection.cityName);
+  }, []);
 
   return (
     <section className="mx-auto max-w-7xl px-4 pt-6 pb-2">
@@ -116,23 +138,13 @@ export default function WeatherWidget() {
           {/* ======================================== */}
           {/* Region Selector */}
           {/* ======================================== */}
-          <div className="flex items-center gap-2 self-stretch sm:self-auto">
-            <MapPin size={15} className="text-[#0F8A5F] dark:text-lime-300" />
-            <span className="text-xs font-semibold text-slate-600 dark:text-emerald-100">
-              استان شما:
-            </span>
-            <select
-              value={province}
-              onChange={(e) => setProvince(e.target.value)}
-              className="min-h-11 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-800 focus:border-[#0F8A5F] focus:outline-none dark:border-emerald-800 dark:bg-emerald-950 dark:text-white"
-              aria-label="انتخاب استان"
-            >
-              <option value="fars">فارس (شیراز و مرودشت)</option>
-              <option value="khozestan">خوزستان (اهواز و دزفول)</option>
-              <option value="kerman">کرمان (رفسنجان و سیرجان)</option>
-              <option value="mazandaran">مازندران (ساری و بابل)</option>
-              <option value="khorasan">خراسان رضوی (مشهد و نیشابور)</option>
-            </select>
+          <div className="w-full md:max-w-xl">
+            <ClimateSelector onChange={handleClimateChange} />
+            {city && (
+              <p className="mt-1 text-end text-fluid-2xs text-slate-400 dark:text-emerald-300">
+                توصیه اقلیمی انتخاب‌شده برای {city}
+              </p>
+            )}
           </div>
         </div>
 

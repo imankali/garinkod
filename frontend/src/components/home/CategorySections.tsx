@@ -9,7 +9,7 @@
 // and — because sorting and filtering are per section — the state for each
 // lives inside the section, not in App.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from 'react-router';
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, ArrowRight } from "lucide-react";
@@ -40,6 +40,7 @@ const SORT_ORDERING: Record<SortOption, string | undefined> = {
 };
 
 export interface CategorySectionsProps {
+  group?: "primary" | "secondary" | "all";
   /** Only show products flagged as featured (the `?featured=true` deep link). */
   featuredOnly?: boolean;
   /** A crop tag from the crop selector; filters client-side like before. */
@@ -54,6 +55,8 @@ export interface CategorySectionsProps {
 }
 
 export default function CategorySections(props: CategorySectionsProps) {
+  const boundaryRef = useRef<HTMLDivElement>(null);
+  const isVisible = useLazyVisibility(boundaryRef);
   const { data: categories, isLoading } = useQuery({
     queryKey: ["categories"],
     queryFn: async () => {
@@ -61,18 +64,37 @@ export default function CategorySections(props: CategorySectionsProps) {
       return (response.data.results || []) as Category[];
     },
     staleTime: 5 * 60 * 1000,
+    enabled: isVisible,
   });
 
   // Empty categories would render as a heading with "۰ محصول یافت شد" —
   // noise, not information — so only departments with stock get a section.
-  const sections = useMemo(
-    () => (categories ?? []).filter((category) => category.product_count > 0),
-    [categories],
-  );
+  const sections = useMemo(() => {
+    const group = props.group ?? "all";
+    const ordered = [
+      { rank: 0, test: /pesticide|سم/i, group: "primary" },
+      { rank: 1, test: /fertilizer|کود/i, group: "primary" },
+      { rank: 2, test: /seed|بذر/i, group: "primary" },
+      { rank: 3, test: /equipment|tool|ادوات/i, group: "primary" },
+      { rank: 4, test: /irrigation|آبیاری/i, group: "secondary" },
+      { rank: 5, test: /greenhouse|گلخانه/i, group: "secondary" },
+      { rank: 6, test: /feed|خوراک دام/i, group: "secondary" },
+    ];
+    return (categories ?? [])
+      .filter((category) => category.product_count > 0)
+      .map((category) => {
+        const text = `${category.slug} ${category.name}`;
+        const match = ordered.find((item) => item.test.test(text));
+        return { category, rank: match?.rank ?? 99, sectionGroup: match?.group };
+      })
+      .filter((item) => group === "all" || item.sectionGroup === group)
+      .sort((a, b) => a.rank - b.rank)
+      .map((item) => item.category);
+  }, [categories, props.group]);
 
-  if (isLoading) {
+  if (!isVisible || isLoading) {
     return (
-      <div className="mx-auto max-w-7xl space-y-10 px-4 py-8" aria-busy="true">
+      <div ref={boundaryRef} className="mx-auto min-h-[32rem] max-w-7xl space-y-10 px-4 py-8" aria-busy="true">
         {[0, 1].map((index) => (
           <SectionSkeleton key={index} />
         ))}
@@ -117,6 +139,8 @@ function CategorySection({
   const [priceLimit, setPriceLimit] = useState<number>(FALLBACK_MAX_PRICE);
   const [inStockOnly, setInStockOnly] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const sectionRef = useRef<HTMLElement>(null);
+  const isVisible = useLazyVisibility(sectionRef);
 
   const priceFilterActive = priceLimit < FALLBACK_MAX_PRICE;
 
@@ -145,6 +169,7 @@ function CategorySection({
     },
     staleTime: 30_000,
     placeholderData: (previous) => previous,
+    enabled: isVisible,
   });
 
   const products: MockProduct[] = useMemo(
@@ -182,6 +207,7 @@ function CategorySection({
 
   return (
     <section
+      ref={sectionRef}
       aria-labelledby={headingId}
       className="scroll-mt-[calc(var(--header-height,72px)+1rem)] rounded-3xl border border-emerald-100/80 bg-white/70 p-3 shadow-sm dark:border-emerald-900 dark:bg-emerald-950/40 sm:p-5"
     >
@@ -282,6 +308,32 @@ function CategorySection({
       )}
     </section>
   );
+}
+
+function useLazyVisibility<T extends Element>(ref: React.RefObject<T | null>): boolean {
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    if (isVisible) return undefined;
+    const node = ref.current;
+    if (!node || typeof IntersectionObserver === 'undefined') {
+      setIsVisible(true);
+      return undefined;
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) {
+          setIsVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '400px 0px' },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [isVisible, ref]);
+
+  return isVisible;
 }
 
 // ========================================

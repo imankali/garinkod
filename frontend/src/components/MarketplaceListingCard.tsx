@@ -105,11 +105,21 @@ export default function MarketplaceListingCard({
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
         </picture>
-        {discount > 0 && (
-          <span className="absolute start-2.5 top-2.5 rounded-full bg-brand-orange px-2.5 py-1 text-fluid-2xs font-bold text-white shadow-md">
-            {discount.toLocaleString('fa-IR')}{t('shop.discount')}
+        <div className="absolute start-2.5 top-2.5 flex max-w-[75%] flex-wrap gap-1">
+          {listing.sales_count > 0 && (
+            <span className="rounded-full bg-emerald-700 px-2.5 py-1 text-fluid-2xs font-bold text-white shadow-md">
+              پرفروش‌ترین
+            </span>
+          )}
+          {discount > 0 && (
+            <span className="rounded-full bg-brand-orange px-2.5 py-1 text-fluid-2xs font-bold text-white shadow-md">
+              پرتخفیف‌ترین · {discount.toLocaleString('fa-IR')}{t('shop.discount')}
+            </span>
+          )}
+          <span className="rounded-full bg-sky-600 px-2.5 py-1 text-fluid-2xs font-bold text-white shadow-md">
+            نو
           </span>
-        )}
+        </div>
         {!listing.is_purchasable && (
           <span className="absolute end-2.5 top-2.5 rounded-full bg-slate-900/80 px-2.5 py-1 text-fluid-2xs font-bold text-white">
             {t('common.status')}

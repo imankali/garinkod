@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
+import { motion, useReducedMotion } from 'framer-motion';
 import {
   BadgeCheck,
   CheckCircle2,
@@ -25,7 +26,7 @@ import { useUrlFilters } from '../hooks/useUrlFilters';
 import LocationPicker from '../components/LocationPicker';
 import PostCard from '../components/social/PostCard';
 import StoriesRow from '../components/social/StoriesRow';
-import { StorefrontCard } from './Storefronts';
+import StorefrontCard from '../components/StorefrontCard';
 import type { MarketplaceListing, SellerType, Storefront, StorefrontAvailability, StorefrontPost } from '@/types/storefront';
 import { formatPrice } from '../utils/formatPrice';
 
@@ -62,6 +63,7 @@ const ORDERINGS = [
 const PAGE_SIZE = 12;
 
 export default function Marketplace() {
+  const reduceMotion = useReducedMotion();
   const { isAuthenticated } = useAuthStore();
   const { filters, setFilter, setFilters, resetFilters, activeCount } = useUrlFilters(DEFAULT_FILTERS);
 
@@ -78,6 +80,8 @@ export default function Marketplace() {
   const [stories, setStories] = useState<StorefrontPost[]>([]);
   const [posts, setPosts] = useState<StorefrontPost[]>([]);
   const [featured, setFeatured] = useState<Storefront[]>([]);
+  const [railsLoading, setRailsLoading] = useState(true);
+  const [railsError, setRailsError] = useState('');
 
   useEffect(() => {
     if (debouncedSearch !== filters.search) setFilter('search', debouncedSearch);
@@ -116,26 +120,31 @@ export default function Marketplace() {
     void fetchListings();
   }, [fetchListings]);
 
-  useEffect(() => {
-    storefrontPostsApi
-      .list({ post_type: 'story' })
-      .then((response) => setStories(response.data.results))
-      .catch(() => setStories([]));
-    storefrontPostsApi
-      .list({ post_type: 'post' })
-      .then((response) => setPosts(response.data.results))
-      .catch(() => setPosts([]));
-    storefrontsApi
-      .featured(5)
-      .then((response) => setFeatured(response.data))
-      .catch(() => setFeatured([]));
+  const fetchRails = useCallback(async () => {
+    setRailsLoading(true);
+    setRailsError('');
+    const results = await Promise.allSettled([
+      storefrontPostsApi.list({ post_type: 'story' }),
+      storefrontPostsApi.list({ post_type: 'post' }),
+      storefrontsApi.featured(5),
+    ]);
+    const [storyResult, postResult, featuredResult] = results;
+    if (storyResult.status === 'fulfilled') setStories(storyResult.value.data.results);
+    if (postResult.status === 'fulfilled') setPosts(postResult.value.data.results);
+    if (featuredResult.status === 'fulfilled') setFeatured(featuredResult.value.data);
+    if (results.some((result) => result.status === 'rejected')) {
+      setRailsError('دریافت بخشی از محتوای بازار انجام نشد. می‌توانید دوباره تلاش کنید.');
+    }
+    setRailsLoading(false);
   }, []);
+
+  useEffect(() => { void fetchRails(); }, [fetchRails]);
 
   const totalPages = Math.max(Math.ceil(count / PAGE_SIZE), 1);
   const currentPage = Number(filters.page) || 1;
 
   return (
-    <main className="mx-auto max-w-7xl px-[var(--page-gutter)] py-8">
+    <main className="mx-auto max-w-7xl px-[var(--page-gutter)] py-8 [&_a]:min-h-11 [&_a]:min-w-11 [&_button]:min-h-11 [&_button]:min-w-11 [&_input]:min-h-11 [&_input]:min-w-11 [&_select]:min-h-11 [&_select]:min-w-11">
       {/* Hero */}
       <section className="rounded-3xl bg-gradient-to-l from-emerald-800 via-emerald-700 to-lime-600 p-6 text-white md:p-10">
         <div className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
@@ -148,20 +157,27 @@ export default function Marketplace() {
               هر آگهی پیش از انتشار بررسی می‌شود تا بازاری قابل اعتماد و شفاف برای خرید عمده شکل بگیرد.
             </p>
           </div>
-          <button
+          <motion.button
             type="button"
+            whileHover={reduceMotion ? undefined : { y: -4 }}
+            whileTap={reduceMotion ? undefined : { scale: 0.97 }}
             onClick={() => setShowStoreForm((value) => !value)}
             aria-expanded={showStoreForm}
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-extrabold text-emerald-700"
           >
             <UserRoundPlus size={18} />
             ساخت غرفه
-          </button>
+          </motion.button>
         </div>
       </section>
 
-      {/* Stories: their own strip of circles, above the posts feed. */}
-      <StoriesRow stories={stories} />
+      {railsLoading ? <MarketplaceRailsSkeleton /> : <StoriesRow stories={stories} />}
+      {railsError && (
+        <div role="alert" className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
+          <span>{railsError}</span>
+          <motion.button type="button" onClick={() => void fetchRails()} whileHover={reduceMotion ? undefined : { y: -4 }} whileTap={reduceMotion ? undefined : { scale: 0.97 }} className="rounded-xl border border-amber-300 px-4 font-bold">تلاش مجدد</motion.button>
+        </div>
+      )}
 
       {showStoreForm && (
         <StorefrontForm
@@ -174,7 +190,7 @@ export default function Marketplace() {
       )}
 
       {/* Featured storefronts */}
-      {featured.length > 0 && (
+      {!railsLoading && featured.length > 0 && (
         <section className="mt-8">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-lg font-extrabold text-slate-800 dark:text-white">غرفه‌های پیشنهادی</h2>
@@ -193,7 +209,7 @@ export default function Marketplace() {
       )}
 
       {/* Posts feed: a section of its own, below the stories strip. */}
-      {posts.length > 0 && (
+      {!railsLoading && posts.length > 0 && (
         <section className="mt-8" aria-label="پست‌های غرفه‌داران">
           <h2 className="mb-3 text-lg font-extrabold text-slate-800 dark:text-white">
             پست‌های غرفه‌داران
@@ -354,19 +370,19 @@ export default function Marketplace() {
         </div>
 
         {loading ? (
-          <p role="status" aria-live="polite" className="mt-6 text-sm text-slate-500">
-            در حال دریافت آگهی‌ها…
-          </p>
+          <MarketplaceGridSkeleton />
         ) : listError ? (
           <div className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 p-5 text-center dark:border-rose-800 dark:bg-rose-950/30">
             <p className="text-sm font-semibold text-rose-600 dark:text-rose-300">{listError}</p>
-            <button
+            <motion.button
               type="button"
               onClick={() => void fetchListings()}
+              whileHover={reduceMotion ? undefined : { y: -4 }}
+              whileTap={reduceMotion ? undefined : { scale: 0.97 }}
               className="mt-3 rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white"
             >
               تلاش دوباره
-            </button>
+            </motion.button>
           </div>
         ) : listings.length > 0 ? (
           <>
@@ -425,6 +441,7 @@ export default function Marketplace() {
 
 /** A listing card that can actually be bought, respecting the minimum order. */
 function ListingCard({ listing }: { listing: MarketplaceListing }) {
+  const reduceMotion = useReducedMotion();
   const addListingToCart = useCartStore((state) => state.addListingToCart);
   const [quantity, setQuantity] = useState(String(listing.minimum_order || 1));
   const [busy, setBusy] = useState(false);
@@ -503,14 +520,16 @@ function ListingCard({ listing }: { listing: MarketplaceListing }) {
               aria-label={`تعداد ${listing.title} بر حسب ${listing.unit}`}
               className="w-20 rounded-xl border border-slate-200 px-2 py-2 text-center text-sm dark:border-emerald-800 dark:bg-emerald-900 dark:text-white"
             />
-            <button
+            <motion.button
               type="button"
               onClick={handleAdd}
+              whileHover={!reduceMotion && !busy ? { y: -4 } : undefined}
+              whileTap={!reduceMotion && !busy ? { scale: 0.97 } : undefined}
               disabled={busy}
               className="flex-1 rounded-xl bg-emerald-600 py-2 text-xs font-bold text-white transition hover:bg-emerald-700 disabled:opacity-60"
             >
               {busy ? 'در حال افزودن…' : 'افزودن به سبد'}
-            </button>
+            </motion.button>
           </div>
         ) : (
           <p className="mt-3 rounded-xl bg-slate-100 py-2 text-center text-xs font-bold text-slate-500 dark:bg-emerald-900 dark:text-emerald-200">
@@ -549,6 +568,7 @@ function StorefrontForm({
   isAuthenticated: boolean;
   onCreated: () => void;
 }) {
+  const reduceMotion = useReducedMotion();
   const [store, setStore] = useState({
     name: '',
     slug: '',
@@ -755,12 +775,34 @@ function StorefrontForm({
         </label>
       </div>
 
-      <button
+      <motion.button
         disabled={creating || !canSubmit}
+        whileHover={!reduceMotion && canSubmit && !creating ? { y: -4 } : undefined}
+        whileTap={!reduceMotion && canSubmit && !creating ? { scale: 0.97 } : undefined}
         className="mt-5 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white disabled:opacity-50"
       >
         {creating ? 'در حال ساخت…' : 'ساخت غرفه'}
-      </button>
+      </motion.button>
     </form>
   );
+}
+
+
+function MarketplaceRailsSkeleton() {
+  return <div className="mt-6 space-y-6" role="status" aria-label="در حال دریافت محتوای بازار">
+    <div className="flex gap-3 overflow-hidden" aria-hidden="true">{Array.from({ length: 6 }).map((_, index) => <div key={index} className="h-16 w-16 shrink-0 animate-pulse rounded-full bg-slate-100 dark:bg-emerald-900" />)}</div>
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5" aria-hidden="true">{Array.from({ length: 5 }).map((_, index) => <div key={index} className="h-28 animate-pulse rounded-2xl bg-slate-100 dark:bg-emerald-900" />)}</div>
+    <div className="mx-auto h-52 max-w-xl animate-pulse rounded-3xl bg-slate-100 dark:bg-emerald-900" aria-hidden="true" />
+    <span className="sr-only">در حال بارگذاری</span>
+  </div>;
+}
+
+function MarketplaceGridSkeleton() {
+  return <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3" role="status" aria-label="در حال دریافت آگهی‌ها">
+    {Array.from({ length: 6 }).map((_, index) => <article key={index} className="overflow-hidden rounded-3xl border border-slate-100 bg-white dark:border-emerald-900 dark:bg-emerald-950" aria-hidden="true">
+      <div className="h-40 animate-pulse bg-slate-100 dark:bg-emerald-900" />
+      <div className="space-y-3 p-5"><div className="h-4 w-1/3 animate-pulse rounded bg-slate-100 dark:bg-emerald-900" /><div className="h-6 w-3/4 animate-pulse rounded bg-slate-100 dark:bg-emerald-900" /><div className="h-12 animate-pulse rounded bg-slate-100 dark:bg-emerald-900" /><div className="h-11 animate-pulse rounded-xl bg-slate-100 dark:bg-emerald-900" /></div>
+    </article>)}
+    <span className="sr-only">در حال بارگذاری</span>
+  </div>;
 }

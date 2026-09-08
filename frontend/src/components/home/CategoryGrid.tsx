@@ -20,6 +20,10 @@ const EMOJI: Record<string, string> = {
   pesticide: '🧪',
   seed: '🌾',
   equipment: '🚜',
+  irrigation: '💧',
+  greenhouse: '🏡',
+  'animal-feed': '🐄',
+  tools: '🛠️',
 };
 
 /**
@@ -73,7 +77,7 @@ export default function CategoryGrid() {
         </Link>
       </div>
 
-      <ul className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <ul className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-5">
         {tiles.map((tile) => (
           <li key={tile.slug}>
             <Link

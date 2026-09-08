@@ -8,17 +8,21 @@
 // farmers rated) and what should I read before I buy. Each rail is one request
 // to the existing product API; nothing here is a hard-coded promotion.
 
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Newspaper, Sparkles } from 'lucide-react';
 
 import ProductCard from '../ProductCard';
 import ArticleCard from '../article/ArticleCard';
+import ProductCarousel from '../ProductCarousel';
 import { articlesApi, productsApi } from '../../api/services';
 import { convertToMockProduct } from '../../utils/convertProduct';
 import type { MockProduct, ProductList } from '@/types/shop';
 
 interface RailProps {
+  railIds?: Array<(typeof RAILS)[number]["id"]>;
+  showMagazine?: boolean;
   wishlistIds: Set<number>;
   compareIds: Set<number>;
   compareDisabled: boolean;
@@ -56,6 +60,8 @@ const RAILS = [
 ] as const;
 
 export default function ContentRails({
+  railIds,
+  showMagazine = false,
   wishlistIds,
   compareIds,
   compareDisabled,
@@ -64,39 +70,67 @@ export default function ContentRails({
   onQuickView,
   onToggleCompare,
 }: RailProps) {
+  const boundaryRef = useRef<HTMLElement>(null);
+  const [isVisible, setIsVisible] = useState(false);
+  const selectedRails = RAILS.filter((rail) => !railIds || railIds.includes(rail.id));
+  useEffect(() => {
+    const node = boundaryRef.current;
+    if (!node || typeof IntersectionObserver === 'undefined') {
+      setIsVisible(true);
+      return undefined;
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) {
+          setIsVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '400px 0px' },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
   const { data, isLoading } = useQuery({
-    queryKey: ['home-rails', RAILS.map((rail) => rail.id).join(',')],
+    queryKey: ['home-rails', selectedRails.map((rail) => rail.id).join(',')],
     queryFn: async () => {
       const responses = await Promise.all(
-        RAILS.map((rail) =>
+        selectedRails.map((rail) =>
           productsApi.getAll({ ...rail.params, page_size: RAIL_SIZE }),
         ),
       );
       const map: Record<string, MockProduct[]> = {};
       responses.forEach((response, index) => {
-        map[RAILS[index]!.id] = (response.data.results || []).map((item: ProductList) =>
+        map[selectedRails[index]!.id] = (response.data.results || []).map((item: ProductList) =>
           convertToMockProduct(item),
         );
       });
       return map;
     },
     staleTime: 5 * 60 * 1000,
+    enabled: isVisible,
   });
 
   const { data: articles = [] } = useQuery({
     queryKey: ['home-magazine'],
     queryFn: async () => (await articlesApi.getAll({ limit: 4 })).data,
     staleTime: 10 * 60 * 1000,
+    enabled: isVisible && showMagazine,
   });
+
+  if (!isVisible || isLoading) {
+    return <section ref={boundaryRef} className="mx-auto min-h-72 max-w-7xl px-[var(--page-gutter)] pt-10" aria-busy="true" />;
+  }
 
   // Three empty rails plus no published article would make the home page look
   // broken, so the whole block disappears until there is something to show.
-  const hasProducts = RAILS.some((rail) => (data?.[rail.id]?.length || 0) > 0);
-  if (isLoading ? false : !hasProducts && articles.length === 0) return null;
+  const hasProducts = selectedRails.some((rail) => (data?.[rail.id]?.length || 0) > 0);
+  if (isLoading ? false : !hasProducts && (!showMagazine || articles.length === 0)) return null;
 
   return (
-    <section className="mx-auto max-w-7xl space-y-10 px-[var(--page-gutter)] pt-10" aria-label="پیشنهادهای گرین کود">
-      {RAILS.map((rail) => {
+    <section ref={boundaryRef} className="mx-auto max-w-7xl space-y-10 px-[var(--page-gutter)] pt-10" aria-label="پیشنهادهای گرین کود">
+      {selectedRails.map((rail) => {
         const products = data?.[rail.id] || [];
         if (!products.length) return null;
         return (
@@ -118,12 +152,11 @@ export default function ContentRails({
               </Link>
             </div>
 
-            {/* A swipeable row on touch, a grid from lg up. */}
-            <div className="no-scrollbar -mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-2 lg:grid lg:grid-cols-4 lg:gap-4">
+            <ProductCarousel label={rail.title}>
               {products.slice(0, RAIL_SIZE).map((product, index) => (
                 <div
                   key={product.id}
-                  className="w-[62vw] max-w-[260px] shrink-0 snap-start sm:w-[38vw] lg:w-auto lg:max-w-none"
+                  className="w-[78vw] max-w-[280px] shrink-0 snap-start transition-transform duration-300 hover:scale-[1.015] sm:w-[42vw] md:w-[31vw] lg:w-[24%]"
                 >
                   <ProductCard
                     product={product}
@@ -138,12 +171,12 @@ export default function ContentRails({
                   />
                 </div>
               ))}
-            </div>
+            </ProductCarousel>
           </div>
         );
       })}
 
-      {articles.length > 0 && (
+      {showMagazine && articles.length > 0 && (
         <div className="rounded-3xl border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 dark:border-emerald-900 dark:bg-emerald-950">
           <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
             <div>

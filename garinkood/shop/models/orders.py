@@ -254,6 +254,10 @@ class Order(models.Model):
 
     class Meta:
         ordering = ('-created_at',)
+        indexes = [
+            models.Index(fields=['user', '-created_at'], name='order_user_created_idx'),
+            models.Index(fields=['status', '-created_at'], name='order_status_created_idx'),
+        ]
         verbose_name = 'سفارش'
         verbose_name_plural = 'سفارش‌ها'
 

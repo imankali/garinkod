@@ -1,7 +1,7 @@
 // frontend/src/pages/storefront/Overlays.tsx — split from StorefrontPage.tsx
 
 import {useEffect} from 'react';
-import {motion} from 'framer-motion';
+import {motion, useReducedMotion} from 'framer-motion';
 import {X} from 'lucide-react';
 import {useTranslation} from '../../i18n';
 
@@ -45,6 +45,7 @@ export function StoryViewer({
   onIndexChange: (index: number) => void;
   onClose: () => void;
 }) {
+  const reduceMotion = useReducedMotion();
   const { dir } = useTranslation();
   const current = posts[index];
 
@@ -67,9 +68,9 @@ export function StoryViewer({
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
+      initial={reduceMotion ? false : { opacity: 0 }}
       animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
+      exit={reduceMotion ? undefined : { opacity: 0 }}
       role="dialog"
       aria-modal="true"
       aria-label={`استوری‌های ${storefrontName}`}
@@ -89,7 +90,7 @@ export function StoryViewer({
         type="button"
         onClick={onClose}
         aria-label="بستن استوری"
-        className="absolute end-4 top-8 z-10 rounded-full bg-white/15 p-2 text-white hover:bg-white/25"
+        className="absolute end-4 top-8 z-10 flex min-h-11 min-w-11 items-center justify-center rounded-full bg-white/15 p-2 text-white hover:bg-white/25"
       >
         <X size={20} />
       </button>

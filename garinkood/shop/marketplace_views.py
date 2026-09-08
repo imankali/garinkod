@@ -81,6 +81,16 @@ class StorefrontDirectoryViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         params = self.request.query_params
+        live_stories = StorefrontPost.objects.filter(
+            storefront=OuterRef('pk'),
+            post_type='story',
+            status='published',
+            expires_at__gt=timezone.now(),
+        )
+        unseen_stories = live_stories
+        if self.request.user.is_authenticated:
+            unseen_stories = unseen_stories.exclude(views__user=self.request.user)
+
         queryset = (
             Storefront.objects
             .filter(is_active=True)
@@ -90,6 +100,8 @@ class StorefrontDirectoryViewSet(viewsets.ReadOnlyModelViewSet):
                 listings_total=Count(
                     'listings', filter=Q(listings__status='published'), distinct=True
                 ),
+                active_stories_available=Exists(live_stories),
+                unseen_stories_available=Exists(unseen_stories),
             )
         )
 

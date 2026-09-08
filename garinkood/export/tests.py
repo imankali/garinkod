@@ -315,6 +315,34 @@ class ExportApiTests(ExportMediaTestCase):
         self.assertEqual(documents[0]["document_type"], "commercial_invoice")
         self.assertEqual(documents[0]["document_type_label"], "فاکتور تجاری")
         self.assertTrue(documents[0]["is_verified"])
+        self.assertNotIn("file", documents[0])
+        self.assertNotIn("/media/export/docs/", str(documents[0]))
+        self.assertEqual(
+            documents[0]["download_url"],
+            f"/api/export/documents/{documents[0]['id']}/download/",
+        )
+
+    def test_owner_downloads_verified_document(self):
+        document = self.owner_file.documents.get()
+        self.client.force_authenticate(self.owner)
+        response = self.client.get(f"/api/export/documents/{document.pk}/download/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(b"".join(response.streaming_content), PDF_BYTES)
+        self.assertIn("attachment", response["Content-Disposition"])
+
+    def test_non_owner_cannot_download_document(self):
+        document = self.owner_file.documents.get()
+        self.client.force_authenticate(self.intruder)
+        response = self.client.get(f"/api/export/documents/{document.pk}/download/")
+        self.assertEqual(response.status_code, 403)
+
+    def test_unverified_document_cannot_be_downloaded(self):
+        document = self.owner_file.documents.get()
+        document.is_verified = False
+        document.save(update_fields=["is_verified"])
+        self.client.force_authenticate(self.owner)
+        response = self.client.get(f"/api/export/documents/{document.pk}/download/")
+        self.assertEqual(response.status_code, 403)
 
     def test_intruder_gets_404_and_never_sees_foreign_files(self):
         self.client.force_authenticate(self.intruder)

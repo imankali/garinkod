@@ -12,9 +12,17 @@ Mutations are staff-only: status moves, file creation, paper uploads and
 verification are legal acts. The buyer's surface is strictly read-only.
 """
 
+import mimetypes
+from pathlib import Path
+
 from django.db.models import Prefetch
+from django.http import FileResponse
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import filters, permissions, viewsets
+from rest_framework import filters, permissions, status, viewsets
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from .models import ExportDocument, ExportOrder
 from .serializers import ExportDocumentSerializer, ExportOrderSerializer
@@ -85,4 +93,50 @@ class ExportDocumentViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return ExportDocument.objects.select_related(
             "export_order", "export_order__order"
+        )
+
+
+class ExportDocumentDownloadView(APIView):
+    """Stream one verified customs paper to its owning buyer only.
+
+    Storage URLs are deliberately never exposed by the API.  Looking the row
+    up without owner filtering lets us return the required 403 for a known but
+    foreign document while still applying authentication before disclosure.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(responses={(200, "application/octet-stream"): OpenApiTypes.BINARY})
+    def get(self, request, pk):
+        try:
+            document = ExportDocument.objects.select_related(
+                "export_order__order"
+            ).get(pk=pk)
+        except ExportDocument.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        if document.export_order.order.user_id != request.user.id:
+            return Response(
+                {"detail": "شما اجازه دریافت این سند را ندارید."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if not document.is_verified:
+            return Response(
+                {"detail": "این سند هنوز توسط کارشناس تأیید نشده است."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        stored_file = document.file
+        try:
+            stream = stored_file.storage.open(stored_file.name, "rb")
+        except FileNotFoundError:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        filename = Path(stored_file.name).name
+        content_type, _encoding = mimetypes.guess_type(filename)
+        return FileResponse(
+            stream,
+            as_attachment=True,
+            filename=filename,
+            content_type=content_type or "application/octet-stream",
         )

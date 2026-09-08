@@ -1,6 +1,6 @@
 // frontend/src/components/ProductCard.tsx
 
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { Eye, GitCompare, Heart, PackageX, ShoppingCart, Star } from "lucide-react";
 import { formatPrice } from "../utils/formatPrice";
 import SkeletonCard from "./ui/SkeletonCard";
@@ -50,6 +50,13 @@ export default function ProductCard({
   onToggleCompare,
   isLoading = false,
 }: ProductCardProps) {
+  const reduceMotion = useReducedMotion();
+  const cardMotion = reduceMotion ? {} : {
+    initial: { opacity: 0, y: 20 },
+    whileInView: { opacity: 1, y: 0 },
+  };
+  const desktopHover = reduceMotion ? undefined : { y: -4 };
+
   // Loading contract: identical outer geometry, zero layout shift on swap-in.
   // This component holds no hooks, so an early return is safe.
   if (isLoading) {
@@ -67,11 +74,10 @@ export default function ProductCard({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 30 }}
-      whileInView={{ opacity: 1, y: 0 }}
+      {...cardMotion}
       viewport={{ once: true, margin: "-80px" }}
-      transition={{ delay: (index % 4) * 0.06, duration: 0.4 }}
-      whileHover={{ y: -8 }}
+      transition={reduceMotion ? undefined : { delay: Math.min(index * 0.04, 0.2), duration: 0.35 }}
+      whileHover={desktopHover}
       className="group relative flex flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm transition-shadow duration-300 hover:shadow-2xl hover:shadow-emerald-900/10 dark:border-emerald-900/40 dark:bg-[#08392a]"
     >
       {/* ======================================== */}
@@ -101,8 +107,8 @@ export default function ProductCard({
             material, not five. */}
         <motion.button
           onClick={() => onToggleWishlist(product)}
-          whileHover={{ scale: 1.12 }}
-          whileTap={{ scale: 0.88 }}
+          whileHover={reduceMotion ? undefined : { scale: 1.08 }}
+          whileTap={reduceMotion ? undefined : { scale: 0.97 }}
           transition={TACTILE}
           className={`flex h-11 w-11 items-center justify-center rounded-full shadow-md backdrop-blur transition-colors ${
             isWishlisted ? "bg-rose-500 text-white" : "bg-white/90 text-slate-400 hover:text-rose-500"
@@ -153,7 +159,7 @@ export default function ProductCard({
               // Grid cards are never the LCP — stay lazy and off the main thread.
               loading="lazy"
               decoding="async"
-              whileHover={{ scale: 1.1 }}
+              whileHover={reduceMotion ? undefined : { scale: 1.05 }}
               transition={{ duration: 0.4, ease: "easeOut" }}
               className={`aspect-[4/3] h-full w-full object-cover ${!product.inStock ? "grayscale" : ""}`}
               onError={(e) => {
@@ -197,9 +203,14 @@ export default function ProductCard({
 
         {/* Quick View Overlay — pointer/hover devices only. */}
         <motion.button
-          onClick={() => onQuickView(product)}
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onQuickView(product);
+          }}
           tabIndex={-1}
-          className="pointer-events-none absolute inset-x-3 bottom-3 hidden translate-y-2 items-center justify-center gap-1.5 rounded-xl bg-white/95 py-2.5 text-xs font-bold text-slate-700 opacity-0 shadow-lg backdrop-blur transition-all duration-300 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:translate-y-0 group-focus-within:opacity-100 [@media(hover:hover)]:flex"
+          className="pointer-events-none absolute inset-x-3 bottom-3 z-[2] hidden translate-y-2 items-center justify-center gap-1.5 rounded-xl bg-white/95 py-2.5 text-xs font-bold text-slate-700 opacity-0 shadow-lg backdrop-blur transition-all duration-300 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:translate-y-0 group-focus-within:opacity-100 [@media(hover:hover)]:flex"
           aria-label="نمای سریع محصول"
         >
           <Eye size={14} /> نمای سریع
@@ -283,8 +294,8 @@ export default function ProductCard({
           <motion.button
             onClick={(e) => onAddToCart(product, e)}
             disabled={!product.inStock}
-            whileHover={product.inStock ? { scale: 1.03 } : {}}
-            whileTap={product.inStock ? { scale: 0.97 } : {}}
+            whileHover={!reduceMotion && product.inStock ? { y: -4 } : undefined}
+            whileTap={!reduceMotion && product.inStock ? { scale: 0.97 } : undefined}
             transition={TACTILE}
             className="flex min-h-11 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl bg-brand-gradient-accent px-2 text-fluid-xs font-bold text-white shadow-md transition-shadow hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-40"
           >
@@ -307,8 +318,8 @@ export default function ProductCard({
           <motion.button
             onClick={() => onToggleCompare(product)}
             disabled={!compareInteractive}
-            whileHover={compareInteractive ? { scale: 1.08 } : {}}
-            whileTap={compareInteractive ? { scale: 0.92 } : {}}
+            whileHover={!reduceMotion && compareInteractive ? { y: -4 } : undefined}
+            whileTap={!reduceMotion && compareInteractive ? { scale: 0.97 } : undefined}
             transition={TACTILE}
             title={isComparing ? "حذف از مقایسه" : "افزودن به مقایسه"}
             className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-colors disabled:cursor-not-allowed disabled:opacity-30 dark:border-emerald-700 ${

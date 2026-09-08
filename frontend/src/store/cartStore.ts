@@ -1,7 +1,6 @@
 // frontend/src/store/cartStore.ts
 
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import toast from 'react-hot-toast';
 
 import type { Cart } from '@/types/commerce';
@@ -44,6 +43,7 @@ interface CartState {
   openCart: () => void;
   closeCart: () => void;
   clearCart: () => void;
+  reset: () => void;
   clearLastAdded: () => void;
   clearItemError: (itemId: number) => void;
   clearErrors: () => void;
@@ -52,9 +52,7 @@ interface CartState {
 // ========================================
 // Cart Store
 // ========================================
-export const useCartStore = create<CartState>()(
-  persist(
-    (set, get) => ({
+export const useCartStore = create<CartState>((set, get) => ({
       // Initial State
       cart: null,
       isOpen: false,
@@ -179,17 +177,10 @@ export const useCartStore = create<CartState>()(
       openCart: () => set({ isOpen: true }),
       closeCart: () => set({ isOpen: false }),
       clearCart: () => set({ cart: null, itemErrors: {}, lastError: null }),
+      reset: () => set({ cart: null, isOpen: false, isLoading: false, lastAddedProduct: null, itemErrors: {}, lastError: null }),
       clearLastAdded: () => set({ lastAddedProduct: null }),
       clearItemError: (itemId: number) => {
         set({ itemErrors: withoutKey(get().itemErrors, itemId) });
       },
       clearErrors: () => set({ itemErrors: {}, lastError: null }),
-    }),
-    {
-      name: 'cart-storage',
-      partialize: (state) => ({
-        cart: state.cart,
-      }),
-    },
-  ),
-);
+}));

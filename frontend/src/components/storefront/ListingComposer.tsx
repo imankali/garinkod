@@ -8,7 +8,7 @@
 // covers the whole lifecycle.
 
 import { FormEvent, useEffect, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Plus, Save, Send, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -61,6 +61,7 @@ export default function ListingComposer({
   onClose: () => void;
   onSaved: () => void | Promise<void>;
 }) {
+  const reduceMotion = useReducedMotion();
   const { t } = useTranslation();
   const [draft, setDraft] = useState<ListingDraft>(EMPTY);
   const [saving, setSaving] = useState(false);
@@ -105,20 +106,20 @@ export default function ListingComposer({
     <AnimatePresence>
       {open && (
         <motion.div
-          initial={{ opacity: 0 }}
+          initial={reduceMotion ? false : { opacity: 0 }}
           animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+          exit={reduceMotion ? undefined : { opacity: 0 }}
           className="fixed inset-0 z-[80] flex items-end justify-center bg-emerald-950/40 p-3 backdrop-blur-sm sm:items-center"
           role="dialog"
           aria-modal="true"
           aria-label={listing ? 'ویرایش آگهی' : t('account.createListing')}
         >
           <motion.form
-            initial={{ y: 40, opacity: 0 }}
+            initial={reduceMotion ? false : { y: 40, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 40, opacity: 0 }}
+            exit={reduceMotion ? undefined : { y: 40, opacity: 0 }}
             onSubmit={submit}
-            className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-3xl border border-emerald-100 bg-white p-5 shadow-2xl dark:border-emerald-800 dark:bg-emerald-950 sm:p-6"
+            className="max-h-[90dvh] w-full [&_button]:min-h-11 [&_button]:min-w-11 [&_input]:min-h-11 [&_input]:min-w-11 max-w-lg overflow-y-auto rounded-3xl border border-emerald-100 bg-white p-5 shadow-2xl dark:border-emerald-800 dark:bg-emerald-950 sm:p-6"
           >
             <div className="flex items-center justify-between gap-2">
               <h2 className="text-lg font-extrabold text-slate-800 dark:text-white">
@@ -127,7 +128,7 @@ export default function ListingComposer({
               <button
                 type="button"
                 onClick={onClose}
-                className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-emerald-900"
+                className="flex min-h-11 min-w-11 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-emerald-900"
                 aria-label={t('common.close')}
               >
                 <X size={17} />
@@ -178,19 +179,21 @@ export default function ListingComposer({
                   rows={3}
                   value={draft.description}
                   onChange={(event) => setDraft({ ...draft, description: event.target.value })}
-                  className="mt-2 w-full rounded-xl border border-slate-200 bg-white p-3 font-normal outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-emerald-700 dark:bg-emerald-900"
+                  className="mt-2 min-h-11 min-w-11 w-full rounded-xl border border-slate-200 bg-white p-3 font-normal outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-emerald-700 dark:bg-emerald-900"
                 />
               </label>
             </div>
 
-            <button
+            <motion.button
               type="submit"
+              whileHover={!reduceMotion && !saving ? { y: -4 } : undefined}
+              whileTap={!reduceMotion && !saving ? { scale: 0.97 } : undefined}
               disabled={saving}
               className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"
             >
               {listing ? <Save size={16} /> : <Send size={15} />}
               {saving ? t('common.loading') : listing ? t('common.save') : t('account.createListing')}
-            </button>
+            </motion.button>
           </motion.form>
         </motion.div>
       )}
@@ -200,16 +203,19 @@ export default function ListingComposer({
 
 /** The button that opens the composer in create mode. */
 export function NewListingButton({ onClick }: { onClick: () => void }) {
+  const reduceMotion = useReducedMotion();
   const { t } = useTranslation();
   return (
-    <button
+    <motion.button
       type="button"
       onClick={onClick}
-      className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-4 text-xs font-bold text-white transition hover:bg-emerald-700"
+      whileHover={reduceMotion ? undefined : { y: -4 }}
+      whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+      className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-4 text-xs font-bold text-white transition hover:bg-emerald-700"
     >
       <Plus size={14} />
       {t('account.createListing')}
-    </button>
+    </motion.button>
   );
 }
 
@@ -232,7 +238,7 @@ function Field({
         type={type}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-normal outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-emerald-700 dark:bg-emerald-900"
+        className="mt-2 min-h-11 min-w-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-normal outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-emerald-700 dark:bg-emerald-900"
       />
     </label>
   );

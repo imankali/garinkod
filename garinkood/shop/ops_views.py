@@ -34,7 +34,8 @@ from django.utils.cache import add_never_cache_headers
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET
 from rest_framework import status as http_status
-from rest_framework.decorators import api_view, throttle_classes
+from rest_framework import permissions
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 
@@ -261,6 +262,7 @@ def _user_label(beat) -> str:
 # --------------------------------------------------------------------------
 
 @api_view(['get'])
+@permission_classes([permissions.AllowAny])
 def log_list(request):
     """The notebook: grouped, counted, and filterable by whether anyone has looked.
 
@@ -351,6 +353,7 @@ def _log_row(entry) -> dict:
 
 
 @api_view(['post'])
+@permission_classes([permissions.AllowAny])
 def log_resolve(request, pk: int):
     """Close a line, or reopen it. The note is the handover to the next person."""
     if not has_operations_access(request):
@@ -375,6 +378,7 @@ def log_resolve(request, pk: int):
 
 @api_view(['post'])
 @throttle_classes([ClientReportThrottle])
+@permission_classes([permissions.AllowAny])
 def client_report(request):
     """A visitor's «اینجا خطا داد», in the same list staff read.
 

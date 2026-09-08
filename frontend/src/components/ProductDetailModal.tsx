@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Link } from 'react-router';
 import { useQuery } from "@tanstack/react-query";
 import { useFocusTrap } from "../hooks/useFocusTrap";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   AlertTriangle,
   Beaker,
@@ -65,6 +65,12 @@ export default function ProductDetailModal({
   isWishlisted,
   onToggleWishlist,
 }: ProductDetailModalProps) {
+  const reduceMotion = useReducedMotion();
+  const tabMotion = reduceMotion ? {} : {
+    initial: { opacity: 0, y: 8 },
+    animate: { opacity: 1, y: 0 },
+    exit: { opacity: 0, y: -8 },
+  };
   const panelRef = useFocusTrap<HTMLDivElement>(Boolean(product), { onEscape: onClose });
   const [qty, setQty] = useState(1);
   const [activeTab, setActiveTab] = useState<Tab>("description");
@@ -105,9 +111,9 @@ export default function ProductDetailModal({
           {/* Overlay */}
           {/* ======================================== */}
           <motion.div
-            initial={{ opacity: 0 }}
+            initial={reduceMotion ? false : { opacity: 0 }}
             animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            exit={reduceMotion ? undefined : { opacity: 0 }}
             onClick={onClose}
             className="fixed inset-0 z-[80] bg-slate-900/60 backdrop-blur-sm"
           />
@@ -116,23 +122,23 @@ export default function ProductDetailModal({
           {/* Modal Panel */}
           {/* ======================================== */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.9, y: 40 }}
+            initial={reduceMotion ? false : { opacity: 0, scale: 0.96, y: 24 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 40 }}
+            exit={reduceMotion ? undefined : { opacity: 0, scale: 0.96, y: 24 }}
             transition={{ type: "spring", damping: 26, stiffness: 300 }}
             ref={panelRef}
             role="dialog"
             aria-modal="true"
             aria-label={product?.name ?? "جزئیات محصول"}
             tabIndex={-1}
-            className="fixed inset-x-4 top-1/2 z-[90] mx-auto max-h-[90dvh] max-w-3xl -translate-y-1/2 overflow-y-auto rounded-3xl bg-white shadow-2xl outline-none md:inset-x-auto"
+            className="fixed inset-x-4 top-1/2 z-[90] [&_button]:min-h-11 [&_button]:min-w-11 mx-auto max-h-[90dvh] max-w-3xl -translate-y-1/2 overflow-y-auto rounded-3xl bg-white shadow-2xl outline-none md:inset-x-auto"
           >
             {/* Close Button */}
             <motion.button
               onClick={onClose}
-              whileHover={{ rotate: 90, scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              className="absolute end-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-slate-500 shadow-md backdrop-blur"
+              whileHover={reduceMotion ? undefined : { scale: 1.05 }}
+              whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+              className="absolute end-4 top-4 z-10 flex min-h-11 min-w-11 items-center justify-center rounded-full bg-white/90 text-slate-500 shadow-md backdrop-blur"
               aria-label="بستن"
             >
               <X size={18} />
@@ -220,7 +226,7 @@ export default function ProductDetailModal({
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
-                      className={`relative flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 text-fluid-xs font-bold transition-colors ${
+                      className={`relative flex min-h-11 min-w-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 text-fluid-xs font-bold transition-colors ${
                         activeTab === tab.id ? "text-white" : "text-slate-500 hover:text-[#0F8A5F]"
                       }`}
                     >
@@ -228,7 +234,7 @@ export default function ProductDetailModal({
                         <motion.span
                           layoutId="detail-tab-pill"
                           className="absolute inset-0 rounded-lg bg-brand-gradient-accent"
-                          transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                          transition={reduceMotion ? { duration: 0 } : { duration: 0.2 }}
                         />
                       )}
                       <tab.icon size={12} className="relative" />
@@ -246,9 +252,7 @@ export default function ProductDetailModal({
                     {activeTab === "specs" && (
                       <motion.div
                         key="specs"
-                        initial={{ opacity: 0, x: 10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: -10 }}
+                        {...tabMotion}
                         transition={{ duration: 0.2 }}
                       >
                         {specRows.length > 0 ? (
@@ -271,9 +275,7 @@ export default function ProductDetailModal({
                     {activeTab === "description" && (
                       <motion.div
                         key="description"
-                        initial={{ opacity: 0, x: 10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: -10 }}
+                        {...tabMotion}
                         transition={{ duration: 0.2 }}
                       >
                         <p className="mb-3 text-sm leading-relaxed text-slate-500">{product.description}</p>
@@ -292,9 +294,7 @@ export default function ProductDetailModal({
                     {activeTab === "usage" && (
                       <motion.div
                         key="usage"
-                        initial={{ opacity: 0, x: 10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: -10 }}
+                        {...tabMotion}
                         transition={{ duration: 0.2 }}
                         className="space-y-3 text-xs"
                       >
@@ -339,9 +339,7 @@ export default function ProductDetailModal({
                     {activeTab === "warnings" && (
                       <motion.div
                         key="warnings"
-                        initial={{ opacity: 0, x: 10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: -10 }}
+                        {...tabMotion}
                         transition={{ duration: 0.2 }}
                         className="space-y-2"
                       >
@@ -362,13 +360,11 @@ export default function ProductDetailModal({
                     {activeTab === "brochure" && (
                       <motion.div
                         key="brochure"
-                        initial={{ opacity: 0, x: 10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: -10 }}
+                        {...tabMotion}
                         transition={{ duration: 0.2 }}
                       >
                         {product.brochureAvailable ? (
-                          <button className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-emerald-200 bg-emerald-50/50 py-4 text-xs font-bold text-[#0F8A5F] transition-colors hover:bg-emerald-50">
+                          <button className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-emerald-200 bg-emerald-50/50 py-4 text-xs font-bold text-[#0F8A5F] transition-colors hover:bg-emerald-50">
                             <Download size={15} />
                             دانلود برگه آنالیز و بروشور محصول (PDF)
                           </button>
@@ -396,7 +392,7 @@ export default function ProductDetailModal({
                   {/* Quantity Selector */}
                   <div className={priceOnRequest ? "hidden" : "flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 shadow-sm"}>
                     <motion.button
-                      whileTap={{ scale: 0.85 }}
+                      whileTap={reduceMotion ? undefined : { scale: 0.97 }}
                       onClick={() => setQty((q) => q + 1)}
                       className="flex h-11 w-11 items-center justify-center text-[#0F8A5F] hover:bg-emerald-50"
                       aria-label="افزایش تعداد"
@@ -405,7 +401,7 @@ export default function ProductDetailModal({
                     </motion.button>
                     <span className="w-8 text-center font-bold">{qty}</span>
                     <motion.button
-                      whileTap={{ scale: 0.85 }}
+                      whileTap={reduceMotion ? undefined : { scale: 0.97 }}
                       onClick={() => setQty((q) => Math.max(1, q - 1))}
                       className="flex h-11 w-11 items-center justify-center text-slate-500 hover:bg-slate-100"
                       aria-label="کاهش تعداد"
@@ -419,8 +415,8 @@ export default function ProductDetailModal({
                   <motion.button
                     onClick={handleAdd}
                     disabled={!product.inStock}
-                    whileHover={product.inStock ? { scale: 1.02 } : {}}
-                    whileTap={product.inStock ? { scale: 0.97 } : {}}
+                    whileHover={!reduceMotion && product.inStock ? { y: -4 } : undefined}
+                    whileTap={!reduceMotion && product.inStock ? { scale: 0.97 } : undefined}
                     className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-brand-gradient-accent py-3.5 text-sm font-bold text-white shadow-lg shadow-emerald-200 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <ShoppingCart size={17} />
@@ -440,8 +436,8 @@ export default function ProductDetailModal({
                   {/* Wishlist Button */}
                   <motion.button
                     onClick={() => onToggleWishlist(product)}
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
+                    whileHover={reduceMotion ? undefined : { y: -4 }}
+                    whileTap={reduceMotion ? undefined : { scale: 0.97 }}
                     className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-colors ${
                       isWishlisted ? "border-rose-200 bg-rose-50 text-rose-500" : "border-slate-200 bg-white text-slate-400 hover:text-rose-500"
                     }`}

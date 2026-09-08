@@ -11,7 +11,7 @@ Architect-review fix: free-text agronomic fields now match partial input
 """
 
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import filters, viewsets
+from rest_framework import filters, permissions, viewsets
 
 from .models import Fertilizer, Pesticide, Seed, Seedling
 from .serializers import (
@@ -23,6 +23,7 @@ from .serializers import (
 
 
 class AgriInputViewSet(viewsets.ReadOnlyModelViewSet):
+    permission_classes = [permissions.AllowAny]
     """Base for every agri-input listing endpoint; no writes for now —
     the holding modules own their own create paths (admin/staff flows)."""
 

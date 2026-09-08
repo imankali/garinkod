@@ -7,6 +7,7 @@
 
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
+import { motion, useReducedMotion } from 'framer-motion';
 import {
   BadgeCheck,
   CalendarDays,
@@ -43,6 +44,7 @@ export default function ListingDetailModal({
   onClose: () => void;
   isOwner?: boolean;
 }) {
+  const reduceMotion = useReducedMotion();
   const { t } = useTranslation();
   // Share links must be absolute, so the origin is taken from the deployment.
   const siteUrl = (import.meta.env.VITE_SITE_URL || window.location.origin).replace(/\/$/, '');
@@ -159,30 +161,34 @@ export default function ListingDetailModal({
                     className="h-11 w-24 rounded-xl border border-slate-200 px-2 text-center text-sm dark:border-emerald-800 dark:bg-emerald-900 dark:text-white"
                   />
                 </label>
-                <button
+                <motion.button
                   type="button"
                   onClick={() => void addToCart()}
+                  whileHover={!reduceMotion && !busy ? { y: -4 } : undefined}
+                  whileTap={!reduceMotion && !busy ? { scale: 0.97 } : undefined}
                   disabled={busy}
-                  className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-fluid-xs font-bold text-white transition hover:bg-emerald-700 disabled:opacity-60"
+                  className="flex min-h-11 min-w-11 flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-fluid-xs font-bold text-white transition hover:bg-emerald-700 disabled:opacity-60"
                 >
                   {busy ? <Loader2 size={15} className="animate-spin" /> : <ShoppingCart size={15} />}
                   {t('shop.buy')}
-                </button>
+                </motion.button>
               </>
             ) : (
-              <p className="flex min-h-11 flex-1 items-center justify-center rounded-xl bg-slate-100 text-fluid-xs font-bold text-slate-500 dark:bg-emerald-900 dark:text-emerald-200">
+              <p className="flex min-h-11 min-w-11 flex-1 items-center justify-center rounded-xl bg-slate-100 text-fluid-xs font-bold text-slate-500 dark:bg-emerald-900 dark:text-emerald-200">
                 موجودی این آگهی تمام شده است
               </p>
             )}
             {!isOwner && (
-              <button
+              <motion.button
                 type="button"
                 onClick={askSeller}
-                className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-emerald-300 px-4 text-fluid-xs font-bold text-emerald-700 transition hover:bg-emerald-50 dark:border-emerald-700 dark:text-lime-300 dark:hover:bg-emerald-900/50"
+                whileHover={reduceMotion ? undefined : { y: -4 }}
+                whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+                className="flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-xl border border-emerald-300 px-4 text-fluid-xs font-bold text-emerald-700 transition hover:bg-emerald-50 dark:border-emerald-700 dark:text-lime-300 dark:hover:bg-emerald-900/50"
               >
                 <MessageCircle size={15} />
                 {t('storefront.message')}
-              </button>
+              </motion.button>
             )}
           </div>
         ) : undefined

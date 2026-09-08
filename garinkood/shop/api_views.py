@@ -9,6 +9,7 @@ from uuid import UUID
 from .schema import documented_api
 from django.conf import settings
 from django.db.models import Avg, Count, Exists, F, Max, OuterRef, Prefetch, Q, Sum
+from django.contrib.postgres.search import SearchQuery, SearchVector
 from rest_framework import mixins, viewsets, permissions, status
 from rest_framework.decorators import action, api_view, permission_classes, throttle_classes
 from rest_framework.response import Response
@@ -103,6 +104,27 @@ from .throttling import (
     OtpVerifyRateThrottle, SearchRateThrottle, CheckoutRateThrottle,
     UploadRateThrottle, FeedbackRateThrottle,
 )
+
+
+class DatabaseAwareSearchFilter(SearchFilter):
+    """Use PostgreSQL full-text ranking for titles, SQLite icontains locally."""
+
+    def filter_queryset(self, request, queryset, view):
+        terms = self.get_search_terms(request)
+        if not terms or connection.vendor != 'postgresql':
+            return super().filter_queryset(request, queryset, view)
+
+        query_text = ' '.join(terms).strip()
+        search_query = SearchQuery(query_text, config='simple', search_type='plain')
+        queryset = queryset.annotate(
+            _title_search=SearchVector('title', config='simple')
+        )
+        condition = Q(_title_search=search_query)
+        for field in self.get_search_fields(view, request):
+            if field != 'title':
+                condition |= Q(**{f'{field}__icontains': query_text})
+        return queryset.filter(condition)
+
 
 class ClientConfigurablePagination(PageNumberPagination):
     """Page size the client may choose, with a ceiling.
@@ -340,6 +362,7 @@ def auth_session(request):
 # Category ViewSet
 # ========================================
 class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
+    permission_classes = [permissions.AllowAny]
     queryset = Category.objects.prefetch_related('subcategories')
     serializer_class = CategorySerializer
     lookup_field = 'slug'
@@ -349,10 +372,11 @@ class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
 # Product ViewSet
 # ========================================
 class ProductViewSet(viewsets.ReadOnlyModelViewSet):
+    permission_classes = [permissions.AllowAny]
     queryset = Product.objects.filter(status='published').select_related('category', 'subcategory')
     filter_backends = [DjangoFilterBackend, ResilientProductSearchFilter, OrderingFilter]
     filterset_class = ProductFilter
-    search_fields = ['title', 'description', 'brand', 'sku']
+    search_fields = ['title', 'brand', 'sku']
     ordering_fields = [
         'price', 'publish', 'created', 'sales_count', 'discount_percent',
         'avg_rating', 'reviews_count', 'views',
@@ -483,7 +507,22 @@ class CommentViewSet(viewsets.ModelViewSet):
             product=OuterRef('product'),
             order__payment_status='paid',
         )
-        return super().get_queryset().annotate(verified_purchase=Exists(bought))
+        return (
+            super()
+            .get_queryset()
+            .annotate(verified_purchase=Exists(bought))
+            .prefetch_related(
+                Prefetch(
+                    'replies',
+                    queryset=(
+                        Comment.objects.filter(active=True)
+                        .select_related('user')
+                        .annotate(verified_purchase=Exists(bought))
+                    ),
+                    to_attr='active_replies',
+                )
+            )
+        )
 
     def perform_create(self, serializer):
         user = self.request.user if self.request.user.is_authenticated else None
@@ -499,7 +538,7 @@ class CommentViewSet(viewsets.ModelViewSet):
         product_slug = request.query_params.get('product', None)
         if product_slug:
             product = get_object_or_404(Product, slug=product_slug)
-            comments = self.queryset.filter(product=product)
+            comments = self.get_queryset().filter(product=product)
             serializer = self.get_serializer(comments, many=True)
             return Response(serializer.data)
         return Response({'error': 'Product slug is required'}, status=400)
@@ -1289,8 +1328,8 @@ def create_procurement_request(request):
 class MarketplaceListingViewSet(viewsets.ModelViewSet):
     serializer_class = MarketplaceListingSerializer
     lookup_field = 'slug'
-    filter_backends = [SearchFilter, OrderingFilter]
-    search_fields = ['title', 'crop_name', 'description', 'storefront__name']
+    filter_backends = [DatabaseAwareSearchFilter, OrderingFilter]
+    search_fields = ['title', 'crop_name', 'storefront__name']
     ordering_fields = [
         'price', 'created_at', 'harvest_date', 'quantity_available',
         'sales_count', 'discount_percent',
