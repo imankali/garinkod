@@ -1,111 +1,135 @@
-# کاتالوگ تستی فروشگاه (داده نمونه برای تست روی لپ‌تاپ)
+# کاتالوگ تستی فروشگاه 🧪
 
-این راهنما توضیح می‌دهد چطور روی یک لپ‌تاپ تازه، کل سایت را با **محصول تستی در همه بخش‌ها** بالا بیاورید و همه فلوها (فروشگاه، فیلترها، سبد، کوپن، نظرات، بازار غرفه‌داران) را تست کنید.
+این راهنما توضیح می‌دهد چطور روی لپ‌تاپ خودت دیتای تستی کامل سایت را بالا بیاوری و همه بخش‌ها را تست کنی.
 
-> ⚠️ داده تستی فقط برای محیط توسعه/تست است. **هرگز** روی دیتابیس واقعی (production) اجرا نکنید.
-
-## ۱. چه چیزی ساخته می‌شود؟
-
-با یک دستور، این داده‌ها ساخته می‌شوند (همه idempotent هستند؛ اجرای دوباره، رکورد تکراری نمی‌سازد بلکه به‌روزرسانی می‌کند):
-
-| بخش | محتوا |
-|---|---|
-| دسته‌بندی فروشگاه | ۸ دسته: کود، سم، بذر، نهال، ماشین‌آلات و ادوات، آبیاری، ابزار، گلخانه + ۲۱ زیردسته + ۶ برچسب |
-| محصولات فروشگاه | **۳۵ محصول تستی** (اسلاگ با پیشوند `test-`) در همه دسته‌ها |
-| حالت‌های خاص محصول | ویژه (⭐)، تخفیف‌دار، ناموجود، غیرفعال، قیمت استعلامی («تماس بگیرید»)، نزدیک انقضا (بج ۹۰ روزه)، حداقل سفارش، چندبسته‌ای (کیسه/جامبوبگ) |
-| پروفایل‌های تخصصی | کود/سم/بذر/نهال (`agri_inputs`) + تراکتور نو و دست‌دوم/ادوات (`machinery`) + جدول مشخصات فنی |
-| نظرات | امتیاز ستاره‌ای، نظر ویژه صفحه «تجربه مشتریان»، ترد پرسش‌وپاسخ، یک نظر تاییدنشده برای تست صف بررسی |
-| بازار غرفه‌داران | ۵ غرفه + آگهی + پست/استوری (از طریق `seed_demo_marketplace`) |
-| کوپن تست checkout | `TEST10` (۱۰٪ تا سقف ۵۰۰ هزار)، `TESTFIX50` (۵۰ هزار ثابت)، `TESTOLD` (منقضی، برای تست خطا) |
-| کاربرها | خریدار `test-buyer` با ۵۰۰ امتیاز وفاداری + فروشنده‌های نمونه؛ همه با رمز `demo-12345` |
-
-## ۲. اجرا روی لپ‌تاپ (قدم‌به‌قدم)
-
-### قدم ۱ — گرفتن آخرین کد از گیت
+## ۱. بالا آوردن با یک دستور
 
 ```bash
-cd garinkod
-git fetch origin
-git checkout arena/01a0871a-garinkod
-git pull origin arena/01a0871a-garinkod
+# لینوکس / مک / WSL — از ریشه مخزن
+./scripts/load_test_catalog.sh
+
+# ویندوز (PowerShell) — از ریشه مخزن
+.\scripts\load_test_catalog.ps1
 ```
 
-### قدم ۲ — بک‌اند
+پیش‌نیاز فقط نصب پکیج‌های بک‌اند است:
 
 ```bash
 cd garinkood
-python -m venv .venv
-source .venv/bin/activate        # ویندوز: .venv\Scripts\activate
-python -m pip install --upgrade pip
 pip install -r requirements-dev.txt
-cp .env.example .env             # فقط بار اول
-python manage.py migrate
-python manage.py seed_locations
-python manage.py seed_agri_inputs
-python manage.py seed_site_content --with-landing
-python manage.py bootstrap_management_roles
-python manage.py createsuperuser  # فقط بار اول (مثلاً admin)
-python manage.py seed_test_catalog
-python manage.py runserver 0.0.0.0:8000
 ```
 
-> میان‌بر: به‌جای ۴ دستور seed می‌توانید اسکریپت را اجرا کنید (از ریشه مخزن):
->
-> ```bash
-> ./scripts/load_test_data.sh
-> ```
+اسکریپت بالا این کارها را انجام می‌دهد:
 
-### قدم ۳ — فرانت‌اند (ترمینال دوم)
+| مرحله | دستور | نتیجه |
+|---|---|---|
+| migrate | `manage.py migrate` | ساخت جدول‌ها (SQLite) |
+| لوکیشن/نهاده/محتوا | `seed_locations` / `seed_agri_inputs` / `seed_site_content --with-landing` | استان/شهر، دوز کود و سم، خدمات و صفحات |
+| بازار | `seed_demo_marketplace` | ۵ غرفه + ۷ آگهی + پست/استوری |
+| **کاتالوگ تستی** | **`seed_test_catalog`** | **۶ دسته + ۲۴ زیردسته + ۳۱ محصول + ۸ برچسب + ۲ کوپن** |
+| تصاویر | `process_async_tasks --limit 200` | ساخت نسخه‌های AVIF/WebP |
+
+> دستور `seed_test_catalog` کاملا **idempotent** است: هر چند بار اجرایش کنی، رکورد تکراری ساخته نمی‌شود و ویرایش‌های فایل دیتا روی رکوردهای قبلی اعمال می‌شود.
+
+## ۲. چه چیزی ساخته می‌شود؟
+
+فایل دیتا: `garinkood/shop/data/test_catalog.py` (تک‌منبع دیتای تستی — با ویرایش آن و اجرای مجدد دستور، کاتالوگ عوض می‌شود)
+
+| بخش (slug) | نام فارسی | محصولات | نکته |
+|---|---|---|---|
+| `pesticide` | سموم دفع آفات | ۵ | علف‌کش، قارچ‌کش، حشره‌کش، کنه‌کش + ۱ قلم عمده (تماس بگیرید) |
+| `fertilizer` | کود کشاورزی | ۵ | اوره، NPK، هیومیک، ریزمغذی، کلات آهن (نزدیک انقضا) |
+| `seed` | بذر و نهال | ۵ | بذر گلخانه‌ای/زراعی/صیفی + ۲ نهال (یکی ناموجود) |
+| `equipment` | ادوات کشاورزی | ۶ | ۲ سمپاش، فیلتر، ست هرس، تیلر + دیسک استعلامی |
+| `irrigation` | آبیاری | ۵ | تیپ، آبپاش، پمپ، شیر + ۱ قلم ناموجود |
+| `tools` | ابزار باغبانی | ۵ | قیچی، ست باغچه، لباس کار، کودپاش دستی، کیت پیوند |
+
+موارد خاص برای تست سناریوهای لبه‌ای:
+
+- ⭐ **۸ محصول ویژه** (`is_featured`) → صفحه اصلی و `/api/products/featured/`
+- 🏷️ **تخفیف‌دارها** (۵ تا ۳۰٪) → فیلتر `has_discount` و قفسه تخفیف
+- 📦 **ناموجودها**: نهال پسته اکبری (`stock=0`) و کیت قطره‌چکان (`available=False`) → فیلتر `in_stock`
+- 📞 **تماس بگیرید**: پاراکوات عمده و دیسک هرس (`price_on_request`) → دکمه تماس به‌جای افزودن به سبد
+- ⏳ **نزدیک انقضا**: کلات آهن (۴۵ روز) و تری‌فورین (۸۰ روز) → فیلتر `expiring_soon` (تاریخ‌ها نسبی‌اند و کهنه نمی‌شوند)
+- ⚖️ **فروش فله**: اوره، گندم، پاراکوات (`min_order_quantity` + `bulk_note`)
+- 📐 **چندبسته‌ای**: اوره، گلایفوزیت، بذر گوجه، گندم → انتخاب بسته در صفحه محصول
+- 💬 **۱۲ دیدگاه** با امتیاز → ستاره‌ها، فیلتر `min_rating`، صفحه «تجربه خرید مشتریان»
+- 🎟️ **کوپن‌ها**: `TEST10` (۱۰٪ تا سقف ۲۰۰ هزار) و `WELCOME50` (۵۰ هزار ثابت)
+
+## ۳. اجرای سایت بعد از سید
 
 ```bash
+# ترمینال ۱ — بک‌اند
+cd garinkood
+python manage.py runserver 0.0.0.0:8000
+
+# ترمینال ۲ — فرانت‌اند
 cd frontend
 npm ci
-cp .env.example .env.local       # فقط بار اول
 npm run dev -- --host 0.0.0.0
 ```
 
-### قدم ۴ — باز کردن سایت
+- فروشگاه: http://localhost:5173/products
+- محصول نمونه: http://localhost:5173/products/glyphosate-41-1l
+- دسته نمونه: http://localhost:5173/c/fertilizer
+- برند نمونه: http://localhost:5173/brand/kymya-sbz (اسلاگ فارسی برند «کیمیا سبز»)
+- برچسب نمونه: http://localhost:5173/tag/greenhouse
+- بازار: http://localhost:5173/marketplace
+- API خام: http://localhost:8000/api/products/?category=fertilizer
 
-- فروشگاه: `http://localhost:5173`
-- صفحه تکی محصول: `http://localhost:5173/products/test-npk-20-granular`
-- بازار غرفه‌داران: `http://localhost:5173/marketplace`
-- مدیریت جنگو: `http://localhost:8000/admin/`
+## ۴. چک‌لیست تست همه بخش‌ها
 
-## ۳. چک‌لیست تست پیشنهادی (همه بخش‌ها)
+- [ ] مگامنو بالای سایت هر ۶ دسته را نشان می‌دهد و زیرمنوها (۲۴ زیردسته) باز می‌شوند
+- [ ] صفحه `/products` با فیلتر دسته، برند، بازه قیمت، «فقط موجود» و «تخفیف‌دار» درست فیلتر می‌شود
+- [ ] جستجو (مثلا «اوره» یا «پمپ») نتیجه مرتبط برمی‌گرداند
+- [ ] صفحه محصول: گالری، جدول مشخصات، انتخاب بسته، ویدیو (سمپاش موتوری)، دیدگاه‌ها و امتیاز
+- [ ] افزودن به سبد (مهمان و کاربر)، تغییر تعداد، حداقل سفارش فله
+- [ ] ثبت سفارش با کوپن `TEST10` و پیگیری سفارش
+- [ ] صفحات `/c/fertilizer` (دسته)، `/brand/...` (برند)، `/tag/greenhouse` (برچسب) محصول نشان می‌دهند
+- [ ] بازار (`/marketplace`): غرفه‌ها، آگهی‌ها، دنبال‌کردن، گفت‌وگو
+- [ ] ماشین‌حساب دوز (نهاده‌ها)، انتخاب استان/شهر (لوکیشن)، خدمات و صفحات اطلاعاتی
 
-- [ ] صفحه اصلی: گرید دسته‌بندی‌ها (۸ دسته با شمارش)، ردیف پرفروش‌ها/تخفیف‌دارها/جدیدها
-- [ ] فروشگاه `/products`: فیلتر دسته، برند، بازه قیمت، «فقط موجود»، «فقط تخفیف‌دار»، «استعلامی»، «دارای بازخورد»، «نزدیک انقضا» + مرتب‌سازی (پرفروش/امتیاز/جدید/پربازدید/قیمت)
-- [ ] صفحه محصول: گالری، جدول مشخصات، انتخاب بسته‌بندی (روی کود NPK و بذر گندم)، نظرات و ثبت نظر
-- [ ] محصول استعلامی (`test-glyphosate`): به‌جای افزودن به سبد، «تماس بگیرید» نمایش داده شود
-- [ ] محصول نزدیک انقضا (`test-potassium-sulfate`): بج هشدار دیده شود
-- [ ] سبد + checkout: ورود با `test-buyer` / `demo-12345`، اعمال کوپن `TEST10`، خرج امتیاز وفاداری، ثبت سفارش، پیگیری سفارش
-- [ ] کود/سم/بذر/نهال: پروفایل تخصصی در صفحه محصول و APIهای `api/inputs/*`
-- [ ] تراکتور و ادوات: APIهای `api/machinery/*` + بج «دست دوم» روی رومانی
-- [ ] بازار: غرفه‌ها، آگهی‌ها، دنبال‌کردن، پست/استوری
-- [ ] مشتریان/نظرات: صفحه تجربه خرید (نظر ویژه کود NPK)
-
-## ۴. دستورهای مفید
+## ۵. دستورهای کاربردی
 
 ```bash
-# اجرای دوباره بعد از pull (به‌روزرسانی بدون تکرار)
+cd garinkood
+
+# سید مجدد فقط کاتالوگ (بعد از ویرایش test_catalog.py)
 python manage.py seed_test_catalog
 
-# فقط کاتالوگ، بدون بازار غرفه‌داران
-python manage.py seed_test_catalog --skip-marketplace
+# بدون تصویر (سریع‌تر؛ محصول با عکس پیش‌فرض سایت نمایش داده می‌شود)
+python manage.py seed_test_catalog --skip-images
 
-# حذف کامل داده تستی (محصولات test-* و کوپن‌های TEST*)
-python manage.py seed_test_catalog --clear
+# تعیین نویسنده محصولات
+python manage.py seed_test_catalog --author myuser
+
+# ساخت نسخه‌های بهینه تصاویر (بعد از سید با تصویر)
+python manage.py process_async_tasks --limit 200
+
+# مشاهده خلاصه از شل
+python manage.py shell -c "
+from shop.models import Product, Category
+for c in Category.objects.all(): print(c.slug, c.get_product_count())
+print('total:', Product.objects.filter(status='published').count())
+"
 ```
 
-## ۵. فایل‌های مرتبط
+## ۶. ساختار فایل دیتا
 
-- داده خام: `garinkood/shop/data/test_catalog.py` (ویرایش/افزودن محصول تستی اینجاست)
-- دستور نصب: `garinkood/shop/management/commands/seed_test_catalog.py`
-- بازار نمونه: `garinkood/shop/management/commands/seed_demo_marketplace.py`
-- اسکریپت یک‌مرحله‌ای: `scripts/load_test_data.sh`
+هر محصول در `TEST_PRODUCTS` این کلیدهاست (همه اختیاری‌ها با `(... | optional)`):
 
-## ۶. افزودن محصول تستی جدید
+```
+slug, title, category, subcategory, description, price, stock,
+available, is_featured, discount_percent, sales_count, brand,
+package_weight, price_on_request, sku, views, video_url,
+min_order_quantity, bulk_note,
+production_days_ago | expiry_in_days,        # تاریخ نسبی
+tags: [slug, ...],
+detail: {kind, ...},                          # مشخصات تخصصی دسته
+attributes: [(label, value), ...],            # جدول مشخصات
+packages: [{label, weight_kg, price, ...}],   # بسته‌بندی‌ها
+reviews: [{name, body, rating, ...}],         # دیدگاه‌ها
+gallery: [caption, ...]                       # عکس‌های اضافه گالری
+```
 
-۱. یک دیکشنری به `TEST_PRODUCTS` در `test_catalog.py` اضافه کنید (اسلاگ حتماً با `test-` شروع شود).
-۲. `python manage.py seed_test_catalog` را اجرا کنید.
-۳. تغییر را commit و push کنید تا روی لپ‌تاپ با `git pull` بیاید.
+برای اضافه کردن محصول جدید کافی است یک دیکشنری به لیست اضافه کنی و `seed_test_catalog` را دوباره اجرا کنی.

@@ -1,49 +1,44 @@
 # -*- coding: utf-8 -*-
-"""Seed a full test catalogue so every storefront section has products.
+"""Seed a full test catalogue: every shop section with realistic products.
 
-Development/QA only — never run in production. Idempotent: every row is
-matched on its slug/code and updated in place, so rerunning after a data
-edit fixes the existing records instead of duplicating them.
+Development/testing convenience only — never run on production data without a
+backup. Everything is matched on its slug and updated in place, so re-running
+after editing ``shop/data/test_catalog.py`` fixes the existing rows instead of
+duplicating them.
 
 Usage (from ``garinkood/``)::
 
-    python manage.py seed_test_catalog            # build everything
-    python manage.py seed_test_catalog --clear    # remove the test fixture
-    python manage.py seed_test_catalog --skip-marketplace   # catalogue only
+    python manage.py seed_test_catalog
+    python manage.py seed_test_catalog --skip-images
+    python manage.py seed_test_catalog --author myuser
 
-What gets built (see ``shop/data/test_catalog.py``):
+What it creates:
+  * 6 categories + 24 subcategories (slugs match the storefront MegaMenu)
+  * 8 usage tags
+  * 31 products (5–6 per category) with Persian titles, brands, prices,
+    discounts, spec tables, packages, detail rows and reviews
+  * placeholder cover + gallery images (generated locally with Pillow, no
+    network needed) unless --skip-images is passed
+  * 2 test coupons (TEST10, WELCOME50) for checkout testing
 
-* 8 categories + 21 subcategories + 6 tags
-* 35 products covering every section: fertilizer, pesticide, seed,
-  seedling, tractors, implements, irrigation, tools, greenhouse — with
-  featured / discounted / out-of-stock / unavailable / price-on-request /
-  expiring-soon / multi-package variants
-* domain profiles: shop detail tables + agri_inputs (Fertilizer, Pesticide,
-  Seed, Seedling) + machinery (Tractor, Implement)
-* reviews, a Q&A thread, a featured testimonial, one pending-moderation row
-* coupons TEST10 / TESTFIX50 / TESTOLD + demo buyer ``test-buyer``
-* the demo marketplace (storefronts + listings) via seed_demo_marketplace,
-  unless --skip-marketplace is passed
+After seeding, run the background worker once so the responsive AVIF/WebP
+variants are generated for the new images::
+
+    python manage.py process_async_tasks --limit 200
 """
 
+from __future__ import annotations
+
+import io
 from datetime import timedelta
 
-from django.contrib.auth import get_user_model
-from django.core.management import call_command
+from django.contrib.auth.models import User
+from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
 
-from shop.data.test_catalog import (
-    TEST_BUYER_LOYALTY_POINTS,
-    TEST_BUYER_PASSWORD,
-    TEST_BUYER_USERNAME,
-    TEST_CATEGORIES,
-    TEST_COMMENTS,
-    TEST_COUPONS,
-    TEST_PRODUCTS,
-    TEST_TAGS,
-)
+from shop.data.test_catalog import TEST_CATEGORIES, TEST_COUPONS, TEST_PRODUCTS, TEST_TAGS
 from shop.models import (
     Category,
     Comment,
@@ -53,16 +48,24 @@ from shop.models import (
     PesticideDetail,
     Product,
     ProductAttribute,
+    ProductImage,
     ProductPackage,
     SeedDetail,
     SubCategory,
     Tag,
-    Wallet,
 )
 
-User = get_user_model()
+# One recognisable colour per section, reused for the generated placeholders.
+CATEGORY_COLOURS = {
+    "pesticide": (15, 138, 95),    # green
+    "fertilizer": (16, 185, 129),  # emerald
+    "seed": (245, 158, 11),        # amber
+    "equipment": (101, 163, 13),   # lime
+    "irrigation": (14, 165, 233),  # sky
+    "tools": (20, 184, 166),       # teal
+}
 
-SHOP_DETAIL_MODELS = {
+DETAIL_MODELS = {
     "fertilizer": FertilizerDetail,
     "pesticide": PesticideDetail,
     "seed": SeedDetail,
@@ -70,162 +73,203 @@ SHOP_DETAIL_MODELS = {
 }
 
 
+def make_placeholder_image(slug: str, colour: tuple[int, int, int], shade: int = 0) -> bytes:
+    """Render a small branded JPEG placeholder with Pillow (no network).
+
+    Persian text is deliberately *not* drawn: the default bitmap font has no
+    Persian glyphs, and shipping a font file for test data is not worth it.
+    The ASCII slug keeps every image identifiable in the admin and on disk.
+    """
+    from PIL import Image, ImageDraw
+
+    width, height = 800, 600
+    darken = max(0, min(shade, 2)) * 28
+    base = tuple(max(0, c - darken) for c in colour)
+    img = Image.new("RGB", (width, height), base)
+    draw = ImageDraw.Draw(img)
+
+    # Diagonal stripes for a bit of texture.
+    stripe = tuple(max(0, c - 18) for c in base)
+    for x in range(-height, width, 56):
+        draw.polygon([(x, 0), (x + 26, 0), (x + 26 + height, height), (x + height, height)], fill=stripe)
+
+    # White frame.
+    draw.rectangle([14, 14, width - 15, height - 15], outline=(255, 255, 255), width=5)
+
+    # Centered ASCII labels.
+    title = "GARINKOOD TEST CATALOG"
+    label = slug[:34]
+    sub = f"{width}x{height} PLACEHOLDER"
+    for i, text in enumerate((title, label, sub)):
+        w = draw.textlength(text)
+        draw.text(((width - w) / 2, height / 2 - 30 + i * 34), text, fill=(255, 255, 255))
+
+    buf = io.BytesIO()
+    img.save(buf, "JPEG", quality=82)
+    return buf.getvalue()
+
+
 class Command(BaseCommand):
-    help = "Seed the full test catalogue (dev/QA only, idempotent)."
+    help = "Seed every shop section with realistic Persian test products."
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "--clear",
-            action="store_true",
-            help="حذف محصولات و کوپن‌های تستی (slug با test- و کد با TEST).",
+            "--author",
+            default="",
+            help="نام کاربری نویسنده محصولات (پیش‌فرض: اولین کاربر staff، وگرنه test-seller ساخته می‌شود)",
         )
         parser.add_argument(
-            "--skip-marketplace",
+            "--skip-images",
             action="store_true",
-            help="نصب بازار غرفه‌داران (seed_demo_marketplace) انجام نشود.",
+            help="بدون ساخت تصویر تستی (محصولات با تصویر پیش‌فرض سایت نمایش داده می‌شوند)",
         )
 
     @transaction.atomic
     def handle(self, *args, **options):
-        if options["clear"]:
-            self._clear()
-            return
-
         today = timezone.localdate()
-        author = self._get_author()
+        now = timezone.now()
+        author = self._resolve_author(options["author"])
+        with_images = not options["skip_images"]
+
         categories = self._seed_categories()
         subcategories = self._seed_subcategories(categories)
         tags = self._seed_tags()
 
-        created_products = 0
+        created = updated = 0
         for index, entry in enumerate(TEST_PRODUCTS):
-            created_products += int(self._seed_product(
-                entry, author, categories, subcategories, tags, today, index,
-            ))
+            was_created = self._seed_product(
+                entry, index, author, categories, subcategories, tags,
+                today=today, now=now, with_images=with_images,
+            )
+            created += int(was_created)
+            updated += int(not was_created)
 
-        reviews = self._seed_comments()
-        coupons = self._seed_coupons()
-        self._seed_buyer()
+        coupons = self._seed_coupons(now)
+        self._print_summary(categories, created, updated, coupons, with_images)
 
-        if options["skip_marketplace"]:
-            self.stdout.write("بازار غرفه‌داران رد شد (--skip-marketplace).")
-        else:
-            call_command("seed_demo_marketplace", verbosity=0)
-            self.stdout.write("بازار نمونه (غرفه‌ها و آگهی‌ها) نصب/به‌روزرسانی شد.")
-
-        published = Product.objects.filter(status="published").count()
-        self.stdout.write(self.style.SUCCESS(
-            f"کاتالوگ تستی آماده شد: {created_products} محصول جدید، "
-            f"{reviews} نظر، {coupons} کوپن. "
-            f"مجموع محصولات منتشرشده: {published}."
-        ))
-
-    # -- clear ------------------------------------------------------------
-    def _clear(self):
-        products = Product.objects.filter(slug__startswith="test-")
-        product_count = products.count()
-        products.delete()  # cascades: profiles, attributes, packages, comments
-        coupons_deleted, _details = Coupon.objects.filter(code__startswith="TEST").delete()
-        self.stdout.write(self.style.SUCCESS(
-            f"{product_count} محصول تستی و {coupons_deleted} کوپن تستی حذف شد."
-        ))
-
-    # -- lookups ----------------------------------------------------------
+    # -- lookups ---------------------------------------------------------
     @staticmethod
-    def _get_author():
-        author, _ = User.objects.get_or_create(
-            username="test-shop",
-            defaults={"email": "test-shop@example.com", "first_name": "فروشگاه", "last_name": "تستی"},
+    def _resolve_author(username: str) -> User:
+        if username:
+            user, _ = User.objects.get_or_create(
+                username=username, defaults={"email": f"{username}@example.com"}
+            )
+            return user
+        staff = User.objects.filter(is_staff=True).order_by("id").first()
+        if staff:
+            return staff
+        user, _ = User.objects.get_or_create(
+            username="test-seller",
+            defaults={"email": "test-seller@example.com", "first_name": "فروشنده", "last_name": "تستی"},
         )
-        return author
+        return user
 
-    def _seed_categories(self):
-        categories = {}
+    # -- categories / tags ----------------------------------------------
+    def _seed_categories(self) -> dict[str, Category]:
+        categories: dict[str, Category] = {}
         for entry in TEST_CATEGORIES:
             category, _ = Category.objects.update_or_create(
                 slug=entry["slug"],
                 defaults={
                     "name": entry["name"],
                     "description": entry.get("description", ""),
+                    "seo_title": f'خرید {entry["name"]} | قیمت و مشخصات',
+                    "seo_description": entry.get("description", "")[:160],
                 },
             )
             categories[entry["slug"]] = category
-        self.stdout.write(f"{len(categories)} دسته ساخته/به‌روزرسانی شد.")
         return categories
 
     @staticmethod
-    def _seed_subcategories(categories):
-        subcategories = {}
+    def _seed_subcategories(categories: dict[str, Category]) -> dict[str, SubCategory]:
+        subcategories: dict[str, SubCategory] = {}
         for entry in TEST_CATEGORIES:
-            for sub in entry.get("subcategories", []):
-                subcategory, _ = SubCategory.objects.update_or_create(
+            for sub in entry["subcategories"]:
+                obj, _ = SubCategory.objects.update_or_create(
                     slug=sub["slug"],
                     defaults={"name": sub["name"], "category": categories[entry["slug"]]},
                 )
-                subcategories[sub["slug"]] = subcategory
+                subcategories[sub["slug"]] = obj
         return subcategories
 
     @staticmethod
-    def _seed_tags():
-        tags = {}
-        for name in TEST_TAGS:
-            tag, _ = Tag.objects.get_or_create(name=name)
-            tags[name] = tag
+    def _seed_tags() -> dict[str, Tag]:
+        tags: dict[str, Tag] = {}
+        for entry in TEST_TAGS:
+            tag, _ = Tag.objects.update_or_create(
+                slug=entry["slug"],
+                defaults={"name": entry["name"], "description": entry.get("description", "")},
+            )
+            tags[entry["slug"]] = tag
         return tags
 
-    # -- products ---------------------------------------------------------
-    def _seed_product(self, entry, author, categories, subcategories, tags, today, index):
-        expiry = entry.get("expiry_in_days")
-        product, created = Product.objects.update_or_create(
-            slug=entry["slug"],
-            defaults={
-                "author": author,
-                "category": categories[entry["category"]],
-                "subcategory": subcategories.get(entry.get("subcategory")),
-                "title": entry["title"],
-                "description": entry["description"],
-                # Staggered publish dates keep the «جدیدترین» sort meaningful.
-                "publish": timezone.now() - timedelta(days=index),
-                "status": "published",
-                "price": entry.get("price", 0),
-                "stock": entry.get("stock", 0),
-                "available": entry.get("available", True),
-                "is_featured": entry.get("is_featured", False),
-                "discount_percent": entry.get("discount_percent", 0),
-                "sales_count": entry.get("sales_count", 0),
-                "views": entry.get("views", 0),
-                "brand": entry.get("brand", ""),
-                "package_weight": entry.get("package_weight", ""),
-                "price_on_request": entry.get("price_on_request", False),
-                "sku": entry.get("sku", ""),
-                "expiry_date": (today + timedelta(days=expiry)) if expiry is not None else None,
-                "min_order_quantity": entry.get("min_order_quantity", 1),
-                "bulk_note": entry.get("bulk_note", ""),
-            },
-        )
-        product.tags.set(tags[name] for name in entry.get("tags", []) if name in tags)
-        self._seed_attributes(product, entry.get("attributes", []))
-        self._seed_packages(product, entry.get("packages", []))
-        if "detail" in entry:
-            kind, fields = entry["detail"]
-            SHOP_DETAIL_MODELS[kind].objects.update_or_create(product=product, defaults=fields)
-        if "agri" in entry:
-            self._seed_agri_profile(product, entry["agri"], today)
-        if "machine" in entry:
-            self._seed_machine_profile(product, entry["machine"])
-        return created
+    # -- products --------------------------------------------------------
+    def _seed_product(self, entry, index, author, categories, subcategories, tags,
+                      *, today, now, with_images: bool) -> bool:
+        category = categories[entry["category"]]
+        subcategory = subcategories.get(entry.get("subcategory", ""))
 
-    @staticmethod
-    def _seed_attributes(product, attributes):
+        production_date = None
+        if entry.get("production_days_ago") is not None:
+            production_date = today - timedelta(days=entry["production_days_ago"])
+        expiry_date = None
+        if entry.get("expiry_in_days") is not None:
+            expiry_date = today + timedelta(days=entry["expiry_in_days"])
+
+        # Stagger publish dates so «جدیدترین» ordering is deterministic.
+        publish = now - timedelta(hours=index * 6)
+
+        defaults = {
+            "category": category,
+            "subcategory": subcategory,
+            "author": author,
+            "title": entry["title"],
+            "description": entry["description"],
+            "publish": publish,
+            "status": "published",
+            "price": entry["price"],
+            "stock": entry.get("stock", 0),
+            "available": entry.get("available", True),
+            "is_featured": entry.get("is_featured", False),
+            "discount_percent": entry.get("discount_percent", 0),
+            "sales_count": entry.get("sales_count", 0),
+            "brand": entry.get("brand", ""),
+            "package_weight": entry.get("package_weight", ""),
+            "price_on_request": entry.get("price_on_request", False),
+            "sku": entry.get("sku", ""),
+            "views": entry.get("views", 0),
+            "min_order_quantity": entry.get("min_order_quantity", 1),
+            "bulk_note": entry.get("bulk_note", ""),
+            "video_url": entry.get("video_url", ""),
+            "production_date": production_date,
+            "expiry_date": expiry_date,
+            "seo_title": f'خرید {entry["title"]} | قیمت روز',
+            "seo_description": entry["description"][:160],
+        }
+        product, created = Product.objects.update_or_create(slug=entry["slug"], defaults=defaults)
+
+        # Tags (M2M): the seed owns the full set.
+        product.tags.set(tags[slug] for slug in entry.get("tags", []) if slug in tags)
+
+        # Category-specific detail row.
+        detail = entry.get("detail")
+        if detail:
+            kind = detail["kind"]
+            model = DETAIL_MODELS[kind]
+            fields = {key: value for key, value in detail.items() if key != "kind"}
+            model.objects.update_or_create(product=product, defaults=fields)
+
+        # Spec table: rewrite so removed rows disappear on re-seed.
         product.attributes.all().delete()
-        for order, (label, value) in enumerate(attributes):
-            ProductAttribute.objects.create(
-                product=product, label=label, value=value, order=order,
-            )
+        attributes = [
+            ProductAttribute(product=product, label=label, value=value, order=order)
+            for order, (label, value) in enumerate(entry.get("attributes", []))
+        ]
+        if attributes:
+            ProductAttribute.objects.bulk_create(attributes)
 
-    @staticmethod
-    def _seed_packages(product, packages):
-        for order, package in enumerate(packages):
+        # Packages: matched on (product, label) — the model's own constraint.
+        for order, package in enumerate(entry.get("packages", [])):
             ProductPackage.objects.update_or_create(
                 product=product,
                 label=package["label"],
@@ -234,90 +278,50 @@ class Command(BaseCommand):
                     "price": package.get("price"),
                     "stock": package.get("stock"),
                     "is_default": package.get("is_default", False),
+                    "min_order_quantity": package.get("min_order_quantity", 1),
                     "order": order,
                 },
             )
 
-    @staticmethod
-    def _seed_agri_profile(product, spec, today):
-        # Local imports: the holding modules are optional neighbours of shop;
-        # importing at call time keeps this command loadable even if one of
-        # them is temporarily uninstalled.
-        kind, fields = spec
-        fields = dict(fields)
-        expiry = fields.pop("expiry_in_days", None)
-        if kind == "fertilizer":
-            from agri_inputs.models import Fertilizer
-            if expiry is not None:
-                fields["expiry_date"] = today + timedelta(days=expiry)
-            Fertilizer.objects.update_or_create(product=product, defaults=fields)
-        elif kind == "pesticide":
-            from agri_inputs.models import Pesticide
-            if expiry is not None:
-                fields["expiry_date"] = today + timedelta(days=expiry)
-            Pesticide.objects.update_or_create(product=product, defaults=fields)
-        elif kind == "seed":
-            from agri_inputs.models import Seed
-            Seed.objects.update_or_create(product=product, defaults=fields)
-        elif kind == "seedling":
-            from agri_inputs.models import Seedling
-            Seedling.objects.update_or_create(product=product, defaults=fields)
+        # Reviews: matched on (product, name, body) so re-seeds never duplicate.
+        for review in entry.get("reviews", []):
+            Comment.objects.update_or_create(
+                product=product,
+                name=review["name"],
+                body=review["body"],
+                defaults={
+                    "rating": review.get("rating"),
+                    "helpful_count": review.get("helpful_count", 0),
+                    "is_featured": review.get("is_featured", False),
+                    "active": True,
+                },
+            )
+
+        # Cover + gallery placeholders (only when missing — never churn files).
+        if with_images:
+            self._ensure_images(product, entry)
+
+        return created
 
     @staticmethod
-    def _seed_machine_profile(product, spec):
-        kind, fields = spec
-        if kind == "tractor":
-            from machinery.models import Tractor
-            Tractor.objects.update_or_create(product=product, defaults=dict(fields))
-        elif kind == "implement":
-            from machinery.models import Implement
-            Implement.objects.update_or_create(product=product, defaults=dict(fields))
+    def _ensure_images(product: Product, entry: dict) -> None:
+        colour = CATEGORY_COLOURS.get(entry["category"], (15, 138, 95))
+        if not product.image:
+            blob = make_placeholder_image(product.slug, colour)
+            product.image.save(f"test/{product.slug}.jpg", ContentFile(blob), save=True)
+        for order, caption in enumerate(entry.get("gallery", []), start=1):
+            exists = ProductImage.objects.filter(product=product, caption=caption).exists()
+            if not exists:
+                blob = make_placeholder_image(f"{product.slug}-g{order}", colour, shade=order)
+                shot = ProductImage(product=product, caption=caption, order=order)
+                shot.image.save(f"test/{product.slug}-g{order}.jpg", ContentFile(blob), save=True)
 
-    # -- comments ---------------------------------------------------------
-    def _seed_comments(self):
-        count = 0
-        for entry in TEST_COMMENTS:
-            try:
-                product = Product.objects.get(slug=entry["product"])
-            except Product.DoesNotExist:
-                self.stdout.write(self.style.WARNING(
-                    f"محصول {entry['product']} یافت نشد؛ نظر رد شد."
-                ))
-                continue
-            parent, parent_created = self._ensure_comment(product, entry, parent=None)
-            count += int(parent_created)
-            for reply in entry.get("replies", []):
-                _, reply_created = self._ensure_comment(product, reply, parent=parent)
-                count += int(reply_created)
-        return count
-
+    # -- coupons ---------------------------------------------------------
     @staticmethod
-    def _ensure_comment(product, entry, parent):
-        """Return (comment, created). The row itself is always returned so a
-        second run still finds the real parent for nested replies."""
-        comment = Comment.objects.filter(
-            product=product, parent=parent, name=entry["name"], body=entry["body"],
-        ).first()
-        if comment is not None:
-            return comment, False
-        comment = Comment.objects.create(
-            product=product,
-            parent=parent,
-            name=entry["name"],
-            body=entry["body"],
-            rating=entry.get("rating"),
-            helpful_count=entry.get("helpful_count", 0),
-            is_featured=entry.get("is_featured", False),
-            active=entry.get("active", True),
-        )
-        return comment, True
-
-    # -- coupons + buyer --------------------------------------------------
-    def _seed_coupons(self):
-        now = timezone.now()
-        count = 0
+    def _seed_coupons(now) -> list[Coupon]:
+        coupons = []
         for entry in TEST_COUPONS:
-            _, created = Coupon.objects.update_or_create(
+            coupon, _ = Coupon.objects.update_or_create(
                 code=entry["code"],
                 defaults={
                     "description": entry["description"],
@@ -328,27 +332,24 @@ class Command(BaseCommand):
                     "usage_limit": entry.get("usage_limit"),
                     "is_active": True,
                     "valid_from": now - timedelta(days=1),
-                    "valid_until": now + timedelta(days=entry.get("valid_days", 30)),
+                    "valid_until": now + timedelta(days=90),
                 },
             )
-            count += int(created)
-        # The expired coupon must stay expired: update_or_create above already
-        # stamps valid_until in the past via valid_days=-1. Nothing else needed.
-        return count
+            coupons.append(coupon)
+        return coupons
 
-    def _seed_buyer(self):
-        buyer, _ = User.objects.get_or_create(
-            username=TEST_BUYER_USERNAME,
-            defaults={"email": f"{TEST_BUYER_USERNAME}@example.com", "first_name": "خریدار", "last_name": "تستی"},
-        )
-        if not buyer.check_password(TEST_BUYER_PASSWORD):
-            buyer.set_password(TEST_BUYER_PASSWORD)
-            buyer.save(update_fields=["password"])
-        wallet, _ = Wallet.objects.get_or_create(user=buyer)
-        if wallet.loyalty_points < TEST_BUYER_LOYALTY_POINTS:
-            wallet.loyalty_points = TEST_BUYER_LOYALTY_POINTS
-            wallet.save(update_fields=["loyalty_points"])
-        self.stdout.write(
-            f"کاربر خریدار تستی «{TEST_BUYER_USERNAME}» با "
-            f"{TEST_BUYER_LOYALTY_POINTS} امتیاز وفاداری آماده است."
-        )
+    # -- report ----------------------------------------------------------
+    def _print_summary(self, categories, created, updated, coupons, with_images: bool) -> None:
+        self.stdout.write(self.style.SUCCESS(
+            f'کاتالوگ تستی آماده شد: {created} محصول جدید، {updated} محصول به‌روزرسانی شد '
+            f'(مجموع منتشرشده: {Product.objects.filter(status="published").count()}).'
+        ))
+        for slug, category in categories.items():
+            count = category.get_product_count()
+            self.stdout.write(f'  • {category.name} ({slug}): {count} محصول')
+        self.stdout.write('کدهای تخفیف تستی: ' + '، '.join(coupon.code for coupon in coupons))
+        if with_images:
+            self.stdout.write(self.style.WARNING(
+                'برای ساخت نسخه‌های بهینه تصاویر (AVIF/WebP) یک‌بار ورکر را اجرا کنید:\n'
+                '  python manage.py process_async_tasks --limit 200'
+            ))
