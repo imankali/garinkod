@@ -15,8 +15,11 @@ if (-not (Test-Path ".env")) {
   Copy-Item .env.example .env
 }
 
-if (-not $env:DB_ENGINE) { $env:DB_ENGINE = "sqlite" }
-if (-not $env:DEBUG) { $env:DEBUG = "True" }
+# Respect an explicit choice in .env (e.g. postgresql on a laptop with an
+# existing database): shell env wins, then .env, then these dev defaults.
+$DotEnv = Get-Content ".env" -ErrorAction SilentlyContinue
+if (-not $env:DB_ENGINE -and -not ($DotEnv -match "^DB_ENGINE=.+")) { $env:DB_ENGINE = "sqlite" }
+if (-not $env:DEBUG -and -not ($DotEnv -match "^DEBUG=.+")) { $env:DEBUG = "True" }
 
 Write-Host "→ migrate"
 python manage.py migrate

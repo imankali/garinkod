@@ -2,6 +2,61 @@
 
 این راهنما توضیح می‌دهد چطور روی لپ‌تاپ خودت دیتای تستی کامل سایت را بالا بیاوری و همه بخش‌ها را تست کنی.
 
+## ۰. از صفر روی لپ‌تاپ (راهنمای کامل)
+
+پیش‌نیازها: **Python 3.11 یا 3.12**، **Node.js 22** (حداقل ۱۸)، **Git**. دیتابیس پیش‌فرض **SQLite** است و چیزی لازم ندارد؛ Redis، مدل AI، Meilisearch و بقیه سرویس‌ها برای توسعه لازم نیستند.
+
+```powershell
+# ۱. گرفتن کد (اولین بار) — یا اگر قبلا کلون کردی فقط fetch + checkout
+git clone https://github.com/imankali/garinkod.git
+cd garinkod
+git fetch origin
+git checkout arena/01a0871a-garinkod
+git pull
+
+# ۲. بک‌اند: محیط مجازی + نصب پکیج‌ها
+cd garinkood
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+pip install -r requirements-dev.txt
+
+# ۳. همه سیدها به ترتیب (migrate + لوکیشن + نهاده + محتوا + حقوقی + بازار + کاتالوگ + اجتماعی + تصاویر)
+cd ..
+.\scripts\load_test_catalog.ps1
+# اگر پاورشل اسکریپت را بلاک کرد، یک بار در همان پنجره:
+#   Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+
+# ۴. ساخت مدیر (برای /management و /farmers که سطح ۶+ می‌خواهند)
+cd garinkood
+python manage.py createsuperuser
+
+# ۵. اجرای بک‌اند (ترمینال ۱ — باز بماند)
+python manage.py runserver 0.0.0.0:8000
+
+# ۶. فرانت‌اند (ترمینال ۲ — جدا، از ریشه مخزن)
+cd frontend
+npm ci
+Copy-Item .env.example .env.local   # فقط بار اول
+npm run dev -- --host 0.0.0.0
+# فروشگاه: http://localhost:5173/products
+```
+
+> اگر از Git Bash یا WSL استفاده می‌کنی، همان دستورات با سینتکس bash است: `source .venv/bin/activate` و `./scripts/load_test_catalog.sh`.
+
+**اتصال به پستگرس قدیمی (اختیاری):** اگر به‌جای SQLite می‌خواهی به همان Postgres لپ‌تاپت وصل شوی، قبل از مرحله ۳ در فایل `garinkood/.env` این‌ها را بگذار (درایورش با requirements نصب می‌شود، چیز اضافه لازم نیست):
+
+```ini
+DB_ENGINE=postgresql
+DB_NAME=garinkood
+DB_USER=postgres
+DB_PASSWORD=رمز-خودت
+DB_HOST=localhost
+DB_PORT=5432
+```
+
+لودر همین را می‌خواند و روی پستگرس migrate/seed می‌کند. اگر دیتابیس قدیمی schema کهنه دارد و migrate خطا داد، تمیزترین راه ساخت یک دیتابیس خالی جدید و عوض کردن `DB_NAME` است. برای تست تمیز روزانه همان SQLite پیشنهاد می‌شود (با پاک کردن `garinkood/db.sqlite3` از نو شروع می‌کنی).
+
 ## ۱. بالا آوردن با یک دستور
 
 ```bash
@@ -23,10 +78,12 @@ pip install -r requirements-dev.txt
 
 | مرحله | دستور | نتیجه |
 |---|---|---|
-| migrate | `manage.py migrate` | ساخت جدول‌ها (SQLite) |
+| migrate | `manage.py migrate` | ساخت جدول‌ها (پیش‌فرض SQLite) |
 | لوکیشن/نهاده/محتوا | `seed_locations` / `seed_agri_inputs` / `seed_site_content --with-landing` | استان/شهر، دوز کود و سم، خدمات و صفحات |
+| حقوقی/نقش‌ها | `seed_legal_pages` / `seed_faq_page` / `bootstrap_management_roles` | ۸ صفحه حقوقی، سوالات متداول، گروه‌های مدیریتی |
 | بازار | `seed_demo_marketplace` | ۵ غرفه + ۷ آگهی + پست/استوری |
 | **کاتالوگ تستی** | **`seed_test_catalog`** | **۶ دسته + ۲۴ زیردسته + ۳۲ محصول + ۸ برچسب + ۲ کوپن + پروفایل نهاده/ماشین‌آلات** |
+| **بخش‌های اجتماعی** | **`seed_test_community`** | **۶ مقاله، میز خدمت، شکایت، مزرعه، سفارش (جزئیات: بخش ۲-ب)** |
 | تصاویر | `process_async_tasks --limit 200` | ساخت نسخه‌های AVIF/WebP |
 
 > دستور `seed_test_catalog` کاملا **idempotent** است: هر چند بار اجرایش کنی، رکورد تکراری ساخته نمی‌شود و ویرایش‌های فایل دیتا روی رکوردهای قبلی اعمال می‌شود.

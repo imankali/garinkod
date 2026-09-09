@@ -22,8 +22,14 @@ if [ ! -f ".env" ]; then
   cp .env.example .env
 fi
 
-export DB_ENGINE="${DB_ENGINE:-sqlite}"
-export DEBUG="${DEBUG:-True}"
+# Respect an explicit choice in .env (e.g. postgresql on a laptop with an
+# existing database): shell env wins, then .env, then these dev defaults.
+if [ -z "${DB_ENGINE:-}" ] && ! grep -Eq "^DB_ENGINE=.+" .env 2>/dev/null; then
+  export DB_ENGINE="sqlite"
+fi
+if [ -z "${DEBUG:-}" ] && ! grep -Eq "^DEBUG=.+" .env 2>/dev/null; then
+  export DEBUG="True"
+fi
 
 echo "→ migrate"
 python manage.py migrate
