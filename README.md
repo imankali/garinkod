@@ -98,6 +98,7 @@ npm run dev -- --host 0.0.0.0
 ```bash
 cd garinkood
 python manage.py seed_test_catalog
+python manage.py seed_test_community   # مقاله، غرفه، میز خدمت، شکایت، مزرعه، سفارش (بعد از کاتالوگ)
 python manage.py process_async_tasks --limit 200   # ساخت نسخه‌های AVIF/WebP تصاویر
 ```
 

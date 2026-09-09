@@ -31,7 +31,6 @@ variants are generated for the new images::
 
 from __future__ import annotations
 
-import io
 from datetime import timedelta
 
 from django.contrib.auth.models import User
@@ -41,6 +40,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from shop.data.test_catalog import TEST_CATEGORIES, TEST_COUPONS, TEST_PRODUCTS, TEST_TAGS
+from shop.data.test_images import make_placeholder_image
 from shop.models import (
     Category,
     Comment,
@@ -73,42 +73,6 @@ DETAIL_MODELS = {
     "seed": SeedDetail,
     "equipment": EquipmentDetail,
 }
-
-
-def make_placeholder_image(slug: str, colour: tuple[int, int, int], shade: int = 0) -> bytes:
-    """Render a small branded JPEG placeholder with Pillow (no network).
-
-    Persian text is deliberately *not* drawn: the default bitmap font has no
-    Persian glyphs, and shipping a font file for test data is not worth it.
-    The ASCII slug keeps every image identifiable in the admin and on disk.
-    """
-    from PIL import Image, ImageDraw
-
-    width, height = 800, 600
-    darken = max(0, min(shade, 2)) * 28
-    base = tuple(max(0, c - darken) for c in colour)
-    img = Image.new("RGB", (width, height), base)
-    draw = ImageDraw.Draw(img)
-
-    # Diagonal stripes for a bit of texture.
-    stripe = tuple(max(0, c - 18) for c in base)
-    for x in range(-height, width, 56):
-        draw.polygon([(x, 0), (x + 26, 0), (x + 26 + height, height), (x + height, height)], fill=stripe)
-
-    # White frame.
-    draw.rectangle([14, 14, width - 15, height - 15], outline=(255, 255, 255), width=5)
-
-    # Centered ASCII labels.
-    title = "GARINKOOD TEST CATALOG"
-    label = slug[:34]
-    sub = f"{width}x{height} PLACEHOLDER"
-    for i, text in enumerate((title, label, sub)):
-        w = draw.textlength(text)
-        draw.text(((width - w) / 2, height / 2 - 30 + i * 34), text, fill=(255, 255, 255))
-
-    buf = io.BytesIO()
-    img.save(buf, "JPEG", quality=82)
-    return buf.getvalue()
 
 
 class Command(BaseCommand):

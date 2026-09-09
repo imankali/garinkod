@@ -30,11 +30,19 @@ try {
   python manage.py seed_site_content
 }
 
+Write-Host "→ seed legal pages / FAQ / management roles"
+python manage.py seed_legal_pages
+python manage.py seed_faq_page
+python manage.py bootstrap_management_roles
+
 Write-Host "→ seed demo marketplace (storefronts + listings)"
 python manage.py seed_demo_marketplace
 
 Write-Host "→ seed test catalogue (all shop sections)"
 python manage.py seed_test_catalog
+
+Write-Host "→ seed test community (articles, desk, farm, orders)"
+python manage.py seed_test_community
 
 Write-Host "→ build responsive image variants"
 try {

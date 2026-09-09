@@ -33,11 +33,19 @@ python manage.py seed_locations
 python manage.py seed_agri_inputs
 python manage.py seed_site_content --with-landing || python manage.py seed_site_content
 
+echo "→ seed legal pages / FAQ / management roles"
+python manage.py seed_legal_pages
+python manage.py seed_faq_page
+python manage.py bootstrap_management_roles
+
 echo "→ seed demo marketplace (storefronts + listings)"
 python manage.py seed_demo_marketplace
 
 echo "→ seed test catalogue (all shop sections)"
 python manage.py seed_test_catalog
+
+echo "→ seed test community (articles, desk, farm, orders)"
+python manage.py seed_test_community
 
 echo "→ build responsive image variants"
 python manage.py process_async_tasks --limit 200 || true
