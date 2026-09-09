@@ -56,8 +56,11 @@ python manage.py seed_agri_inputs
 python manage.py seed_site_content     # خدمات، صفحات اطلاعاتی و (با --with-landing) صفحه فرود نمونه
 python manage.py bootstrap_management_roles
 python manage.py createsuperuser
+python manage.py seed_test_catalog   # کاتالوگ تستی کامل (فقط dev) — راهنما: docs/test-catalog-fa.md
 python manage.py runserver 0.0.0.0:8000
 ```
+
+> میان‌بر نصب یک‌مرحله‌ای داده تستی از ریشه مخزن: `./scripts/load_test_catalog.sh` (یا `.\scripts\load_test_catalog.ps1` در ویندوز) — فقط محیط توسعه؛ هرگز روی production.
 
 فایل نمونه برای توسعه از SQLite استفاده می‌کند. برای production همه مقادیر نمونه و placeholderها را با secret/config واقعی جایگزین کنید.
 
@@ -77,6 +80,29 @@ npm run dev -- --host 0.0.0.0
 ```
 
 در توسعه، Vite درخواست‌های `/api`، `/media` و `/static` را به Django روی پورت 8000 proxy می‌کند. در production نیز reverse proxy باید همین مسیرهای same-origin را مسیریابی کند.
+
+## داده تستی فروشگاه 🧪
+
+برای تست همه بخش‌های سایت با یک دستور، کاتالوگ تستی کامل (۶ دسته، ۲۴ زیردسته، ۳۲ محصول فارسی، ۸ برچسب، ۱۲ دیدگاه، ۲ کوپن تخفیف و پروفایل‌های نهاده/ماشین‌آلات) را سید کنید:
+
+```bash
+# لینوکس / مک / WSL — از ریشه مخزن
+./scripts/load_test_catalog.sh
+
+# ویندوز (PowerShell) — از ریشه مخزن
+.\scripts\load_test_catalog.ps1
+```
+
+یا دستی، فقط کاتالوگ:
+
+```bash
+cd garinkood
+python manage.py seed_test_catalog
+python manage.py seed_test_community   # مقاله، غرفه، میز خدمت، شکایت، مزرعه، سفارش (بعد از کاتالوگ)
+python manage.py process_async_tasks --limit 200   # ساخت نسخه‌های AVIF/WebP تصاویر
+```
+
+جزئیات کامل (لیست محصولات، سناریوهای لبه‌ای، کوپن‌ها و چک‌لیست تست) در [راهنمای کاتالوگ تستی](docs/test-catalog-fa.md) آمده است.
 
 - فروشگاه: `http://localhost:5173`
 - API: `http://localhost:8000/api/`
