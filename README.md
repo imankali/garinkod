@@ -56,8 +56,11 @@ python manage.py seed_agri_inputs
 python manage.py seed_site_content     # خدمات، صفحات اطلاعاتی و (با --with-landing) صفحه فرود نمونه
 python manage.py bootstrap_management_roles
 python manage.py createsuperuser
+python manage.py seed_test_catalog   # کاتالوگ تستی کامل (فقط dev) — راهنما: docs/test-catalog-fa.md
 python manage.py runserver 0.0.0.0:8000
 ```
+
+> میان‌بر نصب یک‌مرحله‌ای داده تستی از ریشه مخزن: `./scripts/load_test_data.sh` (فقط محیط توسعه؛ هرگز روی production).
 
 فایل نمونه برای توسعه از SQLite استفاده می‌کند. برای production همه مقادیر نمونه و placeholderها را با secret/config واقعی جایگزین کنید.
 
