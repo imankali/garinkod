@@ -9,13 +9,17 @@ by the ``seed_test_catalog`` management command::
 Idempotent: everything is matched on its slug and updated in place, so
 re-running after an edit fixes the existing rows instead of duplicating them.
 
-Coverage (30 products, 5 per category):
+Coverage (32 products: 5 per category, 7 in equipment):
   * pesticide   → سموم دفع آفات      (insecticide, fungicide, herbicide, miticide)
   * fertilizer  → کود کشاورزی        (npk, urea, humic, micronutrient)
   * seed        → بذر و نهال          (vegetable-seed, field-seed, greenhouse-seed, sapling)
   * equipment   → ادوات کشاورزی      (sprayer, irrigation-eq, hand-tool, machinery)
   * irrigation  → آبیاری              (drip, sprinkler, pump, valve)
   * tools       → ابزار باغبانی      (garden-tool, workwear, manual-feeder, shears)
+
+Holding modules also get linked profiles, so their endpoints are not empty:
+  * agri_inputs → /api/inputs/fertilizers|pesticides|seeds|seedlings/
+  * machinery   → /api/machinery/tractors|implements/
 
 The slugs intentionally match the storefront's MegaMenu icons/colours and the
 ``shopData`` navigation (``frontend/src/data/shopData.ts``), so every menu,
@@ -129,6 +133,8 @@ TEST_TAGS = [
 # Optional keys and their meaning:
 #   expiry_in_days / production_days_ago → relative dates (never go stale)
 #   detail → {'kind': 'fertilizer'|'pesticide'|'seed'|'equipment', ...fields}
+#   agri → {'kind': 'fertilizer'|'pesticide'|'seed'|'seedling', ...} (holding profile)
+#   machine → {'kind': 'tractor'|'implement', ...} (holding profile)
 #   attributes → [(label, value), ...] spec-table rows
 #   packages → [{label, weight_kg, price, stock, is_default, ...}]
 #   reviews → [{name, body, rating, helpful_count, is_featured}]
@@ -159,6 +165,13 @@ TEST_PRODUCTS = [
             "pesticide_type": "علف‌کش سیستمیک",
             "active_ingredient": "گلایفوزیت",
             "concentration": "۴۱٪",
+        },
+        "agri": {
+            "kind": "pesticide",
+            "registration_number": "TST-P-001",
+            "target_pest": "علف‌های هرز پهن‌برگ و باریک‌برگ",
+            "toxicity_level": "medium",
+            "waiting_period": 14,
         },
         "attributes": [
             ("فرمولاسیون", "SL (مایع محلول در آب)"),
@@ -212,6 +225,13 @@ TEST_PRODUCTS = [
             "active_ingredient": "تری‌فورین",
             "concentration": "۱۹٪",
         },
+        "agri": {
+            "kind": "pesticide",
+            "registration_number": "TST-P-002",
+            "target_pest": "سفیدک پودری و لکه برگی",
+            "toxicity_level": "medium",
+            "waiting_period": 7,
+        },
         "attributes": [
             ("فرمولاسیون", "EC (امولسیون شونده)"),
             ("دوره کارنس", "۷ روز"),
@@ -250,6 +270,13 @@ TEST_PRODUCTS = [
             "active_ingredient": "دلتامترین",
             "concentration": "۲.۵٪",
         },
+        "agri": {
+            "kind": "pesticide",
+            "registration_number": "TST-P-003",
+            "target_pest": "کرم غوزه، شته و تریپس",
+            "toxicity_level": "medium",
+            "waiting_period": 7,
+        },
         "attributes": [
             ("فرمولاسیون", "EC"),
             ("دوره کارنس", "۷ روز"),
@@ -278,6 +305,13 @@ TEST_PRODUCTS = [
             "pesticide_type": "کنه‌کش با اثر انتقالی",
             "active_ingredient": "آبامکتین",
             "concentration": "۱.۸٪",
+        },
+        "agri": {
+            "kind": "pesticide",
+            "registration_number": "TST-P-004",
+            "target_pest": "کنه تارتن و مینوز",
+            "toxicity_level": "medium",
+            "waiting_period": 3,
         },
         "attributes": [
             ("فرمولاسیون", "EC"),
@@ -344,6 +378,12 @@ TEST_PRODUCTS = [
             "phosphorus": "۰٪",
             "potassium": "۰٪",
         },
+        "agri": {
+            "kind": "fertilizer",
+            "registration_number": "TST-F-001",
+            "active_ingredient": "اوره گرانوله",
+            "npk_ratio": "46-0-0",
+        },
         "attributes": [
             ("نوع بسته‌بندی", "کیسه لمینت ۵۰ کیلویی"),
             ("مصرف در هکتار", "۱۵۰ تا ۲۵۰ کیلوگرم"),
@@ -403,6 +443,12 @@ TEST_PRODUCTS = [
             "phosphorus": "۲۰٪",
             "potassium": "۲۰٪",
         },
+        "agri": {
+            "kind": "fertilizer",
+            "registration_number": "TST-F-002",
+            "active_ingredient": "NPK + ریزمغذی کلاته",
+            "npk_ratio": "20-20-20",
+        },
         "attributes": [
             ("نوع بسته‌بندی", "سطل ۱۰ کیلویی"),
             ("حلالیت", "کامل در آب (بدون رسوب)"),
@@ -442,6 +488,12 @@ TEST_PRODUCTS = [
             "phosphorus": "۱٪",
             "potassium": "۳٪",
         },
+        "agri": {
+            "kind": "fertilizer",
+            "registration_number": "TST-F-003",
+            "active_ingredient": "اسید هیومیک و فولویک",
+            "npk_ratio": "2-1-3",
+        },
         "attributes": [
             ("ماده آلی", "۱۲٪ اسید هیومیک + فولویک"),
             ("مصرف در هکتار", "۲ تا ۳ لیتر در آب آبیاری"),
@@ -471,6 +523,12 @@ TEST_PRODUCTS = [
             "nitrogen": "۴٪",
             "phosphorus": "۰٪",
             "potassium": "۶٪",
+        },
+        "agri": {
+            "kind": "fertilizer",
+            "registration_number": "TST-F-004",
+            "active_ingredient": "ریزمغذی کلاته EDTA",
+            "npk_ratio": "4-0-6",
         },
         "attributes": [
             ("فرم عناصر", "کلاته EDTA"),
@@ -532,6 +590,13 @@ TEST_PRODUCTS = [
             "variety": "هیبرید F1 مقاوم TMV",
             "weight": "بسته ۱۰۰۰ عددی",
         },
+        "agri": {
+            "kind": "seed",
+            "germination_rate": 95,
+            "planting_season": "both",
+            "seed_treatment": True,
+            "variety_name": "هیبرید F1 گلخانه‌ای",
+        },
         "attributes": [
             ("نوع رقم", "هیبرید F1"),
             ("قوه‌نامیه", "بالای ۹۵٪"),
@@ -586,6 +651,13 @@ TEST_PRODUCTS = [
             "variety": "سرداری",
             "weight": "کیسه ۵۰ کیلویی",
         },
+        "agri": {
+            "kind": "seed",
+            "germination_rate": 90,
+            "planting_season": "autumn",
+            "seed_treatment": True,
+            "variety_name": "سرداری",
+        },
         "attributes": [
             ("نوع رقم", "اصلاح‌شده گواهی‌شده"),
             ("قوه‌نامیه", "بالای ۹۰٪"),
@@ -620,6 +692,13 @@ TEST_PRODUCTS = [
             "variety": "هیبرید F1",
             "weight": "بسته ۵۰۰ عددی",
         },
+        "agri": {
+            "kind": "seed",
+            "germination_rate": 92,
+            "planting_season": "spring",
+            "seed_treatment": False,
+            "variety_name": "هیبرید F1 فضای باز",
+        },
         "attributes": [
             ("نوع رقم", "هیبرید F1"),
             ("روز تا برداشت", "۴۵ تا ۵۵ روز"),
@@ -645,6 +724,13 @@ TEST_PRODUCTS = [
             "crop_type": "سیب",
             "variety": "گلدن دلیشز / پایه MM106",
             "weight": "ارتفاع ۱۲۰-۱۵۰ سانتی‌متر",
+        },
+        "agri": {
+            "kind": "seedling",
+            "rootstock": "MM106",
+            "scion_variety": "گلدن دلیشز",
+            "age_years": 2,
+            "height_cm": 135,
         },
         "attributes": [
             ("سن نهال", "دو ساله پیوندی"),
@@ -672,6 +758,13 @@ TEST_PRODUCTS = [
             "crop_type": "پسته",
             "variety": "اکبری / پایه بادامی",
             "weight": "ارتفاع ۸۰-۱۱۰ سانتی‌متر",
+        },
+        "agri": {
+            "kind": "seedling",
+            "rootstock": "بادامی زرند",
+            "scion_variety": "اکبری",
+            "age_years": 2,
+            "height_cm": 95,
         },
         "attributes": [
             ("سن نهال", "دو ساله پیوندی"),
@@ -847,10 +940,52 @@ TEST_PRODUCTS = [
             "material": "فولاد منگنزی",
             "weight": "۱۴۵۰ کیلوگرم",
         },
+        "machine": {
+            "kind": "implement",
+            "implement_type": "disc",
+            "working_width": "2.40",
+            "compatible_tractors": "فرگوسن ۲۸۵، رومانی ۶۵۰، جاندیر ۳۳۵۰",
+            "warranty_months": 12,
+        },
         "attributes": [
             ("تعداد پره", "۲۴ عدد"),
             ("عرض کار", "۲.۴ متر"),
             ("گارانتی", "۱۲ ماهه شاسی"),
+        ],
+    },
+    {
+        "slug": "ferguson-285-tractor",
+        "title": "تراکتور فرگوسن ۲۸۵ دو دیفرانسیل (نو)",
+        "category": "equipment",
+        "subcategory": "machinery",
+        "description": "تراکتور ۸۵ اسب فرگوسن ۲۸۵ دو دیفرانسیل، مدل ۱۴۰۳، صفر کیلومتر با گارانتی ۱۲ ماهه؛ مناسب زراعت، باغ و حمل‌ونقل مزرعه. تحویل از نمایندگی با پلاک و سند رسمی.",
+        "price": 1850000000,
+        "stock": 2,
+        "sales_count": 7,
+        "brand": "تراکتورسازی تبریز",
+        "package_weight": "۸۵ اسب",
+        "sku": "EQP-TRC-285",
+        "views": 11200,
+        "tags": ["field-crop"],
+        "detail": {
+            "kind": "equipment",
+            "tool_type": "تراکتور دو دیفرانسیل",
+            "material": "بدنه فولادی",
+            "weight": "۳۱۰۰ کیلوگرم",
+        },
+        "machine": {
+            "kind": "tractor",
+            "horsepower": 85,
+            "manufacture_year": 1403,
+            "working_hours": 0,
+            "warranty_months": 12,
+            "is_second_hand": False,
+        },
+        "attributes": [
+            ("توان موتور", "۸۵ اسب بخار"),
+            ("سال ساخت", "۱۴۰۳"),
+            ("دیفرانسیل", "دو دیفرانسیل (۴WD)"),
+            ("گارانتی", "۱۲ ماهه"),
         ],
     },
     # ================================= آبیاری =================================

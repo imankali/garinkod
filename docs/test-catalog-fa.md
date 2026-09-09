@@ -26,7 +26,7 @@ pip install -r requirements-dev.txt
 | migrate | `manage.py migrate` | ساخت جدول‌ها (SQLite) |
 | لوکیشن/نهاده/محتوا | `seed_locations` / `seed_agri_inputs` / `seed_site_content --with-landing` | استان/شهر، دوز کود و سم، خدمات و صفحات |
 | بازار | `seed_demo_marketplace` | ۵ غرفه + ۷ آگهی + پست/استوری |
-| **کاتالوگ تستی** | **`seed_test_catalog`** | **۶ دسته + ۲۴ زیردسته + ۳۱ محصول + ۸ برچسب + ۲ کوپن** |
+| **کاتالوگ تستی** | **`seed_test_catalog`** | **۶ دسته + ۲۴ زیردسته + ۳۲ محصول + ۸ برچسب + ۲ کوپن + پروفایل نهاده/ماشین‌آلات** |
 | تصاویر | `process_async_tasks --limit 200` | ساخت نسخه‌های AVIF/WebP |
 
 > دستور `seed_test_catalog` کاملا **idempotent** است: هر چند بار اجرایش کنی، رکورد تکراری ساخته نمی‌شود و ویرایش‌های فایل دیتا روی رکوردهای قبلی اعمال می‌شود.
@@ -40,7 +40,7 @@ pip install -r requirements-dev.txt
 | `pesticide` | سموم دفع آفات | ۵ | علف‌کش، قارچ‌کش، حشره‌کش، کنه‌کش + ۱ قلم عمده (تماس بگیرید) |
 | `fertilizer` | کود کشاورزی | ۵ | اوره، NPK، هیومیک، ریزمغذی، کلات آهن (نزدیک انقضا) |
 | `seed` | بذر و نهال | ۵ | بذر گلخانه‌ای/زراعی/صیفی + ۲ نهال (یکی ناموجود) |
-| `equipment` | ادوات کشاورزی | ۶ | ۲ سمپاش، فیلتر، ست هرس، تیلر + دیسک استعلامی |
+| `equipment` | ادوات کشاورزی | ۷ | ۲ سمپاش، فیلتر، ست هرس، تیلر + دیسک استعلامی + تراکتور |
 | `irrigation` | آبیاری | ۵ | تیپ، آبپاش، پمپ، شیر + ۱ قلم ناموجود |
 | `tools` | ابزار باغبانی | ۵ | قیچی، ست باغچه، لباس کار، کودپاش دستی، کیت پیوند |
 
@@ -54,6 +54,7 @@ pip install -r requirements-dev.txt
 - ⚖️ **فروش فله**: اوره، گندم، پاراکوات (`min_order_quantity` + `bulk_note`)
 - 📐 **چندبسته‌ای**: اوره، گلایفوزیت، بذر گوجه، گندم → انتخاب بسته در صفحه محصول
 - 💬 **۱۲ دیدگاه** با امتیاز → ستاره‌ها، فیلتر `min_rating`، صفحه «تجربه خرید مشتریان»
+- 🚜 **۱۳ پروفایل نهاده + ۲ پروفایل ماشین‌آلات** → endpointهای `/api/inputs/fertilizers|pesticides|seeds|seedlings/` و `/api/machinery/tractors|implements/`
 - 🎟️ **کوپن‌ها**: `TEST10` (۱۰٪ تا سقف ۲۰۰ هزار) و `WELCOME50` (۵۰ هزار ثابت)
 
 ## ۳. اجرای سایت بعد از سید
@@ -88,6 +89,7 @@ npm run dev -- --host 0.0.0.0
 - [ ] صفحات `/c/fertilizer` (دسته)، `/brand/...` (برند)، `/tag/greenhouse` (برچسب) محصول نشان می‌دهند
 - [ ] بازار (`/marketplace`): غرفه‌ها، آگهی‌ها، دنبال‌کردن، گفت‌وگو
 - [ ] ماشین‌حساب دوز (نهاده‌ها)، انتخاب استان/شهر (لوکیشن)، خدمات و صفحات اطلاعاتی
+- [ ] endpointهای ماژول‌های holding: `/api/inputs/pesticides/` ،`/api/inputs/fertilizers/` ،`/api/inputs/seeds/` ،`/api/inputs/seedlings/` ،`/api/machinery/tractors/` ،`/api/machinery/implements/`
 
 ## ۵. دستورهای کاربردی
 
@@ -126,6 +128,8 @@ min_order_quantity, bulk_note,
 production_days_ago | expiry_in_days,        # تاریخ نسبی
 tags: [slug, ...],
 detail: {kind, ...},                          # مشخصات تخصصی دسته
+agri: {kind, ...},                            # پروفایل نهاده (fertilizer|pesticide|seed|seedling)
+machine: {kind, ...},                         # پروفایل ماشین‌آلات (tractor|implement)
 attributes: [(label, value), ...],            # جدول مشخصات
 packages: [{label, weight_kg, price, ...}],   # بسته‌بندی‌ها
 reviews: [{name, body, rating, ...}],         # دیدگاه‌ها

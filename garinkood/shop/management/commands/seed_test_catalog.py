@@ -15,8 +15,10 @@ Usage (from ``garinkood/``)::
 What it creates:
   * 6 categories + 24 subcategories (slugs match the storefront MegaMenu)
   * 8 usage tags
-  * 31 products (5–6 per category) with Persian titles, brands, prices,
-    discounts, spec tables, packages, detail rows and reviews
+  * 32 products (5 per category, 7 in equipment) with Persian titles, brands,
+    prices, discounts, spec tables, packages, detail rows and reviews
+  * linked agri_inputs/machinery profiles so /api/inputs/* and /api/machinery/*
+    also serve test data
   * placeholder cover + gallery images (generated locally with Pillow, no
     network needed) unless --skip-images is passed
   * 2 test coupons (TEST10, WELCOME50) for checkout testing
@@ -259,6 +261,14 @@ class Command(BaseCommand):
             fields = {key: value for key, value in detail.items() if key != "kind"}
             model.objects.update_or_create(product=product, defaults=fields)
 
+        # Holding-module profiles (optional one-to-one rows).
+        agri = entry.get("agri")
+        if agri:
+            self._seed_agri_profile(product, agri, today)
+        machine = entry.get("machine")
+        if machine:
+            self._seed_machine_profile(product, machine)
+
         # Spec table: rewrite so removed rows disappear on re-seed.
         product.attributes.all().delete()
         attributes = [
@@ -315,6 +325,99 @@ class Command(BaseCommand):
                 blob = make_placeholder_image(f"{product.slug}-g{order}", colour, shade=order)
                 shot = ProductImage(product=product, caption=caption, order=order)
                 shot.image.save(f"test/{product.slug}-g{order}.jpg", ContentFile(blob), save=True)
+
+    # -- holding-module profiles -------------------------------------------
+    @staticmethod
+    def _seed_agri_profile(product: Product, spec: dict, today) -> None:
+        """One-to-one agri_inputs row so /api/inputs/* has test data.
+
+        Fertiliser/pesticide expiry falls back to the product's own expiry
+        when the spec does not declare its own relative date.
+        """
+        kind = spec["kind"]
+        if spec.get("expiry_in_days") is not None:
+            expiry = today + timedelta(days=spec["expiry_in_days"])
+        else:
+            expiry = product.expiry_date
+        if kind == "fertilizer":
+            from agri_inputs.models import Fertilizer
+
+            Fertilizer.objects.update_or_create(
+                product=product,
+                defaults={
+                    "registration_number": spec["registration_number"],
+                    "active_ingredient": spec["active_ingredient"],
+                    "npk_ratio": spec["npk_ratio"],
+                    "expiry_date": expiry,
+                },
+            )
+        elif kind == "pesticide":
+            from agri_inputs.models import Pesticide
+
+            Pesticide.objects.update_or_create(
+                product=product,
+                defaults={
+                    "registration_number": spec["registration_number"],
+                    "target_pest": spec["target_pest"],
+                    "toxicity_level": spec.get("toxicity_level", "medium"),
+                    "waiting_period": spec["waiting_period"],
+                    "expiry_date": expiry,
+                },
+            )
+        elif kind == "seed":
+            from agri_inputs.models import Seed
+
+            Seed.objects.update_or_create(
+                product=product,
+                defaults={
+                    "germination_rate": spec["germination_rate"],
+                    "planting_season": spec.get("planting_season", "spring"),
+                    "seed_treatment": spec.get("seed_treatment", False),
+                    "variety_name": spec["variety_name"],
+                },
+            )
+        elif kind == "seedling":
+            from agri_inputs.models import Seedling
+
+            Seedling.objects.update_or_create(
+                product=product,
+                defaults={
+                    "rootstock": spec["rootstock"],
+                    "scion_variety": spec["scion_variety"],
+                    "age_years": spec["age_years"],
+                    "height_cm": spec["height_cm"],
+                },
+            )
+
+    @staticmethod
+    def _seed_machine_profile(product: Product, spec: dict) -> None:
+        """One-to-one machinery row so /api/machinery/* has test data."""
+        kind = spec["kind"]
+        if kind == "tractor":
+            from machinery.models import Tractor
+
+            Tractor.objects.update_or_create(
+                product=product,
+                defaults={
+                    "horsepower": spec["horsepower"],
+                    "manufacture_year": spec["manufacture_year"],
+                    "working_hours": spec.get("working_hours", 0),
+                    "warranty_months": spec.get("warranty_months", 0),
+                    "is_second_hand": spec.get("is_second_hand", False),
+                },
+            )
+        elif kind == "implement":
+            from machinery.models import Implement
+
+            Implement.objects.update_or_create(
+                product=product,
+                defaults={
+                    "implement_type": spec["implement_type"],
+                    "working_width": spec["working_width"],
+                    "compatible_tractors": spec.get("compatible_tractors", ""),
+                    "warranty_months": spec.get("warranty_months", 0),
+                },
+            )
 
     # -- coupons ---------------------------------------------------------
     @staticmethod
