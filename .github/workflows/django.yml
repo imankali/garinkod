@@ -86,6 +86,11 @@ jobs:
   # indistinguishable from an abuser to a 120/hour anonymous budget.
   e2e:
     runs-on: ubuntu-latest
+    # The suite reports itself on the pull request when it goes red — a run nobody
+    # can read the log of is a run nobody can act on.
+    permissions:
+      contents: read
+      pull-requests: write
     # The journey suite is the slow one on purpose: every storefront test
     # registers a real account through the form, and axe walks eight pages.
     # Three workers with one retry keeps a genuine failure inside the budget
@@ -210,7 +215,7 @@ jobs:
                   // selector, which violation — is the second or third.
                   const message = ((result.error && result.error.message) || 'failed')
                     .split('\n').map((line) => line.trim()).filter(Boolean).slice(0, 3).join(' · ') || 'failed';
-                  rows.push('| ' + spec.file + ' | ' + spec.title + ' | ' + message.slice(0, 170).replace(/\|/g, '/') + ' |');
+                  rows.push('| ' + spec.file + ' | ' + spec.title + ' | ' + message.slice(0, 600).replace(/\|/g, '/') + ' |');
                 }
               }));
             };
@@ -219,8 +224,30 @@ jobs:
             out += '| spec | test | first line of the error |\n|---|---|---|\n' + rows.join('\n') + '\n';
           }
           fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, out);
+          fs.writeFileSync('/tmp/e2e-summary.md', out);
           process.stdout.write(out);
           "
+
+      - name: Report the failures on the pull request
+        if: failure() && github.event_name == 'pull_request'
+        working-directory: frontend
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        # Only when red: a green run has nothing to say, and a thread full of
+        # "all good" is how people stop reading them.
+        run: |
+          {
+            echo "## Playwright — desktop-chromium · run ${{ github.run_id }}"
+            echo
+            if [ -f /tmp/e2e-summary.md ]; then
+              sed -n '1,120p' /tmp/e2e-summary.md
+            else
+              echo "_the suite produced no results file — it failed before finishing_"
+            fi
+            echo
+            echo "_artefact: \`playwright-report\` (html + junit + json) for traces and screenshots._"
+          } | gh pr comment "$PR_NUMBER" --body-file -
 
       - name: Fail when the suite failed
         if: steps.suite.outputs.status != '0'
