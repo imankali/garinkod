@@ -289,7 +289,7 @@ export default function Shop({ compareItems, onToggleCompare }: ShopProps) {
       })),
       maxPrice: facetData.max_price || 0,
     };
-  }, [facetData, source]);
+  }, [facetData]);
 
   useEffect(() => {
     let cancelled = false;

@@ -145,11 +145,17 @@ export default function ShopFilterBar({
     }
   }, [filters.minPrice, filters.maxPrice, showPrice]);
 
-  const categories = readCsv(filters.category);
-  const subcategories = readCsv(filters.subcategory);
-  const brands = readCsv(filters.brand);
-  const packs = readCsv(filters.pack);
-  const orderings = readCsv(filters.ordering);
+  /*
+    The parsed filters, memoised on the query string rather than recomputed on
+    every render. The lists below are handed to child memos and to `selected`
+    props, and a fresh array identity each render would invalidate all of them —
+    the URL changes when a filter changes, and nothing else.
+  */
+  const categories = useMemo(() => readCsv(filters.category), [filters.category]);
+  const subcategories = useMemo(() => readCsv(filters.subcategory), [filters.subcategory]);
+  const brands = useMemo(() => readCsv(filters.brand), [filters.brand]);
+  const packs = useMemo(() => readCsv(filters.pack), [filters.pack]);
+  const orderings = useMemo(() => readCsv(filters.ordering), [filters.ordering]);
 
   const setCategory = (value: string) =>
     onChange({ category: writeCsv(toggleInList(categories, value)) || undefined, page: undefined });
@@ -175,7 +181,7 @@ export default function ShopFilterBar({
       categories.length === 0
         ? []
         : facets.subcategories.filter((option) => !option.category || categories.includes(option.category)),
-    [categories.join(','), facets.subcategories],
+    [categories, facets.subcategories],
   );
 
   const labelOf = (options: FacetOption[], value: string) =>
@@ -445,7 +451,7 @@ function SortFacet({
       if (conflict) taken.add(conflict);
     });
     return taken;
-  }, [selected.join(','), sorts]);
+  }, [selected, sorts]);
 
   const summary = selected.length
     ? `${sorts.find((sort) => sort.value === selected[0])?.label || 'مرتب‌سازی'}${selected.length > 1 ? ` +${(selected.length - 1).toLocaleString('fa-IR')}` : ''}`

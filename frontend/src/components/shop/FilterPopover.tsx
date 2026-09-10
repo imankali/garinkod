@@ -94,7 +94,7 @@ export function FilterShell({
       >
         <span className="truncate">{summary || label}</span>
         {badge ? (
-          <span className="rounded-full bg-emerald-600 px-1.5 text-[10px] font-extrabold leading-5 text-white">
+          <span className="rounded-full bg-emerald-600 px-1.5 text-fluid-2xs font-extrabold leading-5 text-white">
             {badge.toLocaleString('fa-IR')}
           </span>
         ) : null}

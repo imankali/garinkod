@@ -18,7 +18,7 @@
 
 import { useEffect, useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router';
-import { Camera, LogIn, Store } from 'lucide-react';
+import { Camera, Store } from 'lucide-react';
 
 import { agricultureApi } from '../api/services';
 import StorefrontForm from '../components/storefront/StorefrontForm';
@@ -82,26 +82,11 @@ export default function Studio() {
   }
 
   if (gate === 'signed-out') {
-    return (
-      <main className="mx-auto max-w-3xl px-[var(--page-gutter)] py-12">
-        <section className="rounded-3xl border border-emerald-100 bg-white p-6 text-center shadow-sm dark:border-emerald-900 dark:bg-emerald-950 sm:p-10">
-          <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-200">
-            <Camera size={24} aria-hidden="true" />
-          </span>
-          <h1 className="mt-4 text-fluid-2xl font-extrabold text-slate-800 dark:text-white">استودیو غرفه</h1>
-          <p className="mx-auto mt-3 max-w-md text-fluid-sm leading-7 text-slate-600 dark:text-emerald-100">
-            با غرفه خودتان می‌توانید آگهی محصول، پست و استوری ۲۴ ساعته منتشر کنید. برای شروع وارد حساب خود شوید.
-          </p>
-          <Link
-            to="/login"
-            className="mt-5 inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-emerald-600 px-5 text-fluid-sm font-extrabold text-white transition hover:bg-emerald-700"
-          >
-            <LogIn size={16} aria-hidden="true" />
-            ورود یا ثبت‌نام
-          </Link>
-        </section>
-      </main>
-    );
+    // The same convention as every other protected address on the site: hand the
+    // visitor to the login page with this one remembered, so signing in returns
+    // them here and the gate resolves again — this time onto the form or their
+    // own غرفه. A page that only *explains* the gate strands them.
+    return <Navigate to="/login" replace state={{ from: '/studio' }} />;
   }
 
   return (

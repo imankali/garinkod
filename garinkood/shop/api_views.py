@@ -2091,6 +2091,10 @@ class StorefrontPostViewSet(viewsets.ModelViewSet):
     """
 
     serializer_class = StorefrontPostSerializer
+    # The storefronts page asks for the five most-liked posts and Explore asks for
+    # its own strip per page; with the default paginator both were handed twelve
+    # rows whatever they requested. Same ceiling as the catalogue rails.
+    pagination_class = ClientConfigurablePagination
     filter_backends = [OrderingFilter]
     # The counters are annotated onto the queryset below, so they are orderable:
     # «پست‌های غرفه‌داران» on the storefronts page asks for ``-likes_total`` and

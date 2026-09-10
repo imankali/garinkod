@@ -147,9 +147,15 @@ export default function MarketplaceListingCard({
             </span>
           </span>
         ) : null}
+        {/*
+          A card whose seller has nothing to sell says so in the same words the
+          rest of the site uses («ناموجود» — the listing is unpublished or its
+          quantity has run out); «وضعیت», the label that used to sit here, only
+          pointed at the idea of a status without naming it.
+        */}
         {!listing.is_purchasable && (
           <span className="absolute end-2.5 top-2.5 rounded-full bg-slate-900/80 px-2.5 py-1 text-fluid-2xs font-bold text-white">
-            {t('common.status')}
+            ناموجود
           </span>
         )}
       </Link>

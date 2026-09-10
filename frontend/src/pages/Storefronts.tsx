@@ -22,7 +22,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import toast from 'react-hot-toast';
 import {
   ArrowLeft, ChevronLeft, ChevronRight, Search, SlidersHorizontal, Sparkles,
   Store, TrendingUp, UserPlus, X, Flame,
@@ -122,7 +121,6 @@ const LISTING_SECTIONS: Array<{
 ];
 
 export default function Storefronts() {
-  const { t } = useTranslation();
   const navigate = useNavigate();
   const reduceMotion = useReducedMotion();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -150,13 +148,23 @@ export default function Storefronts() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch]);
 
-  // The seller's own stall decides what the hero button does: build one, or
-  // open the one you already have.
+  // The seller's own stall decides what the hero button does: build one, or open
+  // the one you already have. Only this one request needs a session — asking
+  // while signed out just collects a 401.
   useEffect(() => {
+    if (!isAuthenticated) {
+      setStorefront(null);
+      return;
+    }
     agricultureApi
       .getStorefront()
       .then((response) => setStorefront(response.data || null))
       .catch(() => setStorefront(null));
+  }, [isAuthenticated]);
+
+  // Everything else on this page is public, and must load for a visitor too: the
+  // suggested stalls, the posts, the province list the filters are built from.
+  useEffect(() => {
     locationsApi
       .provinces()
       .then((response) => setProvinces(response.data.results))
@@ -257,14 +265,7 @@ export default function Storefronts() {
                 type="button"
                 whileHover={reduceMotion ? undefined : { y: -3 }}
                 whileTap={reduceMotion ? undefined : { scale: 0.97 }}
-                onClick={() => {
-                  if (!isAuthenticated) {
-                    toast('برای ساخت غرفه وارد حساب کاربری خود شوید.');
-                    navigate('/login');
-                    return;
-                  }
-                  setCreating(true);
-                }}
+                onClick={() => setCreating(true)}
                 className="flex min-h-11 items-center gap-1.5 rounded-xl bg-white px-4 text-fluid-sm font-extrabold text-emerald-800 transition hover:bg-lime-100"
               >
                 <UserPlus size={16} aria-hidden="true" />
@@ -348,7 +349,7 @@ export default function Storefronts() {
       {/* The directory */}
       <div id="directory" className="mt-10 scroll-mt-28">
         <h2 className="mb-3 text-fluid-lg font-extrabold text-slate-800 dark:text-white">
-          {t('storefronts.tab.stores')}
+          همه غرفه‌داران
         </h2>
         {/* Sticks below the header, not under it — top-0 put this bar behind the
             sticky header on every scroll. */}

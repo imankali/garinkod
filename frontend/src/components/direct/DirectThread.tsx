@@ -9,7 +9,7 @@
 // original above the new bubble, edit swaps the composer into edit mode, and
 // delete leaves a "پیام حذف شد" placeholder so quotes still make sense.
 
-import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -66,6 +66,25 @@ function quoteSummary(quote: QuotedMessage, t: (key: string) => string): string 
   if (quote.attachment_type === 'audio') return '🎤 پیام صوتی';
   if (quote.listing_title) return `📦 ${quote.listing_title}`;
   return '';
+}
+
+/**
+ * Fold a re-fetched window into the list without discarding older pages.
+ *
+ * A quiet refresh while the reader has scrolled back through history must not
+ * throw that history away: rows older than the window are kept, rows inside it
+ * are replaced with their fresh copies (edits and deletions land there), and
+ * anything new at the end is appended.
+ */
+export function mergeWindow(
+  existing: StorefrontMessage[],
+  window: StorefrontMessage[],
+): StorefrontMessage[] {
+  if (existing.length === 0 || window.length === 0) return window.length ? window : existing;
+  const windowIds = new Set(window.map((message) => message.id));
+  const firstOfWindow = Math.min(...windowIds);
+  const older = existing.filter((message) => message.id < firstOfWindow && !windowIds.has(message.id));
+  return [...older, ...window];
 }
 
 /** Merge a fresh copy of a message into the list, by id. */
@@ -132,6 +151,9 @@ export default function DirectThread({
    */
   const [desk, setDesk] = useState<DeskState | null>(null);
 
+  /** Whether the thread has messages before the window currently on screen. */
+  const [olderAvailable, setOlderAvailable] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const mediaInputRef = useRef<HTMLInputElement>(null);
@@ -143,7 +165,9 @@ export default function DirectThread({
       if (!quiet) setLoading(true);
       try {
         const response = await messagesApi.messages(conversationId, { pageSize: THREAD_PAGE_SIZE });
-        setMessages(response.data.results || []);
+        const window = response.data.results || [];
+        setMessages((current) => (quiet ? mergeWindow(current, window) : window));
+        setOlderAvailable(Boolean(response.data.older_available));
         const thread = response.data.conversation;
         if (thread) {
           setConversation(thread);
@@ -254,11 +278,58 @@ export default function DirectThread({
     return () => clearInterval(interval);
   }, [messages, load]);
 
-  useEffect(() => {
-    // Keep the newest message in view as the thread grows.
+  /*
+    Scroll discipline, which a chat is judged on:
+
+    • a new message (or the first paint) belongs in view, so jump to the bottom;
+    • loading older messages must NOT move the viewport — the row the reader was
+      looking at has to stay exactly where it was, only with more above it;
+    • a quiet poll that changes nothing must not twitch at all.
+
+    Height-based rules on `messages.length` did none of these: prepending history
+    scrolled the reader to the newest message, which is the one place a chat must
+    never send someone who is reading backwards.
+  */
+  const metricsRef = useRef({ height: 0, top: 0, firstId: null as number | null, lastId: null as number | null });
+  useLayoutEffect(() => {
     const element = scrollRef.current;
-    if (element) element.scrollTop = element.scrollHeight;
-  }, [messages.length]);
+    if (!element) return undefined;
+    const metrics = metricsRef.current;
+    const firstId = messages[0]?.id ?? null;
+    const lastId = messages[messages.length - 1]?.id ?? null;
+    const prepended =
+      metrics.firstId !== null && firstId !== null && firstId !== metrics.firstId && lastId === metrics.lastId;
+    if (prepended) {
+      element.scrollTop = element.scrollHeight - metrics.height + metrics.top;
+    } else if (lastId !== metrics.lastId) {
+      element.scrollTop = element.scrollHeight;
+    }
+    metricsRef.current = { height: element.scrollHeight, top: element.scrollTop, firstId, lastId };
+    return undefined;
+  });
+
+  /** Pull the window of messages before the oldest one on screen. */
+  const loadOlder = useCallback(async () => {
+    const oldest = messages[0];
+    if (!oldest || loadingOlder) return;
+    setLoadingOlder(true);
+    try {
+      const response = await messagesApi.messages(conversationId, {
+        pageSize: THREAD_PAGE_SIZE,
+        beforeId: oldest.id,
+      });
+      const older = response.data.results || [];
+      // The thread was marked seen when it opened — the window ends at the
+      // newest message, so nothing is left unseen below it. Walking back up does
+      // not have to touch receipts again, and does not ask the server to.
+      setOlderAvailable(Boolean(response.data.older_available));
+      setMessages((current) => [...older, ...current]);
+    } catch {
+      toast.error('پیام‌های قدیمی‌تر بارگذاری نشد.');
+    } finally {
+      setLoadingOlder(false);
+    }
+  }, [conversationId, messages, loadingOlder]);
 
   // Switching threads drops any half-finished reply/edit, and a land that was
   // about to be shared in the other conversation.
@@ -268,6 +339,10 @@ export default function DirectThread({
     setMenuFor(null);
     setBody('');
     attachLand(null);
+    // A new thread starts at its newest window, and the scroll memory of the
+    // previous one must not be applied to it.
+    setOlderAvailable(false);
+    metricsRef.current = { height: 0, top: 0, firstId: null, lastId: null };
   }, [conversationId, attachLand]);
 
   // Close an open bubble menu on outside tap or Escape.
@@ -565,6 +640,18 @@ export default function DirectThread({
           </div>
         ) : (
           <>
+            {olderAvailable && (
+              <div className="pb-1 text-center">
+                <button
+                  type="button"
+                  onClick={() => void loadOlder()}
+                  disabled={loadingOlder}
+                  className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-emerald-200 bg-white/80 px-3.5 text-fluid-2xs font-bold text-emerald-700 transition hover:bg-white disabled:opacity-60 dark:border-emerald-800 dark:bg-emerald-950/70 dark:text-lime-300"
+                >
+                  {loadingOlder ? t('common.loading') : 'پیام‌های قدیمی‌تر'}
+                </button>
+              </div>
+            )}
             {messages.map((message) => (
             <MessageBubble
               key={message.id}

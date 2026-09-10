@@ -17,7 +17,7 @@
 // errors back onto these inputs.
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { motion, useReducedMotion } from 'framer-motion';
 import { CheckCircle2, Loader2, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -25,41 +25,14 @@ import toast from 'react-hot-toast';
 import { agricultureApi } from '../../api/services';
 import { parseApiError } from '../../api/errors';
 import { useAuthStore } from '../../store/authStore';
+import { isValidNationalId, nationalIdError } from '../../utils/nationalId';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import LocationPicker from '../LocationPicker';
 import type { SellerType, Storefront, StorefrontAvailability } from '../../types/storefront';
 import { cn } from '../../utils/cn';
 
-/** Persian or Arabic digits folded to ASCII, so a pasted ۰۱۲… still validates. */
-function toAsciiDigits(value: string): string {
-  let out = '';
-  for (let index = 0; index < value.length; index += 1) {
-    const char = value[index] ?? '';
-    const codePoint = char.charCodeAt(0);
-    // ۰-۹ (U+06F0) and ۰-۹ Arabic-Indic (U+0660) both start a ten-digit run.
-    if (codePoint >= 0x0660 && codePoint <= 0x0669) out += String(codePoint - 0x0660);
-    else if (codePoint >= 0x06f0 && codePoint <= 0x06f9) out += String(codePoint - 0x06f0);
-    else out += char;
-  }
-  return out;
-}
-
-/** Iranian national code: 10 digits, not all the same, with a valid check digit. */
-export function isValidNationalId(raw: string): boolean {
-  const code = toAsciiDigits(raw.trim());
-  if (!/^\d{10}$/.test(code)) return false;
-  // Both of the shapes the registry refuses outright: ten identical digits, and
-  // a code whose first six digits are one repeated digit.
-  if (/^(\d)\1{9}$/.test(code) || code.slice(0, 6) === code.slice(0, 1).repeat(6)) return false;
-  const digits = code.split('').map(Number);
-  const control = digits[9] ?? -1;
-  let sum = 0;
-  for (let index = 0; index < 9; index += 1) {
-    sum += (digits[index] ?? 0) * (10 - index);
-  }
-  const remainder = sum % 11;
-  return remainder < 2 ? control === remainder : control === 11 - remainder;
-}
+/** Where a half-filled form waits while its author signs in. */
+const DRAFT_KEY = 'garinkod:storefront-draft';
 
 const EMPTY = {
   name: '',
@@ -85,12 +58,41 @@ export default function StorefrontForm({
   variant?: 'card' | 'dialog';
 }) {
   const reduceMotion = useReducedMotion();
+  const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
+  /**
+   * The address that reopens this form after signing in. Building a غرفه is the
+   * one thing a visitor can start while signed out — name and address are checked
+   * against the registry in public — so sending them to /login and dropping the
+   * half-filled form behind them is the failure this avoids.
+   */
+  const returnTo = variant === 'card' ? '/studio' : '/storefronts?create=1';
   const [store, setStore] = useState(EMPTY);
   const [creating, setCreating] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [availability, setAvailability] = useState<StorefrontAvailability | null>(null);
   const [checking, setChecking] = useState(false);
+
+  /*
+    Signing in is a round trip through another page, and a form that loses the
+    name, the city and the national code on the way back is a form people abandon.
+    So the draft is parked for the duration — in sessionStorage, which dies with
+    the tab, because a national code has no business outliving a browsing session
+    in local storage.
+  */
+  useEffect(() => {
+    let restored: Partial<typeof EMPTY> | null = null;
+    try {
+      const raw = sessionStorage.getItem(DRAFT_KEY);
+      if (raw) {
+        sessionStorage.removeItem(DRAFT_KEY);
+        restored = JSON.parse(raw) as Partial<typeof EMPTY>;
+      }
+    } catch {
+      // A draft that cannot be read is simply no draft.
+    }
+    if (restored) setStore((current) => ({ ...current, ...restored }));
+  }, []);
 
   // The profile already knows this person's name, so the form starts filled and
   // they only correct it. The national code has no source but them.
@@ -133,8 +135,14 @@ export default function StorefrontForm({
 
   const nameStatus = availability?.name;
   const slugStatus = availability?.slug;
-  const codeTooShort = store.national_id.trim().length > 0 && store.national_id.trim().length < 10;
-  const codeInvalid = store.national_id.trim().length >= 10 && !isValidNationalId(store.national_id);
+  // Silent while the field is still untouched, worded like the server once it is
+  // not: the same problem must not read differently in the browser and in the API.
+  const nationalIdIssue = store.national_id.trim() ? nationalIdError(store.national_id) : '';
+  const identityIssues = {
+    owner_first_name: store.owner_first_name.trim() ? '' : 'نام را وارد کنید.',
+    owner_last_name: store.owner_last_name.trim() ? '' : 'نام خانوادگی را وارد کنید.',
+    national_id: nationalIdIssue,
+  };
 
   const canSubmit = useMemo(() => {
     if (!store.name.trim() || !store.province || !store.city) return false;
@@ -145,10 +153,22 @@ export default function StorefrontForm({
     return true;
   }, [store, nameStatus, slugStatus]);
 
+  function signInToContinue() {
+    try {
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify(store));
+    } catch {
+      // Storage disabled (private mode) — the form still works, it just will not
+      // survive the trip.
+    }
+    navigate('/login', { state: { from: returnTo } });
+  }
+
   async function createStore(event: FormEvent) {
     event.preventDefault();
     if (!user) {
-      toast.error('برای ساخت غرفه ابتدا وارد حساب کاربری شوید.');
+      // Not an error to shrug at: the visitor is one step from finishing, so the
+      // button takes them to the step instead of lecturing them about it.
+      signInToContinue();
       return;
     }
     setCreating(true);
@@ -165,6 +185,11 @@ export default function StorefrontForm({
         owner_last_name: store.owner_last_name.trim(),
         national_id: store.national_id.trim(),
       });
+      try {
+        sessionStorage.removeItem(DRAFT_KEY);
+      } catch {
+        // Nothing to clean up where storage is unavailable.
+      }
       toast.success('غرفه شما ساخته شد؛ آگهی‌ها پس از بررسی منتشر می‌شوند.');
       await onCreated(response.data);
     } catch (error) {
@@ -328,60 +353,48 @@ export default function StorefrontForm({
           این اطلاعات فقط برای احراز هویت و رسیدگی به اختلاف‌هاست و در صفحه عمومی غرفه نمایش داده نمی‌شود.
         </p>
         <div className="grid gap-4 sm:grid-cols-3">
-          <label className="block text-sm font-bold text-slate-700 dark:text-emerald-50">
-            نام
-            <input
-              required
-              value={store.owner_first_name}
-              onChange={(event) => setStore({ ...store, owner_first_name: event.target.value })}
-              aria-invalid={Boolean(fieldErrors.owner_first_name)}
-              className={cn(fieldClass, fieldErrors.owner_first_name && 'border-rose-400')}
-            />
-          </label>
-          <label className="block text-sm font-bold text-slate-700 dark:text-emerald-50">
-            نام خانوادگی
-            <input
-              required
-              value={store.owner_last_name}
-              onChange={(event) => setStore({ ...store, owner_last_name: event.target.value })}
-              aria-invalid={Boolean(fieldErrors.owner_last_name)}
-              className={cn(fieldClass, fieldErrors.owner_last_name && 'border-rose-400')}
-            />
-          </label>
-          <label className="block text-sm font-bold text-slate-700 dark:text-emerald-50">
-            کد ملی
-            <input
-              required
-              inputMode="numeric"
-              value={store.national_id}
-              onChange={(event) => setStore({ ...store, national_id: event.target.value })}
-              placeholder="۱۰ رقم"
-              aria-invalid={Boolean(fieldErrors.national_id || codeInvalid)}
-              aria-describedby="national-id-status"
-              className={cn(
-                fieldClass,
-                (codeInvalid || fieldErrors.national_id) && 'border-rose-400',
-                !codeInvalid && !fieldErrors.national_id && store.national_id && 'border-emerald-500',
-              )}
-            />
-          </label>
+          <IdentityField
+            id="store-owner-first-name"
+            label="نام"
+            value={store.owner_first_name}
+            error={fieldErrors.owner_first_name || identityIssues.owner_first_name}
+            onChange={(value) => setStore({ ...store, owner_first_name: value })}
+          />
+          <IdentityField
+            id="store-owner-last-name"
+            label="نام خانوادگی"
+            value={store.owner_last_name}
+            error={fieldErrors.owner_last_name || identityIssues.owner_last_name}
+            onChange={(value) => setStore({ ...store, owner_last_name: value })}
+          />
+          <IdentityField
+            id="store-national-id"
+            label="کد ملی"
+            value={store.national_id}
+            inputMode="numeric"
+            placeholder="۱۰ رقم"
+            hint="همراه با نام و نام خانوادگی روی حساب شما ذخیره می‌شود."
+            error={fieldErrors.national_id || identityIssues.national_id}
+            valid={Boolean(store.national_id.trim()) && !nationalIdIssue}
+            onChange={(value) => setStore({ ...store, national_id: value })}
+          />
         </div>
-        <p
-          id="national-id-status"
-          role={codeInvalid || fieldErrors.national_id ? 'alert' : 'status'}
-          className={cn(
-            'mt-2 text-fluid-xs font-semibold',
-            codeInvalid || codeTooShort || fieldErrors.national_id ? 'text-rose-600' : 'text-slate-400',
-          )}
-        >
-          {fieldErrors.national_id ||
-            (codeInvalid
-              ? 'کد ملی معتبر نیست؛ رقم کنترلی نمی‌خواند.'
-              : codeTooShort
-                ? 'کد ملی ۱۰ رقم است.'
-                : 'همراه با نام و نام خانوادگی روی حساب شما ذخیره می‌شود.')}
-        </p>
       </fieldset>
+
+      {!user && (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100">
+          <span>
+            نام غرفه را می‌توانید همین‌جا بررسی کنید؛ برای ثبت نهایی، وارد حساب خود شوید تا غرفه به نام شما ثبت شود.
+          </span>
+          <button
+            type="button"
+            onClick={signInToContinue}
+            className="flex min-h-11 items-center gap-1.5 rounded-xl bg-amber-600 px-4 text-xs font-bold text-white transition hover:bg-amber-700"
+          >
+            ورود یا ثبت‌نام
+          </button>
+        </div>
+      )}
 
       <motion.button
         type="submit"
@@ -390,8 +403,79 @@ export default function StorefrontForm({
         whileTap={!reduceMotion && canSubmit && !creating ? { scale: 0.97 } : undefined}
         className="mt-5 w-full rounded-xl bg-emerald-600 px-5 py-3 min-h-11 text-sm font-bold text-white disabled:opacity-50"
       >
-        {creating ? 'در حال ساخت…' : 'ساخت غرفه'}
+        {creating ? 'در حال ساخت…' : user ? 'ساخت غرفه' : 'ورود و ساخت غرفه'}
       </motion.button>
     </form>
+  );
+}
+
+/**
+ * One identity input, with its own error line.
+ *
+ * A red border alone is not feedback: the person has to be told what is wrong
+ * with the digits they typed, and a screen reader has to be pointed at that text
+ * with `aria-describedby` rather than left to guess from `aria-invalid`.
+ */
+function IdentityField({
+  id,
+  label,
+  value,
+  onChange,
+  error = '',
+  hint = '',
+  valid = false,
+  inputMode,
+  placeholder,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  error?: string;
+  hint?: string;
+  valid?: boolean;
+  inputMode?: 'numeric' | 'text';
+  placeholder?: string;
+}) {
+  const message = error || hint;
+  return (
+    <div>
+      <label
+        htmlFor={id}
+        className="block text-sm font-bold text-slate-700 dark:text-emerald-50"
+      >
+        {label}
+      </label>
+      <input
+        id={id}
+        required
+        value={value}
+        inputMode={inputMode}
+        placeholder={placeholder}
+        onChange={(event) => onChange(event.target.value)}
+        aria-invalid={Boolean(error)}
+        aria-describedby={message ? `${id}-status` : undefined}
+        className={cn(
+          'w-full rounded-xl border px-3 py-2.5 outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:bg-emerald-900',
+          error
+            ? 'border-rose-400'
+            : valid
+              ? 'border-emerald-500'
+              : 'border-slate-200 dark:border-emerald-700',
+        )}
+      />
+      {message && (
+        <p
+          id={`${id}-status`}
+          role={error ? 'alert' : undefined}
+          className={cn(
+            'mt-1 text-fluid-xs font-semibold',
+            error ? 'text-rose-600' : 'text-slate-400',
+          )}
+        >
+          {message}
+        </p>
+      )}
+    </div>
   );
 }

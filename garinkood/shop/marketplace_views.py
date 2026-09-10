@@ -140,7 +140,13 @@ class StorefrontDirectoryViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=False, methods=['get'])
     def featured(self, request):
         """The handful of storefronts promoted on the home page."""
-        limit = min(int(request.query_params.get('limit', 5) or 5), 12)
+        # A hand-typed address must not raise: junk is the same as not asking,
+        # and the count is clamped so nobody can turn this into a full dump.
+        try:
+            limit = int(request.query_params.get('limit', 5) or 5)
+        except (TypeError, ValueError):
+            limit = 5
+        limit = max(1, min(limit, 12))
         storefronts = self.get_queryset()[:limit]
         return Response(self.get_serializer(storefronts, many=True).data)
 
@@ -398,22 +404,91 @@ class MessagePagination(PageNumberPagination):
     max_page_size = 100
 
 
-def _tail_page_size(request):
-    """How many of the newest messages to return, or ``None`` for plain paging.
+# The relations a thread row reads, joined once instead of per message. Keeping
+# it in one place is the point: the tail query and the plain query below must not
+# drift into two lists where one forgot ``post__storefront``.
+_THREAD_RELATIONS = (
+    'sender', 'sender__account', 'listing', 'listing__storefront',
+    'conversation', 'conversation__storefront',
+    'reply_to', 'reply_to__sender', 'reply_to__listing',
+    'land', 'land__owner', 'post', 'post__storefront', 'post__listing',
+)
 
-    Only the tail mode is opt-in (`?page_size=` without `?page`) so every
-    existing caller — and every test — keeps the paginated behaviour.
+
+def _thread_messages(conversation):
+    """One thread, oldest first, with every relation the serializer reads joined."""
+    return (
+        conversation.messages.select_related(*_THREAD_RELATIONS)
+        .prefetch_related('sender__desk_profiles')
+        .order_by('created_at', 'id')
+    )
+
+
+def _thread_window(request):
+    """The tail window: how many newest rows to take, and before which message.
+
+    ``?page_size=N`` with no ``?page`` asks for the *tail* of the thread, because
+    plain pagination counts from the front — a long conversation would open on
+    its first weeks, with the part the reader actually wants unreachable.
+
+    ``?before_id=<message id>`` walks further back from there, one window at a
+    time, which is how a chat loads history without a page number for something
+    that keeps growing at the other end.
+
+    Returns ``(size, before_id)``; ``size`` is ``None`` for plain pagination.
     """
-    if request.query_params.get('page'):
-        return None
     raw = request.query_params.get('page_size')
-    if raw in (None, ''):
-        return None
+    before_raw = request.query_params.get('before_id')
     try:
-        size = int(raw)
+        before_id = int(before_raw) if before_raw not in (None, '') else None
     except (TypeError, ValueError):
-        return None
-    return max(1, min(size, 100))
+        before_id = None
+
+    if request.query_params.get('page'):
+        # An explicit page number is plain pagination; the two modes do not mix.
+        return None, before_id
+
+    try:
+        size = int(raw) if raw not in (None, '') else None
+    except (TypeError, ValueError):
+        size = None  # Junk is the same as not asking: keep the default behaviour.
+    if size is None and before_id is None:
+        return None, before_id
+    if size is None:
+        size = MessagePagination.page_size
+    return max(1, min(size, MessagePagination.max_page_size)), before_id
+
+
+def _tail_window(conversation, size, before_id):
+    """``(rows, older_available)`` for the newest ``size`` messages of a thread.
+
+    ``rows`` come back oldest-first, which is what a chat window renders; the
+    window itself is chosen from the newest end.
+    """
+    from django.db.models import Q
+
+    base = _thread_messages(conversation)
+    if before_id is not None:
+        anchor = base.filter(pk=before_id).first()
+        if anchor is not None:
+            # Same-timestamp ties are broken on the id, or two messages written
+            # in the same instant would either repeat or vanish at the boundary.
+            base = base.filter(Q(created_at__lt=anchor.created_at) | Q(
+                created_at=anchor.created_at, id__lt=anchor.id
+            ))
+        else:
+            # The anchor itself was deleted; ids only ever grow, so walking back
+            # from it still lands on the right slice.
+            base = base.filter(pk__lt=before_id)
+
+    total = base.count()
+    if total <= size:
+        return list(base), False
+    newest = list(
+        base.order_by('-created_at', '-id').values_list('id', flat=True)[:size]
+    )
+    rows = list(_thread_messages(conversation).filter(pk__in=newest))
+    return rows, True
 
 
 def _participant_conversations(user):
@@ -672,12 +747,6 @@ def conversation_messages(request, conversation_id):
             )
 
     if request.method == 'GET':
-        messages = conversation.messages.select_related(
-            'sender', 'sender__account', 'listing', 'listing__storefront',
-            'conversation', 'conversation__storefront',
-            'reply_to', 'reply_to__sender', 'reply_to__listing',
-            'land', 'land__owner', 'post', 'post__storefront', 'post__listing',
-        ).prefetch_related('sender__desk_profiles').order_by('created_at')
         # Fetching a thread means the viewer has seen it: this is also what turns
         # the sender's green «sendane» tick into a read one.
         StorefrontMessage.objects.filter(conversation=conversation, is_read=False).exclude(
@@ -685,37 +754,23 @@ def conversation_messages(request, conversation_id):
         ).update(is_read=True)
         # For an operator, opening a thread is proof they are at their desk.
         desk.touch_presence(request.user)
-        paginator = MessagePagination()
         context = {'request': request}
-        # ?page_size=N with no ?page asks for the *tail* of the thread: the
-        # newest N rows, still returned oldest-first. Plain pagination counts
-        # from the front, so a long conversation opened on its first weeks and
-        # the client had no way to reach the recent part it actually needs.
-        tail = _tail_page_size(request)
-        if tail is None:
-            page = paginator.paginate_queryset(messages, request)
+        size, before_id = _thread_window(request)
+        if size is None:
+            paginator = MessagePagination()
+            page = paginator.paginate_queryset(_thread_messages(conversation), request)
             response = paginator.get_paginated_response(
                 StorefrontMessageSerializer(page, many=True, context=context).data
             )
         else:
-            newest = list(
-                messages.order_by('-created_at', '-id').values_list('id', flat=True)[:tail]
-            )
-            rows = list(
-                StorefrontMessage.objects.filter(pk__in=newest)
-                .select_related(
-                    'sender', 'sender__account', 'listing', 'listing__storefront',
-                    'conversation', 'conversation__storefront',
-                    'reply_to', 'reply_to__sender', 'reply_to__listing',
-                    'land', 'land__owner', 'post', 'post__storefront', 'post__listing',
-                )
-                .prefetch_related('sender__desk_profiles')
-                .order_by('created_at', 'id')
-            )
+            rows, older = _tail_window(conversation, size, before_id)
             response = Response({
-                'count': messages.count(),
+                # The thread's whole size, not the window's: the client shows
+                # «چند پیام قدیمی‌تر مانده» from the difference.
+                'count': conversation.messages.count(),
                 'next': None,
                 'previous': None,
+                'older_available': older,
                 'results': StorefrontMessageSerializer(rows, many=True, context=context).data,
             })
         response.data['conversation'] = StorefrontConversationSerializer(

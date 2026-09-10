@@ -576,6 +576,16 @@ export const levelsApi = {
 };
 
 // ========================================
+/**
+ * A window over one thread: the standard page envelope plus the two fields the
+ * messenger needs — the conversation header, and whether older messages remain.
+ */
+export interface ThreadMessagesResponse extends PaginatedResponse<StorefrontMessage> {
+  conversation: StorefrontConversation;
+  /** Present in tail mode: there are messages before the first row returned. */
+  older_available?: boolean;
+}
+
 export const messagesApi = {
   /** The caller's whole inbox, optionally narrowed to one channel. */
   conversations: (channel?: MessageChannel) =>
@@ -614,13 +624,20 @@ export const messagesApi = {
    * thread, so a long conversation would otherwise open on its oldest messages
    * with the recent ones unreachable.
    */
-  messages: (conversationId: number, options?: { page?: number; pageSize?: number }) =>
-    apiClient.get<PaginatedResponse<StorefrontMessage> & { conversation: StorefrontConversation }>(
+  messages: (
+    conversationId: number,
+    options?: { page?: number; pageSize?: number; beforeId?: number },
+  ) =>
+    apiClient.get<ThreadMessagesResponse>(
       `/marketplace/conversations/${conversationId}/messages/`,
       {
         params: {
           ...(options?.page ? { page: options.page } : {}),
           ...(options?.pageSize ? { page_size: options.pageSize } : {}),
+          // Walk further back from one specific message. A chat has no stable
+          // page numbers — the newest end keeps moving — so history is paged by
+          // cursor instead.
+          ...(options?.beforeId ? { before_id: options.beforeId } : {}),
         },
       },
     ),
