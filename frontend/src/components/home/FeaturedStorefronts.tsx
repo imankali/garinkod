@@ -2,48 +2,50 @@
 
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
-import { ArrowLeft, BadgeCheck, MapPin, Star, Store, Users } from 'lucide-react';
+import { ArrowLeft, Store } from 'lucide-react';
 
 import { storefrontsApi } from '../../api/services';
-import type { Storefront, StorefrontPost } from '@/types/storefront';
-import { storefrontPostsApi } from '../../api/services';
+import StorefrontCard from '../StorefrontCard';
+import type { Storefront } from '@/types/storefront';
 
 /**
- * Featured storefronts and live stories.
+ * «مستقیم از کشاورزان» — the home page's window onto the marketplace.
  *
- * The marketplace is what distinguishes this platform from a plain shop, and
- * it had no presence on the home page at all. This strip puts real sellers —
- * with their location, rating and live stories — in front of visitors.
+ * Two things used to be wrong here. The cards were a second, hand-rolled seller
+ * card (avatar + one line of meta) that looked nothing like the stall cards on
+ * the marketplace page, and a row of story bubbles sat above them, which made
+ * the home page read like a social feed rather than a shop window. Stories are a
+ * thing a returning user follows — they live in the profile now — while what
+ * belongs on the home page is the stall itself: who is selling, where, with what
+ * rating and how many ads.
  *
- * The whole section unmounts when there is nothing to show: an empty
- * "featured sellers" heading looks like a broken page, whereas simply not
- * rendering it looks intentional.
+ * So this section renders the very same StorefrontCard the storefronts directory
+ * renders, and follows the same rule: it unmounts when there is nothing to show,
+ * because an empty "featured sellers" heading looks like a broken page.
  */
 export default function FeaturedStorefronts() {
   const [storefronts, setStorefronts] = useState<Storefront[]>([]);
-  const [stories, setStories] = useState<StorefrontPost[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
-
-    Promise.allSettled([
-      storefrontsApi.featured(6),
-      storefrontPostsApi.list({ post_type: 'story' }),
-    ]).then(([featured, storyResult]) => {
-      if (cancelled) return;
-      if (featured.status === 'fulfilled') setStorefronts(featured.value.data);
-      if (storyResult.status === 'fulfilled') setStories(storyResult.value.data.results.slice(0, 10));
-      setLoading(false);
-    });
-
+    storefrontsApi
+      .featured(8)
+      .then((response) => {
+        if (!cancelled) setStorefronts(response.data);
+      })
+      .catch(() => {
+        if (!cancelled) setStorefronts([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  // A failed or empty fetch must not leave a hollow section behind.
-  if (loading || (storefronts.length === 0 && stories.length === 0)) return null;
+  if (loading || storefronts.length === 0) return null;
 
   return (
     <section className="page-shell py-8" aria-labelledby="storefronts-heading">
@@ -69,104 +71,15 @@ export default function FeaturedStorefronts() {
         </Link>
       </div>
 
-      {/* Live stories, Instagram-style. */}
-      {stories.length > 0 && (
-        <ul className="mt-5 flex gap-4 overflow-x-auto pb-2" aria-label="استوری‌های غرفه‌ها">
-          {stories.map((story) => (
-            <li key={story.id} className="shrink-0">
-              <Link
-                to={`/storefronts/${story.storefront_slug}`}
-                className="flex w-[4.5rem] flex-col items-center gap-1.5"
-              >
-                <span className="rounded-full bg-gradient-to-tr from-amber-400 to-rose-500 p-[3px]">
-                  <span className="block h-16 w-16 overflow-hidden rounded-full border-2 border-white dark:border-emerald-950">
-                    <img
-                      src={story.image_url}
-                      alt=""
-                      width={64}
-                      height={64}
-                      loading="lazy"
-                      className="h-full w-full object-cover"
-                    />
-                  </span>
-                </span>
-                <span className="w-full truncate text-center text-fluid-2xs font-semibold text-slate-600 dark:text-emerald-100">
-                  {story.storefront_name}
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {/* Seller cards. */}
-      {storefronts.length > 0 && (
-        <ul className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {storefronts.map((storefront) => (
-            <li key={storefront.id}>
-              <Link
-                to={`/storefronts/${storefront.slug}`}
-                className="flex h-full items-center gap-3 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md dark:border-emerald-900 dark:bg-emerald-950"
-              >
-                <span className="h-14 w-14 shrink-0 overflow-hidden rounded-full bg-emerald-100 dark:bg-emerald-900">
-                  {storefront.avatar_url ? (
-                    <img
-                      src={storefront.avatar_url}
-                      alt=""
-                      width={56}
-                      height={56}
-                      loading="lazy"
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <span className="flex h-full w-full items-center justify-center text-fluid-sm font-extrabold text-emerald-700 dark:text-lime-300">
-                      {storefront.name.slice(0, 2)}
-                    </span>
-                  )}
-                </span>
-
-                <span className="min-w-0 flex-1">
-                  <span className="flex min-w-0 items-center gap-1 text-fluid-sm font-extrabold text-slate-800 dark:text-white">
-                    <span className="truncate">{storefront.name}</span>
-                    {storefront.is_verified && (
-                      <BadgeCheck
-                        size={14}
-                        aria-label="غرفه تأییدشده"
-                        className="shrink-0 text-emerald-500"
-                      />
-                    )}
-                  </span>
-                  <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-fluid-2xs text-slate-500 dark:text-emerald-300">
-                    <span>{storefront.seller_type_label}</span>
-                    {storefront.city && (
-                      <span className="flex items-center gap-0.5">
-                        <MapPin size={10} aria-hidden="true" />
-                        {storefront.city}
-                      </span>
-                    )}
-                    <span className="flex items-center gap-0.5">
-                      <Store size={10} aria-hidden="true" />
-                      {storefront.listing_count} آگهی
-                    </span>
-                    {storefront.followers_count > 0 && (
-                      <span className="flex items-center gap-0.5">
-                        <Users size={10} aria-hidden="true" />
-                        {storefront.followers_count}
-                      </span>
-                    )}
-                    {Number(storefront.rating) > 0 && (
-                      <span className="flex items-center gap-0.5">
-                        <Star size={10} aria-hidden="true" className="text-amber-400" />
-                        {storefront.rating}
-                      </span>
-                    )}
-                  </span>
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
+      {/* Four cards on a desktop row, two on a tablet, one on a phone: the same
+          rhythm as the directory, so the section is recognisably the same thing. */}
+      <ul className="mt-5 grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+        {storefronts.map((storefront) => (
+          <li key={storefront.id}>
+            <StorefrontCard storefront={storefront} />
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }

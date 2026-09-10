@@ -207,7 +207,13 @@ class OrderAndPlatformTests(TestCase):
         self.client.force_authenticate(self.seller)
         storefront = self.client.post(
             "/api/marketplace/storefront/",
-            {"name": "غرفه نمونه", "slug": "sample-stall", "seller_type": "farmer", "province": "فارس", "city": "شیراز"},
+            {
+                "name": "غرفه نمونه", "slug": "sample-stall", "seller_type": "farmer",
+                "province": "فارس", "city": "شیراز",
+                # Opening a stall requires a named owner with a valid national code.
+                "owner_first_name": "مریم", "owner_last_name": "رضایی",
+                "national_id": "3971857299",
+            },
             format="json",
         )
         self.assertEqual(storefront.status_code, 201)

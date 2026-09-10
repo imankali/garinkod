@@ -2,7 +2,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from . import (
     api_views, catalog_views, content_views, desk_views, farm_views, marketplace_views, ops_views,
-    reference_views,
+    reference_views, studio_content_views,
 )
 from .messaging.webhooks import whatsapp_webhook
 
@@ -24,9 +24,24 @@ router.register(r'articles', content_views.SiteArticleViewSet, basename='article
 router.register(r'pages', content_views.SitePageViewSet, basename='site-page')
 router.register(r'services/catalog', content_views.ServiceViewSet, basename='service')
 
+# Content production for the management console (سطح ۶ به بالا). The public
+# read-only endpoints above stay untouched: a buyer's shop page and a manager's
+# product form have different permissions and different fields, and gluing them
+# together is how "the API lets the client set stock" bugs start.
+router.register(r'management/content/products', studio_content_views.ProductWorkViewSet, basename='content-product')
+router.register(r'management/content/articles', studio_content_views.ArticleWorkViewSet, basename='content-article')
+router.register(r'management/content/categories', studio_content_views.CategoryWorkViewSet, basename='content-category')
+router.register(r'management/content/subcategories', studio_content_views.SubCategoryWorkViewSet, basename='content-subcategory')
+router.register(r'management/content/tags', studio_content_views.TagWorkViewSet, basename='content-tag')
+
 urlpatterns = [
     # API Routes (از Router)
     path('', include(router.urls)),
+    path(
+        'management/content/options/',
+        studio_content_views.StudioOptionsView.as_view({'get': 'list'}),
+        name='content_options',
+    ),
 
     # Auth Routes
     path('auth/register/', api_views.register, name='api_register'),

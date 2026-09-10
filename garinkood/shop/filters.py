@@ -3,6 +3,12 @@
 The names in this filter set are part of the frontend API contract.  Keeping
 those aliases here prevents UI query parameters from being silently ignored by
 Django Filter.
+
+The taxonomy axes (``category``, ``subcategory``, ``brand``, ``package_weight``)
+accept a comma-separated list, because a farmer shopping for «کود فسفره و اورانی»
+reasonably wants both departments at once, and a brand comparison wants two
+brands side by side. Everything else — an attribute, a search term — stays
+single-valued, since a second value would change the meaning rather than widen it.
 """
 
 import django_filters
@@ -13,23 +19,39 @@ from datetime import timedelta
 
 from .models import Product
 
+# Cap on how many values one facet may select: enough for a real comparison,
+# low enough that a crafted URL cannot turn one filter into a thousand ORs.
+MAX_SELECTED_VALUES = 24
+
+
+def csv_values(raw: str | None) -> list[str]:
+    """Split a facet parameter into clean values, order preserved, no repeats."""
+    if not raw:
+        return []
+    seen: list[str] = []
+    for part in str(raw).split(','):
+        value = part.strip()
+        if value and value not in seen:
+            seen.append(value)
+    return seen[:MAX_SELECTED_VALUES]
+
 
 class ProductFilter(django_filters.FilterSet):
-    category = django_filters.CharFilter(field_name="category__slug", lookup_expr="exact")
+    category = django_filters.CharFilter(method='filter_category')
+    subcategory = django_filters.CharFilter(method='filter_subcategory')
     min_price = django_filters.NumberFilter(field_name="price", lookup_expr="gte")
     max_price = django_filters.NumberFilter(field_name="price", lookup_expr="lte")
     in_stock = django_filters.BooleanFilter(method="filter_in_stock")
     has_discount = django_filters.BooleanFilter(field_name="discount_percent", lookup_expr="gt", label="دارای تخفیف")
-    # Facets that a wholesale catalogue is browsed by: the maker and the size of
-    # the package. Both are exact matches on indexed text columns.
-    brand = django_filters.CharFilter(field_name="brand", lookup_expr="iexact")
-    package_weight = django_filters.CharFilter(field_name="package_weight", lookup_expr="iexact")
+    # Facets a wholesale catalogue is browsed by: the maker and the size of the
+    # package. Both accept several values at once, so a comparison survives.
+    brand = django_filters.CharFilter(method='filter_brand')
+    package_weight = django_filters.CharFilter(method='filter_package_weight')
     price_on_request = django_filters.BooleanFilter(field_name="price_on_request")
     # The axes a landing/category page filters on. ``brand_slug`` is the one the
     # brand pages use, since a brand page has to survive a supplier renaming its
     # display text.
     brand_slug = django_filters.CharFilter(field_name="brand_slug", lookup_expr="exact")
-    subcategory = django_filters.CharFilter(field_name="subcategory__slug", lookup_expr="exact")
     tag = django_filters.CharFilter(field_name="tags__slug", lookup_expr="exact")
     # Star ratings and review counts are annotated by the viewset's queryset, so
     # these two filters read the same numbers the cards show — a chip can never
@@ -46,6 +68,51 @@ class ProductFilter(django_filters.FilterSet):
             "brand_slug", "subcategory", "tag", "min_rating", "has_reviews",
             "expiring_soon",
         ]
+
+    # -- multi-value taxonomy facets ---------------------------------------
+
+    @staticmethod
+    def filter_category(queryset: QuerySet, _name: str, value) -> QuerySet:
+        slugs = csv_values(value)
+        if not slugs:
+            return queryset
+        # A department includes what the warehouse filed under its own
+        # subcategories, so ticking «کود کشاورزی» can never hide a bag that was
+        # filed under «کود NPK».
+        return queryset.filter(
+            Q(category__slug__in=slugs) | Q(subcategory__category__slug__in=slugs)
+        ).distinct()
+
+    @staticmethod
+    def filter_subcategory(queryset: QuerySet, _name: str, value) -> QuerySet:
+        slugs = csv_values(value)
+        if not slugs:
+            return queryset
+        return queryset.filter(subcategory__slug__in=slugs).distinct()
+
+    @staticmethod
+    def filter_brand(queryset: QuerySet, _name: str, value) -> QuerySet:
+        brands = csv_values(value)
+        if not brands:
+            return queryset
+        from .slugs import slugify_fa
+
+        query = Q()
+        for brand in brands:
+            query |= Q(brand__iexact=brand) | Q(brand_slug=slugify_fa(brand))
+        return queryset.filter(query).distinct()
+
+    @staticmethod
+    def filter_package_weight(queryset: QuerySet, _name: str, value) -> QuerySet:
+        sizes = csv_values(value)
+        if not sizes:
+            return queryset
+        query = Q()
+        for size in sizes:
+            query |= Q(package_weight__iexact=size)
+        return queryset.filter(query).distinct()
+
+    # -- derived flags -----------------------------------------------------
 
     @staticmethod
     def filter_has_reviews(queryset: QuerySet, _name: str, value: bool | None) -> QuerySet:

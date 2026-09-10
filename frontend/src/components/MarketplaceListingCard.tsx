@@ -21,15 +21,27 @@ import SkeletonCard from './ui/SkeletonCard';
 // ever on controls that are actually enabled.
 const TACTILE = { duration: 0.2, ease: 'easeInOut' } as const;
 
+/**
+ * `discount` is the row variant used inside «پرتخفیف‌ترین‌ها».
+ *
+ * That section is already the discount list, so a «پرتخفیف‌ترین» chip on every
+ * card repeats the heading five times and pushes the price down; what a buyer
+ * needs there is the number. The variant keeps only a small red watermark of the
+ * percentage, which is a fact about the price rather than a claim about the row.
+ */
+export type ListingCardVariant = 'default' | 'discount';
+
 export default function MarketplaceListingCard({
   listing,
   index = 0,
   isLoading = false,
+  variant = 'default',
 }: {
   listing: MarketplaceListing;
   index?: number;
   /** Swaps the card for its geometry-exact shimmer (see SkeletonCard). */
   isLoading?: boolean;
+  variant?: ListingCardVariant;
 }) {
   const { t } = useTranslation();
   const addListingToCart = useCartStore((state) => state.addListingToCart);
@@ -105,21 +117,36 @@ export default function MarketplaceListingCard({
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
         </picture>
-        <div className="absolute start-2.5 top-2.5 flex max-w-[75%] flex-wrap gap-1">
-          {listing.sales_count > 0 && (
-            <span className="rounded-full bg-emerald-700 px-2.5 py-1 text-fluid-2xs font-bold text-white shadow-md">
-              پرفروش‌ترین
+        {/*
+          Badges that state something checkable, and nothing else:
+          «نو» was printed on every card forever, which is how a badge stops
+          being read at all. Stock is the seller's own declaration, and the
+          best-seller mark is a real count — both are kept.
+        */}
+        {variant === 'default' ? (
+          <div className="absolute start-2.5 top-2.5 flex max-w-[75%] flex-wrap gap-1">
+            {listing.sales_count > 0 && (
+              <span className="rounded-full bg-emerald-700 px-2.5 py-1 text-fluid-2xs font-bold text-white shadow-md">
+                پرفروش‌ترین
+              </span>
+            )}
+            {listing.is_stock && (
+              <span className="rounded-full bg-indigo-600 px-2.5 py-1 text-fluid-2xs font-bold text-white shadow-md">
+                استوک
+              </span>
+            )}
+          </div>
+        ) : discount > 0 ? (
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 flex items-center justify-center"
+          >
+            <span className="-rotate-12 rounded-lg border-2 border-rose-500/80 bg-rose-500/15 px-2.5 py-1 text-center text-fluid-sm font-extrabold text-rose-600 backdrop-blur-[1px] dark:text-rose-300">
+              ٪{discount.toLocaleString('fa-IR')}
+              <span className="block text-fluid-2xs leading-4">تخفیف</span>
             </span>
-          )}
-          {discount > 0 && (
-            <span className="rounded-full bg-brand-orange px-2.5 py-1 text-fluid-2xs font-bold text-white shadow-md">
-              پرتخفیف‌ترین · {discount.toLocaleString('fa-IR')}{t('shop.discount')}
-            </span>
-          )}
-          <span className="rounded-full bg-sky-600 px-2.5 py-1 text-fluid-2xs font-bold text-white shadow-md">
-            نو
           </span>
-        </div>
+        ) : null}
         {!listing.is_purchasable && (
           <span className="absolute end-2.5 top-2.5 rounded-full bg-slate-900/80 px-2.5 py-1 text-fluid-2xs font-bold text-white">
             {t('common.status')}
@@ -135,14 +162,16 @@ export default function MarketplaceListingCard({
           {listing.title}
         </Link>
         <p className="mt-1 truncate text-fluid-2xs text-slate-400 dark:text-emerald-300/70">
-          {listing.storefront.name} · {listing.crop_name}
+          {listing.storefront.name}
+          {' · '}
+          {listing.category_label || listing.crop_name}
         </p>
 
         <div className="mt-2.5 flex items-baseline gap-2">
           <strong className="text-sm font-extrabold text-emerald-700 dark:text-lime-300">
             {formatPrice(listing.discounted_price)}
           </strong>
-          {discount > 0 && (
+          {discount > 0 && variant === 'default' && (
             <del className="text-fluid-2xs text-slate-400">{formatPrice(listing.price)}</del>
           )}
           <span className="text-fluid-2xs text-slate-400">/ {listing.unit}</span>

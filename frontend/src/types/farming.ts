@@ -62,6 +62,13 @@ export interface FarmConsultationRequest {
   status: 'pending' | 'answered' | 'closed';
   status_label: string;
   replied_by: number | null;
+  /**
+   * The messenger thread this request is mirrored into, and how many messages
+   * it holds. A consultation is a conversation, not a form with one answer:
+   * «ادامه گفتگو» needs the thread id to open it.
+   */
+  conversation_id: number | null;
+  thread_message_count: number;
   created_at: string;
   updated_at: string;
 }

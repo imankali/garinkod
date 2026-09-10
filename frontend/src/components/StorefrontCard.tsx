@@ -1,13 +1,29 @@
 import { useState, type MouseEvent } from 'react';
 import { Link } from 'react-router';
-import { BadgeCheck, MapPin, Star, Store, Users } from 'lucide-react';
+import { BadgeCheck, MapPin, Star, Store, UserPlus, Users } from 'lucide-react';
+import toast from 'react-hot-toast';
 
-import { storefrontPostsApi } from '../api/services';
+import { storefrontPostsApi, storefrontsApi } from '../api/services';
+import { useAuthStore } from '../store/authStore';
 import type { Storefront, StorefrontPost } from '@/types/storefront';
+import { parseApiError } from '../api/errors';
 import { cn } from '../utils/cn';
 import StoryViewer from './social/StoryViewer';
 
+/**
+ * One غرفه in a grid — the card the storefronts directory and the home page's
+ * «مستقیم از کشاورزان» section both render, so the marketplace looks like one
+ * thing wherever it appears.
+ *
+ * Following lives here rather than on the storefront page because the decision
+ * is made while browsing: «این غرفه را دنبال می‌کنم» should not require opening
+ * it first.
+ */
 export default function StorefrontCard({ storefront }: { storefront: Storefront }) {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const [following, setFollowing] = useState(Boolean(storefront.is_following));
+  const [followers, setFollowers] = useState(storefront.followers_count);
+  const [followBusy, setFollowBusy] = useState(false);
   const [stories, setStories] = useState<StorefrontPost[]>([]);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [loadingStories, setLoadingStories] = useState(false);
@@ -32,6 +48,32 @@ export default function StorefrontCard({ storefront }: { storefront: Storefront 
       }
     } finally {
       setLoadingStories(false);
+    }
+  }
+
+  async function toggleFollow() {
+    if (!isAuthenticated) {
+      toast.error('برای دنبال کردن غرفه وارد حساب خود شوید.');
+      return;
+    }
+    setFollowBusy(true);
+    // Optimistic: the press has to feel instant on a phone, and a failed call
+    // puts the number back the same way it moved.
+    const was = following;
+    setFollowing(!was);
+    setFollowers((value) => value + (was ? -1 : 1));
+    try {
+      const response = was
+        ? await storefrontsApi.unfollow(storefront.slug)
+        : await storefrontsApi.follow(storefront.slug);
+      setFollowing(response.data.is_following);
+      setFollowers(response.data.followers_count);
+    } catch (error) {
+      setFollowing(was);
+      setFollowers((value) => value + (was ? 1 : -1));
+      toast.error(parseApiError(error).message);
+    } finally {
+      setFollowBusy(false);
     }
   }
 
@@ -130,7 +172,7 @@ export default function StorefrontCard({ storefront }: { storefront: Storefront 
             <div className="flex items-center gap-1">
               <Users size={12} />
               <dt className="sr-only">دنبال‌کننده</dt>
-              <dd>{storefront.followers_count}</dd>
+              <dd>{followers.toLocaleString('fa-IR')}</dd>
             </div>
             {Number(storefront.rating) > 0 && (
               <div className="flex items-center gap-1">
@@ -141,6 +183,24 @@ export default function StorefrontCard({ storefront }: { storefront: Storefront 
             )}
           </dl>
         </Link>
+
+        {!storefront.is_owner && (
+          <button
+            type="button"
+            onClick={() => void toggleFollow()}
+            disabled={followBusy}
+            aria-pressed={following}
+            className={cn(
+              'mt-3 flex min-h-11 items-center justify-center gap-1.5 rounded-xl border px-3 text-fluid-xs font-bold transition-colors',
+              following
+                ? 'border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700'
+                : 'border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-50 dark:border-emerald-700 dark:bg-emerald-950 dark:text-lime-300 dark:hover:bg-emerald-900',
+            )}
+          >
+            <UserPlus size={14} aria-hidden="true" />
+            {following ? 'دنبال می‌کنید' : 'دنبال کردن'}
+          </button>
+        )}
       </article>
 
       {viewerOpen && stories.length > 0 && (

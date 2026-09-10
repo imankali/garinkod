@@ -10,7 +10,6 @@ import {
   type LucideIcon,
   Sprout,
   Store,
-  Tractor,
 } from 'lucide-react';
 
 interface Shortcut {
@@ -32,17 +31,13 @@ interface Shortcut {
  * the merchandise.
  */
 const SHORTCUTS: Shortcut[] = [
-  {
-    to: '/marketplace',
-    label: 'بازار کشاورزان',
-    description: 'خرید مستقیم از غرفه‌ها',
-    icon: Tractor,
-    tone: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-lime-300',
-  },
+  // One entry for the marketplace. It used to be two cards — «بازار کشاورزان»
+  // and «غرفه‌داران» — because they were two pages, and a visitor had to guess
+  // which one held the thing they were looking for.
   {
     to: '/storefronts',
     label: 'غرفه‌داران',
-    description: 'کشاورزان و تعاونی‌ها',
+    description: 'بازار مستقیم کشاورزان و تعاونی‌ها',
     icon: Store,
     tone: 'bg-lime-100 text-lime-800 dark:bg-lime-900/40 dark:text-lime-200',
   },

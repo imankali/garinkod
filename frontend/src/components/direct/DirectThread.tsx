@@ -88,6 +88,13 @@ function mergeMessage(list: StorefrontMessage[], updated: StorefrontMessage): St
   );
 }
 
+/**
+ * Rows fetched per read of a thread. A chat window shows one screen at a time,
+ * but a poll is only cheap when it is one request — 80 rows covers a long
+ * working day without paging, and the server caps the size at 100.
+ */
+const THREAD_PAGE_SIZE = 80;
+
 export default function DirectThread({
   conversationId,
   onBack,
@@ -130,36 +137,39 @@ export default function DirectThread({
   const mediaInputRef = useRef<HTMLInputElement>(null);
   const bubbleRefs = useRef<Map<number, HTMLElement>>(new Map());
 
-  const load = useCallback(async (quiet = false) => {
-    if (!conversationId) return;
-    if (!quiet) setLoading(true);
-    try {
-      const response = await messagesApi.messages(conversationId);
-      setMessages(response.data.results || []);
-      const thread = response.data.conversation;
-      if (thread) {
-        setConversation(thread);
-        if (!conversationId) setConversationId(thread.id);
-        // Only the two service desks have hours, presence or canned replies; a
-        // private shop chat must not go looking for them.
-        if (thread.channel === 'support' || thread.channel === 'consulting') {
-          try {
-            const state = await deskApi.state(thread.channel);
-            setDesk(state.data);
-          } catch {
-            // The desk header is decoration next to the conversation itself: a
-            // failed presence poll must not look like a broken chat.
+  const load = useCallback(
+    async (quiet = false) => {
+      if (!conversationId) return;
+      if (!quiet) setLoading(true);
+      try {
+        const response = await messagesApi.messages(conversationId, { pageSize: THREAD_PAGE_SIZE });
+        setMessages(response.data.results || []);
+        const thread = response.data.conversation;
+        if (thread) {
+          setConversation(thread);
+          if (!conversationId) setConversationId(thread.id);
+          // Only the two service desks have hours, presence or canned replies; a
+          // private shop chat must not go looking for them.
+          if (thread.channel === 'support' || thread.channel === 'consulting') {
+            // Deliberately not awaited. Presence, duty hours and canned lines
+            // decorate the header; making the first paint of the thread wait for
+            // a second round trip made opening a chat feel slow for no reason.
+            void deskApi
+              .state(thread.channel)
+              .then((state) => setDesk(state.data))
+              .catch(() => undefined);
+          } else {
+            setDesk(null);
           }
-        } else {
-          setDesk(null);
         }
+      } catch {
+        // A revoked or missing thread simply shows the empty state.
+      } finally {
+        setLoading(false);
       }
-    } catch {
-      // A revoked or missing thread simply shows the empty state.
-    } finally {
-      setLoading(false);
-    }
-  }, [conversationId, setConversationId]);
+    },
+    [conversationId, setConversationId],
+  );
 
   useEffect(() => {
     void load();
@@ -478,7 +488,7 @@ export default function DirectThread({
           <button
             type="button"
             onClick={onBack}
-            className="-ms-1.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-slate-500 hover:bg-emerald-50 dark:text-emerald-200 dark:hover:bg-emerald-900 lg:hidden"
+            className="-ms-1.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-slate-500 hover:bg-emerald-50 dark:text-emerald-200 dark:hover:bg-emerald-900"
             aria-label={t('common.back')}
           >
             <ArrowRight size={17} />
@@ -943,8 +953,12 @@ function MessageBubble({
                     exit={{ opacity: 0, scale: 0.95, y: 4 }}
                     transition={{ duration: 0.14 }}
                     className={cn(
-                      'absolute bottom-full z-30 mb-1 w-44 overflow-hidden rounded-2xl border border-slate-100 bg-white p-1 text-start shadow-xl dark:border-emerald-800 dark:bg-emerald-950',
-                      mine ? 'end-0' : 'start-0',
+                      // Phones get a bottom sheet: inside a scrolling message list,
+                      // an absolutely positioned popover is clipped by the list's
+                      // own overflow, so the first item's menu lost its top rows.
+                      'fixed inset-x-3 bottom-4 z-40 flex flex-col gap-0.5 overflow-hidden rounded-2xl border border-slate-100 bg-white p-1.5 text-start shadow-2xl dark:border-emerald-800 dark:bg-emerald-950',
+                      'sm:absolute sm:inset-x-auto sm:bottom-full sm:z-30 sm:mb-1 sm:w-max sm:shadow-xl',
+                      mine ? 'sm:end-0' : 'sm:start-0',
                     )}
                   >
                     <MenuItem icon={Reply} label={t('direct.reply')} onClick={onReply} />
@@ -1130,7 +1144,7 @@ function MenuItem({
         role="menuitem"
         onClick={onClick}
         className={cn(
-          'flex min-h-10 w-full items-center gap-2.5 rounded-xl px-3 text-fluid-xs font-bold transition',
+          'flex min-h-11 w-full items-center gap-2.5 whitespace-nowrap rounded-xl px-3 text-fluid-sm font-bold transition sm:min-h-10 sm:text-fluid-xs',
           danger
             ? 'text-rose-600 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-950/40'
             : 'text-slate-700 hover:bg-emerald-50 dark:text-emerald-100 dark:hover:bg-emerald-900',

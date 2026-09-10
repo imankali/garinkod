@@ -86,7 +86,7 @@ export default function HomeHero() {
           </motion.div>
           <motion.div whileHover={reduceMotion ? undefined : { y: -4 }} whileTap={reduceMotion ? undefined : { scale: 0.97 }}>
           <Link
-            to="/marketplace"
+            to="/storefronts"
             className="inline-flex min-h-12 items-center gap-2 rounded-xl border-2 border-white/70 px-6 text-fluid-sm font-extrabold text-white transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white "
           >
             {t('home.farmersMarket')}

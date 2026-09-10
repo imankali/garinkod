@@ -323,7 +323,10 @@ def catalog_index(request):
     «همه دسته‌ها» panel all need the same list, and none of them should have to
     know how many brands or tags exist.
     """
-    categories = Category.objects.annotate(
+    # Departments only the marketplace trades in (fresh produce, livestock) are
+    # deliberately absent: this index feeds the warehouse's own browses, and a
+    # tile that can never have stock in it is a dead end for a buyer.
+    categories = Category.objects.exclude(storefront_only=True).annotate(
         product_count=Count('products', filter=Q(products__status='published'))
     ).order_by('name')
     brands = list(

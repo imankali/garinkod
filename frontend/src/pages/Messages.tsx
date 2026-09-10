@@ -34,6 +34,14 @@ export default function Messages() {
   const [activeId, setActiveId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
+  /**
+   * `?c=<id>` opens one conversation directly — a notification or the farmer's
+   * «ادامه گفتگو» button jumps into the thread instead of into the inbox. It is
+   * resolved here rather than in an effect so the auto-select below cannot win
+   * the race against it.
+   */
+  const requestedId = Number(searchParams.get('c')) || null;
+
   const load = useCallback(async () => {
     try {
       // Always fetch the whole inbox and filter on the client: the filter
@@ -43,6 +51,10 @@ export default function Messages() {
       setConversations(response.data.results || []);
       setChannels(response.data.channels || []);
       setUnreadByChannel(response.data.unread_by_channel || {});
+      if (requestedId) {
+        setActiveId((current) => current ?? requestedId);
+        return;
+      }
       // Auto-selecting the first thread only makes sense on the desktop
       // two-pane layout; on a phone it would skip past the list entirely.
       if (window.matchMedia('(min-width: 1024px)').matches) {
@@ -56,7 +68,7 @@ export default function Messages() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [requestedId]);
 
   // The inbox refreshes while the tab is in the foreground; an open thread is
   // kept live by its own event stream, so the list does not need to be faster.

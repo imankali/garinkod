@@ -7,9 +7,10 @@
 //     land, every calendar, every request
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router';
 import {
-  ArrowRight, CalendarPlus, Inbox, MapPin, MessageCircleQuestion, MessagesSquare, Search, Send,
-  Sprout, Users,
+  ArrowRight, CalendarPlus, Inbox, MapPin, MessageCircle, MessageCircleQuestion, MessagesSquare,
+  Search, Send, Sprout, Users,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -338,14 +339,30 @@ function RequestWorkspace({
             placeholder="پاسخ کارشناسی…"
             className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs dark:border-emerald-700 dark:bg-emerald-900 dark:text-white"
           />
-          <button
-            type="submit"
-            disabled={sending}
-            className="mt-2 flex min-h-10 items-center gap-1.5 rounded-xl bg-emerald-600 px-4 text-xs font-bold text-white disabled:opacity-50"
-          >
-            <Send size={13} className="-scale-x-100" />
-            {sending ? t('common.loading') : 'ارسال پاسخ'}
-          </button>
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+            <button
+              type="submit"
+              disabled={sending}
+              className="flex min-h-11 items-center gap-1.5 rounded-xl bg-emerald-600 px-4 text-xs font-bold text-white disabled:opacity-50"
+            >
+              <Send size={13} className="-scale-x-100" />
+              {sending ? t('common.loading') : 'ارسال پاسخ'}
+            </button>
+            {request.conversation_id && (
+              /*
+                The reply is mirrored into the messenger thread, so the farmer
+                answers back there; naming the thread here keeps the consultant
+                from thinking this form is the only channel.
+              */
+              <Link
+                to={`/messages?c=${request.conversation_id}`}
+                className="flex min-h-11 items-center gap-1.5 rounded-xl border border-emerald-200 px-3 text-fluid-xs font-bold text-emerald-700 hover:bg-emerald-50 dark:border-emerald-700 dark:text-lime-300 dark:hover:bg-emerald-900"
+              >
+                <MessageCircle size={13} aria-hidden="true" />
+                گفتگو در پیام‌رسان
+              </Link>
+            )}
+          </div>
         </form>
       </div>
     </div>

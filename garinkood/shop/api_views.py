@@ -29,6 +29,7 @@ from drf_spectacular.utils import extend_schema
 
 from .pest_vision import analyze_crop_image
 from .filters import ProductFilter
+from .listing_filters import apply_listing_filters, category_facet_rows, csv_values, facet_rows
 from .search import ResilientProductSearchFilter
 from .models import (
     Category, Product, Comment, UserAccount, Cart, CartItem, Order, OrderItem,
@@ -362,10 +363,24 @@ def auth_session(request):
 # Category ViewSet
 # ========================================
 class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
+    """Departments, with the warehouse's own list and the marketplace's as two scopes.
+
+    ``?scope=marketplace`` is what the storefront composer and the ad filter bar
+    ask for: a farmer selling grapes needs a produce department, and the
+    warehouse does not stock one. Without a scope the caller gets the warehouse
+    list, which is what the home page grid and the catalogue chips want — they
+    must not offer a tile that can never contain stock.
+    """
+
     permission_classes = [permissions.AllowAny]
-    queryset = Category.objects.prefetch_related('subcategories')
     serializer_class = CategorySerializer
     lookup_field = 'slug'
+
+    def get_queryset(self):
+        queryset = Category.objects.prefetch_related('subcategories')
+        if self.request.query_params.get('scope', '') != 'marketplace':
+            queryset = queryset.exclude(storefront_only=True)
+        return queryset
 
 
 # ========================================
@@ -436,29 +451,92 @@ class ProductViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='facets')
     def facets(self, request):
-        """Facet values (brands, package sizes, price ceiling) for the shop UI.
+        """Facet values (departments, brands, packages, price ceiling) for the shop UI.
 
         Distinct values come from the published catalogue only, so a filter
         chip can never promise a result set that is empty because it is made of
         drafts.
+
+        Every list is narrowed by the filters already applied *except* its own
+        axis: pick a department and the brand dropdown keeps only the brands
+        that exist in it, while the department list still shows what else could
+        be added next. One rule, applied identically to the ad facets, is what
+        lets a single filter bar drive both sources.
         """
-        published = Product.objects.filter(status='published')
-        brands = list(
-            published.exclude(brand='')
-            .values('brand')
+        params = request.query_params
+        selected_categories = csv_values(params.get('category'))
+        selected_subcategories = csv_values(params.get('subcategory'))
+        selected_brands = csv_values(params.get('brand'))
+
+        def scoped(*skip):
+            """Published products matching every facet except the ones named."""
+            queryset = Product.objects.filter(status='published')
+            kept = [key for key in ('category', 'subcategory', 'brand', 'package_weight') if key not in skip]
+            if 'category' in kept and selected_categories:
+                queryset = queryset.filter(
+                    Q(category__slug__in=selected_categories)
+                    | Q(subcategory__category__slug__in=selected_categories)
+                )
+            if 'subcategory' in kept and selected_subcategories:
+                queryset = queryset.filter(subcategory__slug__in=selected_subcategories)
+            if 'brand' in kept and selected_brands:
+                from .slugs import slugify_fa
+
+                query = Q()
+                for brand in selected_brands:
+                    query |= Q(brand__iexact=brand) | Q(brand_slug=slugify_fa(brand))
+                queryset = queryset.filter(query)
+            if 'package_weight' in kept:
+                packages = csv_values(params.get('package_weight'))
+                if packages:
+                    query = Q()
+                    for size in packages:
+                        query |= Q(package_weight__iexact=size)
+                    queryset = queryset.filter(query)
+            return queryset.distinct()
+
+        brands = [
+            {'value': row['brand'], 'count': row['total']}
+            for row in scoped('brand').exclude(brand='')
+            .values('brand').annotate(total=Count('id')).order_by('-total', 'brand')[:60]
+        ]
+        packages = [
+            {'value': row['package_weight'], 'count': row['total']}
+            for row in scoped('package_weight').exclude(package_weight='')
+            .values('package_weight').annotate(total=Count('id')).order_by('package_weight')[:40]
+        ]
+        categories = [
+            {'value': row['category__slug'], 'label': row['category__name'], 'count': row['total']}
+            for row in scoped('category', 'subcategory')
+            .exclude(category__isnull=True)
+            .values('category__slug', 'category__name')
             .annotate(total=Count('id'))
-            .order_by('-total', 'brand')[:60]
-        )
-        packages = list(
-            published.exclude(package_weight='')
-            .values('package_weight')
+            .order_by('-total', 'category__name')[:30]
+        ]
+        subcategory_source = scoped('subcategory')
+        if selected_categories:
+            subcategory_source = subcategory_source.filter(
+                Q(category__slug__in=selected_categories)
+                | Q(subcategory__category__slug__in=selected_categories)
+            )
+        subcategories = [
+            {
+                'value': row['subcategory__slug'],
+                'label': row['subcategory__name'],
+                'count': row['total'],
+                'category': row['subcategory__category__slug'],
+            }
+            for row in subcategory_source.exclude(subcategory__isnull=True)
+            .values('subcategory__slug', 'subcategory__name', 'subcategory__category__slug')
             .annotate(total=Count('id'))
-            .order_by('package_weight')[:40]
-        )
-        price_bound = published.aggregate(high=Max('price'))['high'] or 0
+            .order_by('-total', 'subcategory__name')[:40]
+        ]
+        price_bound = scoped().aggregate(high=Max('price'))['high'] or 0
         return Response({
-            'brands': [{'value': row['brand'], 'count': row['total']} for row in brands],
-            'package_weights': [{'value': row['package_weight'], 'count': row['total']} for row in packages],
+            'brands': brands,
+            'package_weights': packages,
+            'categories': categories,
+            'subcategories': subcategories,
             'max_price': int(price_bound),
         })
 
@@ -1330,9 +1408,13 @@ class MarketplaceListingViewSet(viewsets.ModelViewSet):
     lookup_field = 'slug'
     filter_backends = [DatabaseAwareSearchFilter, OrderingFilter]
     search_fields = ['title', 'crop_name', 'storefront__name']
+    # ``-publish``/``-sales_count``/``-views`` are the same sort keys the
+    # catalogue tab offers, so one sort control drives both sources; DRF splits a
+    # comma-separated ``ordering`` and applies the fields in order, which is what
+    # lets «ارزان‌ترین + پرفروش‌ترین» be a real query rather than a wish.
     ordering_fields = [
         'price', 'created_at', 'harvest_date', 'quantity_available',
-        'sales_count', 'discount_percent',
+        'sales_count', 'discount_percent', 'views',
     ]
     ordering = ['-created_at']
     throttle_classes = [SearchRateThrottle]
@@ -1348,13 +1430,13 @@ class MarketplaceListingViewSet(viewsets.ModelViewSet):
         # Those counts must be annotated on the *storefront* rows the
         # serializer actually reads, so the storefronts are prefetched from an
         # annotated queryset rather than joined onto the listing.
-        annotated_storefronts = Storefront.objects.select_related('user').annotate(
+        annotated_storefronts = Storefront.objects.select_related('user', 'user__account').annotate(
             followers_total=Count('followers', distinct=True),
             listings_total=Count(
                 'listings', filter=Q(listings__status='published'), distinct=True
             ),
         )
-        base = MarketplaceListing.objects.prefetch_related(
+        base = MarketplaceListing.objects.select_related('category', 'subcategory').prefetch_related(
             Prefetch('storefront', queryset=annotated_storefronts),
             'attributes',
         )
@@ -1368,51 +1450,84 @@ class MarketplaceListingViewSet(viewsets.ModelViewSet):
     def _apply_marketplace_filters(self, queryset):
         """Server-side filters shared by the marketplace list view.
 
-        Everything the buyer can narrow by lives here rather than in the
-        client, so a filtered result set is paginated correctly instead of
-        being trimmed after the fact.
+        Everything the buyer can narrow by lives in :mod:`shop.listing_filters`
+        rather than in the client, so a filtered result set is paginated
+        correctly instead of being trimmed after the fact — and so the shop's
+        filter bar speaks one grammar for both the warehouse catalogue and the
+        sellers' ads.
         """
-        params = self.request.query_params
+        return apply_listing_filters(queryset, self.request.query_params)
 
-        province = params.get('province', '').strip()
-        if province:
-            queryset = queryset.filter(storefront__province__iexact=province)
-        city = params.get('city', '').strip()
-        if city:
-            queryset = queryset.filter(storefront__city__iexact=city)
-        seller_type = params.get('seller_type', '').strip()
-        if seller_type:
-            queryset = queryset.filter(storefront__seller_type=seller_type)
-        storefront_slug = params.get('storefront', '').strip()
-        if storefront_slug:
-            queryset = queryset.filter(storefront__slug=storefront_slug)
-        crop = params.get('crop', '').strip()
-        if crop:
-            queryset = queryset.filter(crop_name__icontains=crop)
-        unit = params.get('unit', '').strip()
-        if unit:
-            queryset = queryset.filter(unit__iexact=unit)
-        if params.get('verified') in {'1', 'true', 'True'}:
-            queryset = queryset.filter(storefront__is_verified=True)
-        if params.get('in_stock') in {'1', 'true', 'True'}:
-            queryset = queryset.filter(quantity_available__gt=0)
+    @action(detail=False, methods=['get'], url_path='facets')
+    def facets(self, request):
+        """Facet values for the ad filter bar: departments, brands, packages.
 
-        for param, lookup in (('min_price', 'price__gte'), ('max_price', 'price__lte'),
-                              ('min_quantity', 'quantity_available__gte')):
-            raw = params.get(param, '').strip()
-            if raw:
-                try:
-                    queryset = queryset.filter(**{lookup: Decimal(raw)})
-                except (InvalidOperation, ValueError):
-                    # An unparsable bound is ignored rather than 500-ing the
-                    # whole listing page.
-                    continue
-        return queryset
+        Each list is narrowed by every filter *except* the axis it draws, which
+        is the rule that keeps the dropdowns honest: once a department is
+        picked, the brand list shows only the brands that actually appear in
+        that department, so a buyer can never assemble an empty result set by
+        ticking two chips that cannot coexist.
+        """
+        params = request.query_params
+        published = MarketplaceListing.objects.filter(status='published')
+
+        def narrowed(*skip_keys):
+            local = {
+                key: value
+                for key, value in params.items()
+                if key not in skip_keys and str(value).strip()
+            }
+            return apply_listing_filters(published, local)
+
+        categories = [
+            row for row in category_facet_rows(narrowed('category', 'subcategory'), limit=30)
+        ]
+        selected_categories = csv_values(params.get('category'))
+        subcategory_source = narrowed('subcategory')
+        if selected_categories:
+            subcategory_source = subcategory_source.filter(
+                Q(category__slug__in=selected_categories)
+                | Q(subcategory__category__slug__in=selected_categories)
+            )
+        subcategories = [
+            {
+                'value': row['subcategory__slug'],
+                'label': row['subcategory__name'],
+                'count': row['total'],
+                'category': row['subcategory__category__slug'],
+            }
+            for row in (
+                subcategory_source.exclude(subcategory__isnull=True)
+                .values('subcategory__slug', 'subcategory__name', 'subcategory__category__slug')
+                .annotate(total=Count('id'))
+                .order_by('-total', 'subcategory__name')[:40]
+            )
+        ]
+        return Response({
+            'categories': categories,
+            'subcategories': subcategories,
+            'brands': facet_rows(narrowed('brand'), 'brand', limit=40),
+            'packages': facet_rows(narrowed('package_size'), 'package_size', limit=40, order_by_count=False),
+            'crops': facet_rows(narrowed('crop'), 'crop_name', limit=40),
+            'units': facet_rows(narrowed('unit'), 'unit', limit=20, order_by_count=False),
+            'max_price': int(published.aggregate(high=Max('price'))['high'] or 0),
+        })
 
     def get_permissions(self):
-        if self.action in {'list', 'retrieve'}:
+        # The filter bar is rendered before anybody signs in, so its facet list
+        # has to be readable by an anonymous buyer too.
+        if self.action in {'list', 'retrieve', 'facets'}:
             return [permissions.AllowAny()]
         return [permissions.IsAuthenticated()]
+
+    def get_object(self):
+        instance = super().get_object()
+        # One UPDATE, not a read-modify-write: the counter only has to be
+        # approximately right, and a stamped column is how «پربازدیدترین» sorts.
+        if self.action == 'retrieve':
+            MarketplaceListing.objects.filter(pk=instance.pk).update(views=F('views') + 1)
+            instance.views += 1
+        return instance
 
     def get_serializer_context(self):
         return {**super().get_serializer_context(), 'request': self.request}
@@ -1421,11 +1536,26 @@ class MarketplaceListingViewSet(viewsets.ModelViewSet):
         storefront = get_object_or_404(Storefront, user=self.request.user)
         # The seller never supplies an address; it is derived from the title and
         # de-duplicated with a numeric suffix.
-        serializer.save(
-            storefront=storefront,
-            status='pending_review',
-            slug=unique_listing_slug(serializer.validated_data.get('title', '')),
-        )
+        extra = {
+            'storefront': storefront,
+            'status': 'pending_review',
+            'slug': unique_listing_slug(serializer.validated_data.get('title', '')),
+        }
+        if not serializer.validated_data.get('category'):
+            # An ad nobody filed under a department is invisible to the category
+            # chips, so the same keyword rules the migration used fill it in. A
+            # seller's own choice always wins; this is only the fallback.
+            from .catalog_classify import classify
+
+            category, subcategory = classify(
+                serializer.validated_data.get('title', ''),
+                serializer.validated_data.get('crop_name', ''),
+            )
+            if category is not None:
+                extra['category'] = category
+                if subcategory is not None and not serializer.validated_data.get('subcategory'):
+                    extra['subcategory'] = subcategory
+        serializer.save(**extra)
 
     def perform_update(self, serializer):
         # Editing a rejected or published listing sends it back for review, and
@@ -1962,7 +2092,11 @@ class StorefrontPostViewSet(viewsets.ModelViewSet):
 
     serializer_class = StorefrontPostSerializer
     filter_backends = [OrderingFilter]
-    ordering_fields = ['created_at']
+    # The counters are annotated onto the queryset below, so they are orderable:
+    # «پست‌های غرفه‌داران» on the storefronts page asks for ``-likes_total`` and
+    # the Explore page asks for the same list without a limit. Sorting likes in
+    # the client instead would only ever rank the first page.
+    ordering_fields = ['created_at', 'likes_total', 'comments_total', '-likes_total']
     ordering = ['-created_at']
 
     def _annotate(self, queryset):

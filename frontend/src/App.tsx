@@ -30,6 +30,7 @@ import HomeHero from "./components/home/HomeHero";
 import ServiceShortcuts from "./components/home/ServiceShortcuts";
 import CategoryGrid from "./components/home/CategoryGrid";
 import FeaturedStorefronts from "./components/home/FeaturedStorefronts";
+import StorefrontAds from "./components/home/StorefrontAds";
 import DirectMessagesDrawer from "./components/direct/DirectMessagesDrawer";
 import RouteSeo from "./components/RouteSeo";
 import LoginModal from "./components/LoginModal";
@@ -51,7 +52,7 @@ const OrderTrackingPage = lazy(() => import("./pages/OrderTrackingPage"));
 const ExportDashboard = lazy(() => import("./pages/ExportDashboard"));
 const Services = lazy(() => import("./pages/Services"));
 const FarmerSell = lazy(() => import("./pages/FarmerSell"));
-const Marketplace = lazy(() => import("./pages/Marketplace"));
+const StorefrontExplore = lazy(() => import("./pages/StorefrontExplore"));
 const Support = lazy(() => import("./pages/Support"));
 const Affiliate = lazy(() => import("./pages/Affiliate"));
 const Finance = lazy(() => import("./pages/Finance"));
@@ -361,7 +362,8 @@ export default function App() {
                     <InstallmentBanner />
 
                     {/* Exact merchandising order: fresh, discounts, four core
-                        departments, verified ratings, then specialist ranges. */}
+                        departments, then the specialist ranges (آبیاری و گلخانه),
+                        then the magazine with the sellers' ads under it. */}
                     <ContentRails
                       railIds={["newest", "discounted"]}
                       wishlistIds={wishlistIds}
@@ -384,17 +386,6 @@ export default function App() {
                       onQuickView={setSelectedProduct}
                       onToggleCompare={handleToggleCompare}
                     />
-                    <ContentRails
-                      railIds={["best_rated"]}
-                      showMagazine
-                      wishlistIds={wishlistIds}
-                      compareIds={compareIds}
-                      compareDisabled={compareItems.length >= 3}
-                      onToggleWishlist={handleToggleWishlist}
-                      onAddToCart={(product, event) => handleAddToCart(product, 1, event)}
-                      onQuickView={setSelectedProduct}
-                      onToggleCompare={handleToggleCompare}
-                    />
                     <CategorySections
                       group="secondary"
                       featuredOnly={featuredOnly}
@@ -407,6 +398,21 @@ export default function App() {
                       onQuickView={setSelectedProduct}
                       onToggleCompare={handleToggleCompare}
                     />
+                    <ContentRails
+                      railIds={["best_rated"]}
+                      showMagazine
+                      wishlistIds={wishlistIds}
+                      compareIds={compareIds}
+                      compareDisabled={compareItems.length >= 3}
+                      onToggleWishlist={handleToggleWishlist}
+                      onAddToCart={(product, event) => handleAddToCart(product, 1, event)}
+                      onQuickView={setSelectedProduct}
+                      onToggleCompare={handleToggleCompare}
+                    />
+
+                    {/* آگهی‌های غرفه‌داران — the sellers' own products, right
+                        after the magazine and before the calculator. */}
+                    <StorefrontAds />
 
                     {/* AgriCalculator */}
                     <AgriCalculator onAddToCart={handleAddToCart} />
@@ -447,7 +453,14 @@ export default function App() {
               <Route path="/page/:slug" element={<SitePageView kind="page" />} />
               <Route path="/offer/:slug" element={<SitePageView kind="landing" />} />
               <Route path="/farmer-sell" element={<FarmerSell />} />
-              <Route path="/marketplace" element={<Marketplace />} />
+              {/*
+                بازار کشاورزان and غرفه‌داران were two pages over the same
+                marketplace; only غرفه‌داران exists now, and the old address
+                redirects instead of 404-ing.
+              */}
+              <Route path="/marketplace" element={<Navigate to="/storefronts" replace />} />
+              {/* کاوش: every published stall post, Instagram-style. */}
+              <Route path="/explore" element={<StorefrontExplore />} />
               <Route path="/support" element={<Support />} />
               {/* Legal documents. /legal is the hub and /legal/<slug> the canonical
                   address of each document; the three older routes stay alive
@@ -490,15 +503,14 @@ export default function App() {
                 }
               />
 
-              {/* Seller studio is for storefront owners (level 2+). */}
-              <Route
-                path="/studio"
-                element={
-                  <RequireLevel level={USER_LEVEL.SELLER}>
-                    <Studio />
-                  </RequireLevel>
-                }
-              />
+              {/*
+                استودیو غرفه is a gate, not a level check. Someone who already
+                owns a stall belongs on their own غرفه page — that is where posts
+                and stories are published — and someone who does not gets the
+                ساخت غرفه form. Gating on level 2 would simply hide the way in for
+                the people the form is for.
+              */}
+              <Route path="/studio" element={<Studio />} />
 
               {/*
                 The management console lives at /poshtiban and is restricted to

@@ -12,9 +12,10 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Plus, Save, Send, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-import { agricultureApi } from '../../api/services';
+import { agricultureApi, categoriesApi } from '../../api/services';
 import { parseApiError } from '../../api/errors';
 import { useTranslation } from '../../i18n';
+import type { Category } from '@/types/shop';
 import type { MarketplaceListing } from '@/types/storefront';
 
 interface ListingDraft {
@@ -25,6 +26,14 @@ interface ListingDraft {
   unit: string;
   quantity_available: string;
   min_order_quantity: string;
+  /** Slugs, because that is how the API accepts them and how filters match. */
+  category: string;
+  subcategory: string;
+  brand: string;
+  package_size: string;
+  harvest_date: string;
+  discount_percent: string;
+  is_stock: boolean;
 }
 
 const EMPTY: ListingDraft = {
@@ -35,6 +44,13 @@ const EMPTY: ListingDraft = {
   unit: 'کیلوگرم',
   quantity_available: '',
   min_order_quantity: '1',
+  category: '',
+  subcategory: '',
+  brand: '',
+  package_size: '',
+  harvest_date: '',
+  discount_percent: '',
+  is_stock: false,
 };
 
 function draftFrom(listing: MarketplaceListing): ListingDraft {
@@ -46,6 +62,13 @@ function draftFrom(listing: MarketplaceListing): ListingDraft {
     unit: listing.unit,
     quantity_available: String(listing.quantity_available),
     min_order_quantity: String(listing.min_order_quantity),
+    category: listing.category ?? '',
+    subcategory: listing.subcategory ?? '',
+    brand: listing.brand ?? '',
+    package_size: listing.package_size ?? '',
+    harvest_date: listing.harvest_date ? listing.harvest_date.slice(0, 10) : '',
+    discount_percent: listing.discount_percent ? String(listing.discount_percent) : '',
+    is_stock: Boolean(listing.is_stock),
   };
 }
 
@@ -65,6 +88,21 @@ export default function ListingComposer({
   const { t } = useTranslation();
   const [draft, setDraft] = useState<ListingDraft>(EMPTY);
   const [saving, setSaving] = useState(false);
+  /**
+   * The departments a seller can file under, with their sub-departments.
+   *
+   * Loaded lazily the first time the composer opens: the غرفه page itself should
+   * not pay for a taxonomy request nobody may use.
+   */
+  const [departments, setDepartments] = useState<Category[]>([]);
+
+  useEffect(() => {
+    if (!open || departments.length > 0) return;
+    categoriesApi
+      .getAll()
+      .then((response) => setDepartments(response.data.results || []))
+      .catch(() => setDepartments([]));
+  }, [open, departments.length]);
 
   // Re-seed whenever the dialog opens, so editing one آگهی then another does
   // not carry the first one's values over.
@@ -84,6 +122,16 @@ export default function ListingComposer({
       unit: draft.unit.trim(),
       quantity_available: draft.quantity_available,
       min_order_quantity: draft.min_order_quantity,
+      // Filed under the same taxonomy the warehouse uses, so the آگهی can be
+      // found by the department and sub-department filters. Left empty on
+      // purpose when nothing is chosen: the server then classifies the text.
+      category: draft.category || null,
+      subcategory: draft.subcategory || null,
+      brand: draft.brand.trim(),
+      package_size: draft.package_size.trim(),
+      harvest_date: draft.harvest_date || null,
+      discount_percent: draft.discount_percent ? Number(draft.discount_percent) : 0,
+      is_stock: draft.is_stock,
     } as Partial<MarketplaceListing>;
     try {
       if (listing) {
@@ -172,6 +220,64 @@ export default function ListingComposer({
                 value={draft.min_order_quantity}
                 onChange={(value) => setDraft({ ...draft, min_order_quantity: value })}
               />
+
+              {/* Classify it like a product: the same department and
+                  sub-department the warehouse uses, so a buyer filtering the
+                  marketplace by «کود → فسفره» finds this آگهی too. */}
+              <SelectField
+                label="دسته‌بندی"
+                value={draft.category}
+                onChange={(value) => setDraft({ ...draft, category: value, subcategory: '' })}
+                options={[{ value: '', label: 'بدون دسته‌بندی (خودکار)' }, ...departments.map((item) => ({ value: item.slug, label: item.name }))]}
+              />
+              <SelectField
+                label="زیردسته"
+                disabled={!draft.category}
+                value={draft.subcategory}
+                onChange={(value) => setDraft({ ...draft, subcategory: value })}
+                options={[
+                  { value: '', label: draft.category ? 'انتخاب کنید (اختیاری)' : 'ابتدا دسته‌بندی' },
+                  ...(departments.find((item) => item.slug === draft.category)?.subcategories || []).map((item) => ({
+                    value: item.slug,
+                    label: item.name,
+                  })),
+                ]}
+              />
+              <Field
+                required={false}
+                label="برند (اختیاری)"
+                value={draft.brand}
+                onChange={(value) => setDraft({ ...draft, brand: value })}
+              />
+              <Field
+                required={false}
+                label="بسته‌بندی (مثلاً ۲۵ کیسه‌ای)"
+                value={draft.package_size}
+                onChange={(value) => setDraft({ ...draft, package_size: value })}
+              />
+              <Field
+                required={false}
+                label="تاریخ برداشت (اختیاری)"
+                type="date"
+                value={draft.harvest_date}
+                onChange={(value) => setDraft({ ...draft, harvest_date: value })}
+              />
+              <Field
+                required={false}
+                label="تخفیف (٪)"
+                type="number"
+                value={draft.discount_percent}
+                onChange={(value) => setDraft({ ...draft, discount_percent: value })}
+              />
+              <label className="flex min-h-11 items-center gap-2 text-xs font-bold text-slate-600 dark:text-emerald-100 sm:col-span-2">
+                <input
+                  type="checkbox"
+                  checked={draft.is_stock}
+                  onChange={(event) => setDraft({ ...draft, is_stock: event.target.checked })}
+                  className="h-4 w-4 rounded accent-emerald-600"
+                />
+                این آگهی استوک است (نه برداشت تازه فصل)
+              </label>
               <label className="block text-sm font-bold text-slate-700 dark:text-emerald-50 sm:col-span-2">
                 توضیحات محصول
                 <textarea
@@ -219,27 +325,67 @@ export function NewListingButton({ onClick }: { onClick: () => void }) {
   );
 }
 
+/**
+ * `required` defaults to true because the six core fields are all mandatory;
+ * the classification block added for the marketplace is not, and an optional
+ * field that blocks submit is how a form gets abandoned.
+ */
 function Field({
   label,
   value,
   onChange,
   type = 'text',
+  required = true,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   type?: string;
+  required?: boolean;
 }) {
   return (
     <label className="block text-sm font-bold text-slate-700 dark:text-emerald-50">
       {label}
       <input
-        required
+        required={required}
         type={type}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         className="mt-2 min-h-11 min-w-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-normal outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-emerald-700 dark:bg-emerald-900"
       />
+    </label>
+  );
+}
+
+/** A dropdown with the same shape as Field, so a grid of them lines up. */
+function SelectField({
+  label,
+  value,
+  onChange,
+  options,
+  disabled = false,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: { value: string; label: string }[];
+  disabled?: boolean;
+}) {
+  return (
+    <label className="block text-sm font-bold text-slate-700 dark:text-emerald-50">
+      {label}
+      <select
+        value={value}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-2 min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-normal outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:opacity-50 dark:border-emerald-700 dark:bg-emerald-900 dark:text-white"
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
     </label>
   );
 }
