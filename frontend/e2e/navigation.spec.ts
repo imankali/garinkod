@@ -9,9 +9,16 @@ import { expect, test, type Page } from '@playwright/test';
  */
 
 /** Routes a signed-out visitor must be able to reach by clicking alone. */
+/**
+ * Routes a signed-out visitor must be able to reach by clicking alone.
+ *
+ * There is no /marketplace here: the farmers' market and the storefront
+ * directory are one page now (/storefronts), and the ads live as a tab of the
+ * shop (/products?source=marketplace). The old address survives only as a
+ * redirect, which public-routes.spec.ts guards.
+ */
 const PUBLIC_DESTINATIONS = [
   '/products',
-  '/marketplace',
   '/storefronts',
   '/services',
   '/farmer-sell',
@@ -55,7 +62,7 @@ test.describe('reachability', () => {
       anchors.map((anchor) => (anchor as HTMLAnchorElement).getAttribute('href')?.split('?')[0]),
     );
 
-    for (const destination of ['/products', '/marketplace', '/storefronts', '/support']) {
+    for (const destination of ['/products', '/storefronts', '/support']) {
       expect(links, `${destination} missing from the mobile menu`).toContain(destination);
     }
   });
@@ -71,7 +78,7 @@ test.describe('reachability', () => {
   });
 
   test('the active page is marked with aria-current', async ({ page }) => {
-    await page.goto('/marketplace');
+    await page.goto('/storefronts');
     await expect(page.locator('[aria-current="page"]').first()).toBeVisible();
   });
 });
@@ -115,7 +122,7 @@ test.describe('touch targets', () => {
   test.use({ viewport: { width: 375, height: 812 } });
 
   test('every visible control meets the 44px minimum', async ({ page }) => {
-    for (const route of ['/', '/marketplace', '/storefronts']) {
+    for (const route of ['/', '/storefronts', '/products']) {
       await page.goto(route);
       await page.waitForLoadState('networkidle');
 
@@ -151,12 +158,11 @@ test.describe('touch targets', () => {
 test.describe('home page as the shop window', () => {
   /**
    * The home page previously surfaced only the product catalogue and the dose
-   * calculator; the marketplace, storefront directory, services, procurement,
-   * loyalty club, affiliate scheme, order tracking and support were all
-   * invisible without opening a menu. These tests keep the shop window full.
+   * calculator; the storefront directory, services, procurement, loyalty club,
+   * affiliate scheme, order tracking and support were all invisible without
+   * opening a menu. These tests keep the shop window full.
    */
   const EXPECTED_ON_HOME = [
-    '/marketplace',
     '/storefronts',
     '/services',
     '/farmer-sell',
@@ -185,19 +191,25 @@ test.describe('home page as the shop window', () => {
     const hero = page.getByRole('region', { name: /کود، سم، بذر/ });
     await expect(hero).toBeVisible();
     await expect(hero.getByRole('link', { name: /خرید از فروشگاه/ })).toBeVisible();
-    await expect(hero.getByRole('link', { name: /بازار کشاورزان/ })).toBeVisible();
+    await expect(hero.getByRole('link', { name: /بازار غرفه‌داران/ })).toHaveAttribute(
+      'href',
+      '/storefronts',
+    );
   });
 
-  test('the marketplace is represented on the home page', async ({ page }) => {
+  test('the sellers’ market is represented on the home page', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    // Either real sellers render, or the section hides itself — never an
-    // empty heading with nothing under it.
-    const heading = page.getByRole('heading', { name: /مستقیم از غرفه کشاورزان/ });
-    if (await heading.count()) {
-      await expect(page.locator('a[href^="/storefronts/"]').first()).toBeVisible();
-    }
+    // The directory is what makes this site different from a shop, so it has to
+    // be on the front page in words and as a way in — not only in a menu.
+    await expect(
+      page.getByRole('heading', { name: 'مستقیم از غرفه کشاورزان' }),
+    ).toBeVisible();
+    await expect(page.locator('a[href^="/storefronts/"]').first()).toBeVisible();
+    // …and the section is never an empty heading: it either shows stalls or
+    // removes itself.
+    await expect(page.getByRole('link', { name: /مشاهده همه غرفه‌داران/ })).toBeVisible();
   });
 
   test('the home page has one h1 and an ordered heading structure', async ({ page }) => {

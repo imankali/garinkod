@@ -34,6 +34,13 @@ const publicRoutes = [
   '/login',
 ];
 
+test('the retired /marketplace address lands on the storefront directory', async ({ page }) => {
+  await page.goto('/marketplace');
+
+  await expect(page).toHaveURL(/\/storefronts$/);
+  await expect(page.getByRole('heading', { name: 'بازار مستقیم کشاورزی' })).toBeVisible();
+});
+
 test('home renders key public controls', async ({ page }) => {
   await page.goto('/');
   await expect(page).toHaveTitle(/گرین کود/);

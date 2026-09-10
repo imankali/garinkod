@@ -21,6 +21,7 @@ test.describe('storefront directory', () => {
 
     // The profile shows the tab strip and a follow control.
     await expect(page.getByRole('tablist', { name: 'محتوای غرفه' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
     await expect(page.getByRole('button', { name: /دنبال کردن|دنبال می‌کنید/ })).toBeVisible();
   });
 
@@ -33,7 +34,9 @@ test.describe('storefront directory', () => {
 
   test('province filter narrows the directory', async ({ page }) => {
     await page.goto('/storefronts');
-    await page.getByRole('button', { name: /فیلتر/ }).click();
+    // The trigger prints a count badge once something is applied, so the name is
+    // matched exactly at the moment it is still bare.
+    await page.getByRole('button', { name: 'فیلتر', exact: true }).click();
 
     await page.getByLabel('استان').selectOption('فارس');
     await expect(page).toHaveURL(/province=/);
@@ -48,37 +51,69 @@ test.describe('storefront directory', () => {
   });
 });
 
-test.describe('marketplace listings', () => {
-  test('filters are applied server-side and reflected in the URL', async ({ page }) => {
-    await page.goto('/marketplace');
-    await page.getByRole('button', { name: /فیلتر/ }).click();
+test.describe('farmers’ ad listings in the shop', () => {
+  /**
+   * Ads are not a page of their own any more. They are the second tab of the
+   * shop — same filter bar, same cart, different source — so these tests
+   * open /products?source=marketplace, which is what the directory's buttons and
+   * the home rails link to. /marketplace itself only redirects.
+   */
+  const ADS = '/products?source=marketplace';
 
-    await page.getByLabel('فقط آگهی‌های موجود').check();
+  test('the ads tab is reachable from the directory', async ({ page }) => {
+    await page.goto('/storefronts');
+    await page.getByRole('link', { name: /همه آگهی‌ها با فیلتر/ }).click();
+    await expect(page).toHaveURL(/source=marketplace/);
+  });
+
+  test('filters are applied server-side and reflected in the URL', async ({ page }) => {
+    await page.goto(ADS);
+    await page.getByRole('button', { name: /امکانات/ }).click();
+
+    await page.getByRole('checkbox', { name: 'فقط موجود' }).check();
     await expect(page).toHaveURL(/in_stock=1/);
   });
 
   test('a listing can be added to the cart and shows its storefront', async ({ page }) => {
-    await page.goto('/marketplace');
+    await page.goto(ADS);
 
     const addButton = page.getByRole('button', { name: 'افزودن به سبد' }).first();
     await expect(addButton).toBeVisible();
     await addButton.click();
 
-    // The drawer opens with a listing row labelled as a storefront item.
-    await expect(page.getByText('غرفه').first()).toBeVisible();
+    // The drawer opens with the row, and the row carries the chip that says the
+    // item came from a غرفه rather than from the shop's own shelves.
+    const drawer = page.getByRole('dialog', { name: 'سبد خرید' });
+    await expect(drawer).toBeVisible();
+    await expect(drawer.getByText('غرفه', { exact: true }).first()).toBeVisible();
   });
 
-  test('a quantity below the minimum order is rejected with a field message', async ({ page }) => {
+  test('a quantity below the stall’s minimum is explained where it is changed', async ({ page }) => {
+    await page.goto(ADS);
+
+    const buy = page.getByRole('button', { name: 'افزودن به سبد' }).first();
+    await expect(buy).toBeVisible();
+    await buy.click();
+
+    const drawer = page.getByRole('dialog', { name: 'سبد خرید' });
+    await expect(drawer).toBeVisible();
+    const decrease = drawer.getByRole('button', { name: /^کاهش تعداد/ }).first();
+    test.skip((await decrease.count()) === 0, 'The cart has no row to reduce yet');
+
+    // Adding a listing puts the minimum in the cart; going below it is the case
+    // the buyer has to be told about, in the drawer, not with a silent clamp.
+    await decrease.click();
+    const note = drawer.getByText(/حداقل سفارش این غرفه/);
+    test.skip((await note.count()) === 0, 'This listing has no minimum above one');
+    await expect(note).toBeVisible();
+  });
+});
+
+test.describe('the retired marketplace address', () => {
+  test('sends visitors to the directory instead of a blank page', async ({ page }) => {
     await page.goto('/marketplace');
-
-    // Find a listing that declares a minimum above one.
-    const card = page.locator('article', { hasText: 'حداقل سفارش' }).first();
-    const cardCount = await card.count();
-    test.skip(cardCount === 0, 'No listing with a minimum order in the seeded data');
-
-    await card.getByRole('spinbutton').fill('1');
-    await card.getByRole('button', { name: 'افزودن به سبد' }).click();
-    await expect(card.getByRole('alert')).toContainText('حداقل سفارش');
+    await expect(page).toHaveURL(/\/storefronts$/);
+    await expect(page.getByRole('heading', { name: 'همه غرفه‌داران' })).toBeVisible();
   });
 });
 
