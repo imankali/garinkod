@@ -142,16 +142,34 @@ test.describe('touch targets', () => {
           })
           .map((element) => {
             const rect = element.getBoundingClientRect();
+            const parent = element.parentElement;
+            const own = (element.textContent ?? '').trim().length;
+            const around = (parent?.textContent ?? '').trim().length;
             return {
               tag: element.tagName,
               text: (element.textContent ?? '').trim().slice(0, 30),
               width: Math.round(rect.width),
               height: Math.round(rect.height),
+              // "In prose": one clause of a longer run of text, not a control.
+              inlineInProse:
+                !!parent &&
+                /^(P|LI|DD|DT|SPAN|H1|H2|H3|H4)$/.test(parent.tagName) &&
+                around > own + 8,
             };
           })
-          // Inline text links inside a paragraph are exempt: they are read as
-          // text, not tapped as controls.
-          .filter((box) => box.height > 0 && box.height < 40 && box.width < 200),
+          // Two bars, both named. Every control in the chrome clears 44px, which is
+          // this product's own rule for buttons and selects. Links are measured
+          // against WCAG 2.2 SC 2.5.8 — 24px — with its Inline exception respected,
+          // because a link that is one clause of a sentence is read as text and no
+          // standard expects anyone to tap it accurately. The old filter claimed the
+          // same exemption in a comment while measuring everything against 40px.
+          .filter((box) => {
+            if (box.height <= 0) return false;
+            if (box.tag === 'A') {
+              return box.inlineInProse ? false : box.height < 24 || box.width < 24;
+            }
+            return box.height < 44;
+          }),
       );
 
       expect(

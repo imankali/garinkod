@@ -71,10 +71,23 @@ test("the buyers' page says where its quotes came from", async ({ page }) => {
 test('the faq page renders the questions the admin publishes', async ({ page }) => {
   await page.goto('/faq');
   await expect(page.getByRole('heading', { level: 1 })).toContainText(/سؤالات متداول|پرسش‌های/);
-  const questions = page.locator('details > summary');
-  // Either the accordion is filled in, or the page admits it is not and points at
-  // the support desk; an empty silence is not an option.
-  expect((await questions.count()) > 0 || (await page.getByText(/هنوز در پنل مدیریت تنظیم نشده/).count()) > 0).toBe(true);
+
+  // The page publishes its questions twice: as the FAQPage JSON-LD a search engine
+  // reads, and as text on screen. That is the contract — which element wraps them
+  // is the page's business, so the test does not care whether it is an accordion.
+  const schemas = (await page.locator('script[type="application/ld+json"]').allTextContents())
+    .filter(Boolean)
+    .map((raw) => JSON.parse(raw) as { '@type'?: string; mainEntity?: { name?: string }[] })
+    .filter((data) => data['@type'] === 'FAQPage');
+  expect(schemas, 'the faq page should publish its FAQPage structure').toHaveLength(1);
+
+  const questions = schemas[0]?.mainEntity ?? [];
+  if (questions.length === 0) {
+    // Nothing configured is an answer, as long as the page says so out loud.
+    await expect(page.getByText(/هنوز در پنل مدیریت تنظیم نشده/)).toBeVisible();
+    return;
+  }
+  await expect(page.getByText(questions[0]?.name ?? '')).toBeVisible();
 });
 
 test('route metadata indexes public pages and protects account pages', async ({ page }) => {

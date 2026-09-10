@@ -37,15 +37,16 @@ const PAGES = [
  * names, roles, labels, headings — is blocking from the first violation, and a new
  * rule appearing on a page has no ceiling at all and therefore fails.
  */
+// Measured on run 34466905457, after the tagline and amber-CTA fixes.
 const CONTRAST_CEILING: Record<string, number> = {
-  '/': 12,
-  '/products?source=marketplace': 19,
-  '/products': 11,
-  '/products/image-pipeline-demo/': 4,
-  '/storefronts': 31,
-  '/checkout': 8,
-  '/login': 6,
-  '/support': 5,
+  '/': 10,
+  '/products?source=marketplace': 17,
+  '/products': 9,
+  '/products/image-pipeline-demo/': 2,
+  '/storefronts': 29,
+  '/checkout': 6,
+  '/login': 4,
+  '/support': 3,
 };
 
 for (const target of PAGES) {

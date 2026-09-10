@@ -56,11 +56,15 @@ test.describe('storefront directory', () => {
     await page.locator('a[href^="/storefronts/"]').first().click();
 
     // The profile's header keeps growing while the stall's avatar and story
-    // images arrive, which moves the tab strip underneath them; Playwright waits
-    // for a still box and the page never gives it one. The click itself is what is
-    // under test — that the tab is there, named, and switches panels — so the wait
-    // is dropped rather than the assertion.
-    await page.getByRole('tab', { name: 'پست‌ها' }).click({ force: true });
+    // images arrive, which moves the tab strip underneath them: a pointer click has
+    // to land on a still box and never gets one. Keyboard activation is the same
+    // contract — a focused tab, Enter, the panel switches — and it does not depend
+    // on where the element happens to be at that millisecond.
+    const postsTab = page.getByRole('tab', { name: 'پست‌ها' });
+    await expect(postsTab).toHaveAttribute('aria-selected', 'false');
+    await postsTab.focus();
+    await page.keyboard.press('Enter');
+    await expect(postsTab).toHaveAttribute('aria-selected', 'true');
     await expect(page.getByRole('tab', { name: 'پست‌ها' })).toHaveAttribute('aria-selected', 'true');
   });
 });
@@ -103,7 +107,9 @@ test.describe('farmers’ ad listings in the shop', () => {
     // Adding to the cart does not open the cart — the buyer decides when to look.
     // The row inside it carries the chip saying the item came from a غرفه rather
     // than from the shop's own shelves, which is what the journey is about.
-    await page.getByRole('button', { name: /^سبد خرید/ }).click();
+    const cartButton = page.getByRole('button', { name: /^سبد خرید/ });
+    await expect(cartButton).toBeVisible();
+    await cartButton.click();
     const drawer = page.getByRole('dialog', { name: 'سبد خرید' });
     await expect(drawer).toBeVisible();
     await expect(drawer.getByText('غرفه', { exact: true }).first()).toBeVisible();
@@ -116,17 +122,26 @@ test.describe('farmers’ ad listings in the shop', () => {
     await expect(buy).toBeVisible();
     await buy.click();
 
-    await page.getByRole('button', { name: /^سبد خرید/ }).click();
+    const openCart = page.getByRole('button', { name: /^سبد خرید/ });
+    await expect(openCart).toBeVisible();
+    await openCart.click();
     const drawer = page.getByRole('dialog', { name: 'سبد خرید' });
     await expect(drawer).toBeVisible();
-    const decrease = drawer.getByRole('button', { name: /^کاهش تعداد/ }).first();
-    test.skip((await decrease.count()) === 0, 'The cart has no row to reduce yet');
 
-    // Adding a listing puts the minimum in the cart; going below it is the case
-    // the buyer has to be told about, in the drawer, not with a silent clamp.
+    // Whether there is anything to reduce depends on the seeded stall: a listing
+    // whose minimum is one has no rule to explain. count() answers before the
+    // drawer has painted, so ask the element itself, briefly, and treat "absent"
+    // as the precondition it is rather than as a failure or an infinite wait.
+    const decrease = drawer.getByRole('button', { name: /^کاهش تعداد/ }).first();
+    const hasRow = await decrease.waitFor({ state: 'visible', timeout: 8_000 }).then(() => true, () => false);
+    test.skip(!hasRow, 'the cart rendered no row to reduce');
+
+    // Going below the minimum is the case the buyer has to be told about, in the
+    // drawer, where the quantity changes — not with a silent clamp.
     await decrease.click();
     const note = drawer.getByText(/حداقل سفارش این غرفه/);
-    test.skip((await note.count()) === 0, 'This listing has no minimum above one');
+    const hasNote = await note.waitFor({ state: 'visible', timeout: 8_000 }).then(() => true, () => false);
+    test.skip(!hasNote, 'this seeded listing has no minimum above one');
     await expect(note).toBeVisible();
   });
 });
@@ -152,7 +167,9 @@ test.describe('dose calculator', () => {
     await page.getByLabel('سطح زمین').fill('5');
     await page.getByRole('button', { name: 'محاسبه مقدار مورد نیاز' }).click();
 
-    await expect(page.getByText('مقدار مورد نیاز')).toBeVisible();
+    // The calculator's own heading, not "the phrase somewhere on the page": the
+    // same words appear in the form's label and in the disclaimer.
+    await expect(page.getByRole('heading', { name: /مقدار مورد نیاز/ })).toBeVisible();
     // 150-250 kg/ha over five hectares.
     await expect(page.getByText(/750/)).toBeVisible();
     await expect(page.getByText(/جایگزین توصیه کارشناس/)).toBeVisible();
