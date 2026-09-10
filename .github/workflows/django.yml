@@ -124,11 +124,15 @@ jobs:
           # names the directory tests look for, and the guide/legal pages the
           # footer links to. Each command is idempotent — a seeded fixture is what
           # makes an e2e assertion mean something rather than being skipped.
+          #
+          # The order is the one the seeds themselves ask for: the community seed
+          # refuses to run until the catalogue and the marketplace exist, because
+          # its posts, listings and reviews are filed against rows in both.
           python manage.py seed_locations
           python manage.py seed_agri_inputs
           python manage.py seed_test_catalog
-          python manage.py seed_test_community
           python manage.py seed_demo_marketplace
+          python manage.py seed_test_community
           python manage.py seed_site_content
           python manage.py seed_faq_page
           python manage.py seed_legal_pages
