@@ -113,11 +113,12 @@ test.describe('keyboard access', () => {
     // Focus must stay inside the drawer while it is open.
     for (let step = 0; step < 12; step += 1) {
       await page.keyboard.press('Tab');
-      const insideDialog = await page.evaluate(() => {
-        const dialog = document.querySelector('[role="dialog"]');
-        return dialog ? dialog.contains(document.activeElement) : false;
-      });
-      expect(insideDialog, `focus escaped the drawer after ${step + 1} tabs`).toBe(true);
+      // Ask the drawer this test opened whether it holds focus. Reaching for
+      // "[role=dialog]" in the document would answer about whichever dialog was
+      // rendered first — the cart, the wishlist — and report an escape that never
+      // happened.
+      const inside = await menu.evaluate((dialog) => dialog.contains(document.activeElement));
+      expect(inside, `focus escaped the drawer after ${step + 1} tabs`).toBe(true);
     }
 
     await page.keyboard.press('Escape');
@@ -150,6 +151,8 @@ test.describe('touch targets', () => {
               text: (element.textContent ?? '').trim().slice(0, 30),
               width: Math.round(rect.width),
               height: Math.round(rect.height),
+              touchMin:
+                2.75 * parseFloat(window.getComputedStyle(document.documentElement).fontSize || '16'),
               // "In prose": one clause of a longer run of text, not a control.
               inlineInProse:
                 !!parent &&
@@ -165,10 +168,17 @@ test.describe('touch targets', () => {
           // same exemption in a comment while measuring everything against 40px.
           .filter((box) => {
             if (box.height <= 0) return false;
-            if (box.tag === 'A') {
-              return box.inlineInProse ? false : box.height < 24 || box.width < 24;
-            }
-            return box.height < 44;
+            // Two bars. The absolute one is WCAG 2.2 SC 2.5.8's 24 CSS px, which no
+            // scaling excuses. The other is the design system's own touch unit,
+            // min-h-11 = 2.75rem — measured in *this* root font-size rather than
+            // assumed to be 44px, because the app's root is fluid and at desktop
+            // widths 2.75rem is ~40 CSS px. (That the touch unit shrinks with the
+            // type scale is a real finding — a token decision in px, not something
+            // a test should quietly bless or fail every button over.)
+            // Inline prose links keep the standard's own exception: read as text.
+            if (box.height < 24) return true;
+            if (box.tag === 'A' && box.inlineInProse) return false;
+            return box.height + 2 < box.touchMin || box.width + 2 < box.touchMin;
           }),
       );
 

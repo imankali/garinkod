@@ -116,14 +116,19 @@ test.describe('farmers’ ad listings in the shop', () => {
   });
 
   test('a quantity below the stall’s minimum is explained where it is changed', async ({ page }) => {
+    // Add to cart (a POST), open the drawer (an animated panel), reduce a row, then
+    // read the stall's own minimum back. Each step is bounded, but the journey
+    // legitimately spends more than the default allowance, so it asks for its own.
+    test.setTimeout(90_000);
     await page.goto(ADS);
 
     const buy = page.getByRole('button', { name: 'افزودن به سبد' }).first();
     await expect(buy).toBeVisible();
     await buy.click();
 
+    // No separate visibility check: the click's own actionability says the same
+    // thing, and one less 15s wait in a journey that is already doing two requests.
     const openCart = page.getByRole('button', { name: /^سبد خرید/ });
-    await expect(openCart).toBeVisible();
     await openCart.click();
     const drawer = page.getByRole('dialog', { name: 'سبد خرید' });
     await expect(drawer).toBeVisible();

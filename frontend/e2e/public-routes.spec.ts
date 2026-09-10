@@ -109,11 +109,12 @@ test('the faq page renders the questions the admin publishes', async ({ page }) 
 
 test('route metadata indexes public pages and protects account pages', async ({ page }) => {
   await page.goto('/privacy');
-  // The legacy address answers by redirecting, and the metadata belongs to the
-  // route that takes over — so wait for the redirect before reading it, or the
-  // assertion races the navigation and finds the old document's head.
-  await expect(page).toHaveURL(/\/legal\/privacy$/);
+  // The short address keeps working — it is printed on paperwork — but it names the
+  // legal hub as the canonical copy of the same text, so the site does not present
+  // two documents where it means one. Exactly one <link rel="canonical"> may exist.
+  await expect(page).toHaveURL(/\/privacy$/);
   await expect(page).toHaveTitle(/حریم خصوصی/);
+  await expect(page.locator('link[rel="canonical"]')).toHaveCount(1);
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', /\/legal\/privacy$/);
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /index,follow/);
 
@@ -145,16 +146,26 @@ test('login defaults to mobile OTP and keeps password compatibility', async ({ p
   await expect(page.getByLabel('رمز عبور', { exact: true }).first()).toBeVisible();
 });
 
-test('language selector changes document direction safely', async ({ page }) => {
+test('a saved language preference is applied before first paint', async ({ page }) => {
+  // There is no language <select> in the public chrome: the switch is a radio group
+  // on the profile page (the signed-in journey for it lives in auth-and-seller.spec),
+  // and the choice is persisted under `garinkood_locale`. What the public routes owe
+  // a visitor is reading that preference while the app boots, so the document never
+  // paints RTL and then flips — that is a layout shift as well as a flash of the
+  // wrong mirror, and it is exactly what a late locale read looks like in the wild.
   await page.goto('/');
-  // Header and mobile menu each carry a language select; the hidden one is not
-  // "the first", it is the one nobody can use.
-  const language = page.getByLabel('زبان').locator('visible=true').first();
-  await language.selectOption('en');
-  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
-  await expect(page.locator('html')).toHaveAttribute('dir', 'ltr');
-  await language.selectOption('fa');
   await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'fa');
+
+  await page.evaluate(() => window.localStorage.setItem('garinkood_locale', 'en'));
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('dir', 'ltr');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+
+  await page.evaluate(() => window.localStorage.setItem('garinkood_locale', 'fa'));
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'fa');
 });
 
 test('mobile navigation is reachable and opens the menu', async ({ page, isMobile }) => {
@@ -194,6 +205,13 @@ test('legal hub lists every document and each document reads in full', async ({ 
 });
 
 test('the terms a buyer accepts are readable from the checkout itself', async ({ page }) => {
+  // Checkout with an empty cart has nothing to accept: it shows the way back to the
+  // catalogue, not the acceptance box. So the journey starts where a buyer's does.
+  await page.goto('/products?source=marketplace');
+  await page.waitForResponse((response) => response.url().includes('/api/marketplace/'));
+  const add = page.getByRole('button', { name: 'افزودن به سبد' }).first();
+  await expect(add).toBeVisible();
+  await add.click();
   await page.goto('/checkout');
   const acceptance = page
     .locator('label')
@@ -201,7 +219,11 @@ test('the terms a buyer accepts are readable from the checkout itself', async ({
     .first();
   // The input is visually replaced (sr-only) with a styled box beside the text,
   // so "visible" is the wrong verb for it: the label is read, the control exists.
-  await expect(acceptance.getByRole('checkbox')).toBeAttached();
+  // The box is an <input type="checkbox"> inside a wrapping <label>, sized with
+  // min-h-11 so the label text and the box are one target. Asking for the control
+  // by its own name is the contract; reaching it through the wrapper's first match
+  // was an accident of markup.
+  await expect(page.getByRole('checkbox', { name: /صحت اطلاعات تحویل و مبلغ را تأیید می‌کنم/ })).toBeAttached();
 
   // The buyer is pointed at every document they are agreeing to. Where those links
   // go is the contract; how each one is phrased is copy, and copy changes.

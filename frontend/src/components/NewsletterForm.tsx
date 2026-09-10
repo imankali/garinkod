@@ -100,7 +100,7 @@ export default function NewsletterForm({
               type="button"
               onClick={() => setChannel(option.id)}
               className={cn(
-                'flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-lg text-fluid-xs font-bold transition-colors',
+                'flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg text-fluid-xs font-bold transition-colors',
                 channel === option.id
                   ? 'bg-white text-emerald-700 shadow-sm dark:bg-emerald-950 dark:text-lime-300'
                   : 'text-slate-500 dark:text-emerald-300',

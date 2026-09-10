@@ -82,9 +82,16 @@ export default function RouteSeo() {
   const category = location.pathname === '/products'
     ? new URLSearchParams(location.search).get('category')
     : null;
+  // /privacy, /terms and /returns are short addresses the site hands out, and the
+  // legal hub serves the same text under /legal/<slug>. Two URLs for one document
+  // is fine as long as both name the same canonical copy — otherwise the crawler is
+  // handed two pages and asked to guess which one the site means.
+  const LEGAL_ALIAS = /^\/(privacy|terms|returns)$/;
   const canonicalPath = category
     ? `/products?category=${encodeURIComponent(category)}`
-    : location.pathname;
+    : LEGAL_ALIAS.test(location.pathname)
+      ? `/legal${location.pathname}`
+      : location.pathname;
   const canonical = `${siteUrl}${canonicalPath}`;
   const isPrivate = PRIVATE_PREFIXES.some((prefix) => location.pathname.startsWith(prefix));
 

@@ -75,7 +75,22 @@ async function createStorefront(page: Page, name: string) {
   await dialog.getByRole('button', { name: 'ساخت غرفه', exact: true }).click();
 
   // Created → the seller is standing on their own page, which is the studio.
-  await expect(page).toHaveURL(/\/storefronts\/[a-z0-9-]+/, { timeout: 15_000 });
+  // The slug is the storefront's name in Persian, percent-encoded in the address
+  // bar, so the pattern says "a path segment" rather than "ASCII": a [a-z0-9-]
+  // class silently fails on every real stall and reads as a broken create.
+  await expect(page)
+    .toHaveURL(/\/storefronts\/[^/?#]+/, { timeout: 15_000 })
+    .catch(async () => {
+      // The form refuses with a field error, and a timeout on the URL says nothing
+      // about why — so the reason is carried into the failure.
+      const said = (await dialog.locator('[role="alert"]').allTextContents())
+        .map((text) => text.trim())
+        .filter(Boolean)
+        .join(' | ');
+      throw new Error(
+        `the stall was not created — ${said || 'the form said nothing; url ' + page.url()}`,
+      );
+    });
 }
 
 /**
@@ -120,7 +135,7 @@ test.describe('seller studio', () => {
     await createStorefront(page, `غرفه دروازه ${unique()}`);
 
     await page.goto('/studio');
-    await expect(page).toHaveURL(/\/storefronts\/[a-z0-9-]+/);
+    await expect(page).toHaveURL(/\/storefronts\/[^/?#]+/);
     await expect(page.getByRole('button', { name: 'پست جدید', exact: true })).toBeVisible();
   });
 
