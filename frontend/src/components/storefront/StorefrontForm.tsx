@@ -389,7 +389,7 @@ export default function StorefrontForm({
           <button
             type="button"
             onClick={signInToContinue}
-            className="flex min-h-11 items-center gap-1.5 rounded-xl bg-amber-600 px-4 text-xs font-bold text-white transition hover:bg-amber-700"
+            className="flex min-h-11 items-center gap-1.5 rounded-xl bg-amber-700 px-4 text-xs font-bold text-white transition hover:bg-amber-800"
           >
             ورود یا ثبت‌نام
           </button>

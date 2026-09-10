@@ -71,15 +71,20 @@ test.describe('opening a storefront, signed out', () => {
    */
   test('the hero button opens the form with a way in, not a wall', async ({ page }) => {
     await page.goto('/storefronts');
-    await page.getByRole('button', { name: 'ساخت غرفه' }).click();
+    const open = page.getByRole('button', { name: 'ساخت غرفه', exact: true });
+    await expect(open).toBeVisible();
+    await open.click();
 
     const dialog = page.getByRole('dialog', { name: 'ساخت غرفه' });
     await expect(dialog).toBeVisible();
-    await expect(
-      dialog.getByText('برای ثبت نهایی، وارد حساب خود شوید'),
-    ).toBeVisible();
+    await expect(dialog.getByText('برای ثبت نهایی، وارد حساب خود شوید')).toBeVisible();
 
-    await dialog.getByRole('button', { name: 'ورود و ساخت غرفه' }).click();
+    // Submitting an unfinished form is not how a visitor is told to sign in: the
+    // button is disabled until the fields hold something, and the step itself is
+    // offered beside it. Asserting the disabled state is the point — a click here
+    // would wait for an enabled button and read as a hang.
+    await expect(dialog.getByRole('button', { name: 'ورود و ساخت غرفه' })).toBeDisabled();
+    await dialog.getByRole('button', { name: 'ورود یا ثبت‌نام' }).click();
     await expect(page).toHaveURL(/\/login/);
   });
 

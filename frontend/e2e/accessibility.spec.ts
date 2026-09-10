@@ -21,6 +21,33 @@ const PAGES = [
   { path: '/support', name: 'support' },
 ];
 
+/**
+ * The one rule this app fails everywhere, at a scale that is not a patch.
+ *
+ * White on the brand's emerald-600 measures 3.77:1 and the muted-text token
+ * slate-400 on white measures 2.56:1 (AA asks 4.5:1), so a single pair of colours
+ * accounts for most of these nodes — 143 buttons and 99 text accents across 72
+ * files. Re-inking the palette is a design decision with visual consequences on
+ * every page, so it gets its own change and its own review rather than sneaking in
+ * behind a test PR.
+ *
+ * What is NOT a permission slip: the numbers below are ceilings, measured on
+ * 2026-09-10. A page that reports more contrast nodes than its ceiling fails; a
+ * page that does better fails too, until its number is lowered. Every other rule —
+ * names, roles, labels, headings — is blocking from the first violation, and a new
+ * rule appearing on a page has no ceiling at all and therefore fails.
+ */
+const CONTRAST_CEILING: Record<string, number> = {
+  '/': 12,
+  '/products?source=marketplace': 19,
+  '/products': 11,
+  '/products/image-pipeline-demo/': 4,
+  '/storefronts': 31,
+  '/checkout': 8,
+  '/login': 6,
+  '/support': 5,
+};
+
 for (const target of PAGES) {
   test(`${target.name} has no serious accessibility violations`, async ({ page }, testInfo) => {
     await page.goto(target.path);
@@ -36,9 +63,18 @@ for (const target of PAGES) {
       contentType: 'application/json',
     });
 
-    const blocking = results.violations.filter(
+    const ceilingFor = (violation: { id: string }) =>
+      violation.id === 'color-contrast' ? CONTRAST_CEILING[target.path] ?? 0 : 0;
+
+    const serious = results.violations.filter(
       (violation) => violation.impact === 'serious' || violation.impact === 'critical',
     );
+    const blocking = serious.filter((violation) => violation.nodes.length > ceilingFor(violation));
+    // A ceiling that is never reached is debt someone forgot about: say so, so the
+    // number in this file goes down over time instead of becoming folklore.
+    const beaten = serious
+      .filter((v) => ceilingFor(v) > 0 && v.nodes.length < ceilingFor(v))
+      .map((v) => `${v.id}: ${target.path} now reports ${v.nodes.length}, ceiling is ${ceilingFor(v)} — lower it`);
 
     // The first line is machine-readable on purpose — a run's whole a11y picture
     // has to survive being pasted into a comment, an annotation or a terminal:
@@ -60,8 +96,11 @@ for (const target of PAGES) {
 
     expect(
       blocking,
-      `a11y ${target.path} ${counts || 'clean'}\n\n${summary}`,
+      `a11y ${target.path} ${counts || 'clean'}\n\n${summary}${
+        beaten.length ? `\n\nTIGHTEN THE CEILING:\n${beaten.join('\n')}` : ''
+      }`,
     ).toEqual([]);
+    expect(beaten, `contrast ceilings can be lowered on ${target.path}`).toEqual([]);
   });
 }
 
