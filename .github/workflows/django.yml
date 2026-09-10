@@ -86,7 +86,11 @@ jobs:
   # indistinguishable from an abuser to a 120/hour anonymous budget.
   e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # The journey suite is the slow one on purpose: every storefront test
+    # registers a real account through the form, and axe walks eight pages.
+    # Three workers with one retry keeps a genuine failure inside the budget
+    # instead of hiding it behind three timeouts per test.
+    timeout-minutes: 40
     env:
       DB_ENGINE: sqlite
       DJANGO_SETTINGS_MODULE: garinkood.settings
@@ -115,9 +119,19 @@ jobs:
         working-directory: garinkood
         run: |
           python manage.py migrate --noinput
+          # Everything the journeys read: the produce departments and the dose
+          # table, the catalogue the accessibility sweep visits, the sellers whose
+          # names the directory tests look for, and the guide/legal pages the
+          # footer links to. Each command is idempotent — a seeded fixture is what
+          # makes an e2e assertion mean something rather than being skipped.
           python manage.py seed_locations
+          python manage.py seed_agri_inputs
           python manage.py seed_test_catalog
+          python manage.py seed_test_community
           python manage.py seed_demo_marketplace
+          python manage.py seed_site_content
+          python manage.py seed_faq_page
+          python manage.py seed_legal_pages
 
       - name: Start the API
         working-directory: garinkood
@@ -150,7 +164,7 @@ jobs:
 
       - name: Run the journey suite
         working-directory: frontend
-        run: npx playwright test --project=desktop-chromium
+        run: npx playwright test --project=desktop-chromium --workers=3 --retries=1
 
       - name: Upload the report
         if: failure()

@@ -19,8 +19,16 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 2 : undefined,
   forbidOnly: Boolean(process.env.CI),
+  // The `github` reporter writes each failure as a workflow annotation, so a red
+  // run says which test and why in the Checks tab — a cancelled run leaves no log
+  // to read at all, and an artefact nobody downloads is not a signal.
   reporter: process.env.CI
-    ? [['html', { open: 'never' }], ['list'], ['junit', { outputFile: 'playwright-report/results.xml' }]]
+    ? [
+        ['github'],
+        ['html', { open: 'never' }],
+        ['list'],
+        ['junit', { outputFile: 'playwright-report/results.xml' }],
+      ]
     : [['list']],
   use: {
     baseURL,
