@@ -223,8 +223,8 @@ jobs:
                 const last = results.find((r) => r.status === 'failed' || r.status === 'timedOut') || results[results.length - 1] || {};
                 const raw = (last.error && last.error.message)
                   || ((last.errors && last.errors[0]) || {}).message || 'failed';
-                const excerpt = String(raw).split('\n').map((line) => line.trim()).filter(Boolean).slice(0, 9).join(' · ');
-                rows.push('| ' + spec.file + ' | ' + spec.title + ' | ' + excerpt.slice(0, 900).replace(/\|/g, '/') + ' |');
+                const excerpt = String(raw).split('\n').map((line) => line.trim()).filter((line) => line && !line.startsWith('at ')).slice(0, 22).join(' · ');
+                rows.push('| ' + spec.file + ' | ' + spec.title + ' | ' + excerpt.slice(0, 1500).replace(/\|/g, '/') + ' |');
               }));
             };
             (root.suites || []).forEach(each);

@@ -13,6 +13,12 @@ const usesExternalServer = Boolean(process.env.PLAYWRIGHT_BASE_URL);
 export default defineConfig({
   testDir: './e2e',
   timeout: 45_000,
+  // A control that never becomes actionable should say so while the test still has
+  // a story to tell. Left at the default, one click on an element the app does not
+  // render spends the entire 45s budget and the report says only "timeout" — which
+  // is how nine tests in one file failed for a reason nobody could read.
+  actionTimeout: 15_000,
+
   expect: { timeout: 10_000 },
   // A flaky run is retried in CI but never locally, where a failure should be
   // reproduced rather than papered over.

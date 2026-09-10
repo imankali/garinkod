@@ -24,17 +24,33 @@ function unique() {
 
 async function registerAndSignIn(page: Page, username: string) {
   await page.goto('/login');
-  await page.getByRole('tab', { name: /رمز عبور/ }).click();
+  // Every step is announced before it is taken. A helper that quietly waits 45
+  // seconds on a control the app does not render turns one wrong assumption into a
+  // file full of identical timeouts, which is the least useful failure a suite can
+  // produce; this way the report names the missing thing.
+  const passwordTab = page.getByRole('tab', { name: /رمز عبور/ });
+  await expect(passwordTab).toBeVisible();
+  await passwordTab.click();
   const registerToggle = page.getByRole('button', { name: /ثبت‌نام|ایجاد حساب/ });
   if (await registerToggle.count()) await registerToggle.first().click();
 
-  await page.getByLabel(/نام کاربری/).first().fill(username);
-  await page.getByLabel('ایمیل').fill(`${username}@example.test`);
+  const usernameField = page.getByLabel(/نام کاربری/).first();
+  await expect(usernameField).toBeVisible();
+  await usernameField.fill(username);
+  const emailField = page.getByLabel('ایمیل').first();
+  await expect(emailField).toBeVisible();
+  await emailField.fill(`${username}@example.test`);
   const passwords = page.locator('input[type="password"]');
   await passwords.first().fill('SafePassword!234');
   if ((await passwords.count()) > 1) await passwords.nth(1).fill('SafePassword!234');
-  await page.getByRole('button', { name: /ثبت‌نام|ایجاد حساب/ }).last().click();
-  await page.waitForLoadState('networkidle');
+  const submit = page.getByRole('button', { name: /ثبت‌نام|ایجاد حساب/ }).last();
+  await expect(submit).toBeVisible();
+  await submit.click();
+
+  // The API answers with a token or with an error; both are faster than 15s.
+  // Waiting on the URL instead of networkidle keeps the failure honest: if the
+  // account was not created, the report says the visitor is still on /login.
+  await expect(page).not.toHaveURL(/\/login/, { timeout: 20_000 });
 }
 
 async function createStorefront(page: Page, name: string) {

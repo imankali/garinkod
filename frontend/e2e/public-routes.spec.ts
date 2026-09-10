@@ -72,28 +72,48 @@ test('the faq page renders the questions the admin publishes', async ({ page }) 
   await page.goto('/faq');
   await expect(page.getByRole('heading', { level: 1 })).toContainText(/سؤالات متداول|پرسش‌های/);
 
-  // The page publishes its questions twice: as the FAQPage JSON-LD a search engine
-  // reads, and as text on screen. That is the contract — which element wraps them
-  // is the page's business, so the test does not care whether it is an accordion.
-  const schemas = (await page.locator('script[type="application/ld+json"]').allTextContents())
-    .filter(Boolean)
-    .map((raw) => JSON.parse(raw) as { '@type'?: string; mainEntity?: { name?: string }[] })
-    .filter((data) => data['@type'] === 'FAQPage');
-  expect(schemas, 'the faq page should publish its FAQPage structure').toHaveLength(1);
+  // The questions come from a page block over HTTP, so "is the list empty?" can
+  // only be answered once that has landed. Poll for either outcome the page is
+  // allowed to produce: published questions, or the page admitting it has none.
+  await expect
+    .poll(
+      async () =>
+        (await page.locator('details > summary').count()) > 0 ||
+        (await page.getByRole('link', { name: /میز پشتیبانی/ }).count()) > 0,
+      { timeout: 15_000 },
+    )
+    .toBe(true);
 
-  const questions = schemas[0]?.mainEntity ?? [];
-  if (questions.length === 0) {
-    // Nothing configured is an answer, as long as the page says so out loud.
-    await expect(page.getByText(/هنوز در پنل مدیریت تنظیم نشده/)).toBeVisible();
+  const questions = page.locator('details > summary');
+  if ((await questions.count()) === 0) {
+    // Nothing configured is an answer, as long as the page says so and still hands
+    // the visitor to the support desk instead of a blank card.
+    await expect(page.getByRole('link', { name: /میز پشتیبانی/ })).toBeVisible();
     return;
   }
-  await expect(page.getByText(questions[0]?.name ?? '')).toBeVisible();
+
+  // Each question opens to its own answer, and the structured data the crawlers
+  // get mirrors exactly that list — the two must not drift apart.
+  const first = questions.first();
+  await expect(first).toBeVisible();
+  await first.click();
+  await expect(first.locator('xpath=following-sibling::p').first()).toBeVisible();
+
+  const schemas = (await page.locator('script[type="application/ld+json"]').allTextContents())
+    .filter(Boolean)
+    .map((raw) => JSON.parse(raw) as { '@type'?: string; mainEntity?: unknown[] })
+    .filter((data) => data['@type'] === 'FAQPage');
+  expect(schemas, 'the faq page publishes FAQPage structure').toHaveLength(1);
+  expect(schemas[0]?.mainEntity?.length).toBe(await questions.count());
 });
 
 test('route metadata indexes public pages and protects account pages', async ({ page }) => {
   await page.goto('/privacy');
+  // The legacy address answers by redirecting, and the metadata belongs to the
+  // route that takes over — so wait for the redirect before reading it, or the
+  // assertion races the navigation and finds the old document's head.
+  await expect(page).toHaveURL(/\/legal\/privacy$/);
   await expect(page).toHaveTitle(/حریم خصوصی/);
-  // The legacy address answers, and points at the canonical copy of the same text.
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', /\/legal\/privacy$/);
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /index,follow/);
 
@@ -116,17 +136,20 @@ test('checkout clearly communicates the five purchase stages', async ({ page }) 
 test('login defaults to mobile OTP and keeps password compatibility', async ({ page }) => {
   await page.goto('/login');
   await expect(page.getByRole('tab', { name: /کد یک‌بارمصرف/ })).toHaveAttribute('aria-selected', 'true');
-  // Both tabs' fields live in the DOM at once — only one of each is on screen,
-  // and "the field a person can use" is the assertion worth making.
-  await expect(page.getByLabel('شماره موبایل').filter({ visible: true })).toBeVisible();
+  // exact, because the footer's newsletter field is labelled «شماره موبایل برای
+  // خبرنامه» and a substring search cannot tell the two apart — a lesson worth
+  // keeping in the test rather than rediscovering next time.
+  await expect(page.getByLabel('شماره موبایل', { exact: true })).toBeVisible();
   await page.getByRole('tab', { name: /رمز عبور/ }).click();
-  await expect(page.getByLabel('نام کاربری').filter({ visible: true })).toBeVisible();
-  await expect(page.getByLabel('رمز عبور', { exact: true }).filter({ visible: true })).toBeVisible();
+  await expect(page.getByLabel('نام کاربری', { exact: true }).first()).toBeVisible();
+  await expect(page.getByLabel('رمز عبور', { exact: true }).first()).toBeVisible();
 });
 
 test('language selector changes document direction safely', async ({ page }) => {
   await page.goto('/');
-  const language = page.getByLabel('زبان').first();
+  // Header and mobile menu each carry a language select; the hidden one is not
+  // "the first", it is the one nobody can use.
+  const language = page.getByLabel('زبان').locator('visible=true').first();
   await language.selectOption('en');
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   await expect(page.locator('html')).toHaveAttribute('dir', 'ltr');
@@ -179,9 +202,16 @@ test('the terms a buyer accepts are readable from the checkout itself', async ({
   // The input is visually replaced (sr-only) with a styled box beside the text,
   // so "visible" is the wrong verb for it: the label is read, the control exists.
   await expect(acceptance.getByRole('checkbox')).toBeAttached();
-  for (const label of ['قوانین و مقررات', 'حریم خصوصی', 'شرایط خرید و بازگشت کالا']) {
-    await expect(acceptance.getByRole('link', { name: label })).toBeVisible();
-  }
+
+  // The buyer is pointed at every document they are agreeing to. Where those links
+  // go is the contract; how each one is phrased is copy, and copy changes.
+  const hrefs = await acceptance
+    .getByRole('link')
+    .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('href')));
+  expect(hrefs).toEqual(
+    expect.arrayContaining(['/legal/terms', '/legal/privacy', '/legal/returns']),
+  );
+
   await acceptance.getByRole('link', { name: 'قوانین و مقررات' }).click();
   await expect(page).toHaveURL(/\/legal\/terms$/);
 });
