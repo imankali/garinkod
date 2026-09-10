@@ -315,3 +315,15 @@ frontend/.lighthouseci/
 
 # Arena / Continue agent tooling
 .continue/
+
+# Playwright browsers (large binaries)
+.ms-playwright/
+
+# Docker
+docker-compose.override.yml
+
+# Redis dump
+dump.rdb
+
+# Webpack
+frontend/webpack-stats.json
