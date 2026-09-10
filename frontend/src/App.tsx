@@ -285,6 +285,17 @@ export default function App() {
         {/* ======================================== */}
         {/* Header */}
         {/* ======================================== */}
+        {/*
+          Skip link: the first thing a keyboard or screen-reader user reaches,
+          letting them jump past the header and navigation straight to content.
+          It sits ahead of <Header> for exactly that reason — after the header it
+          would only be reachable by tabbing through everything it replaces.
+          (WCAG 2.4.1 Bypass Blocks.)
+        */}
+        <a href="#main-content" className="skip-link">
+          پرش به محتوای اصلی
+        </a>
+
         <Header
           cartOpen={cartOpen}
           onCartOpenChange={setCartOpen}
@@ -301,14 +312,6 @@ export default function App() {
         {/* ✅ pb-24 برای MobileBottomNav در موبایل */}
         {/* ✅ lg:pb-8 برای دسکتاپ */}
         {/* ======================================== */}
-        {/*
-          Skip link: the first thing a keyboard or screen-reader user reaches,
-          letting them jump past the header and navigation straight to content.
-        */}
-        <a href="#main-content" className="skip-link">
-          پرش به محتوای اصلی
-        </a>
-
         <main
           id="main-content"
           tabIndex={-1}

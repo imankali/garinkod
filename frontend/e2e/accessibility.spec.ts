@@ -43,7 +43,7 @@ const CONTRAST_CEILING: Record<string, number> = {
   '/products?source=marketplace': 17,
   '/products': 9,
   '/products/image-pipeline-demo/': 2,
-  '/storefronts': 29,
+  '/storefronts': 16,
   '/checkout': 6,
   '/login': 4,
   '/support': 3,

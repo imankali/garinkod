@@ -160,7 +160,9 @@ export default function StorefrontCard({ storefront }: { storefront: Storefront 
 
         <Link
           to={`/storefronts/${storefront.slug}`}
-          className="mt-3 rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200"
+          // min-h-11: the stat row is the card's second tap target, and at the
+          // height of one line of text it was 22px of target for a thumb.
+          className="mt-3 flex min-h-11 items-center rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200"
           aria-label={`جزئیات غرفه ${storefront.name}`}
         >
           <dl className="flex flex-wrap items-center gap-3 text-fluid-xs text-slate-500 dark:text-emerald-200">
