@@ -395,7 +395,7 @@ export default function ShopFilterBar({
       )}
 
       {chips.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5" aria-label="فیلترهای فعال">
+        <div className="flex flex-wrap items-center gap-1.5" aria-label="فیلترهای فعال" role="group">
           {chips.map((chip) => (
             <span
               key={chip.key}

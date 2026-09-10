@@ -37,6 +37,11 @@ export default defineConfig({
     video: 'retain-on-failure',
     locale: 'fa-IR',
     timezoneId: 'Asia/Tehran',
+    // The UI animates on hover and tap (framer-motion), which makes a control
+    // move while Playwright is deciding whether it is stable enough to click.
+    // Reduced motion stops the fight — and exercises the same path a
+    // motion-sensitive visitor gets, so it is tested rather than worked around.
+    reducedMotion: 'reduce',
   },
   projects: [
     // Chromium runs the exhaustive behavioural, accessibility and explicit

@@ -39,8 +39,18 @@ for (const target of PAGES) {
     const blocking = results.violations.filter(
       (violation) => violation.impact === 'serious' || violation.impact === 'critical',
     );
+    // The targets, not just the counts: an annotation that says "color-contrast
+    // (4 nodes)" sends someone back to a browser; one that prints the selectors
+    // says where to look.
     const summary = blocking
-      .map((violation) => `${violation.id}: ${violation.help} (${violation.nodes.length} node(s))`)
+      .map(
+        (violation) =>
+          `${violation.id}: ${violation.help} (${violation.nodes.length} node(s))\n` +
+          violation.nodes
+            .slice(0, 6)
+            .map((node) => `    · ${node.target.join(' ')}`)
+            .join('\n'),
+      )
       .join('\n');
 
     expect(blocking, `Serious/critical a11y violations on ${target.path}:\n${summary}`).toEqual([]);

@@ -109,7 +109,7 @@ function AdRail({ rail }: { rail: Rail }) {
   const Icon = rail.icon;
 
   return (
-    <div aria-label={rail.title}>
+    <div aria-label={rail.title} role="group">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 className="flex items-center gap-2 text-fluid-lg font-extrabold text-slate-800 dark:text-white">
           <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-xl', rail.tone)}>

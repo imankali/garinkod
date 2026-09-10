@@ -38,7 +38,12 @@ test.describe('storefront directory', () => {
     // matched exactly at the moment it is still bare.
     await page.getByRole('button', { name: 'فیلتر', exact: true }).click();
 
-    await page.getByLabel('استان').selectOption('فارس');
+    // Scoped to the panel: the weather strip on the same page has a «استان»
+    // select of its own, and an unscoped label would match both.
+    await page
+      .getByRole('group', { name: 'فیلترهای غرفه‌ها' })
+      .getByLabel('استان')
+      .selectOption('فارس');
     await expect(page).toHaveURL(/province=/);
   });
 

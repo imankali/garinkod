@@ -32,6 +32,7 @@ export default function MessageStatusTicks({
         className,
       )}
       title={isRead ? 'باز شده' : 'هنوز باز نشده'}
+      role="img"
       aria-label={isRead ? 'طرف مقابل پیام را باز کرده است' : 'پیام ارسال شده و هنوز باز نشده'}
     >
       {isRead ? <CheckCheck size={13} aria-hidden="true" /> : <Check size={12} aria-hidden="true" />}

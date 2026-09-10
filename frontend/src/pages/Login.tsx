@@ -464,7 +464,15 @@ className={`${AUTH_INPUT_CLASS} ps-10`}
 }
 
 function Spinner() {
-  return <span className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" aria-label="در حال انجام" />;
+  // role=status so the label is announced: a bare span with an aria-label is a
+  // name on a generic element, which AT is allowed to ignore (and axe rejects).
+  return (
+    <span
+      role="status"
+      className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent"
+      aria-label="در حال انجام"
+    />
+  );
 }
 
 function Field({ label, htmlFor, icon, children }: { label: string; htmlFor: string; icon: React.ReactNode; children: React.ReactNode }) {

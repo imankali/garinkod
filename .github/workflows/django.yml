@@ -167,11 +167,67 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run the journey suite
+        id: suite
         working-directory: frontend
-        run: npx playwright test --project=desktop-chromium --workers=3 --retries=1
+        # The JSON report is emitted for the summary step; the run's own status is
+        # kept in an output so the summary can be written before the job is failed.
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: playwright-report/results.json
+        run: |
+          set +e
+          npx playwright test --project=desktop-chromium --workers=3 --retries=1 \
+            --reporter=list,github,junit,json
+          echo "status=$?" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Summarise the results
+        if: always()
+        working-directory: frontend
+        # Nobody opens an artefact on a red run, and a cancelled job leaves no log
+        # worth reading — so the numbers and every failing title go into the
+        # Checks tab itself.
+        run: >
+          node -e "
+          const fs = require('fs');
+          const path = 'playwright-report/results.json';
+          let out = '## Playwright — desktop-chromium\n\n';
+          if (!fs.existsSync(path)) {
+            out += '_the suite never produced results; see the step above for the run itself_\n';
+          } else {
+            const root = JSON.parse(fs.readFileSync(path, 'utf8'));
+            const rows = [];
+            let tests = 0, failed = 0, skipped = 0;
+            const each = (suite) => {
+              (suite.suites || []).forEach(each);
+              (suite.specs || []).forEach((spec) => spec.tests.forEach((test) => {
+                tests += 1;
+                const result = (test.results || [])[0] || {};
+                if (result.status === 'skipped') skipped += 1;
+                else if (test.ok === false) {
+                  failed += 1;
+                  // A few lines, not one: Playwright's first line is often the
+                  // matcher that timed out, while the interesting part — which
+                  // selector, which violation — is the second or third.
+                  const message = ((result.error && result.error.message) || 'failed')
+                    .split('\n').map((line) => line.trim()).filter(Boolean).slice(0, 3).join(' · ') || 'failed';
+                  rows.push('| ' + spec.file + ' | ' + spec.title + ' | ' + message.slice(0, 170).replace(/\|/g, '/') + ' |');
+                }
+              }));
+            };
+            (root.suites || []).forEach(each);
+            out += tests + ' tests · ' + failed + ' failed · ' + skipped + ' skipped\n\n';
+            out += '| spec | test | first line of the error |\n|---|---|---|\n' + rows.join('\n') + '\n';
+          }
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, out);
+          process.stdout.write(out);
+          "
+
+      - name: Fail when the suite failed
+        if: steps.suite.outputs.status != '0'
+        run: exit "${{ steps.suite.outputs.status }}"
 
       - name: Upload the report
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report

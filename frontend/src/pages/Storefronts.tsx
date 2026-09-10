@@ -389,7 +389,14 @@ export default function Storefronts() {
           </div>
 
           {showFilters && (
-            <div className="mt-3 grid gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3 dark:border-emerald-900 dark:bg-emerald-950/60 sm:grid-cols-2 lg:grid-cols-4">
+            // A named group, because the page is not the only thing on the site
+            // with a «استان» select — the weather strip has one too, and a label
+            // that resolves to two controls is a label nobody can rely on.
+            <div
+              role="group"
+              aria-label="فیلترهای غرفه‌ها"
+              className="mt-3 grid gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3 dark:border-emerald-900 dark:bg-emerald-950/60 sm:grid-cols-2 lg:grid-cols-4"
+            >
               <FilterSelect
                 label="استان"
                 value={filters.province}
