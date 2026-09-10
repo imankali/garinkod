@@ -39,9 +39,14 @@ for (const target of PAGES) {
     const blocking = results.violations.filter(
       (violation) => violation.impact === 'serious' || violation.impact === 'critical',
     );
-    // The targets, not just the counts: an annotation that says "color-contrast
-    // (4 nodes)" sends someone back to a browser; one that prints the selectors
-    // says where to look.
+
+    // The first line is machine-readable on purpose — a run's whole a11y picture
+    // has to survive being pasted into a comment, an annotation or a terminal:
+    // `a11y /products color-contrast=11 aria-prohibited-attr=1` is what any of
+    // those still shows, while the selector dump underneath is what a person reads.
+    const counts = blocking
+      .map((violation) => `${violation.id}=${violation.nodes.length}`)
+      .join(' ');
     const summary = blocking
       .map(
         (violation) =>
@@ -53,7 +58,10 @@ for (const target of PAGES) {
       )
       .join('\n');
 
-    expect(blocking, `Serious/critical a11y violations on ${target.path}:\n${summary}`).toEqual([]);
+    expect(
+      blocking,
+      `a11y ${target.path} ${counts || 'clean'}\n\n${summary}`,
+    ).toEqual([]);
   });
 }
 
