@@ -229,7 +229,9 @@ jobs:
           "
 
       - name: Report the failures on the pull request
-        if: failure() && github.event_name == 'pull_request'
+        # Not failure(): the step that fails the job runs after this one, on purpose
+        # so the summary is written first. The suite's own status is the signal.
+        if: github.event_name == 'pull_request' && steps.suite.outputs.status != '0'
         working-directory: frontend
         env:
           GH_TOKEN: ${{ github.token }}
