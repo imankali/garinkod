@@ -239,7 +239,9 @@ describe('the filter panel', () => {
   // and these two tests are the difference.
   async function openPanel() {
     await renderPage();
-    await userEvent.click(await screen.findByRole('button', { name: 'فیلتر', exact: true }));
+    await userEvent.click(// A string name is matched exactly by testing-library already, which is what
+    // the panel's trigger needs: «مرتب‌سازی…» and the count badge share that word.
+    await screen.findByRole('button', { name: 'فیلتر' }));
     return within(await screen.findByRole('group', { name: 'فیلترهای غرفه‌ها' }));
   }
 
