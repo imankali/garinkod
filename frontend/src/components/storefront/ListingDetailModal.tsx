@@ -327,7 +327,7 @@ function Fact({
 }) {
   return (
     <div className={cn('rounded-xl bg-slate-50 p-2.5 dark:bg-emerald-900/40')}>
-      <dt className="flex items-center gap-1 text-fluid-2xs text-slate-400 dark:text-emerald-300">
+      <dt className="flex items-center gap-1 text-fluid-2xs text-slate-500 dark:text-emerald-300">
         {Icon && <Icon size={11} aria-hidden="true" />}
         {label}
       </dt>

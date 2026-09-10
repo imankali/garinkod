@@ -170,7 +170,7 @@ export default function UserLevels({ viewerLevel }: { viewerLevel: number }) {
                       </span>
                     )}
                   </span>
-                  <span className="mt-1 block shrink-0 text-fluid-2xs text-slate-400 dark:text-emerald-300/70 sm:mt-0">
+                  <span className="mt-1 block shrink-0 text-fluid-2xs text-slate-500 dark:text-emerald-300/70 sm:mt-0">
                     {row.how}
                   </span>
                 </li>

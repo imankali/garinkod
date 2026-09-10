@@ -1110,7 +1110,7 @@ function MessageBubble({
               <p
                 className={cn(
                   'flex items-center gap-1.5 text-fluid-xs italic',
-                  mine ? 'text-white/85' : 'text-slate-400 dark:text-emerald-300/80',
+                  mine ? 'text-white/85' : 'text-slate-500 dark:text-emerald-300/80',
                 )}
               >
                 <Ban size={13} aria-hidden="true" />
@@ -1134,7 +1134,7 @@ function MessageBubble({
 
         <p
           className={cn(
-            'mt-1 flex items-center gap-1.5 px-1 text-fluid-2xs text-slate-400 dark:text-emerald-300/70',
+            'mt-1 flex items-center gap-1.5 px-1 text-fluid-2xs text-slate-500 dark:text-emerald-300/70',
             mine ? 'justify-end' : 'justify-start',
           )}
         >

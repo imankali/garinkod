@@ -65,7 +65,7 @@ export default function PackagingPicker({
                   )}
                 >
                   <span className="text-fluid-xs font-bold">{item.label}</span>
-                  <span className={cn('text-fluid-2xs', active ? 'text-emerald-50' : 'text-slate-400 dark:text-emerald-300')}>
+                  <span className={cn('text-fluid-2xs', active ? 'text-emerald-50' : 'text-slate-500 dark:text-emerald-300')}>
                     {item.is_in_stock ? `${formatPrice(item.discounted_price)} تومان` : 'ناموجود'}
                   </span>
                 </button>

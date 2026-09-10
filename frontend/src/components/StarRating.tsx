@@ -49,7 +49,7 @@ export function StarRow({
         </span>
       )}
       {typeof count === 'number' && (
-        <span className="text-fluid-2xs text-slate-400 dark:text-emerald-300">({faNumber(count)} دیدگاه)</span>
+        <span className="text-fluid-2xs text-slate-500 dark:text-emerald-300">({faNumber(count)} دیدگاه)</span>
       )}
     </span>
   );

@@ -210,7 +210,7 @@ export function MultiSelectFacet({
           );
         })}
         {visible.length === 0 && (
-          <li className="px-2 py-3 text-fluid-xs text-slate-400 dark:text-emerald-300/70">{emptyHint}</li>
+          <li className="px-2 py-3 text-fluid-xs text-slate-500 dark:text-emerald-300/70">{emptyHint}</li>
         )}
       </ul>
 

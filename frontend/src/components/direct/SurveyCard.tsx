@@ -142,7 +142,7 @@ export default function SurveyCard({
       </button>
 
       {score === 0 && (
-        <p className="mt-1.5 text-center text-fluid-2xs text-slate-400 dark:text-emerald-300/70">
+        <p className="mt-1.5 text-center text-fluid-2xs text-slate-500 dark:text-emerald-300/70">
           برای ثبت نظر، اول امتیاز را انتخاب کنید
         </p>
       )}

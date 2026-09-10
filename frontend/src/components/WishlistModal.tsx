@@ -132,7 +132,7 @@ export default function WishlistModal({
                       <p className="truncate text-sm font-semibold text-slate-700 dark:text-white">
                         {product.name}
                       </p>
-                      <p className="text-xs text-slate-400 dark:text-emerald-300">
+                      <p className="text-xs text-slate-500 dark:text-emerald-300">
                         {product.category}
                       </p>
                       <p className="mt-1 text-sm font-bold text-emerald-600 dark:text-lime-300">

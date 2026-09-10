@@ -813,7 +813,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
                 </div>
               )}
 
-              <p className="mt-4 text-center text-fluid-2xs text-slate-400 dark:text-emerald-300/70">
+              <p className="mt-4 text-center text-fluid-2xs text-slate-500 dark:text-emerald-300/70">
                 {diagnosisResult.disclaimer}
               </p>
             </motion.div>

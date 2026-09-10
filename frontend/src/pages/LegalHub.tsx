@@ -159,7 +159,7 @@ export default function LegalHub() {
                 <span className="block truncate text-fluid-xs font-extrabold text-slate-800 dark:text-white">
                   {row.question}
                 </span>
-                <span className="mt-0.5 block truncate text-fluid-2xs text-slate-400 dark:text-emerald-300/80">
+                <span className="mt-0.5 block truncate text-fluid-2xs text-slate-500 dark:text-emerald-300/80">
                   {row.label}
                 </span>
               </span>

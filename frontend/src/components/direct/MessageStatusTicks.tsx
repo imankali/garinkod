@@ -28,7 +28,7 @@ export default function MessageStatusTicks({
     <span
       className={cn(
         'inline-flex shrink-0 items-center gap-0.5',
-        isRead ? 'text-slate-400 dark:text-emerald-300/70' : 'text-lime-300',
+        isRead ? 'text-slate-500 dark:text-emerald-300/70' : 'text-lime-300',
         className,
       )}
       title={isRead ? 'باز شده' : 'هنوز باز نشده'}

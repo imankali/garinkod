@@ -91,7 +91,7 @@ export default function CategoryGrid() {
                 {tile.name}
               </span>
               {tile.count !== undefined && (
-                <span className="text-fluid-2xs text-slate-400 dark:text-emerald-300">
+                <span className="text-fluid-2xs text-slate-500 dark:text-emerald-300">
                   {tile.count.toLocaleString('fa-IR')} محصول
                 </span>
               )}

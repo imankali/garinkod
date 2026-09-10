@@ -285,7 +285,7 @@ export default function MobileMenu({
                               <span
                                 className={cn(
                                   'block truncate text-fluid-2xs',
-                                  isActive ? 'text-emerald-50' : 'text-slate-400 dark:text-emerald-300/70',
+                                  isActive ? 'text-emerald-50' : 'text-slate-500 dark:text-emerald-300/70',
                                 )}
                               >
                                 {item.description}

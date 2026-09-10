@@ -172,7 +172,7 @@ export default function LandDetailDrawer({
 function IdentityCell({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
     <div className="rounded-2xl bg-emerald-50/70 p-3 dark:bg-emerald-900/30">
-      <dt className="flex items-center gap-1 text-fluid-2xs font-bold text-slate-400 dark:text-emerald-300">
+      <dt className="flex items-center gap-1 text-fluid-2xs font-bold text-slate-500 dark:text-emerald-300">
         {icon}
         {label}
       </dt>

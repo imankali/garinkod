@@ -116,7 +116,7 @@ export default function WeatherWidget() {
             </span>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-slate-400 dark:text-emerald-300">
+                <span className="text-xs font-bold text-slate-500 dark:text-emerald-300">
                   نمونهٔ توصیه اقلیمی
                 </span>
                 <span
@@ -141,7 +141,7 @@ export default function WeatherWidget() {
           <div className="w-full md:max-w-xl">
             <ClimateSelector onChange={handleClimateChange} />
             {city && (
-              <p className="mt-1 text-end text-fluid-2xs text-slate-400 dark:text-emerald-300">
+              <p className="mt-1 text-end text-fluid-2xs text-slate-500 dark:text-emerald-300">
                 توصیه اقلیمی انتخاب‌شده برای {city}
               </p>
             )}

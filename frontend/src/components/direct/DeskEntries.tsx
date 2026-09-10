@@ -184,14 +184,14 @@ export default function DeskEntries({
               </span>
 
               <span className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-bold">
-                <span className={cn(presence === 'online' ? 'text-emerald-600 dark:text-lime-300' : 'text-slate-400 dark:text-emerald-300/70')}>
+                <span className={cn(presence === 'online' ? 'text-emerald-600 dark:text-lime-300' : 'text-slate-500 dark:text-emerald-300/70')}>
                   {presence === 'closed'
                     ? `خارج از ساعت کاری${state?.opens_at_label ? ` — بازگشایی ${state.opens_at_label}` : ''}`
                     : presence === 'online'
                       ? `${(state?.online_count ?? 0).toLocaleString('fa-IR')} نفر آنلاین`
                       : 'در ساعت کاری'}
                 </span>
-                {state?.tracked && <span className="text-slate-400 dark:text-emerald-300/70">{state.hours}</span>}
+                {state?.tracked && <span className="text-slate-500 dark:text-emerald-300/70">{state.hours}</span>}
                 {unassigned > 0 && (
                   <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-amber-800 dark:bg-amber-950/60 dark:text-amber-200">
                     {unassigned.toLocaleString('fa-IR')} گفتگوی بی‌سرپرست

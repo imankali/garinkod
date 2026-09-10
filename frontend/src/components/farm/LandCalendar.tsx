@@ -201,7 +201,7 @@ export default function LandCalendar({
         <ul className="mt-3 space-y-3">
           {grouped.map(([date, dayEvents]) => (
             <li key={date}>
-              <p className="mb-1.5 text-fluid-xs font-extrabold text-slate-400 dark:text-emerald-300">
+              <p className="mb-1.5 text-fluid-xs font-extrabold text-slate-500 dark:text-emerald-300">
                 {formatFaDate(date)}
               </p>
               <ul className="space-y-1.5">

@@ -602,7 +602,7 @@ function SiteSettingsSection({ t }: { t: (key: string) => string }) {
         {/* Language */}
         <div>
           <h3 className="text-sm font-bold text-slate-700 dark:text-emerald-50">{t("language.label")}</h3>
-          <p className="mt-1 text-xs text-slate-400 dark:text-emerald-300/70">{t("language.description")}</p>
+          <p className="mt-1 text-xs text-slate-500 dark:text-emerald-300/70">{t("language.description")}</p>
           <div role="radiogroup" aria-label={t("language.label")} className="mt-3 grid grid-cols-3 gap-2 sm:max-w-md">
             {LANGUAGES.map((language) => (
               <button

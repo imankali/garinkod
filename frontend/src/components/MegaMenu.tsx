@@ -201,7 +201,7 @@ export default function MegaMenu() {
                   </span>
                   <div>
                     <p className="font-bold text-slate-800 dark:text-white">{activeCategory.name}</p>
-                    <p className="text-xs text-slate-400 dark:text-emerald-300">
+                    <p className="text-xs text-slate-500 dark:text-emerald-300">
                       {activeCategory.product_count} محصول
                     </p>
                   </div>

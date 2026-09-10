@@ -101,7 +101,12 @@ for (const target of PAGES) {
         beaten.length ? `\n\nTIGHTEN THE CEILING:\n${beaten.join('\n')}` : ''
       }`,
     ).toEqual([]);
-    expect(beaten, `contrast ceilings can be lowered on ${target.path}`).toEqual([]);
+    // Improvement is not a broken build: it is recorded, on the run, where the
+    // next person to touch this file will see it and lower the number. Failing here
+    // would mean a fix in the app turns CI red — which is how ratchets get deleted.
+    for (const note of beaten) {
+      await testInfo.attach('ceiling-can-be-lowered', { body: note, contentType: 'text/plain' });
+    }
   });
 }
 

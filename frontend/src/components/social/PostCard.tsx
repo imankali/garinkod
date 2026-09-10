@@ -219,7 +219,7 @@ export default function PostCard({
             )}
           </Link>
           {/* The handle: the غرفه's unique address, the stable identifier. */}
-          <p className="truncate text-fluid-2xs text-slate-400 dark:text-emerald-300">
+          <p className="truncate text-fluid-2xs text-slate-500 dark:text-emerald-300">
             <bdi>@{post.storefront_slug}</bdi> · {timeAgo(post.created_at)}
           </p>
         </div>
