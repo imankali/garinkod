@@ -230,3 +230,39 @@ describe('the hero', () => {
     await flush();
   });
 });
+
+describe('the filter panel', () => {
+  // Regression: each select used to sit *inside* its <label>, which folds the
+  // control's own value into its accessible name — «شهر» read as «شهرابتدا استان»,
+  // and «استان» matched both selects at once. Nothing can pick a field by name if
+  // the name moves when the value does, so the panel is now wired with id + htmlFor
+  // and these two tests are the difference.
+  async function openPanel() {
+    await renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'فیلتر', exact: true }));
+    return within(await screen.findByRole('group', { name: 'فیلترهای غرفه‌ها' }));
+  }
+
+  it('names every select by its field alone', async () => {
+    const panel = await openPanel();
+    expect(panel.getAllByLabelText('استان')).toHaveLength(1);
+    expect(panel.getAllByLabelText('شهر')).toHaveLength(1);
+    expect(panel.getAllByLabelText('نوع فروشنده')).toHaveLength(1);
+  });
+
+  it('associates each label with its own control', async () => {
+    const panel = await openPanel();
+    const province = panel.getByLabelText('استان');
+    const city = panel.getByLabelText('شهر');
+    expect(province).toHaveAttribute('id');
+    expect(city).toHaveAttribute('id');
+    expect(province.getAttribute('id')).not.toEqual(city.getAttribute('id'));
+  });
+
+  it('keeps the city field out of the way until a province is chosen', async () => {
+    const panel = await openPanel();
+    expect(panel.getByLabelText('شهر')).toBeDisabled();
+    await userEvent.selectOptions(panel.getByLabelText('استان'), 'فارس');
+    expect(panel.getByLabelText('شهر')).toBeEnabled();
+  });
+});

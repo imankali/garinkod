@@ -155,7 +155,6 @@ export default function Legal() {
       <Helmet>
         <title>{document.title} | گرین کود</title>
         <meta name="description" content={document.summary} />
-        <link rel="canonical" href={`${window.location.origin}/legal/${document.slug}`} />
       </Helmet>
 
       <nav aria-label="بازگشت" className="mb-5">

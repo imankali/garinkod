@@ -89,7 +89,6 @@ export default function LegalHub() {
           name="description"
           content="قوانین و مقررات، حریم خصوصی، شرایط خرید و بازگشت کالا، ارسال، ضمانت اصالت، قوانین غرفه‌داری، امتیاز و پاداش، و رسیدگی به شکایات."
         />
-        <link rel="canonical" href={`${window.location.origin}/legal`} />
       </Helmet>
 
       <header className="max-w-3xl">

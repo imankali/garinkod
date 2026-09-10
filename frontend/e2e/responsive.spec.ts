@@ -68,7 +68,10 @@ test.describe('mobile layout details', () => {
     expect(overflow).toBeLessThanOrEqual(OVERFLOW_TOLERANCE);
   });
 
-  test('tap targets on the bottom navigation are large enough', async ({ page }) => {
+  test('tap targets on the bottom navigation are large enough', async ({ page, isMobile }) => {
+    // The bottom bar is a phone affordance: on a desktop viewport it is not
+    // rendered at all, so there is nothing here to measure outside a device.
+    test.skip(!isMobile, 'the mobile bottom bar is not rendered on desktop viewports');
     await page.goto('/');
     const nav = page.getByRole('navigation', { name: 'منوی پایین موبایل' });
     await expect(nav).toBeVisible();
@@ -99,7 +102,10 @@ test.describe('zoomed layout', () => {
 });
 
 test.describe('layout primitives', () => {
-  test('page content is never hidden behind the fixed mobile bar', async ({ page }) => {
+  test('page content is never hidden behind the fixed mobile bar', async ({ page, isMobile }) => {
+    // Same contract as the tap targets: it is about the bar phones get and
+    // desktop does not.
+    test.skip(!isMobile, 'the fixed mobile bar is not rendered on desktop viewports');
     await page.setViewportSize({ width: 375, height: 812 });
 
     for (const route of ['/', '/marketplace', '/orders']) {

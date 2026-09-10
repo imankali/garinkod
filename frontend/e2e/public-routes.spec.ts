@@ -70,7 +70,7 @@ test("the buyers' page says where its quotes came from", async ({ page }) => {
 
 test('the faq page renders the questions the admin publishes', async ({ page }) => {
   await page.goto('/faq');
-  await expect(page.getByRole('heading', { level: 1 })).toContainText(/پرسش/);
+  await expect(page.getByRole('heading', { level: 1 })).toContainText(/سؤالات متداول|پرسش‌های/);
   const questions = page.locator('details > summary');
   // Either the accordion is filled in, or the page admits it is not and points at
   // the support desk; an empty silence is not an option.
@@ -103,10 +103,12 @@ test('checkout clearly communicates the five purchase stages', async ({ page }) 
 test('login defaults to mobile OTP and keeps password compatibility', async ({ page }) => {
   await page.goto('/login');
   await expect(page.getByRole('tab', { name: /کد یک‌بارمصرف/ })).toHaveAttribute('aria-selected', 'true');
-  await expect(page.getByLabel('شماره موبایل')).toBeVisible();
+  // Both tabs' fields live in the DOM at once — only one of each is on screen,
+  // and "the field a person can use" is the assertion worth making.
+  await expect(page.getByLabel('شماره موبایل').filter({ visible: true })).toBeVisible();
   await page.getByRole('tab', { name: /رمز عبور/ }).click();
-  await expect(page.getByLabel('نام کاربری')).toBeVisible();
-  await expect(page.getByLabel('رمز عبور', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('نام کاربری').filter({ visible: true })).toBeVisible();
+  await expect(page.getByLabel('رمز عبور', { exact: true }).filter({ visible: true })).toBeVisible();
 });
 
 test('language selector changes document direction safely', async ({ page }) => {
@@ -161,7 +163,9 @@ test('the terms a buyer accepts are readable from the checkout itself', async ({
     .locator('label')
     .filter({ hasText: 'صحت اطلاعات تحویل و مبلغ را تأیید می‌کنم' })
     .first();
-  await expect(acceptance.getByRole('checkbox')).toBeVisible();
+  // The input is visually replaced (sr-only) with a styled box beside the text,
+  // so "visible" is the wrong verb for it: the label is read, the control exists.
+  await expect(acceptance.getByRole('checkbox')).toBeAttached();
   for (const label of ['قوانین و مقررات', 'حریم خصوصی', 'شرایط خرید و بازگشت کالا']) {
     await expect(acceptance.getByRole('link', { name: label })).toBeVisible();
   }

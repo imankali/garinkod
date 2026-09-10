@@ -53,7 +53,6 @@ export default function Customers() {
           name="description"
           content="بازخوردهای واقعی خریداران نهاده‌های کشاورزی درباره کیفیت، بسته‌بندی و نتیجه در مزرعه."
         />
-        <link rel="canonical" href="/customers" />
       </Helmet>
 
       <main className="mx-auto max-w-6xl px-[var(--page-gutter)] py-8 md:py-12">

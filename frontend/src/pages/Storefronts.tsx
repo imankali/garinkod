@@ -19,7 +19,7 @@
 // live in the shared ساخت غرفه form, which this page opens in a dialog and the
 // studio redirects to.
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import {
@@ -676,10 +676,21 @@ function FilterSelect({
   options: { value: string; label: string }[];
   disabled?: boolean;
 }) {
+  // An explicit association, not a wrapping <label>: a label that wraps the
+  // select gives the control a name made of the label *plus whatever it currently
+  // shows*, so «استان» also matched the city field, and the name changed with the
+  // value. A name has to name the field, not its state.
+  const selectId = useId();
   return (
-    <label className="block">
-      <span className="mb-1 block text-fluid-xs font-bold text-slate-500 dark:text-emerald-200">{label}</span>
+    <div className="block">
+      <label
+        htmlFor={selectId}
+        className="mb-1 block text-fluid-xs font-bold text-slate-500 dark:text-emerald-200"
+      >
+        {label}
+      </label>
       <select
+        id={selectId}
         value={value}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
@@ -691,6 +702,6 @@ function FilterSelect({
           </option>
         ))}
       </select>
-    </label>
+    </div>
   );
 }

@@ -3,6 +3,8 @@ import { fileURLToPath } from 'node:url';
 
 import { expect, test, type Page } from '@playwright/test';
 
+import { selectWhenReady, waitForOptions } from './selectors';
+
 /**
  * Journeys that need a signed-in user: the seller studio (posts, stories,
  * image upload, highlights), the financial ledger, and the moderation console.
@@ -41,8 +43,10 @@ async function createStorefront(page: Page, name: string) {
   await page.goto('/storefronts?create=1');
   const dialog = page.getByRole('dialog', { name: 'ساخت غرفه' });
   await dialog.getByLabel(/نام غرفه/).fill(name);
-  await dialog.getByLabel('استان').selectOption('فارس');
-  await dialog.getByLabel('شهر').selectOption('شیراز');
+  // Both lists are fetched: cities only start loading once the province is set,
+  // so each pick waits for its own option rather than for a fixed delay.
+  await selectWhenReady(dialog.getByLabel('استان'), 'فارس');
+  await selectWhenReady(dialog.getByLabel('شهر'), 'شیراز');
 
   // A stall is registered to a person. The profile fields are not optional, and
   // the national code goes on the account, which is what «غرفه من» later means.
@@ -214,8 +218,12 @@ test.describe('seller finance', () => {
     await createStorefront(page, `غرفه فیلتر ${unique()}`);
 
     await page.goto('/finance');
-    await page.getByLabel('وضعیت').selectOption({ index: 1 });
-    await page.getByLabel('نوع رویداد').selectOption({ index: 1 });
+    const status = page.getByLabel('وضعیت');
+    const kind = page.getByLabel('نوع رویداد');
+    await waitForOptions(status);
+    await status.selectOption({ index: 1 });
+    await waitForOptions(kind);
+    await kind.selectOption({ index: 1 });
     // The page must stay usable rather than erroring on an empty result set.
     await expect(page.getByRole('heading', { name: /موجودی، کمیسیون/ })).toBeVisible();
   });

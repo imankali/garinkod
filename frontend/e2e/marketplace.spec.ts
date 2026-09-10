@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 
+import { selectWhenReady } from './selectors';
+
 /**
  * Marketplace journeys: browsing storefronts, filtering listings and adding a
  * storefront listing to the cart.
@@ -40,10 +42,12 @@ test.describe('storefront directory', () => {
 
     // Scoped to the panel: the weather strip on the same page has a «استان»
     // select of its own, and an unscoped label would match both.
-    await page
-      .getByRole('group', { name: 'فیلترهای غرفه‌ها' })
-      .getByLabel('استان')
-      .selectOption('فارس');
+    // Provinces arrive over HTTP; selecting before they do is a race the test
+    // would lose on a cold runner and win on a warm one.
+    await selectWhenReady(
+      page.getByRole('group', { name: 'فیلترهای غرفه‌ها' }).getByLabel('استان'),
+      'فارس',
+    );
     await expect(page).toHaveURL(/province=/);
   });
 
@@ -80,7 +84,12 @@ test.describe('farmers’ ad listings in the shop', () => {
     await page.goto(ADS);
     await page.getByRole('button', { name: /امکانات/ }).click();
 
-    await page.getByRole('checkbox', { name: 'فقط موجود' }).check();
+    // click + assert rather than check(): the chip is a button with aria-checked,
+    // and check() insists the attribute has already flipped by the time the click
+    // returns. React has not re-rendered yet, so that is a race, not a contract.
+    const inStock = page.getByRole('checkbox', { name: 'فقط موجود' });
+    await inStock.click();
+    await expect(inStock).toHaveAttribute('aria-checked', 'true');
     await expect(page).toHaveURL(/in_stock=1/);
   });
 
@@ -91,8 +100,10 @@ test.describe('farmers’ ad listings in the shop', () => {
     await expect(addButton).toBeVisible();
     await addButton.click();
 
-    // The drawer opens with the row, and the row carries the chip that says the
-    // item came from a غرفه rather than from the shop's own shelves.
+    // Adding to the cart does not open the cart — the buyer decides when to look.
+    // The row inside it carries the chip saying the item came from a غرفه rather
+    // than from the shop's own shelves, which is what the journey is about.
+    await page.getByRole('button', { name: /^سبد خرید/ }).click();
     const drawer = page.getByRole('dialog', { name: 'سبد خرید' });
     await expect(drawer).toBeVisible();
     await expect(drawer.getByText('غرفه', { exact: true }).first()).toBeVisible();
@@ -105,6 +116,7 @@ test.describe('farmers’ ad listings in the shop', () => {
     await expect(buy).toBeVisible();
     await buy.click();
 
+    await page.getByRole('button', { name: /^سبد خرید/ }).click();
     const drawer = page.getByRole('dialog', { name: 'سبد خرید' });
     await expect(drawer).toBeVisible();
     const decrease = drawer.getByRole('button', { name: /^کاهش تعداد/ }).first();
@@ -136,7 +148,7 @@ test.describe('dose calculator', () => {
     await search.fill('اوره');
 
     await page.getByRole('button', { name: /اوره/ }).first().click();
-    await page.getByLabel('محصول کشاورزی').selectOption('گندم');
+    await selectWhenReady(page.getByLabel('محصول کشاورزی'), 'گندم');
     await page.getByLabel('سطح زمین').fill('5');
     await page.getByRole('button', { name: 'محاسبه مقدار مورد نیاز' }).click();
 

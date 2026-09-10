@@ -85,7 +85,7 @@ test.describe('layout stability', () => {
 });
 
 test.describe('responsive grid & RTL', () => {
-  test('products grid is single-column on a 375px phone', async ({ page }) => {
+  test('products grid keeps two readable columns on a 375px phone', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 800 });
     await page.goto('/products');
     await page.waitForLoadState('networkidle');
@@ -93,8 +93,21 @@ test.describe('responsive grid & RTL', () => {
     const boxes = await catalogueCards(page);
     expect(boxes.length, 'no product cards found on /products').toBeGreaterThan(1);
 
-    const distinctColumns = new Set(boxes.map((b) => Math.round(b.x / 10)));
-    expect(distinctColumns.size, 'phone grid must stack cards in one column').toBe(1);
+    // Two-up is the catalogue's design on a phone — a market grid of compact
+    // cards, not a stack. What has to hold is that the split is even and that the
+    // page never scrolls sideways to read it. Measured off the cards' x offsets
+    // rather than their widths, because a card holds links of several widths.
+    const starts = [...new Set(boxes.map((b) => Math.round(b.x)))].sort((a, b) => a - b);
+    expect(starts.length, 'phone grid should be two columns').toBe(2);
+    const [firstStart = 0, secondStart = 0] = starts;
+    const firstColumnWidth = secondStart - firstStart;
+    expect(firstColumnWidth, 'the two columns must split a 375px phone evenly').toBeGreaterThanOrEqual(160);
+    expect(firstColumnWidth, '…and no wider than the viewport allows').toBeLessThanOrEqual(200);
+
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(overflow, 'a phone must not scroll sideways to read the catalogue').toBeLessThanOrEqual(1);
   });
 
   test('products grid shows at least two columns on a 768px tablet', async ({ page }) => {

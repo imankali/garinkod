@@ -164,21 +164,30 @@ export default function StorefrontCard({ storefront }: { storefront: Storefront 
           aria-label={`جزئیات غرفه ${storefront.name}`}
         >
           <dl className="flex flex-wrap items-center gap-3 text-fluid-xs text-slate-500 dark:text-emerald-200">
+            {/* The icon goes inside the <dd>, not beside the pair: a <div> in a
+                definition list may hold only <dt> and <dd>, so a decorative sibling
+                in the wrapper makes the whole list invalid markup. */}
             <div className="flex items-center gap-1">
-              <Store size={12} />
               <dt className="sr-only">تعداد آگهی</dt>
-              <dd>{storefront.listing_count} آگهی</dd>
+              <dd className="flex items-center gap-1">
+                <Store size={12} aria-hidden="true" />
+                {storefront.listing_count} آگهی
+              </dd>
             </div>
             <div className="flex items-center gap-1">
-              <Users size={12} />
               <dt className="sr-only">دنبال‌کننده</dt>
-              <dd>{followers.toLocaleString('fa-IR')}</dd>
+              <dd className="flex items-center gap-1">
+                <Users size={12} aria-hidden="true" />
+                {followers.toLocaleString('fa-IR')}
+              </dd>
             </div>
             {Number(storefront.rating) > 0 && (
               <div className="flex items-center gap-1">
-                <Star size={12} className="text-amber-400" />
                 <dt className="sr-only">امتیاز</dt>
-                <dd>{storefront.rating}</dd>
+                <dd className="flex items-center gap-1">
+                  <Star size={12} className="text-amber-400" aria-hidden="true" />
+                  {storefront.rating}
+                </dd>
               </div>
             )}
           </dl>
