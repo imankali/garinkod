@@ -53,11 +53,15 @@ export const productsApi = {
   },
 
   /**
-   * Facet values (brand, package size, price ceiling) for the shop filters.
+   * Facet values (department, brand, package size, price ceiling) for the shop filters.
    * GET /api/products/facets/
+   *
+   * The current selection is sent along: each facet list is narrowed by every
+   * filter except its own axis, which is what keeps «برندها» to the brands that
+   * actually exist inside the chosen department.
    */
-  getFacets: () => {
-    return apiClient.get<ProductFacets>('/products/facets/');
+  getFacets: (params?: Record<string, string | number | boolean | undefined>) => {
+    return apiClient.get<ProductFacets>('/products/facets/', { params });
   },
 };
 
@@ -324,8 +328,22 @@ export const agricultureApi = {
   requestService: (data: ServiceRequestPayload) => apiClient.post('/services/requests/', data),
   requestProcurement: (data: ProcurementRequestPayload) => apiClient.post('/procurement/requests/', data),
   getStorefront: () => apiClient.get<Storefront | null>('/marketplace/storefront/'),
-  createStorefront: (data: Pick<Storefront, 'name' | 'slug' | 'seller_type' | 'bio' | 'province' | 'city'>) =>
-    apiClient.post<Storefront>('/marketplace/storefront/', data),
+  /**
+   * ساخت غرفه. نام و نام خانوادگی و کد ملی در همین فرم گرفته می‌شوند و روی
+   * حساب کاربر ذخیره می‌شوند؛ بدون آن‌ها سرور ۴۰۰ می‌دهد، چون غرفه‌ای که
+   * کسی پشتش نباشد قابل پیگیری نیست.
+   */
+  createStorefront: (data: {
+    name: string;
+    slug?: string;
+    seller_type: Storefront['seller_type'];
+    bio?: string;
+    province?: string;
+    city?: string;
+    owner_first_name: string;
+    owner_last_name: string;
+    national_id: string;
+  }) => apiClient.post<Storefront>('/marketplace/storefront/', data),
   updateStorefront: (data: Partial<Storefront> | FormData) =>
     apiClient.patch<Storefront>('/marketplace/storefront/', data),
 
@@ -335,6 +353,14 @@ export const agricultureApi = {
 
   listMarketplace: (params?: MarketplaceQueryParams) =>
     apiClient.get<PaginatedResponse<MarketplaceListing>>('/marketplace/listings/', { params }),
+
+  /**
+   * Facets for the آگهی‌های غرفه‌داران tab, in the same shape the catalogue's own
+   * facets use — one filter bar can therefore drive both sources.
+   * GET /api/marketplace/listings/facets/
+   */
+  listingFacets: (params?: Record<string, string | number | boolean | undefined>) =>
+    apiClient.get<ProductFacets>('/marketplace/listings/facets/', { params }),
   getListing: (slug: string) =>
     apiClient.get<MarketplaceListing>(`/marketplace/listings/${slug}/`),
   myListings: () => apiClient.get<MarketplaceListing[]>('/marketplace/listings/mine/'),
@@ -349,6 +375,17 @@ export const agricultureApi = {
 /** فیلترهای سمت سرور برای بازار غرفه‌داران */
 export interface MarketplaceQueryParams {
   search?: string;
+  /**
+   * همه‌ی این محورها چندمقداری‌اند (لیست جدا‌شده با کاما): همان دستوری که
+   * فیلترهای کاتالوگ محصولات می‌فرستد، تا یک نوار فیلتر برای هر دو منبع کافی باشد.
+   */
+  category?: string;
+  subcategory?: string;
+  brand?: string;
+  package_size?: string;
+  stock?: string;
+  has_discount?: string;
+  min_rating?: string;
   ordering?: string;
   page?: number;
   page_size?: number;
@@ -539,6 +576,16 @@ export const levelsApi = {
 };
 
 // ========================================
+/**
+ * A window over one thread: the standard page envelope plus the two fields the
+ * messenger needs — the conversation header, and whether older messages remain.
+ */
+export interface ThreadMessagesResponse extends PaginatedResponse<StorefrontMessage> {
+  conversation: StorefrontConversation;
+  /** Present in tail mode: there are messages before the first row returned. */
+  older_available?: boolean;
+}
+
 export const messagesApi = {
   /** The caller's whole inbox, optionally narrowed to one channel. */
   conversations: (channel?: MessageChannel) =>
@@ -569,11 +616,30 @@ export const messagesApi = {
       `/marketplace/storefronts/${storefrontSlug}/conversation/`,
     ),
 
-  /** Messages of one conversation, oldest first. Reading marks them as seen. */
-  messages: (conversationId: number, page = 1) =>
-    apiClient.get<PaginatedResponse<StorefrontMessage> & { conversation: StorefrontConversation }>(
+  /**
+   * Messages of one conversation, oldest first. Reading marks them as seen.
+   *
+   * `pageSize` without `page` asks the server for the newest `pageSize` rows —
+   * what a chat window needs. Paging by number counts from the beginning of the
+   * thread, so a long conversation would otherwise open on its oldest messages
+   * with the recent ones unreachable.
+   */
+  messages: (
+    conversationId: number,
+    options?: { page?: number; pageSize?: number; beforeId?: number },
+  ) =>
+    apiClient.get<ThreadMessagesResponse>(
       `/marketplace/conversations/${conversationId}/messages/`,
-      { params: { page } },
+      {
+        params: {
+          ...(options?.page ? { page: options.page } : {}),
+          ...(options?.pageSize ? { page_size: options.pageSize } : {}),
+          // Walk further back from one specific message. A chat has no stable
+          // page numbers — the newest end keeps moving — so history is paged by
+          // cursor instead.
+          ...(options?.beforeId ? { before_id: options.beforeId } : {}),
+        },
+      },
     ),
 
   /** Send a message: text, a listing or land card, and/or one media attachment. */
@@ -756,8 +822,18 @@ export const consultingApi = {
 };
 
 export const storefrontPostsApi = {
-  list: (params?: { post_type?: 'post' | 'story'; storefront?: number | string; page?: number }) =>
-    apiClient.get<PaginatedResponse<StorefrontPost>>('/marketplace/posts/', { params }),
+  list: (params?: {
+    post_type?: 'post' | 'story';
+    storefront?: number | string;
+    page?: number;
+    page_size?: number;
+    /**
+     * `-likes_total` is what «پست‌های غرفه‌داران» asks for: the ranking has to be
+     * computed over every post on the server, not over the first page in the
+     * browser, or the "top five" would just be the five most recent ones.
+     */
+    ordering?: '-likes_total' | '-comments_total' | '-created_at';
+  }) => apiClient.get<PaginatedResponse<StorefrontPost>>('/marketplace/posts/', { params }),
   mine: () => apiClient.get<StorefrontPost[]>('/marketplace/posts/mine/'),
 
   create: (data: {

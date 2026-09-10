@@ -338,7 +338,7 @@ export default function AgriCalculator({ onAddToCart }: AgriCalculatorProps) {
         type="button"
         onClick={handleCalculate}
         disabled={calculating}
-        className="mt-4 w-full rounded-xl bg-gradient-to-r from-emerald-600 to-lime-500 py-3 text-sm font-extrabold text-white shadow transition hover:brightness-105 disabled:opacity-60"
+        className="mt-4 min-h-11 w-full rounded-xl bg-gradient-to-r from-emerald-600 to-lime-500 py-3 text-sm font-extrabold text-white shadow transition hover:brightness-105 disabled:opacity-60"
       >
         {calculating ? 'در حال محاسبه…' : 'محاسبه مقدار مورد نیاز'}
       </button>

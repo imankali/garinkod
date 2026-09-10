@@ -306,9 +306,22 @@ export interface RatingSummary {
   distribution: Record<'1' | '2' | '3' | '4' | '5', number>;
 }
 
+export interface FacetRow {
+  value: string;
+  label?: string;
+  count: number;
+  /** Which department a subcategory belongs to, so the two pickers can agree. */
+  category?: string;
+}
+
 export interface ProductFacets {
-  brands: Array<{ value: string; count: number }>;
-  package_weights: Array<{ value: string; count: number }>;
+  // `label` is what the API prints where a value is free text (a brand name, a
+  // package size); older responses carry only the value, so the UI falls back.
+  brands: Array<{ value: string; label?: string; count: number }>;
+  package_weights: Array<{ value: string; label?: string; count: number }>;
+  /** Departments and sub-departments, counted over the published catalogue. */
+  categories?: FacetRow[];
+  subcategories?: FacetRow[];
   max_price: number;
 }
 

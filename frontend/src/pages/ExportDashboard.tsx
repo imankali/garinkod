@@ -49,7 +49,7 @@ function formatIssueDate(value: string): string {
 /** Two-card shimmer matching the shipped list geometry, so content never jumps. */
 function ExportSkeleton() {
   return (
-    <div aria-busy="true" aria-label="در حال بارگذاری پرونده‌های صادراتی" className="space-y-4">
+    <div aria-busy="true" aria-label="در حال بارگذاری پرونده‌های صادراتی" className="space-y-4" role="status">
       {[0, 1].map((card) => (
         <div
           key={card}

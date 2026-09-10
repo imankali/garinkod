@@ -111,7 +111,7 @@ export default function FarmPanel() {
                     {land.crop_type}
                     {land.crop_variety ? ` · ${land.crop_variety}` : ''}
                   </p>
-                  <dl className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-fluid-2xs text-slate-400 dark:text-emerald-300">
+                  <dl className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-fluid-2xs text-slate-500 dark:text-emerald-300">
                     <span>{land.area_label}</span>
                     <span>{land.irrigation_type_label}</span>
                     {land.city && <span>{land.city}</span>}

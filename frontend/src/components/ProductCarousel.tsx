@@ -16,7 +16,7 @@ export default function ProductCarousel({ children, label }: ProductCarouselProp
   };
 
   return (
-    <div className="group/carousel relative" aria-label={label}>
+    <div className="group/carousel relative" aria-label={label} role="group">
       <div
         ref={railRef}
         className="no-scrollbar flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain scroll-smooth px-1 pb-3 touch-pan-x sm:gap-4"

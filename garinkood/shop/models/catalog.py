@@ -28,6 +28,13 @@ class Category(models.Model):
     description = models.TextField(blank=True, max_length=1000, verbose_name="توضیح سئو")
     seo_title = models.CharField(max_length=70, blank=True, verbose_name="عنوان سئو")
     seo_description = models.CharField(max_length=170, blank=True, verbose_name="توضیح متا")
+    # Departments the warehouse does not stock — fresh produce, livestock — exist
+    # so storefront ads have somewhere to be filed, but they must not appear as
+    # empty tiles in the shop's own catalogue. One flag keeps the two browses
+    # honest without inventing a second taxonomy to keep in step.
+    storefront_only = models.BooleanField(
+        default=False, db_index=True, verbose_name="فقط در بازار غرفه‌داران",
+    )
     history = HistoricalRecords()
 
     class Meta:

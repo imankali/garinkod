@@ -13,14 +13,28 @@ const usesExternalServer = Boolean(process.env.PLAYWRIGHT_BASE_URL);
 export default defineConfig({
   testDir: './e2e',
   timeout: 45_000,
+  // A control that never becomes actionable should say so while the test still has
+  // a story to tell. Left at the default, one click on an element the app does not
+  // render spends the entire 45s budget and the report says only "timeout" — which
+  // is how nine tests in one file failed for a reason nobody could read.
+  actionTimeout: 15_000,
+
   expect: { timeout: 10_000 },
   // A flaky run is retried in CI but never locally, where a failure should be
   // reproduced rather than papered over.
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 2 : undefined,
   forbidOnly: Boolean(process.env.CI),
+  // The `github` reporter writes each failure as a workflow annotation, so a red
+  // run says which test and why in the Checks tab — a cancelled run leaves no log
+  // to read at all, and an artefact nobody downloads is not a signal.
   reporter: process.env.CI
-    ? [['html', { open: 'never' }], ['list'], ['junit', { outputFile: 'playwright-report/results.xml' }]]
+    ? [
+        ['github'],
+        ['html', { open: 'never' }],
+        ['list'],
+        ['junit', { outputFile: 'playwright-report/results.xml' }],
+      ]
     : [['list']],
   use: {
     baseURL,
@@ -29,6 +43,11 @@ export default defineConfig({
     video: 'retain-on-failure',
     locale: 'fa-IR',
     timezoneId: 'Asia/Tehran',
+    // The UI animates on hover and tap (framer-motion), which makes a control
+    // move while Playwright is deciding whether it is stable enough to click.
+    // Reduced motion stops the fight — and exercises the same path a
+    // motion-sensitive visitor gets, so it is tested rather than worked around.
+    reducedMotion: 'reduce',
   },
   projects: [
     // Chromium runs the exhaustive behavioural, accessibility and explicit

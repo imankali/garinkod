@@ -266,6 +266,7 @@ export default function MobileMenu({
                               <span
                                 className="absolute -end-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-fluid-2xs font-bold text-white"
                                 aria-label={`${badge.toLocaleString('fa-IR')} مورد`}
+                                role="img"
                               >
                                 {badge > 9 ? '۹+' : badge.toLocaleString('fa-IR')}
                               </span>
@@ -284,7 +285,7 @@ export default function MobileMenu({
                               <span
                                 className={cn(
                                   'block truncate text-fluid-2xs',
-                                  isActive ? 'text-emerald-50' : 'text-slate-400 dark:text-emerald-300/70',
+                                  isActive ? 'text-emerald-50' : 'text-slate-500 dark:text-emerald-300/70',
                                 )}
                               >
                                 {item.description}

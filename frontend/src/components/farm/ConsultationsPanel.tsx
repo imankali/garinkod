@@ -4,7 +4,8 @@
 // (case file) it is about, and read the consultant's replies.
 
 import { FormEvent, useEffect, useState } from 'react';
-import { MessageCircleQuestion, Send, Stethoscope } from 'lucide-react';
+import { Link } from 'react-router';
+import { MessageCircle, MessageCircleQuestion, Send, Stethoscope } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 import { farmApi } from '../../api/services';
@@ -59,7 +60,7 @@ export default function ConsultationsPanel({
         message: message.trim(),
       });
       setMessage('');
-      toast.success('درخواست مشاوره ثبت شد؛ کارشناس به زودی پاسخ می‌دهد.');
+      toast.success('درخواست مشاوره ثبت شد و گفتگوی شما با کارشناس باز شد.');
       await load();
       onRequested();
     } catch (error) {
@@ -175,7 +176,30 @@ export default function ConsultationsPanel({
                     {request.reply}
                   </div>
                 )}
-                <p className="mt-1.5 text-fluid-2xs text-slate-400">{formatFaDate(request.created_at.slice(0, 10))}</p>
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-fluid-2xs text-slate-400">{formatFaDate(request.created_at.slice(0, 10))}</p>
+                  {request.conversation_id && (
+                    /*
+                      The request and its replies are mirrored into a messenger
+                      thread, so the farmer continues the *conversation* — the
+                      consultant sees the land dossier in the same chat. Linking
+                      to /messages?c=<id> rather than opening a drawer keeps one
+                      copy of the composer on the site.
+                    */
+                    <Link
+                      to={`/messages?c=${request.conversation_id}`}
+                      className="flex min-h-11 items-center gap-1.5 rounded-xl border border-emerald-200 bg-white px-3 text-fluid-xs font-bold text-emerald-700 transition hover:bg-emerald-50 dark:border-emerald-700 dark:bg-emerald-900 dark:text-lime-300"
+                    >
+                      <MessageCircle size={13} aria-hidden="true" />
+                      ادامه گفتگو
+                      {request.thread_message_count > 0 && (
+                        <span className="rounded-full bg-emerald-100 px-1.5 text-fluid-2xs text-emerald-700 dark:bg-emerald-950 dark:text-lime-300">
+                          {request.thread_message_count.toLocaleString('fa-IR')}
+                        </span>
+                      )}
+                    </Link>
+                  )}
+                </div>
               </li>
             ))}
           </ul>

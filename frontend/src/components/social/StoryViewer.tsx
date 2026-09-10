@@ -145,7 +145,7 @@ export default function StoryViewer({
       onTouchCancel={resume}
       className="fixed inset-0 z-[100] flex select-none items-center justify-center bg-black/90 p-4"
     >
-      <div className="absolute inset-x-4 top-4 z-20 flex gap-1" aria-label="پیشرفت استوری‌ها">
+      <div className="absolute inset-x-4 top-4 z-20 flex gap-1" aria-label="پیشرفت استوری‌ها" role="group">
         {stories.map((story, position) => {
           const width = position < index ? 100 : position === index ? progress * 100 : 0;
           return (

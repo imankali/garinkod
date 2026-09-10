@@ -723,10 +723,63 @@ class StorefrontNamingTests(TestCase):
 
         response = self.client.post('/api/marketplace/storefront/', {
             'name': 'گلخانه بهاران', 'seller_type': 'farmer',
+            'owner_first_name': 'زهرا', 'owner_last_name': 'بهاران',
+            'national_id': '3971857299',
         }, format='json')
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data['slug'], 'گلخانه-بهاران')
+
+    def test_storefront_requires_a_named_owner_with_a_valid_national_code(self):
+        """A stall must belong to somebody the platform can name.
+
+        The national code is part of *opening* a storefront, not an optional
+        profile field: a buyer with a bad delivery has to be able to escalate,
+        and a nickname is not an escalation path. The checksum is verified
+        server-side so no client can skip it.
+        """
+        self.client.force_authenticate(user=self.user)
+
+        anonymous = self.client.post('/api/marketplace/storefront/', {
+            'name': 'غرفه بی‌نام', 'seller_type': 'farmer',
+        }, format='json')
+        self.assertEqual(anonymous.status_code, 400)
+        self.assertIn('name', anonymous.data['fields'])
+        self.assertIn('national_id', anonymous.data['fields'])
+
+        wrong_code = self.client.post('/api/marketplace/storefront/', {
+            'name': 'غرفه کد اشتباه', 'seller_type': 'farmer',
+            'owner_first_name': 'رضا', 'owner_last_name': 'کریمی',
+            'national_id': '1234567890',
+        }, format='json')
+        self.assertEqual(wrong_code.status_code, 400)
+        self.assertIn('national_id', wrong_code.data['fields'])
+
+        good = self.client.post('/api/marketplace/storefront/', {
+            'name': 'غرفه کد درست', 'seller_type': 'farmer',
+            'owner_first_name': 'رضا', 'owner_last_name': 'کریمی',
+            'national_id': '۱۵۵۱۵۵۳۱۰۴',  # Persian digits, and only the mask comes back
+        }, format='json')
+        self.assertEqual(good.status_code, 201, good.data)
+        self.assertEqual(good.data['owner_national_id_masked'], '155*****4')
+        self.assertNotIn('3971857299', str(good.data))
+        self.assertTrue(good.data['profile_complete'])
+
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.first_name, 'رضا')
+        self.assertEqual(self.user.account.national_id, '1551553104')
+
+    def test_existing_seller_can_edit_without_repeating_identity(self):
+        """The rule gates *opening* a stall; it must not lock a seller out of it."""
+        user, storefront = make_seller('legacy-owner')
+        self.client.force_authenticate(user=user)
+
+        response = self.client.patch('/api/marketplace/storefront/', {
+            'bio': 'تازه‌ترین برداشت ما',
+        }, format='json')
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(storefront.refresh_from_db() or storefront.bio, 'تازه‌ترین برداشت ما')
 
     def test_listing_slug_is_generated_and_deduplicated(self):
         seller, storefront = make_seller('lister')
@@ -1257,7 +1310,11 @@ class QueryEfficiencyTests(TestCase):
 
     def test_listing_endpoint_stays_under_a_query_budget(self):
         queries = self._count_for('/api/marketplace/listings/')
-        self.assertLess(queries, 10, f'listing endpoint used {queries} queries')
+        # 12, not 10: a row now also carries its spec table, which costs exactly
+        # one prefetch for the whole page (and its department joins, which cost
+        # nothing). The sibling test above is the one that matters — a page of 8
+        # must not cost more than a page of 2.
+        self.assertLess(queries, 12, f'listing endpoint used {queries} queries')
 
     def test_storefront_directory_stays_under_a_query_budget(self):
         queries = self._count_for('/api/marketplace/storefronts/')

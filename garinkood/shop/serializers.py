@@ -22,7 +22,10 @@ from .models import (
     TeamMember, BrandPartner, SiteContact, NewsletterSubscriber, PRODUCT_ATTRIBUTE_TEMPLATE,
     DeskAgent, DeskSettings, QuickReply, ConversationRating,
 )
+from django.core.exceptions import ValidationError as DjangoValidationError
+
 from .desk import agent_payload, desk_channel
+from .national_id import mask_national_id, validate_national_id
 from .phone_numbers import normalize_iranian_mobile
 from .slugs import slugify_fa, unique_storefront_slug
 
@@ -817,13 +820,16 @@ class StorefrontSerializer(serializers.ModelSerializer):
             'avatar', 'avatar_url', 'cover', 'cover_url', 'province', 'city',
             'is_verified', 'is_active', 'commission_rate', 'rating', 'sales_count',
             'followers_count', 'listing_count', 'is_following', 'is_owner',
-            'has_active_stories', 'has_unseen_stories', 'owner_name', 'created_at'
+            'has_active_stories', 'has_unseen_stories', 'owner_name', 'created_at',
+            'owner_first_name', 'owner_last_name', 'national_id',
+            'owner_national_id_masked', 'profile_complete',
         ]
         read_only_fields = [
             'id', 'is_verified', 'is_active', 'commission_rate', 'rating', 'sales_count',
             'owner_name', 'created_at', 'avatar_url', 'cover_url', 'seller_type_label',
             'followers_count', 'listing_count', 'is_following', 'is_owner',
             'has_active_stories', 'has_unseen_stories',
+            'owner_national_id_masked', 'profile_complete',
         ]
 
     def get_owner_name(self, obj) -> str:
@@ -934,12 +940,98 @@ class StorefrontSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('این آدرس قبلاً استفاده شده است.')
         return cleaned
 
+    # --- identity, asked for once, at the moment a buyer becomes a seller -----
+    # A marketplace where anyone can open a stall under a nickname is a
+    # marketplace where a bad delivery is nobody's fault. The national code is
+    # therefore part of *opening* a storefront, not an optional profile field,
+    # and it is validated here (checksum included) rather than in a form so the
+    # SPA, the admin and any future importer all get the same answer.
+    owner_first_name = serializers.CharField(
+        max_length=60, required=False, allow_blank=True, write_only=True,
+    )
+    owner_last_name = serializers.CharField(
+        max_length=60, required=False, allow_blank=True, write_only=True,
+    )
+    national_id = serializers.CharField(
+        max_length=10, required=False, allow_blank=True, write_only=True,
+    )
+    owner_national_id_masked = serializers.SerializerMethodField()
+    profile_complete = serializers.SerializerMethodField()
+
+    def get_owner_national_id_masked(self, obj) -> str:
+        account = getattr(obj.user, 'account', None)
+        return mask_national_id(getattr(account, 'national_id', '')) if account else ''
+
+    def get_profile_complete(self, obj) -> bool:
+        """Whether the owner has the two facts a seller must have declared."""
+        account = getattr(obj.user, 'account', None)
+        return bool(
+            obj.user.first_name.strip()
+            and obj.user.last_name.strip()
+            and getattr(account, 'national_id', '')
+        )
+
     def validate(self, attrs):
         # A storefront created without an explicit address gets one derived
         # from its name, so the seller never has to invent a slug by hand.
         if not self.instance and not attrs.get('slug'):
             attrs['slug'] = unique_storefront_slug(attrs.get('name', ''))
+
+        if self.instance is None:
+            # Identity is only demanded on creation. An existing seller whose
+            # record predates this rule must still be able to edit their bio,
+            # or a privacy addition would silently lock them out of their own
+            # storefront.
+            user = self.context['request'].user if self.context.get('request') else None
+            account = getattr(user, 'account', None)
+            first = (attrs.get('owner_first_name') or getattr(user, 'first_name', '') or '').strip()
+            last = (attrs.get('owner_last_name') or getattr(user, 'last_name', '') or '').strip()
+            missing = []
+            if not first or not last:
+                missing.append('name')
+            code = attrs.get('national_id') or getattr(account, 'national_id', '')
+            if not code:
+                missing.append('national_id')
+            if missing:
+                messages = {
+                    'name': 'برای ساخت غرفه نام و نام خانوادگی خود را در پروفایل وارد کنید.',
+                    'national_id': 'برای ساخت غرفه وارد کردن کد ملی الزامی است.',
+                }
+                raise serializers.ValidationError({key: messages[key] for key in missing})
+        code = attrs.get('national_id')
+        if code:
+            try:
+                attrs['national_id'] = validate_national_id(code)
+            except DjangoValidationError as error:
+                raise serializers.ValidationError({'national_id': list(error.messages)}) from error
         return attrs
+
+    def create(self, validated_data):
+        first = validated_data.pop('owner_first_name', '')
+        last = validated_data.pop('owner_last_name', '')
+        code = validated_data.pop('national_id', '')
+        storefront = super().create(validated_data)
+        if first or last:
+            user = storefront.user
+            user.first_name = first[:60]
+            user.last_name = last[:60]
+            user.save(update_fields=['first_name', 'last_name'])
+        if code:
+            # get_or_create rather than a bare attribute read: an account row is
+            # created by a signal, and a user imported by script may not have one.
+            from .models import UserAccount
+
+            account, _created = UserAccount.objects.get_or_create(
+                user=storefront.user, defaults={'phone': ''}
+            )
+            account.national_id = code
+            account.save(update_fields=['national_id', 'updated'])
+            # The request already holds this user in memory, and its cached
+            # profile row is the one the response below serialises — write the
+            # same object, or the seller is told their code is missing after
+            # the request that just saved it.
+            storefront.user.account = account
+        return storefront
 
 
 class StorefrontHighlightItemSerializer(serializers.ModelSerializer):
@@ -1000,7 +1092,19 @@ class MarketplaceListingSerializer(serializers.ModelSerializer):
     image_url = serializers.SerializerMethodField()
     image_srcset = serializers.SerializerMethodField()
     status_label = serializers.CharField(source='get_status_display', read_only=True)
-
+    # The seller picks a department from the same taxonomy the warehouse uses.
+    # Slug-keyed writes mean the SPA never has to know a primary key, and the
+    # read side gets the label the card prints next to the crop name.
+    category = serializers.SlugRelatedField(
+        slug_field='slug', queryset=Category.objects.all(), required=False, allow_null=True,
+    )
+    category_name = serializers.CharField(source='category.name', read_only=True, default='')
+    subcategory = serializers.SlugRelatedField(
+        slug_field='slug', queryset=SubCategory.objects.all(), required=False, allow_null=True,
+    )
+    subcategory_name = serializers.CharField(source='subcategory.name', read_only=True, default='')
+    category_label = serializers.SerializerMethodField()
+    package_size = serializers.CharField(required=False, allow_blank=True)
     is_purchasable = serializers.BooleanField(read_only=True)
     minimum_order = serializers.IntegerField(read_only=True)
     discounted_price = serializers.SerializerMethodField()
@@ -1012,6 +1116,8 @@ class MarketplaceListingSerializer(serializers.ModelSerializer):
         model = MarketplaceListing
         fields = [
             'id', 'storefront', 'title', 'slug', 'crop_name', 'description',
+            'category', 'category_name', 'subcategory', 'subcategory_name', 'category_label',
+            'brand', 'brand_slug', 'package_size', 'is_stock', 'views',
             'price', 'unit', 'quantity_available', 'min_order_quantity', 'minimum_order',
             'harvest_date', 'image', 'image_url', 'image_srcset', 'status', 'status_label',
             'is_purchasable', 'discount_percent', 'sales_count', 'discounted_price',
@@ -1020,8 +1126,8 @@ class MarketplaceListingSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             'id', 'storefront', 'slug', 'status', 'status_label', 'image_url',
-            'is_purchasable', 'minimum_order', 'discount_percent', 'sales_count',
-            'discounted_price', 'rejection_reason', 'reviewed_at',
+            'is_purchasable', 'minimum_order', 'sales_count',
+            'discounted_price', 'rejection_reason', 'reviewed_at', 'views', 'brand_slug',
             'created_at', 'updated_at',
         ]
 
@@ -1034,12 +1140,46 @@ class MarketplaceListingSerializer(serializers.ModelSerializer):
     def get_discounted_price(self, obj) -> int:
         return obj.discounted_price
 
+    def get_category_label(self, obj) -> str:
+        """What the card prints where a product card prints its department."""
+        if obj.category_id:
+            return obj.category.name
+        return obj.crop_name
+
     def validate_min_order_quantity(self, value):
         if value is None:
             return 1
         if value <= 0:
             raise serializers.ValidationError('حداقل سفارش باید بزرگ‌تر از صفر باشد.')
         return value
+
+    def validate_brand(self, value):
+        """Fold a brand onto the catalogue's own spelling when one exists.
+
+        A free-text brand that differs by a zero-width joiner from a published
+        brand page produces a second, near-empty facet — the same reason
+        ``Product`` stores ``brand_slug`` beside ``brand``.
+        """
+        cleaned = ' '.join((value or '').split())
+        if cleaned:
+            from .models import Product
+
+            exact = Product.objects.filter(brand__iexact=cleaned).exclude(brand='').values_list('brand', flat=True).first()
+            if exact:
+                cleaned = exact
+        return cleaned
+
+    def validate_discount_percent(self, value):
+        """A seller's own price promise, capped so «۹۰٪ تخفیف» stays believable.
+
+        The marketplace used to make the discount a moderator-only field, which
+        meant the storefront tab could never honestly offer a «پرتخفیف‌ترین» row
+        of its own: nothing was being discounted because nobody could say so.
+        """
+        percent = int(value or 0)
+        if percent < 0 or percent > 90:
+            raise serializers.ValidationError('درصد تخفیف باید بین ۰ تا ۹۰ باشد.')
+        return percent
 
     def validate_attributes(self, value):
         if len(value) > 40:
@@ -1084,7 +1224,7 @@ class MarketplaceListingSerializer(serializers.ModelSerializer):
         return instance
 
     def validate(self, attrs):
-        """The minimum order can never exceed what is actually on offer."""
+        """Cross-field rules the composer's pickers and the quantity share."""
         available = attrs.get(
             'quantity_available',
             getattr(self.instance, 'quantity_available', None),
@@ -1097,6 +1237,19 @@ class MarketplaceListingSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({
                 'min_order_quantity': 'حداقل سفارش نمی‌تواند از موجودی آگهی بیشتر باشد.'
             })
+
+        # The two department pickers have to agree with each other, and a
+        # subcategory implies its parent — otherwise the storefront's own page
+        # and the category chip disagree about where the ad lives.
+        subcategory = attrs.get('subcategory')
+        if subcategory is not None:
+            category = attrs.get('category', getattr(self.instance, 'category', None))
+            if category is not None and subcategory.category_id != category.id:
+                raise serializers.ValidationError({
+                    'subcategory': 'این زیردسته زیرمجموعه همان دسته‌ای نیست که انتخاب کرده‌اید.'
+                })
+            if category is None:
+                attrs['category'] = subcategory.category
         return attrs
 
 
@@ -1418,6 +1571,7 @@ class StorefrontMessageSerializer(serializers.ModelSerializer):
     is_mine = serializers.SerializerMethodField()
     listing = serializers.SerializerMethodField()
     land = serializers.SerializerMethodField()
+    post = serializers.SerializerMethodField()
     link = serializers.SerializerMethodField()
     is_system = serializers.BooleanField(read_only=True)
     attachment_url = serializers.SerializerMethodField()
@@ -1432,7 +1586,7 @@ class StorefrontMessageSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'conversation', 'sender', 'sender_name', 'sender_avatar_url', 'sender_role_label',
             'sender_verified', 'is_mine', 'is_system', 'body',
-            'listing', 'land', 'link',
+            'listing', 'land', 'post', 'link',
             'attachment', 'attachment_url', 'attachment_type', 'attachment_duration',
             'reply_to', 'is_edited', 'edited_at', 'is_deleted', 'deleted_at',
             'can_edit', 'can_delete', 'is_read', 'created_at',
@@ -1441,7 +1595,7 @@ class StorefrontMessageSerializer(serializers.ModelSerializer):
             'id', 'conversation', 'sender', 'sender_name', 'sender_avatar_url', 'sender_role_label',
             'sender_verified', 'is_system', 'attachment_url', 'reply_to', 'is_edited', 'edited_at', 'is_deleted',
             'deleted_at', 'can_edit', 'can_delete', 'is_read', 'created_at',
-            'link', 'land',
+            'link', 'land', 'post',
         ]
 
     def get_reply_to(self, obj):
@@ -1590,6 +1744,30 @@ class StorefrontMessageSerializer(serializers.ModelSerializer):
             'image_url': obj.listing.image_url,
             'storefront_name': obj.listing.storefront.name,
             'storefront_slug': obj.listing.storefront.slug,
+        }
+
+    def get_post(self, obj):
+        """The storefront post a message carries — a compact card, not a feed item.
+
+        Consultants answer a question by pointing at the post they already wrote
+        about it; the card has to be readable inside a bubble, so it is priced in
+        engagement and links rather than duplicating the composer's fields.
+        """
+        if not obj.post:
+            return None
+        post = obj.post
+        return {
+            'id': post.id,
+            'caption': (post.caption or '')[:280],
+            'image_url': post.image_url if post.image else '',
+            'post_type': post.post_type,
+            'like_count': post.likes.count(),
+            'comment_count': post.comments.filter(is_hidden=False).count(),
+            'created_at': post.created_at,
+            'storefront_name': post.storefront.name,
+            'storefront_slug': post.storefront.slug,
+            'listing_id': post.listing_id,
+            'listing_title': post.listing.title if post.listing_id else '',
         }
 
     def validate_listing(self, value):
@@ -1847,6 +2025,11 @@ class FarmConsultationRequestSerializer(serializers.ModelSerializer):
     )
     farmer_name = serializers.SerializerMethodField()
     farmer_username = serializers.CharField(source='farmer.username', read_only=True)
+    # The messenger thread this request lives in. Both panels need it: the farmer
+    # taps «ادامه گفتگو» in مزرعه من, the consultant opens the same thread from the
+    # queue, and neither of them is asked to retype what the other already wrote.
+    conversation_id = serializers.SerializerMethodField()
+    thread_message_count = serializers.SerializerMethodField()
 
     class Meta:
         model = FarmConsultationRequest
@@ -1854,6 +2037,7 @@ class FarmConsultationRequestSerializer(serializers.ModelSerializer):
             'id', 'farmer', 'farmer_name', 'farmer_username', 'land', 'land_id',
             'subject', 'subject_label', 'message', 'reply', 'status', 'status_label',
             'replied_by', 'created_at', 'updated_at',
+            'conversation_id', 'thread_message_count',
         ]
         read_only_fields = [
             'id', 'farmer', 'farmer_name', 'farmer_username', 'land', 'reply',
@@ -1862,6 +2046,13 @@ class FarmConsultationRequestSerializer(serializers.ModelSerializer):
 
     def get_farmer_name(self, obj):
         return obj.farmer.get_full_name() or obj.farmer.username
+
+    def get_conversation_id(self, obj):
+        first = obj.messages.order_by('created_at').values('conversation_id').first()
+        return first['conversation_id'] if first else None
+
+    def get_thread_message_count(self, obj) -> int:
+        return obj.messages.count()
 
     def validate_land_id(self, value):
         request = self.context.get('request')

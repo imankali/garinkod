@@ -100,7 +100,7 @@ export default function ClimateSelector({ onChange }: ClimateSelectorProps) {
     'min-h-11 min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-800 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 dark:border-emerald-800 dark:bg-emerald-950 dark:text-white';
 
   return (
-    <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center" aria-label="انتخاب منطقه اقلیمی">
+    <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center" aria-label="انتخاب منطقه اقلیمی" role="group">
       <MapPin size={17} className="hidden shrink-0 text-emerald-600 sm:block" aria-hidden="true" />
 
       <label className="flex min-w-0 flex-1 items-center gap-2 text-xs font-bold text-slate-600 dark:text-emerald-100">

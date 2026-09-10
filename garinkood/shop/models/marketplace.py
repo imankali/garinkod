@@ -159,6 +159,31 @@ class MarketplaceListing(ImageVariantsMixin):
     title = models.CharField(max_length=250)
     slug = models.SlugField(max_length=280, unique=True)
     crop_name = models.CharField(max_length=150)
+    # The same taxonomy the site's own catalogue uses. A seller files an ad under
+    # a category exactly the way a manager files a product, which is what lets one
+    # filter bar serve both sources: without these columns the category chips on
+    # the «آگهی‌های غرفه‌داران» tab could only guess from the free-text crop name.
+    category = models.ForeignKey(
+        'Category', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='listings', verbose_name='دسته آگهی',
+    )
+    subcategory = models.ForeignKey(
+        'SubCategory', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='listings', verbose_name='زیردسته آگهی',
+    )
+    # Kept as text plus a slug, like ``Product``: the display name may be
+    # rewritten by a supplier while the address of the brand page must not move.
+    brand = models.CharField(max_length=140, blank=True, db_index=True, verbose_name='برند')
+    brand_slug = models.SlugField(max_length=140, blank=True, db_index=True, verbose_name='اسلاگ برند')
+    package_size = models.CharField(
+        max_length=60, blank=True, db_index=True, verbose_name='بسته‌بندی',
+        help_text='مثلاً «کارتن ۱۰ کیلویی» یا «گونی ۵۰ کیلویی».',
+    )
+    # Stock is a different promise from a fresh harvest, so it is a fact of the ad
+    # rather than something a reader infers from the harvest date.
+    is_stock = models.BooleanField(default=False, db_index=True, verbose_name='کالای استوک')
+    # «پربازدیدترین» needs a stored counter, not a number derived per request.
+    views = models.PositiveIntegerField(default=0, db_index=True, verbose_name='بازدید')
     description = models.TextField(max_length=3000)
     price = models.PositiveBigIntegerField()
     unit = models.CharField(max_length=30, default='کیلوگرم')
@@ -193,6 +218,12 @@ class MarketplaceListing(ImageVariantsMixin):
         return self.image.url if self.image else '/images/hero-farm.jpg'
 
     def save(self, *args, **kwargs):
+        from ..slugs import slugify_fa
+
+        # Mirrors Product.save: the brand page address is derived on write, so a
+        # supplier renaming its display text never strands the published URL.
+        if self.brand:
+            self.brand_slug = slugify_fa(self.brand)
         image_changed = self._image_has_changed()
         super().save(*args, **kwargs)
         if image_changed:

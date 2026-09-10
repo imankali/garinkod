@@ -61,26 +61,48 @@ test.describe('access levels', () => {
   });
 });
 
-test.describe('storefront name availability', () => {
-  test('checks the name live while typing', async ({ page }) => {
-    await page.goto('/marketplace');
-    await page.getByRole('button', { name: 'ساخت غرفه' }).click();
+test.describe('opening a storefront, signed out', () => {
+  /**
+   * The directory and the studio both offer «ساخت غرفه» to a visitor who has no
+   * account. The rule this pins: that button is never a dead end and never a fake
+   * submit. The form opens, the name can be probed, and the one step that needs
+   * an identity hands the visitor to login — from where they come back to a form
+   * that still holds what they typed.
+   */
+  test('the hero button opens the form with a way in, not a wall', async ({ page }) => {
+    await page.goto('/storefronts');
+    const open = page.getByRole('button', { name: 'ساخت غرفه', exact: true });
+    await expect(open).toBeVisible();
+    await open.click();
 
-    const nameField = page.getByLabel(/نام غرفه/);
-    await nameField.fill(`غرفه تست ${uniqueSuffix()}`);
+    const dialog = page.getByRole('dialog', { name: 'ساخت غرفه' });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText('برای ثبت نهایی، وارد حساب خود شوید')).toBeVisible();
 
-    // The status line reports availability without submitting anything.
-    await expect(page.locator('#store-name-status')).toContainText(/آزاد است|قبلاً ثبت شده/, {
-      timeout: 6000,
-    });
+    // Submitting an unfinished form is not how a visitor is told to sign in: the
+    // button is disabled until the fields hold something, and the step itself is
+    // offered beside it. Asserting the disabled state is the point — a click here
+    // would wait for an enabled button and read as a hang.
+    await expect(dialog.getByRole('button', { name: 'ورود و ساخت غرفه' })).toBeDisabled();
+    await dialog.getByRole('button', { name: 'ورود یا ثبت‌نام' }).click();
+    await expect(page).toHaveURL(/\/login/);
   });
 
-  test('an already-taken name is reported as unavailable', async ({ page }) => {
-    await page.goto('/marketplace');
-    await page.getByRole('button', { name: 'ساخت غرفه' }).click();
+  test('?create=1 opens the same dialog, so links from /studio work', async ({ page }) => {
+    await page.goto('/storefronts?create=1');
 
-    // Seeded by seed_demo_marketplace.
-    await page.getByLabel(/نام غرفه/).fill('باغ سبز شیراز');
-    await expect(page.locator('#store-name-status')).toContainText('قبلاً ثبت شده', { timeout: 6000 });
+    await expect(page.getByRole('dialog', { name: 'ساخت غرفه' })).toBeVisible();
+
+    await page.getByRole('button', { name: 'بستن' }).click();
+    await expect(page).toHaveURL(/\/storefronts$/, { timeout: 5000 });
+    await expect(page.getByRole('dialog', { name: 'ساخت غرفه' })).toBeHidden();
+  });
+
+  test('the national code is asked for, and said to go on the account', async ({ page }) => {
+    await page.goto('/storefronts?create=1');
+
+    const dialog = page.getByRole('dialog', { name: 'ساخت غرفه' });
+    await expect(dialog.getByLabel('کد ملی')).toBeVisible();
+    await expect(dialog.getByText('روی حساب شما ذخیره می‌شود')).toBeVisible();
   });
 });

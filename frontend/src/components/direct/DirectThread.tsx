@@ -9,7 +9,7 @@
 // original above the new bubble, edit swaps the composer into edit mode, and
 // delete leaves a "پیام حذف شد" placeholder so quotes still make sense.
 
-import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -68,6 +68,25 @@ function quoteSummary(quote: QuotedMessage, t: (key: string) => string): string 
   return '';
 }
 
+/**
+ * Fold a re-fetched window into the list without discarding older pages.
+ *
+ * A quiet refresh while the reader has scrolled back through history must not
+ * throw that history away: rows older than the window are kept, rows inside it
+ * are replaced with their fresh copies (edits and deletions land there), and
+ * anything new at the end is appended.
+ */
+export function mergeWindow(
+  existing: StorefrontMessage[],
+  window: StorefrontMessage[],
+): StorefrontMessage[] {
+  if (existing.length === 0 || window.length === 0) return window.length ? window : existing;
+  const windowIds = new Set(window.map((message) => message.id));
+  const firstOfWindow = Math.min(...windowIds);
+  const older = existing.filter((message) => message.id < firstOfWindow && !windowIds.has(message.id));
+  return [...older, ...window];
+}
+
 /** Merge a fresh copy of a message into the list, by id. */
 function mergeMessage(list: StorefrontMessage[], updated: StorefrontMessage): StorefrontMessage[] {
   const patched = list.map((item) => (item.id === updated.id ? updated : item));
@@ -87,6 +106,13 @@ function mergeMessage(list: StorefrontMessage[], updated: StorefrontMessage): St
       : item,
   );
 }
+
+/**
+ * Rows fetched per read of a thread. A chat window shows one screen at a time,
+ * but a poll is only cheap when it is one request — 80 rows covers a long
+ * working day without paging, and the server caps the size at 100.
+ */
+const THREAD_PAGE_SIZE = 80;
 
 export default function DirectThread({
   conversationId,
@@ -125,41 +151,49 @@ export default function DirectThread({
    */
   const [desk, setDesk] = useState<DeskState | null>(null);
 
+  /** Whether the thread has messages before the window currently on screen. */
+  const [olderAvailable, setOlderAvailable] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const mediaInputRef = useRef<HTMLInputElement>(null);
   const bubbleRefs = useRef<Map<number, HTMLElement>>(new Map());
 
-  const load = useCallback(async (quiet = false) => {
-    if (!conversationId) return;
-    if (!quiet) setLoading(true);
-    try {
-      const response = await messagesApi.messages(conversationId);
-      setMessages(response.data.results || []);
-      const thread = response.data.conversation;
-      if (thread) {
-        setConversation(thread);
-        if (!conversationId) setConversationId(thread.id);
-        // Only the two service desks have hours, presence or canned replies; a
-        // private shop chat must not go looking for them.
-        if (thread.channel === 'support' || thread.channel === 'consulting') {
-          try {
-            const state = await deskApi.state(thread.channel);
-            setDesk(state.data);
-          } catch {
-            // The desk header is decoration next to the conversation itself: a
-            // failed presence poll must not look like a broken chat.
+  const load = useCallback(
+    async (quiet = false) => {
+      if (!conversationId) return;
+      if (!quiet) setLoading(true);
+      try {
+        const response = await messagesApi.messages(conversationId, { pageSize: THREAD_PAGE_SIZE });
+        const window = response.data.results || [];
+        setMessages((current) => (quiet ? mergeWindow(current, window) : window));
+        setOlderAvailable(Boolean(response.data.older_available));
+        const thread = response.data.conversation;
+        if (thread) {
+          setConversation(thread);
+          if (!conversationId) setConversationId(thread.id);
+          // Only the two service desks have hours, presence or canned replies; a
+          // private shop chat must not go looking for them.
+          if (thread.channel === 'support' || thread.channel === 'consulting') {
+            // Deliberately not awaited. Presence, duty hours and canned lines
+            // decorate the header; making the first paint of the thread wait for
+            // a second round trip made opening a chat feel slow for no reason.
+            void deskApi
+              .state(thread.channel)
+              .then((state) => setDesk(state.data))
+              .catch(() => undefined);
+          } else {
+            setDesk(null);
           }
-        } else {
-          setDesk(null);
         }
+      } catch {
+        // A revoked or missing thread simply shows the empty state.
+      } finally {
+        setLoading(false);
       }
-    } catch {
-      // A revoked or missing thread simply shows the empty state.
-    } finally {
-      setLoading(false);
-    }
-  }, [conversationId, setConversationId]);
+    },
+    [conversationId, setConversationId],
+  );
 
   useEffect(() => {
     void load();
@@ -244,11 +278,58 @@ export default function DirectThread({
     return () => clearInterval(interval);
   }, [messages, load]);
 
-  useEffect(() => {
-    // Keep the newest message in view as the thread grows.
+  /*
+    Scroll discipline, which a chat is judged on:
+
+    • a new message (or the first paint) belongs in view, so jump to the bottom;
+    • loading older messages must NOT move the viewport — the row the reader was
+      looking at has to stay exactly where it was, only with more above it;
+    • a quiet poll that changes nothing must not twitch at all.
+
+    Height-based rules on `messages.length` did none of these: prepending history
+    scrolled the reader to the newest message, which is the one place a chat must
+    never send someone who is reading backwards.
+  */
+  const metricsRef = useRef({ height: 0, top: 0, firstId: null as number | null, lastId: null as number | null });
+  useLayoutEffect(() => {
     const element = scrollRef.current;
-    if (element) element.scrollTop = element.scrollHeight;
-  }, [messages.length]);
+    if (!element) return undefined;
+    const metrics = metricsRef.current;
+    const firstId = messages[0]?.id ?? null;
+    const lastId = messages[messages.length - 1]?.id ?? null;
+    const prepended =
+      metrics.firstId !== null && firstId !== null && firstId !== metrics.firstId && lastId === metrics.lastId;
+    if (prepended) {
+      element.scrollTop = element.scrollHeight - metrics.height + metrics.top;
+    } else if (lastId !== metrics.lastId) {
+      element.scrollTop = element.scrollHeight;
+    }
+    metricsRef.current = { height: element.scrollHeight, top: element.scrollTop, firstId, lastId };
+    return undefined;
+  });
+
+  /** Pull the window of messages before the oldest one on screen. */
+  const loadOlder = useCallback(async () => {
+    const oldest = messages[0];
+    if (!oldest || loadingOlder) return;
+    setLoadingOlder(true);
+    try {
+      const response = await messagesApi.messages(conversationId, {
+        pageSize: THREAD_PAGE_SIZE,
+        beforeId: oldest.id,
+      });
+      const older = response.data.results || [];
+      // The thread was marked seen when it opened — the window ends at the
+      // newest message, so nothing is left unseen below it. Walking back up does
+      // not have to touch receipts again, and does not ask the server to.
+      setOlderAvailable(Boolean(response.data.older_available));
+      setMessages((current) => [...older, ...current]);
+    } catch {
+      toast.error('پیام‌های قدیمی‌تر بارگذاری نشد.');
+    } finally {
+      setLoadingOlder(false);
+    }
+  }, [conversationId, messages, loadingOlder]);
 
   // Switching threads drops any half-finished reply/edit, and a land that was
   // about to be shared in the other conversation.
@@ -258,6 +339,10 @@ export default function DirectThread({
     setMenuFor(null);
     setBody('');
     attachLand(null);
+    // A new thread starts at its newest window, and the scroll memory of the
+    // previous one must not be applied to it.
+    setOlderAvailable(false);
+    metricsRef.current = { height: 0, top: 0, firstId: null, lastId: null };
   }, [conversationId, attachLand]);
 
   // Close an open bubble menu on outside tap or Escape.
@@ -478,7 +563,7 @@ export default function DirectThread({
           <button
             type="button"
             onClick={onBack}
-            className="-ms-1.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-slate-500 hover:bg-emerald-50 dark:text-emerald-200 dark:hover:bg-emerald-900 lg:hidden"
+            className="-ms-1.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-slate-500 hover:bg-emerald-50 dark:text-emerald-200 dark:hover:bg-emerald-900"
             aria-label={t('common.back')}
           >
             <ArrowRight size={17} />
@@ -555,6 +640,18 @@ export default function DirectThread({
           </div>
         ) : (
           <>
+            {olderAvailable && (
+              <div className="pb-1 text-center">
+                <button
+                  type="button"
+                  onClick={() => void loadOlder()}
+                  disabled={loadingOlder}
+                  className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-emerald-200 bg-white/80 px-3.5 text-fluid-2xs font-bold text-emerald-700 transition hover:bg-white disabled:opacity-60 dark:border-emerald-800 dark:bg-emerald-950/70 dark:text-lime-300"
+                >
+                  {loadingOlder ? t('common.loading') : 'پیام‌های قدیمی‌تر'}
+                </button>
+              </div>
+            )}
             {messages.map((message) => (
             <MessageBubble
               key={message.id}
@@ -943,8 +1040,12 @@ function MessageBubble({
                     exit={{ opacity: 0, scale: 0.95, y: 4 }}
                     transition={{ duration: 0.14 }}
                     className={cn(
-                      'absolute bottom-full z-30 mb-1 w-44 overflow-hidden rounded-2xl border border-slate-100 bg-white p-1 text-start shadow-xl dark:border-emerald-800 dark:bg-emerald-950',
-                      mine ? 'end-0' : 'start-0',
+                      // Phones get a bottom sheet: inside a scrolling message list,
+                      // an absolutely positioned popover is clipped by the list's
+                      // own overflow, so the first item's menu lost its top rows.
+                      'fixed inset-x-3 bottom-4 z-40 flex flex-col gap-0.5 overflow-hidden rounded-2xl border border-slate-100 bg-white p-1.5 text-start shadow-2xl dark:border-emerald-800 dark:bg-emerald-950',
+                      'sm:absolute sm:inset-x-auto sm:bottom-full sm:z-30 sm:mb-1 sm:w-max sm:shadow-xl',
+                      mine ? 'sm:end-0' : 'sm:start-0',
                     )}
                   >
                     <MenuItem icon={Reply} label={t('direct.reply')} onClick={onReply} />
@@ -1009,7 +1110,7 @@ function MessageBubble({
               <p
                 className={cn(
                   'flex items-center gap-1.5 text-fluid-xs italic',
-                  mine ? 'text-white/85' : 'text-slate-400 dark:text-emerald-300/80',
+                  mine ? 'text-white/85' : 'text-slate-500 dark:text-emerald-300/80',
                 )}
               >
                 <Ban size={13} aria-hidden="true" />
@@ -1033,7 +1134,7 @@ function MessageBubble({
 
         <p
           className={cn(
-            'mt-1 flex items-center gap-1.5 px-1 text-fluid-2xs text-slate-400 dark:text-emerald-300/70',
+            'mt-1 flex items-center gap-1.5 px-1 text-fluid-2xs text-slate-500 dark:text-emerald-300/70',
             mine ? 'justify-end' : 'justify-start',
           )}
         >
@@ -1130,7 +1231,7 @@ function MenuItem({
         role="menuitem"
         onClick={onClick}
         className={cn(
-          'flex min-h-10 w-full items-center gap-2.5 rounded-xl px-3 text-fluid-xs font-bold transition',
+          'flex min-h-11 w-full items-center gap-2.5 whitespace-nowrap rounded-xl px-3 text-fluid-sm font-bold transition sm:min-h-10 sm:text-fluid-xs',
           danger
             ? 'text-rose-600 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-950/40'
             : 'text-slate-700 hover:bg-emerald-50 dark:text-emerald-100 dark:hover:bg-emerald-900',

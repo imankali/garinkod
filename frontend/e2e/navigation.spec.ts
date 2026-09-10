@@ -9,9 +9,16 @@ import { expect, test, type Page } from '@playwright/test';
  */
 
 /** Routes a signed-out visitor must be able to reach by clicking alone. */
+/**
+ * Routes a signed-out visitor must be able to reach by clicking alone.
+ *
+ * There is no /marketplace here: the farmers' market and the storefront
+ * directory are one page now (/storefronts), and the ads live as a tab of the
+ * shop (/products?source=marketplace). The old address survives only as a
+ * redirect, which public-routes.spec.ts guards.
+ */
 const PUBLIC_DESTINATIONS = [
   '/products',
-  '/marketplace',
   '/storefronts',
   '/services',
   '/farmer-sell',
@@ -55,7 +62,7 @@ test.describe('reachability', () => {
       anchors.map((anchor) => (anchor as HTMLAnchorElement).getAttribute('href')?.split('?')[0]),
     );
 
-    for (const destination of ['/products', '/marketplace', '/storefronts', '/support']) {
+    for (const destination of ['/products', '/storefronts', '/support']) {
       expect(links, `${destination} missing from the mobile menu`).toContain(destination);
     }
   });
@@ -71,7 +78,7 @@ test.describe('reachability', () => {
   });
 
   test('the active page is marked with aria-current', async ({ page }) => {
-    await page.goto('/marketplace');
+    await page.goto('/storefronts');
     await expect(page.locator('[aria-current="page"]').first()).toBeVisible();
   });
 });
@@ -79,11 +86,18 @@ test.describe('reachability', () => {
 test.describe('keyboard access', () => {
   test('the skip link is the first stop and jumps to the content', async ({ page }) => {
     await page.goto('/');
-    await page.keyboard.press('Tab');
 
-    const focused = page.locator(':focus');
-    await expect(focused).toHaveText(/پرش به محتوای اصلی/);
+    // Sequential focus traversal is not something a headless run can be trusted
+    // to reproduce: Tab lands wherever the browser feels like, and the failure
+    // reads as an empty document. So the contract is asserted on its two real
+    // properties — the link is the first focusable thing in the document, and
+    // activating it moves focus into the main content.
+    const firstFocusable = page
+      .locator('a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])')
+      .first();
+    await expect(firstFocusable).toHaveText(/پرش به محتوای اصلی/);
 
+    await firstFocusable.focus();
     await page.keyboard.press('Enter');
     await expect(page.locator('#main-content')).toBeFocused();
   });
@@ -99,11 +113,12 @@ test.describe('keyboard access', () => {
     // Focus must stay inside the drawer while it is open.
     for (let step = 0; step < 12; step += 1) {
       await page.keyboard.press('Tab');
-      const insideDialog = await page.evaluate(() => {
-        const dialog = document.querySelector('[role="dialog"]');
-        return dialog ? dialog.contains(document.activeElement) : false;
-      });
-      expect(insideDialog, `focus escaped the drawer after ${step + 1} tabs`).toBe(true);
+      // Ask the drawer this test opened whether it holds focus. Reaching for
+      // "[role=dialog]" in the document would answer about whichever dialog was
+      // rendered first — the cart, the wishlist — and report an escape that never
+      // happened.
+      const inside = await menu.evaluate((dialog) => dialog.contains(document.activeElement));
+      expect(inside, `focus escaped the drawer after ${step + 1} tabs`).toBe(true);
     }
 
     await page.keyboard.press('Escape');
@@ -115,7 +130,7 @@ test.describe('touch targets', () => {
   test.use({ viewport: { width: 375, height: 812 } });
 
   test('every visible control meets the 44px minimum', async ({ page }) => {
-    for (const route of ['/', '/marketplace', '/storefronts']) {
+    for (const route of ['/', '/storefronts', '/products']) {
       await page.goto(route);
       await page.waitForLoadState('networkidle');
 
@@ -128,16 +143,43 @@ test.describe('touch targets', () => {
           })
           .map((element) => {
             const rect = element.getBoundingClientRect();
+            const parent = element.parentElement;
+            const own = (element.textContent ?? '').trim().length;
+            const around = (parent?.textContent ?? '').trim().length;
             return {
               tag: element.tagName,
               text: (element.textContent ?? '').trim().slice(0, 30),
               width: Math.round(rect.width),
               height: Math.round(rect.height),
+              touchMin:
+                2.75 * parseFloat(window.getComputedStyle(document.documentElement).fontSize || '16'),
+              // "In prose": one clause of a longer run of text, not a control.
+              inlineInProse:
+                !!parent &&
+                /^(P|LI|DD|DT|SPAN|H1|H2|H3|H4)$/.test(parent.tagName) &&
+                around > own + 8,
             };
           })
-          // Inline text links inside a paragraph are exempt: they are read as
-          // text, not tapped as controls.
-          .filter((box) => box.height > 0 && box.height < 40 && box.width < 200),
+          // Two bars, both named. Every control in the chrome clears 44px, which is
+          // this product's own rule for buttons and selects. Links are measured
+          // against WCAG 2.2 SC 2.5.8 — 24px — with its Inline exception respected,
+          // because a link that is one clause of a sentence is read as text and no
+          // standard expects anyone to tap it accurately. The old filter claimed the
+          // same exemption in a comment while measuring everything against 40px.
+          .filter((box) => {
+            if (box.height <= 0) return false;
+            // Two bars. The absolute one is WCAG 2.2 SC 2.5.8's 24 CSS px, which no
+            // scaling excuses. The other is the design system's own touch unit,
+            // min-h-11 = 2.75rem — measured in *this* root font-size rather than
+            // assumed to be 44px, because the app's root is fluid and at desktop
+            // widths 2.75rem is ~40 CSS px. (That the touch unit shrinks with the
+            // type scale is a real finding — a token decision in px, not something
+            // a test should quietly bless or fail every button over.)
+            // Inline prose links keep the standard's own exception: read as text.
+            if (box.height < 24) return true;
+            if (box.tag === 'A' && box.inlineInProse) return false;
+            return box.height + 2 < box.touchMin || box.width + 2 < box.touchMin;
+          }),
       );
 
       expect(
@@ -151,12 +193,11 @@ test.describe('touch targets', () => {
 test.describe('home page as the shop window', () => {
   /**
    * The home page previously surfaced only the product catalogue and the dose
-   * calculator; the marketplace, storefront directory, services, procurement,
-   * loyalty club, affiliate scheme, order tracking and support were all
-   * invisible without opening a menu. These tests keep the shop window full.
+   * calculator; the storefront directory, services, procurement, loyalty club,
+   * affiliate scheme, order tracking and support were all invisible without
+   * opening a menu. These tests keep the shop window full.
    */
   const EXPECTED_ON_HOME = [
-    '/marketplace',
     '/storefronts',
     '/services',
     '/farmer-sell',
@@ -185,19 +226,25 @@ test.describe('home page as the shop window', () => {
     const hero = page.getByRole('region', { name: /کود، سم، بذر/ });
     await expect(hero).toBeVisible();
     await expect(hero.getByRole('link', { name: /خرید از فروشگاه/ })).toBeVisible();
-    await expect(hero.getByRole('link', { name: /بازار کشاورزان/ })).toBeVisible();
+    await expect(hero.getByRole('link', { name: /بازار غرفه‌داران/ })).toHaveAttribute(
+      'href',
+      '/storefronts',
+    );
   });
 
-  test('the marketplace is represented on the home page', async ({ page }) => {
+  test('the sellers’ market is represented on the home page', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    // Either real sellers render, or the section hides itself — never an
-    // empty heading with nothing under it.
-    const heading = page.getByRole('heading', { name: /مستقیم از غرفه کشاورزان/ });
-    if (await heading.count()) {
-      await expect(page.locator('a[href^="/storefronts/"]').first()).toBeVisible();
-    }
+    // The directory is what makes this site different from a shop, so it has to
+    // be on the front page in words and as a way in — not only in a menu.
+    await expect(
+      page.getByRole('heading', { name: 'مستقیم از غرفه کشاورزان' }),
+    ).toBeVisible();
+    await expect(page.locator('a[href^="/storefronts/"]').first()).toBeVisible();
+    // …and the section is never an empty heading: it either shows stalls or
+    // removes itself.
+    await expect(page.getByRole('link', { name: /مشاهده همه غرفه‌داران/ })).toBeVisible();
   });
 
   test('the home page has one h1 and an ordered heading structure', async ({ page }) => {

@@ -7,16 +7,17 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 
-import { agricultureApi, ordersApi, webPushApi } from "../api/services";
+import { agricultureApi, ordersApi, storefrontPostsApi, webPushApi } from "../api/services";
 import { ACCOUNT_ITEMS, visibleItems } from "../config/navigation";
 import AvatarUploader from "../components/AvatarUploader";
 import FarmPanel from "../components/farm/FarmPanel";
-import LocationPicker from "../components/LocationPicker";
+import StoriesRow from "../components/social/StoriesRow";
+import StorefrontForm from "../components/storefront/StorefrontForm";
 import { LANGUAGES, useTranslation } from "../i18n";
 import { useAuthStore, useUserLevel } from "../store/authStore";
 import { useThemeStore } from "../store/themeStore";
 import type { Order } from '@/types/commerce';
-import type { MarketplaceListing, Storefront } from '@/types/storefront';
+import type { MarketplaceListing, Storefront, StorefrontPost } from '@/types/storefront';
 import { formatPrice } from "../utils/formatPrice";
 import { cn } from "../utils/cn";
 import { normalizePhoneNumber } from "../utils/normalizeDigits";
@@ -31,7 +32,6 @@ interface ProfileForm {
   address: string;
 }
 
-const emptyStore = { name: "", slug: "", seller_type: "farmer" as Storefront["seller_type"], bio: "", province: "", city: "" };
 export default function Profile() {
   const { user, account, isAuthenticated, isLoading, isSessionChecked, logout, fetchProfile, updateProfile } = useAuthStore();
   const level = useUserLevel();
@@ -48,8 +48,25 @@ export default function Profile() {
   const [storefront, setStorefront] = useState<Storefront | null>(null);
   const [listings, setListings] = useState<MarketplaceListing[]>([]);
   const [loadingSeller, setLoadingSeller] = useState(false);
-  const [storeForm, setStoreForm] = useState(emptyStore);
-  const [creatingStore, setCreatingStore] = useState(false);
+  /**
+   * The stories the account follows, shown here rather than on the home page.
+   *
+   * «مستقیم از کشاورزان» on the home page is a shop window; an ephemeral story
+   * is something only a returning visitor has a reason to check, which is what a
+   * profile is for.
+   */
+  const [stories, setStories] = useState<StorefrontPost[]>([]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setStories([]);
+      return;
+    }
+    storefrontPostsApi
+      .list({ post_type: "story", page_size: 20 })
+      .then((response) => setStories(response.data.results || []))
+      .catch(() => setStories([]));
+  }, [isAuthenticated]);
 
   const syncProfileForm = useCallback(() => {
     setProfileForm({
@@ -110,21 +127,6 @@ export default function Profile() {
       // API client reports a detailed error.
     } finally {
       setSavingProfile(false);
-    }
-  }
-
-  async function createStore(event: FormEvent) {
-    event.preventDefault();
-    setCreatingStore(true);
-    try {
-      const response = await agricultureApi.createStorefront(storeForm);
-      setStorefront(response.data);
-      setStoreForm(emptyStore);
-      toast.success(t("account.storeCreated"));
-    } catch {
-      // API client reports a detailed error.
-    } finally {
-      setCreatingStore(false);
     }
   }
 
@@ -233,9 +235,9 @@ export default function Profile() {
           </aside>
 
           <section className="min-w-0">
-            {tab === "overview" && <Overview orders={orders} pendingOrders={pendingOrders.length} storefront={storefront} activeListings={activeListings.length} onBuyer={() => setTab("buyer")} onSeller={openSellerSection} t={t} />}
+            {tab === "overview" && <Overview orders={orders} pendingOrders={pendingOrders.length} storefront={storefront} activeListings={activeListings.length} stories={stories} onBuyer={() => setTab("buyer")} onSeller={openSellerSection} t={t} />}
             {tab === "buyer" && <BuyerPanel orders={orders} t={t} />}
-            {tab === "seller" && <SellerPanel storefront={storefront} listings={listings} loading={loadingSeller} storeForm={storeForm} setStoreForm={setStoreForm} creatingStore={creatingStore} onCreateStore={createStore} t={t} />}
+            {tab === "seller" && <SellerPanel storefront={storefront} listings={listings} loading={loadingSeller} onStoreCreated={setStorefront} t={t} />}
             {tab === "farm" && <FarmPanel />}
             {tab === "settings" && <SettingsPanel form={profileForm} setForm={setProfileForm} editing={editing} setEditing={setEditing} saving={savingProfile} onSave={saveProfile} onCancel={() => { syncProfileForm(); setEditing(false); }} t={t} username={user?.username || ""} />}
           </section>
@@ -245,8 +247,13 @@ export default function Profile() {
   );
 }
 
-function Overview({ orders, pendingOrders, storefront, activeListings, onBuyer, onSeller, t }: { orders: Order[]; pendingOrders: number; storefront: Storefront | null; activeListings: number; onBuyer: () => void; onSeller: () => void; t: (key: string) => string }) {
-  return <div className="space-y-6"><div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4"><Stat icon={ClipboardList} label={t("account.orders")} value={orders.length.toLocaleString("fa-IR")} /><Stat icon={Package} label="سفارش‌های جاری" value={pendingOrders.toLocaleString("fa-IR")} /><Stat icon={Store} label={t("account.store")} value={storefront ? "فعال" : "—"} /><Stat icon={Building2} label="آگهی منتشرشده" value={activeListings.toLocaleString("fa-IR")} /></div><div className="grid gap-6 lg:grid-cols-2"><Panel title={t("account.buyer")} text={t("account.buyerDescription")} icon={ShoppingBag} action={t("account.openOrders")} onClick={onBuyer} /><Panel title={t("account.seller")} text={t("account.sellerDescription")} icon={Store} action={storefront ? t("account.store") : t("account.createStore")} onClick={onSeller} /></div><section className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm dark:border-emerald-900 dark:bg-emerald-950"><div className="flex items-center justify-between"><h2 className="text-lg font-extrabold text-slate-800 dark:text-white">آخرین سفارش‌ها</h2><Link to="/orders" className="inline-flex min-h-11 items-center text-fluid-sm font-bold text-emerald-700 dark:text-lime-300">{t("common.viewAll")}</Link></div>{orders.length ? <div className="mt-4 divide-y divide-slate-100 dark:divide-emerald-900">{orders.slice(0, 3).map((order) => <div key={order.id} className="flex flex-wrap items-center justify-between gap-3 py-4 text-sm"><div><strong className="text-slate-800 dark:text-white" dir="ltr">{order.code}</strong><p className="mt-1 text-xs text-slate-500">{new Date(order.created_at).toLocaleDateString("fa-IR")}</p></div><span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800 dark:bg-amber-950 dark:text-amber-100">{order.status_label}</span><strong className="text-emerald-700 dark:text-lime-300">{formatPrice(order.total_price)}</strong></div>)}</div> : <Empty text={t("account.noOrders")} />}</section></div>;
+function Overview({ orders, pendingOrders, storefront, activeListings, stories, onBuyer, onSeller, t }: { orders: Order[]; pendingOrders: number; storefront: Storefront | null; activeListings: number; stories: StorefrontPost[]; onBuyer: () => void; onSeller: () => void; t: (key: string) => string }) {
+  return <div className="space-y-6"><div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4"><Stat icon={ClipboardList} label={t("account.orders")} value={orders.length.toLocaleString("fa-IR")} /><Stat icon={Package} label="سفارش‌های جاری" value={pendingOrders.toLocaleString("fa-IR")} /><Stat icon={Store} label={t("account.store")} value={storefront ? "فعال" : "—"} /><Stat icon={Building2} label="آگهی منتشرشده" value={activeListings.toLocaleString("fa-IR")} /></div><div className="grid gap-6 lg:grid-cols-2"><Panel title={t("account.buyer")} text={t("account.buyerDescription")} icon={ShoppingBag} action={t("account.openOrders")} onClick={onBuyer} /><Panel title={t("account.seller")} text={t("account.sellerDescription")} icon={Store} action={storefront ? t("account.store") : t("account.createStore")} onClick={onSeller} /></div>{stories.length > 0 && (
+  <section className="rounded-3xl border border-slate-100 bg-white px-5 pb-5 pt-4 shadow-sm dark:border-emerald-900 dark:bg-emerald-950">
+    <StoriesRow stories={stories} title="استوری غرفه‌هایی که می‌خوانید" />
+  </section>
+)}
+<section className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm dark:border-emerald-900 dark:bg-emerald-950"><div className="flex items-center justify-between"><h2 className="text-lg font-extrabold text-slate-800 dark:text-white">آخرین سفارش‌ها</h2><Link to="/orders" className="inline-flex min-h-11 items-center text-fluid-sm font-bold text-emerald-700 dark:text-lime-300">{t("common.viewAll")}</Link></div>{orders.length ? <div className="mt-4 divide-y divide-slate-100 dark:divide-emerald-900">{orders.slice(0, 3).map((order) => <div key={order.id} className="flex flex-wrap items-center justify-between gap-3 py-4 text-sm"><div><strong className="text-slate-800 dark:text-white" dir="ltr">{order.code}</strong><p className="mt-1 text-xs text-slate-500">{new Date(order.created_at).toLocaleDateString("fa-IR")}</p></div><span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800 dark:bg-amber-950 dark:text-amber-100">{order.status_label}</span><strong className="text-emerald-700 dark:text-lime-300">{formatPrice(order.total_price)}</strong></div>)}</div> : <Empty text={t("account.noOrders")} />}</section></div>;
 }
 
 function BuyerPanel({ orders, t }: { orders: Order[]; t: (key: string) => string }) {
@@ -262,7 +269,7 @@ function BuyerPanel({ orders, t }: { orders: Order[]; t: (key: string) => string
  * belong with, instead of on a disconnected account screen that showed a
  * create-form but no way to edit or remove anything afterwards.
  */
-function SellerPanel({ storefront, listings, loading, storeForm, setStoreForm, creatingStore, onCreateStore, t }: { storefront: Storefront | null; listings: MarketplaceListing[]; loading: boolean; storeForm: typeof emptyStore; setStoreForm: (value: typeof emptyStore) => void; creatingStore: boolean; onCreateStore: (event: FormEvent) => Promise<void>; t: (key: string) => string }) {
+function SellerPanel({ storefront, listings, loading, onStoreCreated, t }: { storefront: Storefront | null; listings: MarketplaceListing[]; loading: boolean; onStoreCreated: (storefront: Storefront) => void; t: (key: string) => string }) {
   if (loading) return <section className="rounded-3xl bg-white p-8 text-center text-slate-500 dark:bg-emerald-950">{t("common.loading")}</section>;
 
   if (!storefront) {
@@ -272,20 +279,12 @@ function SellerPanel({ storefront, listings, loading, storeForm, setStoreForm, c
         <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-emerald-200">
           {t("account.noStore")} غرفه به شما امکان ثبت محصول و فروش پس از بررسی را می‌دهد.
         </p>
-        <form onSubmit={onCreateStore} className="mt-6 grid gap-4 sm:grid-cols-2">
-          <TextField label="نام غرفه" value={storeForm.name} onChange={(value) => setStoreForm({ ...storeForm, name: value })} />
-          <TextField label="آدرس یکتا (اختیاری)" required={false} value={storeForm.slug} onChange={(value) => setStoreForm({ ...storeForm, slug: value })} />
-          <SelectField label="نوع فروشنده" value={storeForm.seller_type} onChange={(value) => setStoreForm({ ...storeForm, seller_type: value as Storefront["seller_type"] })} options={[['farmer', t("role.farmer")], ['cooperative', t("role.cooperative")], ['merchant', t("role.merchant")], ['company', t("role.company")]]} />
-          <LocationPicker idPrefix="profile-store" required province={storeForm.province} city={storeForm.city} onProvinceChange={(value) => setStoreForm({ ...storeForm, province: value, city: "" })} onCityChange={(value) => setStoreForm({ ...storeForm, city: value })} />
-          <label className="block text-sm font-bold text-slate-700 dark:text-emerald-50 sm:col-span-2">
-            معرفی کوتاه
-            <textarea value={storeForm.bio} onChange={(event) => setStoreForm({ ...storeForm, bio: event.target.value })} rows={3} className="mt-2 w-full rounded-xl border border-slate-200 p-3 font-normal outline-none focus:border-emerald-500 dark:border-emerald-700 dark:bg-emerald-900" />
-          </label>
-          <button disabled={creatingStore} className="inline-flex w-fit min-h-12 items-center gap-2 rounded-xl bg-emerald-600 px-5 text-sm font-bold text-white disabled:opacity-50 sm:col-span-2">
-            <Plus size={16} />
-            {creatingStore ? t("common.loading") : t("account.createStore")}
-          </button>
-        </form>
+        {/* The shared ساخت غرفه form — the same one the marketplace opens — so
+            the identity fields (نام و خانوادگی و کد ملی) exist in exactly one
+            place and cannot drift apart from what the API demands. */}
+        <div className="mt-5">
+          <StorefrontForm variant="card" onCreated={onStoreCreated} />
+        </div>
       </section>
     );
   }
@@ -603,7 +602,7 @@ function SiteSettingsSection({ t }: { t: (key: string) => string }) {
         {/* Language */}
         <div>
           <h3 className="text-sm font-bold text-slate-700 dark:text-emerald-50">{t("language.label")}</h3>
-          <p className="mt-1 text-xs text-slate-400 dark:text-emerald-300/70">{t("language.description")}</p>
+          <p className="mt-1 text-xs text-slate-500 dark:text-emerald-300/70">{t("language.description")}</p>
           <div role="radiogroup" aria-label={t("language.label")} className="mt-3 grid grid-cols-3 gap-2 sm:max-w-md">
             {LANGUAGES.map((language) => (
               <button
@@ -670,6 +669,4 @@ function SiteSettingsSection({ t }: { t: (key: string) => string }) {
 function Stat({ icon: Icon, label, value }: { icon: typeof BarChart3; label: string; value: string }) { return <div className="rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm dark:border-emerald-900 dark:bg-emerald-950 sm:rounded-3xl sm:p-5"><Icon size={18} className="text-emerald-600 dark:text-lime-300" /><p className="mt-3 text-fluid-xl font-extrabold text-slate-800 dark:text-white">{value}</p><p className="mt-1 text-fluid-2xs leading-5 text-slate-500 dark:text-emerald-200">{label}</p></div>; }
 function Panel({ title, text, icon: Icon, action, onClick }: { title: string; text: string; icon: typeof Store; action: string; onClick: () => void }) { return <article className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm dark:border-emerald-900 dark:bg-emerald-950"><Icon className="text-emerald-600 dark:text-lime-300" /><h2 className="mt-4 text-xl font-extrabold text-slate-800 dark:text-white">{title}</h2><p className="mt-2 min-h-12 text-sm leading-6 text-slate-500 dark:text-emerald-200">{text}</p><button onClick={onClick} className="mt-4 inline-flex min-h-11 items-center text-fluid-sm font-bold text-emerald-700 dark:text-lime-300">{action}</button></article>; }
 function Empty({ text }: { text: string }) { return <div className="mt-5 rounded-2xl bg-slate-50 p-5 text-sm text-slate-500 dark:bg-emerald-900/40 dark:text-emerald-200">{text}</div>; }
-function TextField({ label, value, onChange, type = "text", required = true }: { label: string; value: string; onChange: (value: string) => void; type?: string; required?: boolean }) { return <label className="block text-sm font-bold text-slate-700 dark:text-emerald-50">{label}<input required={required} type={type} min={type === "number" ? 0 : undefined} value={value} onChange={(event) => onChange(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2.5 font-normal outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-emerald-700 dark:bg-emerald-900" /></label>; }
-function SelectField({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: [string, string][] }) { return <label className="block text-sm font-bold text-slate-700 dark:text-emerald-50">{label}<select value={value} onChange={(event) => onChange(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2.5 font-normal dark:border-emerald-700 dark:bg-emerald-900">{options.map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></label>; }
 function InfoField({ label, value, editing, onChange, type = "text", multiline = false }: { label: string; value: string; editing: boolean; onChange: (value: string) => void; type?: string; multiline?: boolean }) { return <label className={`block rounded-2xl bg-emerald-50 p-4 text-sm font-bold text-slate-700 dark:bg-emerald-900/40 dark:text-emerald-50 ${multiline ? "sm:col-span-2" : ""}`}><span className="text-xs text-slate-500 dark:text-emerald-200">{label}</span>{editing ? multiline ? <textarea value={value} onChange={(event) => onChange(event.target.value)} rows={3} className="mt-2 w-full rounded-xl border border-emerald-200 bg-white p-2.5 font-normal outline-none focus:border-emerald-500 dark:border-emerald-700 dark:bg-emerald-950" /> : <input type={type} value={value} onChange={(event) => onChange(event.target.value)} className="mt-2 w-full rounded-xl border border-emerald-200 bg-white px-3 py-2.5 font-normal outline-none focus:border-emerald-500 dark:border-emerald-700 dark:bg-emerald-950" /> : <p className="mt-2 font-bold">{value || "—"}</p>}</label>; }

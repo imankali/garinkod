@@ -89,7 +89,6 @@ export default function LegalHub() {
           name="description"
           content="قوانین و مقررات، حریم خصوصی، شرایط خرید و بازگشت کالا، ارسال، ضمانت اصالت، قوانین غرفه‌داری، امتیاز و پاداش، و رسیدگی به شکایات."
         />
-        <link rel="canonical" href={`${window.location.origin}/legal`} />
       </Helmet>
 
       <header className="max-w-3xl">
@@ -160,7 +159,7 @@ export default function LegalHub() {
                 <span className="block truncate text-fluid-xs font-extrabold text-slate-800 dark:text-white">
                   {row.question}
                 </span>
-                <span className="mt-0.5 block truncate text-fluid-2xs text-slate-400 dark:text-emerald-300/80">
+                <span className="mt-0.5 block truncate text-fluid-2xs text-slate-500 dark:text-emerald-300/80">
                   {row.label}
                 </span>
               </span>

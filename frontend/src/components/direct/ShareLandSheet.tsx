@@ -169,7 +169,7 @@ export default function ShareLandSheet({
                         {land.crop_type ? ` · ${land.crop_type}` : ''}
                       </span>
                       {(land.province || land.city) && (
-                        <span className="mt-1 flex items-center gap-1 text-fluid-2xs text-slate-400 dark:text-emerald-300/70">
+                        <span className="mt-1 flex items-center gap-1 text-fluid-2xs text-slate-500 dark:text-emerald-300/70">
                           <MapPin size={10} aria-hidden="true" />
                           {[land.province, land.city].filter(Boolean).join(' / ')}
                         </span>

@@ -1,6 +1,6 @@
 // frontend/src/pages/Login.tsx
 
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { motion } from 'framer-motion';
 import { LEGAL_CORE_LINKS } from '../config/legal';
@@ -20,7 +20,7 @@ import {
   User,
   UserPlus,
 } from 'lucide-react';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 
 import { parseApiError } from '../api/errors';
 import { useAuthStore } from '../store/authStore';
@@ -64,6 +64,25 @@ export default function Login() {
 
   const { login, register, requestOtp, verifyOtp, isLoading } = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
+  /*
+    Where the gate sent this visitor. Every protected page hands over its own
+    address (`RequireLevel`, the استودیو غرفه gate, the ساخت غرفه dialog), and
+    dropping the visitor on the home page after they log in throws that away —
+    they have to find their way back to the form they were filling in.
+    Only a same-site path is accepted, never an absolute or protocol-relative
+    one, so the parameter cannot be used to bounce someone off the platform.
+  */
+  const returnTo = useMemo(() => {
+    const from = (location.state as { from?: unknown } | null)?.from;
+    if (typeof from !== 'string') return null;
+    if (!from.startsWith('/') || from.startsWith('//')) return null;
+    return from;
+  }, [location.state]);
+
+  function afterAuth() {
+    navigate(returnTo ?? '/', { replace: true });
+  }
 
   useEffect(() => {
     if (resendSeconds <= 0) return;
@@ -93,7 +112,7 @@ export default function Login() {
       if (passwordForm.password.length < 8) return;
       try {
         await register(passwordForm);
-        navigate('/');
+        afterAuth();
       } catch {
         // The store presents password-auth errors exactly once.
       }
@@ -101,7 +120,7 @@ export default function Login() {
     }
     try {
       await login(passwordForm.username, passwordForm.password);
-      navigate('/');
+      afterAuth();
     } catch {
       // The store presents password-auth errors exactly once.
     }
@@ -143,7 +162,7 @@ export default function Login() {
         phone,
         code: cleanCode,
       });
-      navigate('/');
+      afterAuth();
     } catch (error) {
       const parsed = parseApiError(error);
       setOtpError(parsed.fields.code || parsed.message);
@@ -445,7 +464,15 @@ className={`${AUTH_INPUT_CLASS} ps-10`}
 }
 
 function Spinner() {
-  return <span className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" aria-label="در حال انجام" />;
+  // role=status so the label is announced: a bare span with an aria-label is a
+  // name on a generic element, which AT is allowed to ignore (and axe rejects).
+  return (
+    <span
+      role="status"
+      className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent"
+      aria-label="در حال انجام"
+    />
+  );
 }
 
 function Field({ label, htmlFor, icon, children }: { label: string; htmlFor: string; icon: React.ReactNode; children: React.ReactNode }) {

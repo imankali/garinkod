@@ -254,7 +254,7 @@ function NavGroup({
                       <span
                         className={cn(
                           'mt-0.5 block text-fluid-2xs leading-5',
-                          isActive ? 'text-emerald-50' : 'text-slate-400 dark:text-emerald-300/70',
+                          isActive ? 'text-emerald-50' : 'text-slate-500 dark:text-emerald-300/70',
                         )}
                       >
                         {item.description}

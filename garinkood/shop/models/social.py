@@ -366,6 +366,22 @@ class StorefrontMessage(models.Model):
         MarketplaceListing, null=True, blank=True, on_delete=models.SET_NULL,
         related_name='direct_messages',
     )
+    # A storefront post shared into the chat — the «گفتگو با غرفه‌دار» button on a
+    # post means "I am asking about *this*", and the only honest way to carry that
+    # is the record itself, not a screenshot or a caption retyped into the body.
+    post = models.ForeignKey(
+        'StorefrontPost', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='shared_in_messages', verbose_name='پست پیوست‌شده',
+    )
+    # Which consultation request this message belongs to, when the thread is the
+    # consulting desk. Without it the request row and the chat could not be kept
+    # in step: an answer typed in the panel has to be recognisable as the answer
+    # to *this* question, and the question in the chat has to stop showing as
+    # «در انتظار پاسخ» once somebody replies. See shop/consultations.py.
+    consultation = models.ForeignKey(
+        'FarmConsultationRequest', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='messages', verbose_name='درخواست مشاوره',
+    )
     # A farmer sharing their land case file with a consultant: the real record,
     # not a screenshot, so the consultant reads the soil and calendar data that
     # the identification form holds.
@@ -446,6 +462,7 @@ class StorefrontMessage(models.Model):
         self.body = ''
         self.listing = None
         self.land = None
+        self.post = None
         self.link_kind = ''
         self.link_label = ''
         self.link_url = ''
@@ -454,7 +471,7 @@ class StorefrontMessage(models.Model):
         self.attachment_duration = None
         self.deleted_at = timezone.now()
         self.save(update_fields=[
-            'body', 'listing', 'land', 'link_kind', 'link_label', 'link_url',
+            'body', 'listing', 'land', 'post', 'link_kind', 'link_label', 'link_url',
             'attachment', 'attachment_type',
             'attachment_duration', 'deleted_at',
         ])

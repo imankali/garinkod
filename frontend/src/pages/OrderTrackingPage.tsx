@@ -56,7 +56,7 @@ function formatDate(value: string): string {
  */
 function TrackingSkeleton() {
   return (
-    <div aria-busy="true" aria-label="در حال بارگذاری اطلاعات رهگیری">
+    <div aria-busy="true" aria-label="در حال بارگذاری اطلاعات رهگیری" role="status">
       <div className="animate-pulse rounded-3xl border border-slate-100 bg-white px-4 py-5 shadow-sm dark:border-emerald-800 dark:bg-emerald-950">
         <div className="flex items-center gap-3">
           <div className="h-11 w-11 rounded-xl bg-slate-200 dark:bg-emerald-900" />

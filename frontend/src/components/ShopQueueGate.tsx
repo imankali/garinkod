@@ -117,7 +117,7 @@ export default function ShopQueueGate({ children }: { children: React.ReactNode 
           </button>
         </div>
 
-        <p className="mt-5 text-[11px] leading-6 text-slate-400 dark:text-emerald-300/70">
+        <p className="mt-5 text-[11px] leading-6 text-slate-500 dark:text-emerald-300/70">
           رفرش‌های پی‌در‌پی شما را جلو نمی‌اندازد؛ بسته نگه‌داشتن همین صفحه هم جایتان را نگه می‌دارد و هم به سرور
           فرصت می‌دهد تا همان کاری را که برای بقیه انجام می‌داد، برای شما تمام کند.
         </p>

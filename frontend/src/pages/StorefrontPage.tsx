@@ -433,7 +433,7 @@ export default function StorefrontPage() {
           { label: t('storefronts.followers'), value: counts.followers },
         ].map((entry) => (
           <div key={entry.label}>
-            <dt className="text-fluid-xs text-slate-400 dark:text-emerald-300">{entry.label}</dt>
+            <dt className="text-fluid-xs text-slate-500 dark:text-emerald-300">{entry.label}</dt>
             <dd className="text-base font-extrabold text-slate-800 dark:text-white">{entry.value}</dd>
           </div>
         ))}

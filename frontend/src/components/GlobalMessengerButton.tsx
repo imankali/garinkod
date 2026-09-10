@@ -215,7 +215,7 @@ export default function GlobalMessengerButton() {
                         </span>
                         <span className="min-w-0">
                           <span className="block text-sm font-bold text-slate-700 dark:text-emerald-50">تماس تلفنی مستقیم</span>
-                          <span className="block text-xs text-slate-400 dark:text-emerald-300" dir="ltr">{PHONE_NUMBER}</span>
+                          <span className="block text-xs text-slate-500 dark:text-emerald-300" dir="ltr">{PHONE_NUMBER}</span>
                         </span>
                       </a>
                     )}
@@ -232,7 +232,7 @@ export default function GlobalMessengerButton() {
                         </span>
                         <span className="min-w-0">
                           <span className="block text-sm font-bold text-slate-700 dark:text-emerald-50">گفتگو در واتس‌اپ</span>
-                          <span className="block text-xs text-slate-400 dark:text-emerald-300">انتقال به واتس‌اپ</span>
+                          <span className="block text-xs text-slate-500 dark:text-emerald-300">انتقال به واتس‌اپ</span>
                         </span>
                       </a>
                     )}
@@ -275,7 +275,7 @@ function MessengerAction({
       </span>
       <span className="min-w-0 flex-1">
         <span className="block text-sm font-bold text-slate-700 dark:text-emerald-50">{title}</span>
-        <span className="block text-xs text-slate-400 dark:text-emerald-300">{hint}</span>
+        <span className="block text-xs text-slate-500 dark:text-emerald-300">{hint}</span>
       </span>
       {badge && (
         <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-rose-500 px-1.5 text-fluid-2xs font-extrabold text-white">

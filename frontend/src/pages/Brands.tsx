@@ -38,7 +38,6 @@ export default function Brands() {
           name="description"
           content="فهرست تولیدکنندگان و برندهایی که در گرین کود کالا دارند، به‌همراه دسته‌ها و برچسب‌های فهرست."
         />
-        <link rel="canonical" href="/brands" />
       </Helmet>
 
       <main className="mx-auto max-w-6xl px-[var(--page-gutter)] py-8 md:py-12">

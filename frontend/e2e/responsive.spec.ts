@@ -68,7 +68,10 @@ test.describe('mobile layout details', () => {
     expect(overflow).toBeLessThanOrEqual(OVERFLOW_TOLERANCE);
   });
 
-  test('tap targets on the bottom navigation are large enough', async ({ page }) => {
+  test('tap targets on the bottom navigation are large enough', async ({ page, isMobile }) => {
+    // The bottom bar is a phone affordance: on a desktop viewport it is not
+    // rendered at all, so there is nothing here to measure outside a device.
+    test.skip(!isMobile, 'the mobile bottom bar is not rendered on desktop viewports');
     await page.goto('/');
     const nav = page.getByRole('navigation', { name: 'منوی پایین موبایل' });
     await expect(nav).toBeVisible();
@@ -99,7 +102,10 @@ test.describe('zoomed layout', () => {
 });
 
 test.describe('layout primitives', () => {
-  test('page content is never hidden behind the fixed mobile bar', async ({ page }) => {
+  test('page content is never hidden behind the fixed mobile bar', async ({ page, isMobile }) => {
+    // Same contract as the tap targets: it is about the bar phones get and
+    // desktop does not.
+    test.skip(!isMobile, 'the fixed mobile bar is not rendered on desktop viewports');
     await page.setViewportSize({ width: 375, height: 812 });
 
     for (const route of ['/', '/marketplace', '/orders']) {
@@ -124,15 +130,44 @@ test.describe('layout primitives', () => {
 
   test('the layout mirrors correctly in English', async ({ page }) => {
     await page.goto('/');
-    await page.getByLabel('زبان').first().selectOption('en');
+    await page.evaluate(() => window.localStorage.setItem('garinkood_locale', 'en'));
+    await page.reload();
+    await page.waitForLoadState('domcontentloaded');
 
     await expect(page.locator('html')).toHaveAttribute('dir', 'ltr');
 
-    // With logical properties the switch must not introduce overflow.
-    const overflow = await page.evaluate(
-      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-    );
-    expect(overflow, 'switching to LTR caused horizontal overflow').toBeLessThanOrEqual(2);
+    // Mirroring is not only the html attribute: the rails have to re-flow, which
+    // shows up as the first card sitting at the *left* of its row rather than the
+    // right, and as the page's own scroll direction.
+    const first = page.locator("a[href^='/products/']").first();
+    await expect(first).toBeVisible();
+    const boxes = await page
+      .locator("a[href^='/products/']")
+      .evaluateAll((nodes) =>
+        nodes.slice(0, 4).map((node) => Math.round(node.getBoundingClientRect().x)),
+      );
+    const distinct = [...new Set(boxes)].sort((a, b) => a - b);
+    expect(distinct.length, 'the rail should still lay out in more than one column').toBeGreaterThan(1);
+    expect(distinct[0], 'in LTR the row starts at the left').toBeLessThan(distinct[1] ?? 0);
+
+    // Arabic is the other direction on top of the same machinery: RTL *and* a
+    // different script, so a layout that only survives English is not mirrored.
+    await page.evaluate(() => window.localStorage.setItem('garinkood_locale', 'ar'));
+    await page.reload();
+    await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+    await expect(page.locator('html')).toHaveAttribute('lang', 'ar');
+
+    // And no direction may introduce sideways scroll — logical properties make
+    // mirroring cheap, which is exactly why it is worth asserting that the saving
+    // was actually made.
+    for (const locale of ['en', 'ar', 'fa']) {
+      await page.evaluate((value) => window.localStorage.setItem('garinkood_locale', value), locale);
+      await page.reload();
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      expect(overflow, `${locale} introduced horizontal overflow`).toBeLessThanOrEqual(1);
+    }
   });
 
   test('body text is at least 12px everywhere', async ({ page }) => {

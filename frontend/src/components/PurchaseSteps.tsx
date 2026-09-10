@@ -66,6 +66,9 @@ export default function PurchaseSteps({
     >
       <span
         role="progressbar"
+        // role="progressbar" does not take its name from its contents, so the
+        // sr-only text left the node unnamed.
+        aria-label="پیشرفت مراحل خرید"
         aria-valuemin={1}
         aria-valuemax={STEPS.length}
         aria-valuenow={completed ? STEPS.length : currentIndex + 1}

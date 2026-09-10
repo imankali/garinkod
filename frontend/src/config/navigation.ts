@@ -31,12 +31,12 @@ import {
   Package,
   PhoneCall,
   Camera,
+  Compass,
   ShieldCheck,
   Ship,
   Scale,
   Sprout,
   Store,
-  Tractor,
   UserRound,
   Users,
 } from 'lucide-react';
@@ -93,22 +93,24 @@ export const SHOP_ITEMS: NavItem[] = [
     primary: true,
     mobileBar: true,
   },
+  // بازار کشاورزان and غرفه‌داران were two pages over the same marketplace and
+  // each was half-filled: one had the ads, the other the sellers. There is now a
+  // single destination, so the nav has one entry for it.
   {
-    id: 'marketplace',
-    label: 'بازار کشاورزان',
-    description: 'خرید مستقیم از غرفه‌داران',
-    to: '/marketplace',
-    icon: Tractor,
+    id: 'storefronts',
+    label: 'غرفه‌داران',
+    description: 'بازار مستقیم کشاورزان: غرفه‌ها، آگهی‌ها و پست‌ها',
+    to: '/storefronts',
+    icon: Store,
     primary: true,
     mobileBar: true,
   },
   {
-    id: 'storefronts',
-    label: 'غرفه‌داران',
-    description: 'فهرست کامل فروشندگان',
-    to: '/storefronts',
-    icon: Store,
-    primary: true,
+    id: 'explore',
+    label: 'کاوش',
+    description: 'همه پست‌های غرفه‌ها، آن‌طور که در اینستاگرام می‌چرخید',
+    to: '/explore',
+    icon: Compass,
   },
   {
     id: 'services',
@@ -232,12 +234,14 @@ export const SELLER_ITEMS: NavItem[] = [
     icon: Building2,
   },
   {
+    // Deliberately not level-gated: /studio decides for itself — a stall owner is
+    // taken to their غرفه, and anyone without one is shown the ساخت غرفه form.
+    // Hiding the link behind level 2 hid the only way *in* to becoming a seller.
     id: 'studio',
     label: 'استودیو غرفه',
-    description: 'پست، استوری و هایلایت',
+    description: 'غرفه من، پست، استوری و هایلایت',
     to: '/studio',
     icon: Camera,
-    minLevel: USER_LEVEL.SELLER,
   },
   {
     id: 'finance',

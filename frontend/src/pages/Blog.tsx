@@ -128,7 +128,7 @@ export default function Blog({ fixedKind }: { fixedKind?: 'guide' | 'article' })
       </div>
 
       {isGuideHub && crops.length > 0 && (
-        <div className="no-scrollbar mt-4 flex gap-2 overflow-x-auto pb-1" aria-label="فهرست گیاهان">
+        <div className="no-scrollbar mt-4 flex gap-2 overflow-x-auto pb-1" aria-label="فهرست گیاهان" role="group">
           <button
             type="button"
             onClick={() => setCrop('')}

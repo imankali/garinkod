@@ -43,6 +43,16 @@ class UserAccount(models.Model):
     )
     gender = models.CharField(max_length=15, choices=GENDER_CHOICES, default='male', verbose_name="جنسیت")
     address = models.TextField(max_length=250, blank=True, null=True, verbose_name="آدرس")
+    # A seller's identity record. The marketplace only publishes a stall after
+    # its owner has declared one, so a dispute can be traced to a real person;
+    # the checksum is enforced by ``shop.national_id`` rather than here, so the
+    # admin form and the storefront form cannot disagree about what "valid" means.
+    national_id = models.CharField(
+        max_length=10, blank=True, db_index=True, verbose_name="کد ملی",
+    )
+    national_id_verified_at = models.DateTimeField(
+        null=True, blank=True, verbose_name="زمان تأیید کد ملی",
+    )
     avatar = models.ImageField(upload_to='avatars/%Y/%m/', blank=True, null=True, verbose_name="تصویر پروفایل")
     level = models.PositiveSmallIntegerField(
         choices=LEVEL_CHOICES,

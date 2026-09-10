@@ -13,13 +13,10 @@ const ROUTES: Record<string, { title: string; description: string }> = {
     title: 'محصولات و نهاده‌های کشاورزی | گرین کود',
     description: 'مشاهده و مقایسه کود، سم، بذر و تجهیزات کشاورزی با موجودی و قیمت به‌روز.',
   },
-  '/marketplace': {
-    title: 'بازار کشاورزان و غرفه‌ها | گرین کود',
-    description: 'آگهی‌های کشاورزی و محصولات غرفه‌های بررسی‌شده را مشاهده کنید.',
-  },
+  // One entry for the marketplace: /marketplace only redirects here.
   '/storefronts': {
-    title: 'فهرست غرفه‌های کشاورزی | گرین کود',
-    description: 'غرفه‌های فروشندگان و کشاورزان عضو گرین کود را بررسی کنید.',
+    title: 'بازار غرفه‌داران و آگهی کشاورزان | گرین کود',
+    description: 'غرفه کشاورزان، تعاونی‌ها و تأمین‌کنندگان: آگهی‌های روز، محصولات پرفروش و پرتخفیف و پست‌های غرفه‌ها.',
   },
   '/services': {
     title: 'خدمات و مشاوره کشاورزی | گرین کود',
@@ -85,9 +82,16 @@ export default function RouteSeo() {
   const category = location.pathname === '/products'
     ? new URLSearchParams(location.search).get('category')
     : null;
+  // /privacy, /terms and /returns are short addresses the site hands out, and the
+  // legal hub serves the same text under /legal/<slug>. Two URLs for one document
+  // is fine as long as both name the same canonical copy — otherwise the crawler is
+  // handed two pages and asked to guess which one the site means.
+  const LEGAL_ALIAS = /^\/(privacy|terms|returns)$/;
   const canonicalPath = category
     ? `/products?category=${encodeURIComponent(category)}`
-    : location.pathname;
+    : LEGAL_ALIAS.test(location.pathname)
+      ? `/legal${location.pathname}`
+      : location.pathname;
   const canonical = `${siteUrl}${canonicalPath}`;
   const isPrivate = PRIVATE_PREFIXES.some((prefix) => location.pathname.startsWith(prefix));
 

@@ -193,7 +193,12 @@ export default function PostCard({
     <article className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm dark:border-emerald-900 dark:bg-emerald-950">
       {/* Author */}
       <header className="flex items-center gap-3 p-3">
-        <Link to={storeUrl} className="shrink-0">
+        {/* The avatar is a link whose only content is an image with an empty alt,
+            which is to say a link announced as "link" and nothing else. It goes to
+            the same place as the name beside it, so the fix is a name on this one,
+            not hiding it from the accessibility tree — a hidden focusable element is
+            a worse trap than a slightly repetitive label. */}
+        <Link to={storeUrl} className="shrink-0" aria-label={`غرفه ${post.storefront_name}`}>
           <span className="block h-10 w-10 overflow-hidden rounded-full bg-emerald-100 ring-2 ring-emerald-100 dark:ring-emerald-800">
             <img
               src={post.storefront_avatar_url || post.image_url}
@@ -214,7 +219,7 @@ export default function PostCard({
             )}
           </Link>
           {/* The handle: the غرفه's unique address, the stable identifier. */}
-          <p className="truncate text-fluid-2xs text-slate-400 dark:text-emerald-300">
+          <p className="truncate text-fluid-2xs text-slate-500 dark:text-emerald-300">
             <bdi>@{post.storefront_slug}</bdi> · {timeAgo(post.created_at)}
           </p>
         </div>

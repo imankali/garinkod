@@ -30,6 +30,7 @@ from .models import (
 from .attachments import validate_message_attachment
 from . import desk
 from .levels import may_contact_desk
+from .consultations import answer_open_consultation
 from .notifications import get_or_create_service_thread
 from .permissions import IsStorefrontOwnerOrReadOnly
 from .serializers import (
@@ -94,7 +95,10 @@ class StorefrontDirectoryViewSet(viewsets.ReadOnlyModelViewSet):
         queryset = (
             Storefront.objects
             .filter(is_active=True)
-            .select_related('user')
+            # ``account`` because the serializer reports whether the owner has
+            # declared the identity a storefront requires; joined rather than
+            # read per row, or the directory pays one query per card.
+            .select_related('user', 'user__account')
             .annotate(
                 followers_total=Count('followers', distinct=True),
                 listings_total=Count(
@@ -136,7 +140,13 @@ class StorefrontDirectoryViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=False, methods=['get'])
     def featured(self, request):
         """The handful of storefronts promoted on the home page."""
-        limit = min(int(request.query_params.get('limit', 5) or 5), 12)
+        # A hand-typed address must not raise: junk is the same as not asking,
+        # and the count is clamped so nobody can turn this into a full dump.
+        try:
+            limit = int(request.query_params.get('limit', 5) or 5)
+        except (TypeError, ValueError):
+            limit = 5
+        limit = max(1, min(limit, 12))
         storefronts = self.get_queryset()[:limit]
         return Response(self.get_serializer(storefronts, many=True).data)
 
@@ -392,6 +402,93 @@ class MessagePagination(PageNumberPagination):
     page_size = 40
     page_size_query_param = 'page_size'
     max_page_size = 100
+
+
+# The relations a thread row reads, joined once instead of per message. Keeping
+# it in one place is the point: the tail query and the plain query below must not
+# drift into two lists where one forgot ``post__storefront``.
+_THREAD_RELATIONS = (
+    'sender', 'sender__account', 'listing', 'listing__storefront',
+    'conversation', 'conversation__storefront',
+    'reply_to', 'reply_to__sender', 'reply_to__listing',
+    'land', 'land__owner', 'post', 'post__storefront', 'post__listing',
+)
+
+
+def _thread_messages(conversation):
+    """One thread, oldest first, with every relation the serializer reads joined."""
+    return (
+        conversation.messages.select_related(*_THREAD_RELATIONS)
+        .prefetch_related('sender__desk_profiles')
+        .order_by('created_at', 'id')
+    )
+
+
+def _thread_window(request):
+    """The tail window: how many newest rows to take, and before which message.
+
+    ``?page_size=N`` with no ``?page`` asks for the *tail* of the thread, because
+    plain pagination counts from the front — a long conversation would open on
+    its first weeks, with the part the reader actually wants unreachable.
+
+    ``?before_id=<message id>`` walks further back from there, one window at a
+    time, which is how a chat loads history without a page number for something
+    that keeps growing at the other end.
+
+    Returns ``(size, before_id)``; ``size`` is ``None`` for plain pagination.
+    """
+    raw = request.query_params.get('page_size')
+    before_raw = request.query_params.get('before_id')
+    try:
+        before_id = int(before_raw) if before_raw not in (None, '') else None
+    except (TypeError, ValueError):
+        before_id = None
+
+    if request.query_params.get('page'):
+        # An explicit page number is plain pagination; the two modes do not mix.
+        return None, before_id
+
+    try:
+        size = int(raw) if raw not in (None, '') else None
+    except (TypeError, ValueError):
+        size = None  # Junk is the same as not asking: keep the default behaviour.
+    if size is None and before_id is None:
+        return None, before_id
+    if size is None:
+        size = MessagePagination.page_size
+    return max(1, min(size, MessagePagination.max_page_size)), before_id
+
+
+def _tail_window(conversation, size, before_id):
+    """``(rows, older_available)`` for the newest ``size`` messages of a thread.
+
+    ``rows`` come back oldest-first, which is what a chat window renders; the
+    window itself is chosen from the newest end.
+    """
+    from django.db.models import Q
+
+    base = _thread_messages(conversation)
+    if before_id is not None:
+        anchor = base.filter(pk=before_id).first()
+        if anchor is not None:
+            # Same-timestamp ties are broken on the id, or two messages written
+            # in the same instant would either repeat or vanish at the boundary.
+            base = base.filter(Q(created_at__lt=anchor.created_at) | Q(
+                created_at=anchor.created_at, id__lt=anchor.id
+            ))
+        else:
+            # The anchor itself was deleted; ids only ever grow, so walking back
+            # from it still lands on the right slice.
+            base = base.filter(pk__lt=before_id)
+
+    total = base.count()
+    if total <= size:
+        return list(base), False
+    newest = list(
+        base.order_by('-created_at', '-id').values_list('id', flat=True)[:size]
+    )
+    rows = list(_thread_messages(conversation).filter(pk__in=newest))
+    return rows, True
 
 
 def _participant_conversations(user):
@@ -650,12 +747,6 @@ def conversation_messages(request, conversation_id):
             )
 
     if request.method == 'GET':
-        messages = conversation.messages.select_related(
-            'sender', 'sender__account', 'listing', 'listing__storefront',
-            'conversation', 'conversation__storefront',
-            'reply_to', 'reply_to__sender', 'reply_to__listing',
-            'land', 'land__owner',
-        ).prefetch_related('sender__desk_profiles').order_by('created_at')
         # Fetching a thread means the viewer has seen it: this is also what turns
         # the sender's green «sendane» tick into a read one.
         StorefrontMessage.objects.filter(conversation=conversation, is_read=False).exclude(
@@ -663,12 +754,25 @@ def conversation_messages(request, conversation_id):
         ).update(is_read=True)
         # For an operator, opening a thread is proof they are at their desk.
         desk.touch_presence(request.user)
-        paginator = MessagePagination()
-        page = paginator.paginate_queryset(messages, request)
         context = {'request': request}
-        response = paginator.get_paginated_response(
-            StorefrontMessageSerializer(page, many=True, context=context).data
-        )
+        size, before_id = _thread_window(request)
+        if size is None:
+            paginator = MessagePagination()
+            page = paginator.paginate_queryset(_thread_messages(conversation), request)
+            response = paginator.get_paginated_response(
+                StorefrontMessageSerializer(page, many=True, context=context).data
+            )
+        else:
+            rows, older = _tail_window(conversation, size, before_id)
+            response = Response({
+                # The thread's whole size, not the window's: the client shows
+                # «چند پیام قدیمی‌تر مانده» from the difference.
+                'count': conversation.messages.count(),
+                'next': None,
+                'previous': None,
+                'older_available': older,
+                'results': StorefrontMessageSerializer(rows, many=True, context=context).data,
+            })
         response.data['conversation'] = StorefrontConversationSerializer(
             conversation, context=context
         ).data
@@ -682,6 +786,21 @@ def conversation_messages(request, conversation_id):
         if listing.storefront_id != conversation.storefront_id:
             return Response(
                 {'error': 'محصول انتخابی متعلق به این غرفه نیست.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    # An «answer this question with a post» action sends the seller's answer
+    # itself, not only a sentence about it: the card travels with the message so
+    # the consultation stays auditable inside the thread. Validated against the
+    # thread's storefront for the same reason the listing above is — a caller
+    # must not be able to attach somebody else's post by guessing an id.
+    post = None
+    raw_post = request.data.get('post') or request.data.get('post_id')
+    if raw_post not in (None, ''):
+        post = StorefrontPost.objects.filter(pk=raw_post).select_related('storefront').first()
+        if post is None or post.storefront_id != conversation.storefront_id:
+            return Response(
+                {'error': 'پست انتخابی متعلق به این غرفه نیست.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -718,7 +837,7 @@ def conversation_messages(request, conversation_id):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-    if not body and listing is None and attachment is None and land is None:
+    if not body and listing is None and attachment is None and land is None and post is None:
         return Response(
             {'error': 'متن پیام، پیوست، محصول یا پرونده زمین الزامی است.'},
             status=status.HTTP_400_BAD_REQUEST,
@@ -745,7 +864,7 @@ def conversation_messages(request, conversation_id):
     is_customer = request.user.id == conversation.customer_id
     message = StorefrontMessage.objects.create(
         conversation=conversation, sender=request.user,
-        body=body[:2000], listing=listing, land=land,
+        body=body[:2000], listing=listing, land=land, post=post,
         attachment=attachment, attachment_type=attachment_type,
         attachment_duration=attachment_duration,
         reply_to=reply_to,
@@ -783,11 +902,19 @@ def conversation_messages(request, conversation_id):
         conversation.save(update_fields=['agent', 'updated_at'])
     else:
         conversation.save(update_fields=['updated_at'])
+    # A consultant answering inside the chat answers the ticket too — the farmer
+    # must not have to wait for someone to notice the queue, and the panel must
+    # not show «در انتظار پاسخ» under a question that has an answer above it.
+    answered_consultations = answer_open_consultation(message)
+
     context = {'request': request}
-    return Response(
+    response = Response(
         StorefrontMessageSerializer(message, context=context).data,
         status=status.HTTP_201_CREATED,
     )
+    if answered_consultations:
+        response.data['answered_consultations'] = answered_consultations
+    return response
 
 
 @documented_api

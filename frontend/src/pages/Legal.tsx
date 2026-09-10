@@ -155,7 +155,6 @@ export default function Legal() {
       <Helmet>
         <title>{document.title} | گرین کود</title>
         <meta name="description" content={document.summary} />
-        <link rel="canonical" href={`${window.location.origin}/legal/${document.slug}`} />
       </Helmet>
 
       <nav aria-label="بازگشت" className="mb-5">
@@ -177,7 +176,7 @@ export default function Legal() {
         </h1>
         <p className="mt-3 text-fluid-sm leading-7 text-slate-500 dark:text-emerald-200">{document.summary}</p>
 
-        <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-fluid-2xs text-slate-400 dark:text-emerald-300/80">
+        <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-fluid-2xs text-slate-500 dark:text-emerald-300/80">
           <span>{review}</span>
           {hub?.version && (
             <span
@@ -313,7 +312,7 @@ export default function Legal() {
               <div className="mt-2 space-y-3">
                 {hub.groups.map((group) => (
                   <div key={group.id}>
-                    <p className="text-fluid-2xs font-bold text-slate-400 dark:text-emerald-300/80">{group.label}</p>
+                    <p className="text-fluid-2xs font-bold text-slate-500 dark:text-emerald-300/80">{group.label}</p>
                     <div className="mt-1 flex flex-col">
                       {group.items.map((item) => (
                         <Link

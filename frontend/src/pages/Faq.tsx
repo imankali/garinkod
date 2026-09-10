@@ -53,7 +53,6 @@ export default function Faq() {
           name="description"
           content={data?.seo_description || 'پاسخ کوتاه به پرسش‌های رایج خرید نهاده‌های کشاورزی'}
         />
-        <link rel="canonical" href="/faq" />
         {flat.length > 0 && (
           <script type="application/ld+json">
             {JSON.stringify({

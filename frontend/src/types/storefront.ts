@@ -30,6 +30,10 @@ export interface Storefront {
   has_unseen_stories: boolean;
   owner_name: string;
   created_at: string;
+  /** The masked code the owner's account carries; the full one never leaves. */
+  owner_national_id_masked?: string;
+  /** Whether the owner has declared a name and a national code. */
+  profile_complete?: boolean;
 }
 
 export interface StorefrontHighlightItem {
@@ -101,6 +105,19 @@ export interface MarketplaceListing {
   discounted_price: number;
   rejection_reason: string;
   reviewed_at: string | null;
+  /** The catalogue's own department and sub-department, as slugs plus labels. */
+  category?: string | null;
+  category_name?: string;
+  subcategory?: string | null;
+  subcategory_name?: string;
+  /** What the card prints where a product card prints its department. */
+  category_label?: string;
+  brand?: string;
+  brand_slug?: string;
+  package_size?: string;
+  /** Stock (an on-hand bag) and a fresh harvest are different promises. */
+  is_stock?: boolean;
+  views?: number;
   /** Optional spec rows the seller can publish with the آگهی. */
   attributes?: ProductAttribute[];
   created_at: string;

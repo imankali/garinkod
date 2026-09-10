@@ -19,6 +19,7 @@ from rest_framework.decorators import api_view, permission_classes, throttle_cla
 from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema
 
+from .consultations import mirror_answer_in_thread, open_consultation_thread
 from .models import (
     FarmCalendarEvent, FarmConsultationRequest, FarmLand, UserAccount,
     account_level,
@@ -166,10 +167,13 @@ def my_consultations(request):
     serializer = FarmConsultationRequestSerializer(data=request.data, context={'request': request})
     serializer.is_valid(raise_exception=True)
     consultation = serializer.save(farmer=request.user)
-    return Response(
-        FarmConsultationRequestSerializer(consultation, context={'request': request}).data,
-        status=status.HTTP_201_CREATED,
-    )
+    # Filing the request also opens the chat with the consulting desk, so the
+    # farmer can keep asking follow-ups in the messenger and the consultant can
+    # answer from either room. See shop/consultations.py.
+    conversation_id = open_consultation_thread(consultation)
+    data = FarmConsultationRequestSerializer(consultation, context={'request': request}).data
+    data['conversation_id'] = conversation_id
+    return Response(data, status=status.HTTP_201_CREATED)
 
 
 # ============================================================
@@ -229,6 +233,10 @@ def consulting_reply(request, consultation_id):
         consultation.status = 'answered'
     consultation.replied_by = request.user
     consultation.save(update_fields=['reply', 'status', 'replied_by', 'updated_at'])
+    # The answer has to reach the farmer where they read messages, not only where
+    # the ticket was filed; the reverse direction (a reply typed in the chat) is
+    # handled in marketplace_views.conversation_messages.
+    mirror_answer_in_thread(consultation, reply, author=request.user)
     return Response(
         FarmConsultationRequestSerializer(consultation, context={'request': request}).data
     )
