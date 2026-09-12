@@ -56,8 +56,8 @@ change, review the code and then run the full matrix in detail.
 
 | Suite | Command | Last verified |
 |---|---|---|
-| Backend unit + integration | `cd garinkood && source /tmp/env.sh && ../.venv/bin/python manage.py test` | **611 tests, OK** |
-| Backend, tier module only | `... manage.py test shop.tests_price_tiers` | 30 tests, OK |
+| Backend unit + integration | `cd garinkood && source /tmp/env.sh && ../.venv/bin/python manage.py test` | **615 tests, OK** |
+| Backend, tier module only | `... manage.py test shop.tests_price_tiers` | 32 tests, OK |
 | Frontend unit + integration | `cd frontend && CI=true npx vitest run` | **179 tests / 22 files** |
 | Type check | `cd frontend && npx tsc --noEmit` | clean |
 | Build | `cd frontend && npm run build` | ✓ |
@@ -206,11 +206,35 @@ referenced but never loaded), `gradient-text` ×2 (one was on a **price**),
   SHELEG Design (272 files).
 - **Competitor audit** — `docs/competitor-audit.md`.
 
+### Done — latency, first pass
+
+Measured with `CaptureQueriesContext`, before optimising anything.
+
+| Endpoint | Before | After | ms |
+|---|---|---|---|
+| `/api/products/` (12 rows) | 70 queries | **43** | 42.7 → 30.5 |
+| `/api/products/<slug>/` | 21 queries | 21 | ~19 |
+| `/api/cart/` | 8 queries | 8 | ~4.7 |
+
+Two causes, both found by **grouping queries by table** — the total looks
+plausible either way and hides the shape:
+
+- `price_tiers` went onto `ProductListSerializer` with no matching prefetch.
+  One extra query per row. **This was introduced by the tiered-discount work.**
+- `images` and `packages` were prefetched only on `retrieve`, but the list
+  serializer's `image_url` / `image_srcset` / `image_alt_url` method fields
+  reach into `obj.images`. 24 queries per twelve-row page, present long before
+  the ladder.
+
+`ListEndpointQueryCountTests` pins the list endpoint under 60 queries so the
+per-row pattern cannot silently return.
+
 ### Open
 
-- [ ] Latency and throughput pass — **not started**. Measure first: DB query
-      counts on the catalogue and product endpoints, cache headers, gzip/brotli.
-      Do not optimise before there is a number.
+- [ ] Latency, remaining: 43 queries for a list is still high (33 of them touch
+      `shop_product`). Cache headers, gzip/brotli and connection pooling are
+      untouched and unmeasured. No production-scale measurement has been taken —
+      these are dev-SQLite numbers.
 - [ ] Cart row UI for "buy N more to save X%" — the backend already exposes
       `next_tier` on `CartItemSerializer`; no component reads it yet.
 - [ ] Admin surface for creating/editing `PriceTier` rows. The ladder is

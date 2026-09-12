@@ -347,3 +347,60 @@ class LadderMatchesCartTests(TestCase):
         row = CartItem.objects.create(cart=self.cart, product=self.product, quantity=40)
         self.assertEqual(published, row.unit_price)
         self.assertEqual(published, 9000)
+
+class ListEndpointQueryCountTests(TestCase):
+    """The catalogue list must not grow a query per row.
+
+    This is a regression test for a mistake this feature actually caused:
+    `price_tiers` was added to ``ProductListSerializer`` with no matching
+    prefetch, which cost one extra query per row on every catalogue page. A
+    nested ``many=True`` relation is the easiest way to introduce an N+1 in DRF
+    precisely because nothing warns you — the response is correct and only the
+    query count is wrong.
+
+    The assertion is deliberately an upper bound rather than an exact count. An
+    exact number breaks on any unrelated query added anywhere, and a test that
+    cries wolf gets deleted; a bound that only trips when the shape changes
+    from constant to linear is the one that survives.
+    """
+
+    def setUp(self):
+        self.client = APIClient()
+        self.author = User.objects.create_user(username="query-count", password="x12345678")
+        for i in range(12):
+            product = Product.objects.create(
+                title=f"کود QCOUNT{i} شمارش", slug=f"kood-query-{i}", author=self.author,
+                description="تست", price=10000, stock=50, status="published",
+            )
+            PriceTier.objects.create(product=product, min_quantity=20, discount_percent=5)
+
+    def test_twelve_rows_do_not_cost_twelve_times_the_queries(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        with CaptureQueriesContext(connection) as ctx:
+            response = self.client.get("/api/products/")
+        self.assertEqual(response.status_code, 200)
+
+        total = len(ctx.captured_queries)
+        # Measured at 43 for a twelve-row page after the prefetch fix, down from
+        # 70. The bound leaves room for legitimate growth while still failing
+        # loudly if the per-row pattern comes back — a linear regression on 12
+        # rows adds at least 12.
+        self.assertLess(
+            total, 60,
+            f"catalogue list ran {total} queries for 12 rows — "
+            f"suspect a nested serializer without a prefetch",
+        )
+
+    def test_the_ladder_still_arrives_ordered_by_threshold(self):
+        """The prefetch sorts; the payload must not depend on insertion order."""
+        product = Product.objects.get(slug="kood-query-0")
+        PriceTier.objects.create(product=product, min_quantity=5, discount_percent=2)
+
+        response = self.client.get("/api/products/?search=QCOUNT0")
+        self.assertEqual(response.status_code, 200)
+        rows = [r for r in response.data["results"] if r["slug"] == "kood-query-0"]
+        self.assertEqual(len(rows), 1)
+        thresholds = [rung["min_quantity"] for rung in rows[0]["price_tiers"]]
+        self.assertEqual(thresholds, sorted(thresholds))

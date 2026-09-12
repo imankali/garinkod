@@ -32,7 +32,7 @@ from .filters import ProductFilter
 from .listing_filters import apply_listing_filters, category_facet_rows, csv_values, facet_rows
 from .search import ResilientProductSearchFilter
 from .models import (
-    Category, Product, Comment, UserAccount, Cart, CartItem, Order, OrderItem,
+    Category, Product, Comment, UserAccount, Cart, CartItem, Order, OrderItem, PriceTier,
     ProductPackage, ProductImage, Tag, CommentVote, ReturnPolicySettings,
     CapacitySettings, PresenceBeat,
     ServiceRequest, ProcurementRequest, Storefront, MarketplaceListing,
@@ -417,18 +417,48 @@ class ProductViewSet(viewsets.ReadOnlyModelViewSet):
                 reviews_count=Count('comments', filter=review_rows, distinct=True),
             )
         )
+        # Ordered so the ladder reads top-to-bottom in one pass, and filtered to
+        # the three columns the serializer actually emits. Shared by both
+        # branches: a ladder that sorts differently on the detail page than on
+        # the card is the kind of inconsistency nobody notices until a buyer
+        # complains the two pages disagree.
+        price_tier_prefetch = Prefetch(
+            'price_tiers',
+            queryset=PriceTier.objects.only(
+                'id', 'product_id', 'listing_id', 'min_quantity', 'discount_percent',
+            ).order_by('min_quantity'),
+        )
+
         if self.action == 'retrieve':
             # The detail page renders the spec table, the gallery and the package
             # picker; prefetch all three instead of one query per row.
             queryset = queryset.prefetch_related(
                 Prefetch('images', queryset=ProductImage.objects.only('image', 'caption', 'order')),
-                'packages', 'tags', 'attributes',
+                'packages', 'tags', 'attributes', price_tier_prefetch,
             )
         else:
             # The LIST serializer embeds each card's tags
             # (ProductListSerializer.tags) — without this prefetch that is
             # one M2M query PER ROW on every catalogue page.
-            queryset = queryset.prefetch_related('tags')
+            #
+            # `price_tiers` is here for exactly the same reason, and it is worth
+            # naming the mistake: the ladder was added to ProductListSerializer
+            # without a matching prefetch, which silently cost one extra query
+            # per row on every catalogue page. A nested `many=True` relation is
+            # the easiest way to add an N+1 in DRF, because nothing warns you.
+            #
+            # `images` and `packages` were the bigger half of the same problem
+            # and had been there longer: `image_url`, `image_srcset` and
+            # `image_alt_url` are SerializerMethodFields that reach into
+            # `obj.images`, and the packaging badge reads `obj.packages`, so a
+            # twelve-row page was firing 24 queries that one prefetch removes.
+            # Measured by counting queries grouped by table, which is the only
+            # way to see this — the total looks plausible either way.
+            queryset = queryset.prefetch_related(
+                'tags', 'packages',
+                Prefetch('images', queryset=ProductImage.objects.only('image', 'caption', 'order')),
+                price_tier_prefetch,
+            )
         return queryset
 
     def get_serializer_class(self):
