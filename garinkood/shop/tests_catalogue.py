@@ -125,9 +125,14 @@ class PackagingTests(TestCase):
         cart = self.client.get('/api/cart/').data
         self.assertEqual(len(cart['items']), 2)
         by_label = {row['package_label']: row for row in cart['items']}
-        self.assertEqual(by_label['کیسه ۲۵ کیلویی']['unit_price'], 1_500_000)
-        self.assertEqual(by_label['فله']['unit_price'], 70_000)
-        self.assertEqual(cart['total_price'], 1_500_000 + 3 * 70_000)
+        # Priced from each package's own advertised figure, not the product's:
+        # that separation is the subject of this test. `discounted_price` rather
+        # than `price` because the fixture product is 10% off and the cart must
+        # charge what the catalogue page shows.
+        self.assertEqual(by_label['کیسه ۲۵ کیلویی']['unit_price'], bag.discounted_price)
+        self.assertEqual(by_label['فله']['unit_price'], loose.discounted_price)
+        self.assertEqual(bag.discounted_price, 1_350_000)
+        self.assertEqual(cart['total_price'], bag.discounted_price + 3 * loose.discounted_price)
 
     def test_cart_enforces_the_package_minimum_and_its_own_stock(self):
         package = ProductPackage.objects.create(
@@ -183,8 +188,10 @@ class PackagingTests(TestCase):
         self.assertEqual(response.status_code, 201, response.content.decode())
 
         lines = {line.package_label: line for line in OrderItem.objects.filter(order_id=response.data['order']['id'])}
-        self.assertEqual(lines['کیسه ۵۰ کیلویی'].unit_price, 2_000_000)
-        self.assertEqual(lines['فله'].unit_price, 40_000)
+        # The order line carries the price the buyer was actually charged.
+        self.assertEqual(lines['کیسه ۵۰ کیلویی'].unit_price, package.discounted_price)
+        self.assertEqual(lines['فله'].unit_price, inherits.discounted_price)
+        self.assertEqual(lines['کیسه ۵۰ کیلویی'].unit_price, 1_800_000)
 
         package.refresh_from_db()
         inherits.refresh_from_db()

@@ -1257,7 +1257,11 @@ def checkout(request):
                     storefront_name=storefront.name,
                     storefront_slug=storefront.slug,
                     unit=listing.unit,
-                    unit_price=listing.price,
+                    # The advertised price, matching what the cart charged. This
+                    # line is what the seller's payout and the commission are
+                    # both computed from, so recording the raw price here would
+                    # overstate the commission on every discounted listing.
+                    unit_price=item.unit_price,
                     quantity=item.quantity,
                     commission_rate=commission_rate,
                     commission_amount=int(line_total * commission_rate / 100),

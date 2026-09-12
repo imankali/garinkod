@@ -14,7 +14,9 @@ from django.db import IntegrityError, transaction
 from django.test import TestCase
 from rest_framework.test import APIClient
 
-from .models import Cart, CartItem, MarketplaceListing, PriceTier, Product, Storefront
+from .models import (
+    Cart, CartItem, MarketplaceListing, PriceTier, Product, ProductPackage, Storefront,
+)
 from .models.catalog import best_price_tier, tiered_price
 
 User = get_user_model()
@@ -125,14 +127,21 @@ class CartTierPricingTests(TestCase):
         self.assertEqual(row.unit_price, 850)
         self.assertEqual(row.total_price, 20 * 850)
 
-    def test_the_ladder_does_not_compound_with_the_display_discount(self):
-        # `discount_percent` is a separate, display-only field. A ladder that also
-        # swallowed it would silently discount twice and the two would drift
-        # apart the moment either was edited.
+    def test_the_two_discounts_stack_in_a_defined_order(self):
+        # Both discounts apply, but in a fixed sequence rather than whichever
+        # order the code happens to evaluate them: the site-wide
+        # `discount_percent` first, then the quantity ladder off the result.
+        #
+        # That order is the one the buyer reads — "20% off, and 40 of them is
+        # cheaper again" — and it is also the cheaper of the two readings, which
+        # is the direction a pricing ambiguity should always resolve in. It is
+        # pinned here because the reverse order gives a different number and
+        # nothing else in the system would notice the swap.
         self.product.discount_percent = 10
         self.product.save(update_fields=["discount_percent"])
         row = self._row(20)
-        self.assertEqual(row.unit_price, 850)
+        self.assertEqual(row.base_unit_price, 900)   # 1000 - 10%
+        self.assertEqual(row.unit_price, 765)        # 900 - 15%
 
     def test_the_next_rung_is_named_so_the_cart_can_ask_for_it(self):
         row = self._row(5)
@@ -217,3 +226,81 @@ class TierApiTests(TestCase):
         )
         response = APIClient().get(f"/api/products/{plain.slug}/")
         self.assertEqual(response.data["price_tiers"], [])
+
+class DiscountAtCheckoutTests(TestCase):
+    """The site-wide `discount_percent` must reach the cart.
+
+    It was advertised on the product page, on the product card and in three
+    serializers, and then ignored at checkout: `unit_price` read the raw
+    `price` field. A buyer shown «۲۰٪ تخفیف» paid full price. These tests exist
+    so the two paths cannot drift apart again — every screen that shows a price
+    and the cart that charges it now read the same property.
+    """
+
+    def setUp(self):
+        self.author = User.objects.create_user(username="discount-author", password="x12345678")
+        self.cart = Cart.objects.create(user=self.author)
+
+    def _product(self, **kwargs):
+        defaults = dict(
+            title="کود تخفیف‌دار", slug="kood-discounted", author=self.author,
+            description="تست", price=10000, stock=100, status="published",
+        )
+        defaults.update(kwargs)
+        return Product.objects.create(**defaults)
+
+    def test_a_discounted_product_is_charged_at_its_advertised_price(self):
+        product = self._product(discount_percent=20)
+        item = CartItem.objects.create(cart=self.cart, product=product, quantity=3)
+
+        self.assertEqual(item.base_unit_price, 8000)
+        self.assertEqual(item.unit_price, 8000)
+        self.assertEqual(item.total_price, 24000)
+
+    def test_the_cart_charges_what_the_product_page_shows(self):
+        """The exact regression: two properties, two different numbers."""
+        product = self._product(discount_percent=15)
+        item = CartItem.objects.create(cart=self.cart, product=product, quantity=1)
+
+        self.assertEqual(item.unit_price, product.discounted_price)
+
+    def test_an_undiscounted_product_is_untouched(self):
+        product = self._product()
+        item = CartItem.objects.create(cart=self.cart, product=product, quantity=2)
+        self.assertEqual(item.unit_price, 10000)
+
+    def test_discount_then_ladder_in_the_order_the_buyer_reads_them(self):
+        """20% off, then 40+ is 10% off that — not 30% off the raw price."""
+        product = self._product(discount_percent=20)
+        PriceTier.objects.create(product=product, min_quantity=40, discount_percent=10)
+        item = CartItem.objects.create(cart=self.cart, product=product, quantity=40)
+
+        self.assertEqual(item.base_unit_price, 8000)   # 10000 - 20%
+        self.assertEqual(item.unit_price, 7200)        # 8000 - 10%
+        self.assertEqual(item.total_price, 40 * 7200)
+
+    def test_a_packaging_row_gets_the_discount_too(self):
+        product = self._product(discount_percent=20)
+        package = ProductPackage.objects.create(
+            product=product, label="کیسه ۲۵ کیلویی",
+            weight_kg=25, price=240000, stock=10,
+        )
+        item = CartItem.objects.create(cart=self.cart, product=product,
+                                       product_package=package, quantity=1)
+        self.assertEqual(item.unit_price, 192000)
+
+    def test_a_discounted_marketplace_listing_is_charged_at_its_advertised_price(self):
+        storefront = Storefront.objects.create(user=self.author, name="غرفه", slug="ghorfe-disc")
+        listing = MarketplaceListing.objects.create(
+            storefront=storefront, title="بذر", slug="bazr-disc", crop_name="گوجه",
+            price=5000, discount_percent=10, quantity_available=100, status="published",
+        )
+        item = CartItem.objects.create(cart=self.cart, listing=listing, quantity=2)
+        self.assertEqual(item.unit_price, 4500)
+        self.assertEqual(item.total_price, 9000)
+
+    def test_rounding_stays_on_the_buyer_s_side(self):
+        """A price that does not divide evenly must round down, not up."""
+        product = self._product(price=9999, discount_percent=33)
+        item = CartItem.objects.create(cart=self.cart, product=product, quantity=1)
+        self.assertEqual(item.unit_price, 6699)  # 9999 * 0.67 = 6699.33

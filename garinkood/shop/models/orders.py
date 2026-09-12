@@ -125,12 +125,27 @@ class CartItem(models.Model):
 
     @property
     def base_unit_price(self) -> int:
-        """The row's price before any quantity ladder."""
+        """The row's price before any quantity ladder.
+
+        This is the *discounted* price — the number the catalogue page, the
+        product card and the storefront all show as the price. Until it was,
+        the site advertised `discount_percent` everywhere and charged the raw
+        `price` at checkout, so a buyer told «۲۰٪ تخفیف» paid full price the
+        moment they added to cart. Every screen that shows a price goes through
+        `discounted_price`; charging through a different path is what let the
+        two disagree for as long as they did.
+
+        Order of operations, deliberately: the site-wide discount lands first,
+        then the quantity ladder comes off that. That is the order a buyer
+        reads them in — "this is 20% off, and 40 of them is cheaper again" —
+        and it is the cheaper reading for them, which is the direction a
+        pricing ambiguity should always resolve in.
+        """
         if self.listing_id:
-            return int(self.listing.price or 0)
+            return int(self.listing.discounted_price or 0)
         if self.product_package_id:
-            return int(self.product_package.effective_price or 0)
-        return int(self.product.price or 0)
+            return int(self.product_package.discounted_price or 0)
+        return int(self.product.discounted_price or 0)
 
     @property
     def price_tiers(self):
@@ -159,9 +174,10 @@ class CartItem(models.Model):
 
     @property
     def unit_price(self) -> int:
-        # The ladder comes off the price the row already charges, so a product
-        # with no tiers is priced exactly as before — the feature is additive and
-        # cannot silently move an existing order total.
+        # Two discounts, one after the other: the site-wide `discount_percent`
+        # is already folded into `base_unit_price`, and the quantity ladder then
+        # comes off that. A row with neither is priced exactly as it was priced
+        # before either feature existed.
         return tiered_price(self.base_unit_price, self.price_tiers, self.quantity)
 
     @property
