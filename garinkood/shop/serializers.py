@@ -182,10 +182,23 @@ class PriceTierSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PriceTier
-        fields = ['min_quantity', 'discount_percent', 'unit_price']
+        fields = ['id', 'min_quantity', 'discount_percent', 'unit_price']
 
     def get_unit_price(self, obj) -> int:
-        base = obj.product.price if obj.product_id else (obj.listing.price or 0)
+        """The price this rung actually charges.
+
+        This must stay identical to what ``CartItem.unit_price`` computes, and
+        it very nearly was not: an earlier version read the raw ``price`` field
+        here while the cart applied the rung to ``discounted_price``. The ladder
+        table would then have promised one number and the checkout charged
+        another — the precise bug the cart itself was only just fixed of, and
+        the worse version of it, because a ladder that lies is worse than no
+        ladder at all.
+
+        Reading ``discounted_price`` is what keeps the two in step: it is the
+        same property the product page, the product card and the cart all read.
+        """
+        base = obj.product.discounted_price if obj.product_id else (obj.listing.discounted_price or 0)
         return max(int(int(base or 0) * (100 - obj.discount_percent) / 100), 0)
 
 

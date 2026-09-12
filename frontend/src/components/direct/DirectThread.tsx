@@ -1270,10 +1270,21 @@ function ComposerBanner({
     >
       <div
         className={cn(
-          'mb-2 flex items-center gap-2 rounded-xl border-s-4 px-3 py-2',
+          // A hairline ring instead of a 4px accent bar on the inline start.
+          //
+          // The tone is already carried twice here — by the icon and by the
+          // tinted background — so the thick bar was a third way of saying the
+          // same thing, and the loudest of the three. It also sat awkwardly in
+          // RTL: a start-edge border puts the bar on the right, which is where
+          // the icon already is, so the leading edge carried two accents at once.
+          //
+          // (This comment deliberately does not spell the Tailwind class name it
+          // is describing: the design linter scans text, not the class list, and
+          // naming it here re-triggers the very rule the change was made for.)
+          'mb-2 flex items-center gap-2 rounded-xl border px-3 py-2',
           tone === 'amber'
-            ? 'border-amber-400 bg-amber-50 dark:bg-amber-950/30'
-            : 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/40',
+            ? 'border-amber-200 bg-amber-50 dark:border-amber-900/60 dark:bg-amber-950/30'
+            : 'border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-900/40',
         )}
       >
         <span

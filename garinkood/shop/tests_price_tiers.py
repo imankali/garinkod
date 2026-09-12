@@ -304,3 +304,46 @@ class DiscountAtCheckoutTests(TestCase):
         product = self._product(price=9999, discount_percent=33)
         item = CartItem.objects.create(cart=self.cart, product=product, quantity=1)
         self.assertEqual(item.unit_price, 6699)  # 9999 * 0.67 = 6699.33
+
+class LadderMatchesCartTests(TestCase):
+    """The ladder the buyer is shown must equal the price the cart charges.
+
+    These are two different code paths — a serializer method and a model
+    property — computing the same number. When they disagree the buyer is shown
+    one price and charged another, which is the failure this whole feature must
+    not introduce. Both bugs found during this work were exactly that: one path
+    read `price`, the other read `discounted_price`.
+    """
+
+    def setUp(self):
+        self.author = User.objects.create_user(username="ladder-match", password="x12345678")
+        self.cart = Cart.objects.create(user=self.author)
+        self.product = Product.objects.create(
+            title="کود نردبان", slug="kood-ladder-match", author=self.author,
+            description="تست", price=10000, discount_percent=20, stock=500,
+            status="published",
+        )
+        self.rung = PriceTier.objects.create(
+            product=self.product, min_quantity=40, discount_percent=10,
+        )
+
+    def test_the_published_rung_price_equals_what_the_cart_charges(self):
+        from .serializers import PriceTierSerializer
+
+        published = PriceTierSerializer(self.rung).data["unit_price"]
+        row = CartItem.objects.create(cart=self.cart, product=self.product, quantity=40)
+
+        self.assertEqual(published, row.unit_price)
+        self.assertEqual(published, 7200)  # 10000 - 20%, then - 10%
+
+    def test_the_undiscounted_case_also_agrees(self):
+        """Guard the guard: with no site discount the two paths still match."""
+        from .serializers import PriceTierSerializer
+
+        self.product.discount_percent = 0
+        self.product.save(update_fields=["discount_percent"])
+
+        published = PriceTierSerializer(self.rung).data["unit_price"]
+        row = CartItem.objects.create(cart=self.cart, product=self.product, quantity=40)
+        self.assertEqual(published, row.unit_price)
+        self.assertEqual(published, 9000)

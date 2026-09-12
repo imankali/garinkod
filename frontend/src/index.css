@@ -100,8 +100,22 @@
   box-sizing: border-box;
 }
 
+/*
+ * Latin text falls back to the system UI stack rather than naming a webfont.
+ *
+ * This used to request Inter, which was never actually loaded — index.html only
+ * fetches Vazirmatn — so the declaration did nothing except make the CSS claim
+ * a typeface the site does not ship. Naming a font you do not serve is worse
+ * than naming none: it hides the fact that nothing is deciding, and it is the
+ * first thing to check when "the font looks different on my machine".
+ *
+ * The system stack is also the right answer here on the merits. Latin appears
+ * on this site as digits, brand names and NPK codes, all inside a Vazirmatn
+ * Persian page; a second downloaded typeface for that is a blocking request
+ * buying nothing.
+ */
 html[lang="en"] *, html[lang="en"] body {
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 html[dir="ltr"] .rtl-only {
@@ -152,13 +166,23 @@ body {
   background: linear-gradient(90deg, var(--brand-green), var(--brand-lime));
 }
 
+/*
+ * Brand-green text. This was a moving gradient clipped to the glyphs, which
+ * failed on the two counts that matter rather than on taste:
+ *
+ *   - `color: transparent` means the glyphs have no colour of their own, so the
+ *     contrast ratio depends on wherever the gradient happens to be at that
+ *     instant. On a light background the lime end of this ramp falls well under
+ *     4.5:1, and it fails differently at each frame — so no single audit can
+ *     even catch it.
+ *   - It was applied to a price. The one number on the page a buyer must read
+ *     correctly is the worst possible place for text whose legibility changes
+ *     four times a second.
+ *
+ * A static, opaque brand colour keeps the identity and can be measured.
+ */
 .text-brand-gradient {
-  background: linear-gradient(90deg, var(--brand-green), var(--brand-lime), var(--brand-green));
-  background-size: 200% auto;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: gradient-shift 4s ease infinite;
+  color: var(--brand-green);
 }
 
 .bg-brand-cream {
@@ -173,23 +197,23 @@ body {
   background-color: var(--brand-orange);
 }
 
+/*
+ * The logo wordmark keeps its gradient — on a brand mark, in a fixed position,
+ * against a known background, a gradient is a legitimate identity choice and it
+ * is the one place `background-clip: text` earns its keep. What it lost is the
+ * `animation`: the word "گرین" no longer drifts, and the glyph colour no longer
+ * depends on a timer.
+ */
 .text-gradient-green {
-  background: linear-gradient(90deg, #10b981, #84cc16, #10b981);
-  background-size: 200% auto;
+  background: linear-gradient(90deg, #10b981, #84cc16);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  animation: gradient-shift 4s ease infinite;
 }
 
-.text-gradient-purple {
-  background: linear-gradient(90deg, #8b5cf6, #ec4899, #8b5cf6);
-  background-size: 200% auto;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: gradient-shift 4s ease infinite;
-}
+/* `.text-gradient-purple` removed: it had no callers, and a violet-to-pink
+   gradient is the single most recognisable default palette in generated UI.
+   Dead code that also advertises "nobody designed this" is worth deleting. */
 
 /* ========================================
  * 5. Custom Scrollbar
@@ -657,15 +681,16 @@ input[type="range"]::-moz-range-thumb {
   animation: wave 3s ease-in-out infinite;
 }
 
-/* Bounce Soft */
-@keyframes bounce-soft {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-8px); }
-}
-
-.animate-bounce-soft {
-  animation: bounce-soft 2s ease-in-out infinite;
-}
+/*
+ * `bounce-soft` removed. It had no callers.
+ *
+ * It was also the wrong motion on its merits: a symmetric up-and-down loop on a
+ * 2s timer is an attention grabber that never resolves, which is why OS-level
+ * reduced-motion guidance treats indefinite looping motion as a hazard rather
+ * than a style. Anything that needs a "look here" pulse should be finite and
+ * should stop; `glow-pulse` below is the one that survived, and it is finite in
+ * the places it is used.
+ */
 
 /* Glow Pulse */
 @keyframes glow-pulse {

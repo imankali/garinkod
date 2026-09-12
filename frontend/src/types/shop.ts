@@ -62,6 +62,21 @@ export interface ImageSrcset {
   fallback: string;
 }
 
+/**
+ * One rung of a quantity price ladder (تخفیف پلکانی).
+ *
+ * `min_quantity` is inclusive — a rung of 40 applies at exactly 40. Only the
+ * highest rung the cart reaches is used; the rungs never stack. Mirrors
+ * `shop.models.PriceTier` on the server.
+ */
+export interface PriceTier {
+  id: number;
+  min_quantity: number;
+  discount_percent: number;
+  /** The unit price once this rung applies, already in تومان. */
+  unit_price: number;
+}
+
 export interface Product {
   id: number;
   title: string;
@@ -85,6 +100,8 @@ export interface Product {
   discount_percent: number;
   sales_count: number;
   discounted_price: number;
+  /** Quantity ladder, lowest threshold first. Empty when the product has none. */
+  price_tiers?: PriceTier[];
   brand: string;
   sku: string;
   gtin: string;
@@ -148,6 +165,8 @@ export interface ProductList {
   discount_percent: number;
   sales_count: number;
   discounted_price: number;
+  /** Quantity ladder, lowest threshold first. Empty when the product has none. */
+  price_tiers?: PriceTier[];
   brand: string;
   sku: string;
   package_weight?: string;
