@@ -10,6 +10,38 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/*
+ * Palette corrections.
+ *
+ * Tailwind's defaults are picked for a design system, not for this site's
+ * surfaces, and two of them fail WCAG 2.2 AA here. Both are fixed at the token
+ * rather than at 400 call sites, because the alternative is a sweep that the
+ * next restyle quietly undoes.
+ *
+ * emerald-600 is the brand action colour: every primary button, and the text
+ * colour of a lot of emphasis. Tailwind's `oklch(59.6% 0.145 163.225)` is
+ * #059669, which measures 3.77:1 against white — under AA's 4.5:1 for text and
+ * under 3:1 only for large text and UI components. #047857 is 5.48:1 in both
+ * directions (white on it, and it on white), still unmistakably the same green,
+ * and it fixes the ~143 buttons and ~99 text accents in one line.
+ *
+ * slate-400 is the muted-text token, 2.56:1 on white — barely above the 1.5:1
+ * where text stops being legible at all. It cannot simply be darkened: the same
+ * utility is used on the dark surfaces too, where the stock value measures
+ * 6.96:1 and a darkened one would fall to 3.92:1. So the token is corrected per
+ * surface, which is what Tailwind v4's variables are for: #67778f clears AA on
+ * white (4.55:1) and the stock value is restored under `.dark` (6.96:1 on
+ * slate-900). Neither mode loses anything.
+ */
+@theme {
+  --color-emerald-600: #047857;
+  --color-slate-400: #67778f;
+}
+
+.dark {
+  --color-slate-400: #94a3b8;
+}
+
 /* ========================================
  * 2. CSS Custom Properties (Design Tokens)
  * ======================================== */
@@ -36,8 +68,16 @@
   --tap-min: 44px;
 
   /* Fluid type scale: each step interpolates between a 320px phone and a
-     1440px desktop, so text never needs a breakpoint to stay readable. */
-  --text-2xs: clamp(0.6875rem, 0.66rem + 0.14vw, 0.75rem);
+     1440px desktop, so text never needs a breakpoint to stay readable.
+
+     The smallest step is floored at 12px on purpose. It used to start at
+     0.6875rem, which measured 11.09px on a 375px phone — under the suite's own
+     "body text is at least 12px" rule and under the size Persian script stays
+     readable at, since Vazirmatn's x-height gives it less room than a Latin
+     face of the same nominal size. That makes this step and --text-xs meet at
+     12px: there is no room for two distinct steps below the floor, and a scale
+     that keeps a step nobody can read is not a scale, it is a bug. */
+  --text-2xs: clamp(0.75rem, 0.72rem + 0.16vw, 0.8125rem);
   --text-xs:  clamp(0.75rem, 0.72rem + 0.15vw, 0.8125rem);
   --text-sm:  clamp(0.8125rem, 0.78rem + 0.17vw, 0.875rem);
   --text-base: clamp(0.9375rem, 0.9rem + 0.19vw, 1rem);
@@ -314,6 +354,32 @@ button, a, input, select, textarea {
   min-height: var(--tap-min);
   width: 100%;
   height: 100%;
+}
+
+/*
+ * A control the markup has already declared a tap target gets one in *both*
+ * axes, in pixels.
+ *
+ * Two gaps closed at once. First, `min-h-11` is 2.75rem, so the minimum was
+ * only 44px by coincidence of a 16px root; anchor it to `--tap-min` and the
+ * guarantee no longer depends on the type scale. Second — and this is the one
+ * that was actually failing — icon-only buttons carried a height floor and no
+ * width floor, so a 17px glyph between two `px-2.5` paddings rendered 40px
+ * wide: under the product's own rule, and under WCAG 2.2 SC 2.5.8.
+ *
+ * `.tap-target` above cannot cover this. It grows a pseudo-element, which a
+ * finger can hit but nothing can measure — `getBoundingClientRect()` still
+ * reports the small box, so an audit reads the control as undersized even when
+ * it is comfortable. The box itself has to be big enough.
+ *
+ * `:not(.min-w-0)` keeps out of the way of a control that has deliberately
+ * asked to be allowed to shrink, such as a flexible text column.
+ */
+button.min-h-11:not(.min-w-0),
+a.min-h-11:not(.min-w-0),
+[role="button"].min-h-11:not(.min-w-0) {
+  min-height: var(--tap-min);
+  min-width: var(--tap-min);
 }
 
 /*

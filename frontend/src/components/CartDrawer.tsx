@@ -77,6 +77,18 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
     wait instead of a toast the shopper has to look for.
   */
   const [busyItem, setBusyItem] = useState<number | null>(null);
+  /**
+   * Which rows have been told "this is the stall's floor" since the buyer
+   * pressed decrease there.
+   *
+   * The decrease button used to be `disabled` at the minimum, which is the
+   * quietest possible way to refuse someone: the control greys out, nothing
+   * says why, and the explanatory line below it — `min > 1 && quantity < min` —
+   * could never render, because the clamp made `quantity < min` unreachable
+   * through the UI. A rule the interface enforces but never states is the rule
+   * a buyer files as a bug. So the control stays live and explains itself.
+   */
+  const [atFloor, setAtFloor] = useState<Record<number, boolean>>({});
   const navigate = useNavigate();
 
   // دریافت توابع و state از cartStore
@@ -168,6 +180,20 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
         ? item.available_quantity
         : Math.min(10, item.available_quantity || 10);
     return { min, max };
+  }
+
+  /**
+   * Going down from the stall's floor. The order stays valid either way — the
+   * quantity is never sent below the minimum — but the buyer is told the rule
+   * instead of being shown a control that has stopped working.
+   */
+  function handleDecrease(item: CartItem, min: number) {
+    if (item.quantity <= min) {
+      setAtFloor((current) => ({ ...current, [item.id]: true }));
+      return;
+    }
+    setAtFloor((current) => ({ ...current, [item.id]: false }));
+    void handleUpdateQty(item.id, item.quantity - 1);
   }
 
   async function handleRemove(itemId: number) {
@@ -449,9 +475,10 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                               <motion.button
                                 whileTap={reduceMotion ? undefined : { scale: 0.97 }}
                                 type="button"
-                                disabled={busyItem === item.id || item.quantity <= min}
+                                disabled={busyItem === item.id}
                                 aria-label={`کاهش تعداد ${item.title}`}
-                                onClick={() => void handleUpdateQty(item.id, Math.max(min, item.quantity - 1))}
+                                aria-describedby={min > 1 ? `min-order-${item.id}` : undefined}
+                                onClick={() => handleDecrease(item, min)}
                                 className="flex min-h-11 min-w-11 items-center justify-center rounded-e-xl text-slate-500 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-35 dark:text-emerald-400 dark:hover:bg-emerald-800"
                               >
                                 <Minus size={15} />
@@ -463,8 +490,11 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                           </div>
 
                           {/* Stock and seller rules, said once and where they apply. */}
-                          {min > 1 && item.quantity < min && (
-                            <p className="mt-2 flex items-start gap-1 rounded-lg bg-amber-50 px-2 py-1 text-fluid-2xs font-semibold text-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
+                          {min > 1 && (item.quantity < min || atFloor[item.id]) && (
+                            <p
+                              id={`min-order-${item.id}`}
+                              role="status"
+                              className="mt-2 flex items-start gap-1 rounded-lg bg-amber-50 px-2 py-1 text-fluid-2xs font-semibold text-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
                               <AlertTriangle size={12} className="mt-0.5 shrink-0" />
                               <span>
                                 حداقل سفارش این غرفه {min.toLocaleString('fa-IR')} {unit || 'عدد'} است.

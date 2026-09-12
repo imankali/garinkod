@@ -72,6 +72,25 @@ async function createStorefront(page: Page, name: string) {
 
   // The live availability check has to answer before submitting.
   await expect(dialog.locator('#store-name-status')).toContainText('آزاد است', { timeout: 8000 });
+
+  // Everything the page could possibly say about a refusal, captured while the
+  // page is still the one that refused. The earlier version of this helper looked
+  // only at `[role="alert"]` inside the dialog and so reported "the form said
+  // nothing" for a 403 that the app announced in a toast — a diagnostic that
+  // structurally cannot see the app's own error surfaces is how ten tests stay
+  // red for want of one line of output. Console errors and failed responses are
+  // collected for the same reason.
+  const consoleErrors: string[] = [];
+  const failedRequests: string[] = [];
+  page.on('console', (message) => {
+    if (message.type() === 'error') consoleErrors.push(message.text().slice(0, 200));
+  });
+  page.on('response', (response) => {
+    if (response.status() >= 400) {
+      failedRequests.push(`${response.status()} ${new URL(response.url()).pathname}`);
+    }
+  });
+
   await dialog.getByRole('button', { name: 'ساخت غرفه', exact: true }).click();
 
   // Created → the seller is standing on their own page, which is the studio.
@@ -81,14 +100,23 @@ async function createStorefront(page: Page, name: string) {
   await expect(page)
     .toHaveURL(/\/storefronts\/[^/?#]+/, { timeout: 15_000 })
     .catch(async () => {
-      // The form refuses with a field error, and a timeout on the URL says nothing
-      // about why — so the reason is carried into the failure.
-      const said = (await dialog.locator('[role="alert"]').allTextContents())
+      const [alerts, toasts] = await Promise.all([
+        dialog.locator('[role="alert"]').allTextContents().catch(() => [] as string[]),
+        // react-hot-toast renders outside the dialog, which is exactly where the
+        // app put the reason this failed for so long.
+        page.locator('[role="status"], [role="alert"]').allTextContents().catch(() => [] as string[]),
+      ]);
+      const said = [...new Set([...alerts, ...toasts])]
         .map((text) => text.trim())
         .filter(Boolean)
         .join(' | ');
       throw new Error(
-        `the stall was not created — ${said || 'the form said nothing; url ' + page.url()}`,
+        [
+          `the stall was not created — ${said || 'the page said nothing at all'}`,
+          `url: ${page.url()}`,
+          `failed requests: ${failedRequests.join(', ') || 'none'}`,
+          `console errors: ${consoleErrors.slice(0, 3).join(' / ') || 'none'}`,
+        ].join('\n'),
       );
     });
 }

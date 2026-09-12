@@ -70,6 +70,19 @@ export default function StorefrontForm({
   const [store, setStore] = useState(EMPTY);
   const [creating, setCreating] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  /**
+   * The refusal that belongs to no one field: a 403, a throttle, a dropped
+   * connection, a stall this account is not allowed to open.
+   *
+   * It used to have nowhere to go but a toast — and worse, when the axios
+   * interceptor had already toasted it, `parsed.handled` was true and the form
+   * stayed completely silent. A seller pressed «ساخت غرفه», the button
+   * re-enabled, and nothing on the page said why. That is not only bad manners:
+   * a toast is transient, is not inside the form, and carries no `role="alert"`,
+   * so a screen-reader user gets no announcement at all. The reason now lives in
+   * the form, where the click happened.
+   */
+  const [formError, setFormError] = useState('');
   const [availability, setAvailability] = useState<StorefrontAvailability | null>(null);
   const [checking, setChecking] = useState(false);
 
@@ -173,6 +186,7 @@ export default function StorefrontForm({
     }
     setCreating(true);
     setFieldErrors({});
+    setFormError('');
     try {
       const response = await agricultureApi.createStorefront({
         name: store.name.trim(),
@@ -195,7 +209,13 @@ export default function StorefrontForm({
     } catch (error) {
       const parsed = parseApiError(error);
       setFieldErrors(parsed.fields);
-      if (Object.keys(parsed.fields).length === 0 && !parsed.handled) toast.error(parsed.message);
+      if (Object.keys(parsed.fields).length === 0) {
+        // Not `!parsed.handled`: the interceptor having toasted it is not a
+        // reason for the form to stay mute. The toast may already have faded, and
+        // it is not inside the form a screen reader is reading.
+        setFormError(parsed.message);
+        if (!parsed.handled) toast.error(parsed.message);
+      }
     } finally {
       setCreating(false);
     }
@@ -394,6 +414,20 @@ export default function StorefrontForm({
             ورود یا ثبت‌نام
           </button>
         </div>
+      )}
+
+      {/*
+        The form's own refusal, in the form. `role="alert"` is what makes it
+        announced rather than merely visible, and keeping it inside the dialog is
+        what lets a failing submission be diagnosed from the page alone.
+      */}
+      {formError && (
+        <p
+          role="alert"
+          className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-200"
+        >
+          {formError}
+        </p>
       )}
 
       <motion.button

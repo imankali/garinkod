@@ -141,6 +141,28 @@ jobs:
           python manage.py seed_site_content
           python manage.py seed_faq_page
           python manage.py seed_legal_pages
+          # Level-3 roles, then the moderator account the moderation console
+          # specs sign in with. Without the role bootstrap the console refuses
+          # them; without the env pair below the specs skip instead of running.
+          python manage.py bootstrap_management_roles
+          python manage.py shell -c "
+          from django.contrib.auth.models import User
+          from shop.models import UserAccount
+          user, _ = User.objects.get_or_create(username='e2e-moderator', defaults={'is_staff': True})
+          user.set_password('E2eModerator!234'); user.is_staff = True; user.save()
+          account, _ = UserAccount.objects.get_or_create(user=user, defaults={'phone': ''})
+          account.level = UserAccount.LEVEL_MODERATOR; account.save()
+          "
+
+          # Responsive renditions for the catalogue the image-pipeline spec
+          # asserts on. Two commands, and the order matters: the backfill only
+          # queues an outbox task per row, the worker does the encodes. Running
+          # the first without the second leaves the job green and the srcsets
+          # empty, which is precisely the silent gap E2E_IMAGE_PIPELINE exists to
+          # catch.
+          python manage.py backfill_image_variants --model product
+          python manage.py backfill_image_variants --model gallery
+          python manage.py process_async_tasks --limit 500
 
       - name: Start the API
         working-directory: garinkood
@@ -174,18 +196,36 @@ jobs:
       - name: Run the journey suite
         id: suite
         working-directory: frontend
-        # Allowed to fail *for now*. This job is the first time these specs have run
-        # anywhere, and it found real problems that predate this branch — colour
-        # contrast, a 12px body-text rule, an AVIF assertion, a layout-shift budget.
-        # Those belong in their own commits with their own decisions; a permanently
-        # red check only teaches people to ignore red checks. The digest is still
-        # posted on the pull request, so nothing is hidden. Drop this line once the
-        # failing list is empty.
+        # Still allowed to fail — and this comment is the tracking record, because
+        # "drop this line later" on its own is how it stayed.
+        #
+        # Closed since it was written: the stall-creation 403 (no CSRF cookie was
+        # ever issued, so every browser write was refused), the duplicate
+        # meta[name=robots], icon buttons 40px wide, the sub-12px type step, the
+        # emerald-600 and slate-400 contrast tokens, the cart minimum that was
+        # enforced but never stated, and an empty AVIF assertion that was never
+        # switched on.
+        #
+        # Still open, and the only reason this line is here:
+        #   1. `the layout mirrors correctly in English` — the product link is not
+        #      found after the locale switch. App or test is not yet determined,
+        #      and neither can be settled without a browser.
+        #   2. `first paint causes no meaningful layout shift` — 0.13 measured
+        #      against a 0.10 budget. The likely cause is the late web font; the
+        #      fix (a size-adjusted fallback) must be measured, not guessed.
+        # Neither has been run here. Remove this line when a green run says both
+        # are settled.
         continue-on-error: true
         # The JSON report is emitted for the summary step; the run's own status is
         # kept in an output so the summary can be written before the job is failed.
         env:
           PLAYWRIGHT_JSON_OUTPUT_NAME: playwright-report/results.json
+          # The seeding step above produced real .avif renditions, so the
+          # pipeline's browser-side contract is switched on rather than skipped:
+          # at least one AVIF must actually be requested and answered 200.
+          E2E_IMAGE_PIPELINE: "1"
+          E2E_MODERATOR_USERNAME: e2e-moderator
+          E2E_MODERATOR_PASSWORD: E2eModerator!234
         run: |
           set +e
           npx playwright test --project=desktop-chromium --workers=3 --retries=1 \

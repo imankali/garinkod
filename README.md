@@ -126,9 +126,26 @@ DB_ENGINE=sqlite DEBUG=True python manage.py test shop
 cd ../frontend
 npm run type-check
 npm run lint
+npm run test:unit      # ۱۵۸ تست واحد/یکپارچگی در jsdom، بدون مرورگر
 npm run build
 npm audit
 ```
+
+هر تغییری که به این مخزن می‌رسد باید همین چهار لایه را سبز کند: تست واحد،
+یکپارچگی، کارکردی و e2e. لایه‌های بدون مرورگر (`manage.py test` و
+`npm run test:unit`) در هر محیطی قابل اجرا هستند و همان‌جا باید اجرا شوند؛
+لایه‌ی e2e فقط در CI یا روی ماشین توسعه‌دهنده، چون باینری مرورگر لازم دارد.
+
+**سه پاسگاهی که قراردادها را قفل می‌کنند** (هر سه با برداشتنِ درمان قرمز می‌شوند):
+
+| پاسگاه | چه چیزی را قفل می‌کند |
+|---|---|
+| `shop/tests_security.py::CsrfCookieIssuedTests` | سرور کوکی `csrftoken` را صادر می‌کند، و یک مرورگر واردشده با فقط همان کوکی‌ها می‌تواند بنویسد |
+| `shop/tests_outbox_resilience.py::BackfillReportsTruthfullyTests` | `backfill_image_variants` ادعای encode نمی‌کند؛ صف می‌سازد و ورکر را نام می‌برد |
+| `src/test/palette.test.ts` | نسبت کنتراست توکن‌ها (WCAG AA) و کف ۱۲px مقیاس تایپ، از خود stylesheet خوانده می‌شود |
+
+برای e2e در CI، ترتیب seed و کلیدهای `E2E_IMAGE_PIPELINE` و
+`E2E_MODERATOR_*` در [`ARCHITECTURE.md`](ARCHITECTURE.md) بخش ۳.۳ آمده است.
 
 Production باید علاوه بر SQLite روی PostgreSQL آزموده شود، چون row lock و partial unique constraint رفتار متفاوتی دارند. قالب‌های تعمیرشده CI هر دو backend را پوشش می‌دهند؛ به‌دلیل محدودیت permission اپ GitHub، روش فعال‌سازی آن‌ها در `ci/README.md` ثبت شده است.
 

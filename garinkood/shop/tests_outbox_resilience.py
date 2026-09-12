@@ -17,12 +17,29 @@ from io import StringIO
 from types import SimpleNamespace
 from unittest import mock
 
+import io
+
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import TestCase
 from django.utils import timezone
 
 from .management.commands.process_async_tasks import Command
+from django.contrib.auth import get_user_model
+
+from .models import OutboxTask, Product
+
+User = get_user_model()
+
+
+def _tiny_jpeg() -> bytes:
+    """A real 8x8 JPEG, so the encoder has something to read."""
+    from PIL import Image
+
+    buffer = io.BytesIO()
+    Image.new("RGB", (8, 8), (16, 138, 95)).save(buffer, "JPEG")
+    return buffer.getvalue()
 from .models import OutboxTask
 
 
@@ -110,3 +127,56 @@ class BackfillDiskSafetyTests(TestCase):
                 stdout=out,
             )  # no CommandError — the gate lets healthy runs through
         self.assertNotIn("فضای دیسک ناکافی", out.getvalue())
+
+
+class BackfillReportsTruthfullyTests(TestCase):
+    """The backfill must not claim work it delegated.
+
+    ``_refresh_image_variants`` encodes nothing: it writes an outbox task and
+    clears the stale srcset, and the worker does the nine encodes. The summary
+    used to count those rows as «پردازش‌شده» — processed — so an operator (and a
+    CI job) could run the backfill, read a clean report, and conclude the
+    responsive-image pipeline was populated while not one .avif existed. That is
+    how AVIF coverage stayed nominally switched on and actually empty.
+    """
+
+    def setUp(self):
+        self.product = Product.objects.create(
+            title="کود تست گزارش",
+            slug="kood-test-gozareth",
+            author=User.objects.create_user(username="backfill-reporter", password="x"),
+            description="برای آزمودن گزارش فرمان backfill",
+            price=1000,
+            image=SimpleUploadedFile("probe.jpg", _tiny_jpeg(), content_type="image/jpeg"),
+        )
+
+    def test_summary_says_queued_and_names_the_worker(self):
+        roomy = SimpleNamespace(free=10 * 1024**3, total=1, used=1)
+        out = StringIO()
+        with mock.patch("shutil.disk_usage", return_value=roomy):
+            call_command("backfill_image_variants", "--model", "product", stdout=out)
+        report = out.getvalue()
+
+        self.assertIn("در صف قرار گرفت: 1", report)
+        self.assertNotIn("پردازش‌شده", report)
+        # The next command is named, so the run cannot end here by accident.
+        self.assertIn("process_async_tasks", report)
+
+    def test_nothing_is_encoded_until_the_worker_runs(self):
+        # Creating the row already enqueued one task (the model's own save()
+        # hook); the backfill's job is to add exactly one more, not to encode.
+        before = OutboxTask.objects.filter(
+            task_type=OutboxTask.TASK_PROCESS_IMAGE
+        ).count()
+        roomy = SimpleNamespace(free=10 * 1024**3, total=1, used=1)
+        with mock.patch("shutil.disk_usage", return_value=roomy):
+            call_command("backfill_image_variants", "--model", "product", stdout=StringIO())
+        self.product.refresh_from_db()
+        self.assertFalse(
+            self.product.image_variants.get("avif"),
+            "the backfill produced a srcset before the worker ran",
+        )
+        self.assertEqual(
+            OutboxTask.objects.filter(task_type=OutboxTask.TASK_PROCESS_IMAGE).count(),
+            before + 1,
+        )

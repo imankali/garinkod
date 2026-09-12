@@ -151,8 +151,16 @@ test.describe('touch targets', () => {
               text: (element.textContent ?? '').trim().slice(0, 30),
               width: Math.round(rect.width),
               height: Math.round(rect.height),
-              touchMin:
-                2.75 * parseFloat(window.getComputedStyle(document.documentElement).fontSize || '16'),
+              // The design system's own floor, read from the token rather than
+              // recomputed: index.css anchors `.min-h-11` controls to
+              // `--tap-min` in pixels, so the number here cannot drift from the
+              // number the stylesheet enforces.
+              touchMin: parseFloat(
+                window
+                  .getComputedStyle(document.documentElement)
+                  .getPropertyValue('--tap-min')
+                  .trim() || '44px',
+              ),
               // "In prose": one clause of a longer run of text, not a control.
               inlineInProse:
                 !!parent &&
@@ -169,13 +177,10 @@ test.describe('touch targets', () => {
           .filter((box) => {
             if (box.height <= 0) return false;
             // Two bars. The absolute one is WCAG 2.2 SC 2.5.8's 24 CSS px, which no
-            // scaling excuses. The other is the design system's own touch unit,
-            // min-h-11 = 2.75rem — measured in *this* root font-size rather than
-            // assumed to be 44px, because the app's root is fluid and at desktop
-            // widths 2.75rem is ~40 CSS px. (That the touch unit shrinks with the
-            // type scale is a real finding — a token decision in px, not something
-            // a test should quietly bless or fail every button over.)
-            // Inline prose links keep the standard's own exception: read as text.
+            // scaling excuses. The other is `--tap-min`, the design system's own
+            // floor, applied by index.css to every control the markup declares a
+            // tap target. Inline prose links keep the standard's own exception:
+            // a clause of a sentence is read as text, not aimed at.
             if (box.height < 24) return true;
             if (box.tag === 'A' && box.inlineInProse) return false;
             return box.height + 2 < box.touchMin || box.width + 2 < box.touchMin;

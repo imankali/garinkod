@@ -106,18 +106,17 @@ class Command(BaseCommand):
             + (" | بازسازی اجباری" if force else "")
         )
 
-        done = skipped = failed = 0
+        queued = skipped = failed = 0
         for row in rows:
             if not force and row.image_variants and row.image_variants.get("webp"):
                 skipped += 1
                 continue
             if dry_run:
-                done += 1
+                queued += 1
                 continue
             try:
                 row._refresh_image_variants()
-                formats = row.image_variants.get("formats", [])
-                done += 1
+                queued += 1
             except Exception as exc:  # keep going: one bad file must not stop the batch
                 failed += 1
                 self.stdout.write(
@@ -130,13 +129,26 @@ class Command(BaseCommand):
         summary_style = self.style.SUCCESS if failed == 0 else self.style.WARNING
         self.stdout.write(
             summary_style(
-                f"— پایان — کل: {total} | پردازش‌شده: {done} | "
+                f"— پایان — کل: {total} | در صف قرار گرفت: {queued} | "
                 f"رد شده (دارای واریانت): {skipped} | خطا: {failed}"
             )
         )
-        if dry_run and done:
+        if dry_run and queued:
             self.stdout.write(
                 self.style.NOTICE("برای اجرای واقعی همین دستور را بدون --dry-run تکرار کنید.")
+            )
+        if queued and not dry_run:
+            # ``_refresh_image_variants`` does not encode anything: it records an
+            # outbox task and clears the stale srcset, and the worker does the
+            # nine encodes. A summary that said "processed" here was the reason a
+            # pipeline could be reported as run while not a single .avif existed —
+            # the command had only queued the work.
+            self.stdout.write(
+                self.style.NOTICE(
+                    f"{queued} تسک در صف است؛ هیچ فایلی هنوز ساخته نشده. برای ساخت "
+                    "واریانت‌ها ورکر را اجرا کنید:\n"
+                    "  python manage.py process_async_tasks --limit 500"
+                )
             )
         if failed:
             raise CommandError(f"{failed} ردیف با خطا مواجه شد (به هشدارهای بالا نگاه کنید).")
