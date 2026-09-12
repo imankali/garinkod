@@ -572,3 +572,112 @@ PRODUCT_ATTRIBUTE_TEMPLATE = (
 
 # --- Shopping Cart ---
 
+
+
+class PriceTier(models.Model):
+    """One rung of a quantity price ladder (تخفیف پلکانی).
+
+    A farmer buying forty 25kg bags is not buying forty times one bag, and a
+    catalogue that charges them the same unit price is telling them to go
+    somewhere else. A ladder makes that negotiation a published price instead of
+    a phone call.
+
+    The row points at *either* a catalogue product or a storefront listing — the
+    same either/or `CartItem` uses — so the two halves of the shop get one
+    ladder implementation rather than two that drift apart.
+
+    Semantics, stated once because three places read them:
+
+    * ``min_quantity`` is inclusive: a tier at 10 applies to a cart row of 10.
+    * Only the **highest** tier whose threshold the quantity reaches applies.
+      Tiers never stack; a buyer at 40 units gets the 40 rung, not 10 + 20 + 40.
+    * The percentage comes off the price the cart already charges for that row,
+      so a ladder is a quantity discount and nothing else. It does not compose
+      with ``discount_percent``, which is a separate (display-only) field.
+    * A rung at ``min_quantity = 1`` would be a price cut wearing a ladder's
+      clothes, so the floor is 2.
+    """
+
+    product = models.ForeignKey(
+        Product, null=True, blank=True, on_delete=models.CASCADE,
+        related_name='price_tiers', verbose_name="محصول",
+    )
+    listing = models.ForeignKey(
+        'MarketplaceListing', null=True, blank=True, on_delete=models.CASCADE,
+        related_name='price_tiers', verbose_name="آگهی",
+    )
+    min_quantity = models.PositiveIntegerField(
+        verbose_name="حداقل تعداد",
+        validators=[MinValueValidator(2)],
+    )
+    discount_percent = models.PositiveSmallIntegerField(
+        verbose_name="درصد تخفیف",
+        validators=[MinValueValidator(1), MaxValueValidator(100)],
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "پله تخفیف"
+        verbose_name_plural = "پله‌های تخفیف"
+        ordering = ['min_quantity']
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(product__isnull=False, listing__isnull=True) |
+                    models.Q(product__isnull=True, listing__isnull=False)
+                ),
+                name='price_tier_exactly_one_target',
+            ),
+            # One rung per threshold per target. Two rows both starting at 10
+            # would make "the highest applicable tier" ambiguous rather than
+            # merely redundant.
+            models.UniqueConstraint(
+                fields=['product', 'min_quantity'],
+                condition=models.Q(product__isnull=False),
+                name='unique_price_tier_product_threshold',
+            ),
+            models.UniqueConstraint(
+                fields=['listing', 'min_quantity'],
+                condition=models.Q(listing__isnull=False),
+                name='unique_price_tier_listing_threshold',
+            ),
+            models.CheckConstraint(
+                condition=models.Q(min_quantity__gte=2),
+                name='price_tier_min_quantity_at_least_two',
+            ),
+            models.CheckConstraint(
+                condition=models.Q(discount_percent__gte=1, discount_percent__lte=100),
+                name='price_tier_discount_between_1_and_100',
+            ),
+        ]
+
+    def __str__(self):
+        target = self.product_id or self.listing_id
+        return f"≥{self.min_quantity} → {self.discount_percent}٪ ({target})"
+
+
+def best_price_tier(tiers, quantity: int):
+    """The highest rung ``quantity`` reaches, or ``None``.
+
+    Takes an iterable of tiers rather than a queryset so a prefetched ladder and
+    a fresh one behave identically — and so the rule lives in one place instead
+    of being re-derived in the cart, the serializer and the product page.
+    """
+    best = None
+    for tier in tiers:
+        if tier.min_quantity <= quantity and (best is None or tier.min_quantity > best.min_quantity):
+            best = tier
+    return best
+
+
+def tiered_price(base_price: int, tiers, quantity: int) -> int:
+    """``base_price`` after the applicable rung, rounded down to whole تومان.
+
+    Rounding down is deliberate: a buyer is never charged a fraction above the
+    advertised rung, and a ladder whose last digit moves with the rounding rule
+    is a ladder nobody can quote from memory.
+    """
+    tier = best_price_tier(tiers, quantity)
+    if tier is None:
+        return int(base_price)
+    return max(int(int(base_price) * (100 - tier.discount_percent) / 100), 0)

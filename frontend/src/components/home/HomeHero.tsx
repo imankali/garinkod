@@ -5,6 +5,8 @@ import { ArrowLeft, PackageCheck, ShieldCheck, Truck } from 'lucide-react';
 import { motion, useReducedMotion } from 'framer-motion';
 
 import { useTranslation } from '../../i18n';
+import Parallax from '../motion/Parallax';
+import SplitHeading from '../motion/SplitHeading';
 
 /**
  * The opening statement of the shop window.
@@ -34,8 +36,17 @@ export default function HomeHero() {
       className="relative overflow-hidden bg-gradient-to-bl from-emerald-800 via-emerald-700 to-lime-600 text-white"
       aria-labelledby="hero-heading"
     >
-      {/* Decorative only — hidden from assistive technology. */}
-      <picture aria-hidden="true" className="pointer-events-none absolute inset-0">
+      {/*
+        Decorative only — hidden from assistive technology. The backdrop is the
+        one place parallax earns its keep: a 40px drift on a 20%-opacity image
+        gives the hero depth without moving a single letter of text. Content is
+        never parallaxed, because drifting text is unreadable while it moves.
+      */}
+      <Parallax
+        distance={40}
+        className="pointer-events-none absolute inset-0 overflow-hidden"
+      >
+      <picture aria-hidden="true" className="h-full w-full">
         <source
           type="image/avif"
           srcSet="/images/hero-farm-480.avif 480w, /images/hero-farm-768.avif 768w, /images/hero-farm-1024.avif 1024w"
@@ -52,23 +63,31 @@ export default function HomeHero() {
           width={1024}
           height={1024}
           decoding="async"
-          fetchPriority="high"
-          loading="eager"
-          className="h-full w-full object-cover opacity-20"
-        />
-      </picture>
+              fetchPriority="high"
+              loading="eager"
+              className="h-full w-full object-cover opacity-20"
+            />
+          </picture>
+        </Parallax>
 
       <div className="page-shell relative py-10 sm:py-14">
         <p className="text-fluid-sm font-bold text-lime-200">
           نهاده‌های کشاورزی، مستقیم و مطمئن
         </p>
 
-        <h2
+        {/*
+          SplitText reveal on the headline. The component renders a real <h2>
+          with the full sentence in the DOM, so if GSAP never loads — or the
+          visitor asked for reduced motion — this is an ordinary heading. The
+          id is preserved for the e2e assertions that target #hero-heading.
+        */}
+        <SplitHeading
+          as="h2"
           id="hero-heading"
           className="mt-2 max-w-3xl text-fluid-3xl font-extrabold leading-tight"
         >
           {t('home.heroTitle')}
-        </h2>
+        </SplitHeading>
 
         <p className="mt-4 max-w-2xl text-fluid-base leading-8 text-emerald-50">
           {t('home.heroSubtitle')}
