@@ -51,10 +51,21 @@ async function headFor(route: string): Promise<string> {
       </MemoryRouter>
     </HelmetProvider>,
   );
-  // Helmet writes to the document on a tick after commit, not during it.
-  await act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 20));
-  });
+  // Helmet writes to the document after commit, not during it, so this waits for
+  // the write instead of sleeping a guessed number of milliseconds. A fixed
+  // delay is exactly the assertion that passes on a laptop and fails on a loaded
+  // runner — and a red CI job nobody can read locally is worse than a slow one.
+  // Routes RouteSeo declines to handle write nothing at all, so the loop needs a
+  // budget rather than a condition that can always be satisfied. Helmet flushes
+  // on the tick after commit, so a second is a wide margin that still cannot
+  // hang the file.
+  const deadline = Date.now() + 1_000;
+  while (Date.now() < deadline) {
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+    if (document.head.querySelector('meta[name="robots"], link[rel="canonical"]')) break;
+  }
   return document.head.innerHTML;
 }
 

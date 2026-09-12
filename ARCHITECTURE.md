@@ -208,7 +208,7 @@ npm run build && npm run preview        # پورت 4173 با proxy به :8000 �
 
 # گیت‌های کیفیت (همه محلی)
 python manage.py test shop              # 583 backend tests
-npm run test:unit                       # 158 unit/integration tests (بدون مرورگر)
+npm run test:unit                       # 163 unit/integration tests (بدون مرورگر)
 npm run test:all                        # LHCI + playwright
 npm run test:perf:desktop               # نسخه‌ی دسکتاپ LHCI
 ```

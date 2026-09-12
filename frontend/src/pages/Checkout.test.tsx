@@ -121,7 +121,17 @@ describe('the acceptance gate', () => {
   it('accepts through the checkbox and only then submits', async () => {
     const user = userEvent.setup();
     createOrder.mockResolvedValue({
-      data: { order: { id: 5, code: 'GK-1', status: 'pending' }, payment_error: '' },
+      data: {
+        order: {
+          id: 5,
+          code: 'GK-1',
+          status: 'pending',
+          total_price: 545000,
+          loyalty_discount: 0,
+          terms_accepted_at: '2026-09-13T00:00:00Z',
+        },
+        payment_error: '',
+      },
     } as never);
     renderCheckout();
     await flush();

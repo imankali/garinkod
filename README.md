@@ -126,7 +126,7 @@ DB_ENGINE=sqlite DEBUG=True python manage.py test shop
 cd ../frontend
 npm run type-check
 npm run lint
-npm run test:unit      # ۱۵۸ تست واحد/یکپارچگی در jsdom، بدون مرورگر
+npm run test:unit      # ۱۶۳ تست واحد/یکپارچگی در jsdom، بدون مرورگر
 npm run build
 npm audit
 ```
