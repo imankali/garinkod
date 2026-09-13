@@ -62,6 +62,11 @@ MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
+    # Must sit *after* the CSRF middleware: it asks for a token so the middleware
+    # above writes the cookie on the response, which is how a cookie-authenticated
+    # browser gets the value it has to echo in X-CSRFToken. Without it every unsafe
+    # request from the SPA is refused with 403. See garinkood/middleware.py.
+    "garinkood.middleware.IssueCsrfCookieMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     # Axes protects password authentication; the existing OTP limits stay
     # independent and continue to provide phone/IP/cooldown protection.

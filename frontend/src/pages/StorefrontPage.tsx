@@ -426,7 +426,7 @@ export default function StorefrontPage() {
       </header>
 
       {/* Counters */}
-      <dl className="mt-5 grid grid-cols-3 gap-2 rounded-2xl border border-slate-100 bg-white p-3 text-center dark:border-emerald-900 dark:bg-emerald-950/40">
+      <dl className="mt-5 grid grid-cols-3 gap-2 rounded-2xl border border-slate-100 bg-white p-3 text-center dark:border-emerald-900 dark:bg-emerald-950/40 [&>div]:min-w-0 [&_dd]:break-words [&_dt]:break-words">
         {[
           { label: t('storefronts.listings'), value: counts.listings },
           { label: t('storefront.tab.posts'), value: counts.posts },
@@ -461,7 +461,7 @@ export default function StorefrontPage() {
                       <img src={stories[0]?.image_url} alt="" className="h-full w-full object-cover" />
                     </span>
                   </span>
-                  <span className="w-full truncate text-center text-fluid-2xs text-slate-600 dark:text-emerald-100">
+                  <span className="w-full min-w-0 truncate text-center text-fluid-2xs text-slate-600 dark:text-emerald-100">
                     {t('storefront.tab.stories')}
                   </span>
                 </button>
@@ -487,7 +487,7 @@ export default function StorefrontPage() {
                   <span className="block h-14 w-14 overflow-hidden rounded-full border-2 border-slate-200 dark:border-emerald-800">
                     <img src={highlight.cover_url} alt="" className="h-full w-full object-cover" />
                   </span>
-                  <span className="w-full truncate text-center text-fluid-2xs text-slate-600 dark:text-emerald-100">
+                  <span className="w-full min-w-0 truncate text-center text-fluid-2xs text-slate-600 dark:text-emerald-100">
                     {highlight.title}
                   </span>
                 </button>
@@ -674,11 +674,11 @@ export default function StorefrontPage() {
                     )}
                   </button>
                   <div className="p-3">
-                    <h3 className="truncate text-sm font-bold text-slate-800 dark:text-white">
+                    <h3 className="min-w-0 truncate text-sm font-bold text-slate-800 dark:text-white">
                       <button
                         type="button"
                         onClick={() => openListing(listing.slug)}
-                        className="max-w-full truncate text-start hover:text-emerald-700 hover:underline dark:hover:text-lime-300"
+                        className="max-w-full min-w-0 truncate text-start hover:text-emerald-700 hover:underline dark:hover:text-lime-300"
                       >
                         {listing.title}
                       </button>
@@ -863,5 +863,5 @@ export default function StorefrontPage() {
 
 function StorefrontSkeleton() {
   const block = "animate-pulse rounded-2xl bg-slate-100 dark:bg-emerald-900";
-  return <main className="mx-auto max-w-5xl px-[var(--page-gutter)] py-8" role="status" aria-label="در حال بارگذاری غرفه"><div className={`h-52 w-full ${block}`} /><div className="-mt-10 flex items-end gap-4 px-5"><div className={`h-24 w-24 rounded-full ${block}`} /><div className="flex-1 space-y-3 pb-2"><div className={`h-7 w-52 ${block}`} /><div className={`h-4 w-36 ${block}`} /></div></div><div className="mt-5 grid grid-cols-3 gap-2">{Array.from({length:3}).map((_,i)=><div key={i} className={`h-20 ${block}`} />)}</div><div className={`mt-6 h-12 ${block}`} /><div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{Array.from({length:6}).map((_,i)=><div key={i} className={`h-56 ${block}`} />)}</div><span className="sr-only">در حال بارگذاری</span></main>;
+  return <main className="mx-auto max-w-5xl px-[var(--page-gutter)] py-8" role="status" aria-label="در حال بارگذاری غرفه"><div className={`h-52 w-full ${block}`} /><div className="-mt-10 flex items-end gap-4 px-5"><div className={`h-24 w-24 rounded-full ${block}`} /><div className="flex-1 space-y-3 pb-2"><div className={`h-7 w-52 ${block}`} /><div className={`h-4 w-36 ${block}`} /></div></div><div className="mt-5 grid grid-cols-3 gap-2">{Array.from({length:3}).map((_,i)=><div key={i} className={`h-20 min-w-0 ${block}`} />)}</div><div className={`mt-6 h-12 ${block}`} /><div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{Array.from({length:6}).map((_,i)=><div key={i} className={`h-56 ${block}`} />)}</div><span className="sr-only">در حال بارگذاری</span></main>;
 }

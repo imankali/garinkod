@@ -74,8 +74,8 @@ export default function LandDossierCard({
           <Sprout size={17} />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-fluid-xs font-extrabold">{land.name}</span>
-          <span className="mt-0.5 block truncate text-fluid-2xs opacity-80">
+          <span className="block min-w-0 truncate text-fluid-xs font-extrabold">{land.name}</span>
+          <span className="mt-0.5 block min-w-0 truncate text-fluid-2xs opacity-80">
             {land.land_type_label}
             {land.crop_type ? ` · ${land.crop_type}` : ''}
             {land.crop_variety ? ` (${land.crop_variety})` : ''}

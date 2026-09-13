@@ -102,6 +102,23 @@ python manage.py backfill_image_variants --model listing --limit 50 --force
 | per-record isolation | شکست یک رکورد با `self.style.WARNING` ثبت شده و ادامه پیدا می‌کند؛ خروجی نهایی `CommandError` اگر اشتباه > ۰ |
 | هشدار فارسی داخلی | اگر ساختار دیسک مسیر دوتاییِ تاریخی داشت، در خروجی خودفرماند می‌داد — ناهنجاری‌ای که پروتکل بعدی ریشه‌کن کرد (بخش ۴) |
 
+> **این فرمان encode نمی‌کند؛ صف می‌سازد.** `_refresh_image_variants()` تنها یک
+> `OutboxTask` از نوع `process_image` ثبت می‌کند و srcset کهنه را پاک می‌کند؛ نه
+> encode واقعی را ورکر (`process_async_tasks`) انجام می‌دهد. خلاصه‌ی فرمان زمانی
+> «پردازش‌شده» می‌گفت در حالی که هیچ `.avif` ساخته نشده بود — و همین جمله‌ی
+> گمراه‌کننده باعث شد پوشش AVIF در CI عملاً خالی بماند در حالی که سبز گزارش
+> می‌شد. اکنون خروجی «در صف قرار گرفت» می‌گوید و دستور بعدی را نام می‌برد، و
+> `shop/tests_outbox_resilience.py::BackfillReportsTruthfullyTests` همان جمله را
+> قفل می‌کند.
+>
+> ترتیب درست — و هر دو لازم‌اند:
+>
+> ```bash
+> python manage.py backfill_image_variants --model product   # ۱. صف
+> python manage.py backfill_image_variants --model gallery   # ۱. صف
+> python manage.py process_async_tasks --limit 500           # ۲. encode
+> ```
+
 ---
 
 ## ۳. سپرهای دفاعی پرفورمنس — بودجه‌ی عددی، نه حس خوب داشتن
@@ -144,6 +161,21 @@ npm run test:all         # LHCI && E2E — اگر اولی قرمز شود دو�
 
 > **محدودیت مستندشده‌ی محیط توسعه‌ی Sandbox فعلی:** CDNهای باینری مرورگر Playwright از محیط جاری قابل‌دسترس نیستند (`Download failure, code=1`)؛ روی ماشین محلی توسعه‌دهنده `npx playwright install chromium` ساده کار می‌کند. کانفیگ‌ها راستی‌آزماییِ لود شدند و healthcheck محیط را دقیقاً در «Chrome not found» تشخیص می‌دهد.
 
+### ۳.۳ job سراسری e2e — `.github/workflows/django.yml`
+
+همان job هم backend را می‌آزماید و هم سفرهای مرورگر را. آنچه ترتیبش اهمیت دارد:
+
+| مرحله | چرا به همین ترتیب |
+|---|---|
+| `migrate` → `seed_locations` → `seed_agri_inputs` → `seed_test_catalog` → `seed_demo_marketplace` → `seed_test_community` → `seed_site_content` → `seed_faq_page` → `seed_legal_pages` | seed جامعه تا وقتی کاتالوگ و بازار نساخته شده‌اند اجرا نمی‌شود، چون پست/آگهی/دیدگاه‌هایش به ردیف‌های هر دو وابسته‌اند |
+| `bootstrap_management_roles` → ساخت حساب `e2e-moderator` | بدون bootstrap سطح ۳، کنسول نظارت ورود را رد می‌کند؛ بدون `E2E_MODERATOR_USERNAME`/`E2E_MODERATOR_PASSWORD` آن تست‌ها **skip** می‌شوند نه fail — یعنی پوشش بی‌صدا از دست می‌رود |
+| `backfill_image_variants` (product, gallery) → `process_async_tasks` | بخش ۲.۳: اول صف، بعد encode. اجرای اولی بدون دومی، job را سبز و srcset را خالی می‌گذارد |
+| `E2E_IMAGE_PIPELINE: "1"` روی step پلی‌رایت | کلیدِ قرارداد AVIF سمت مرورگر. بدون آن `performance-and-images.spec.ts` هیچ renditionsی مطالبه نمی‌کند و تست عملاً پوشش نمی‌دهد |
+
+`E2E_IMAGE_PIPELINE` یک **تعهد** است نه یک پیشنهاد: وقتی `1` باشد و هیچ پاسخ `.avif`
+با HTTP 200 از `/media/` نرسد، تست fail می‌شود. پس فقط جایی روشنش کنید که seed +
+backfill + worker واقعاً اجرا شده‌اند.
+
 ---
 
 ## ۴. یکپارچگی داده — نرمال‌سازی `media/` به‌عنوان ضدِ بدهی فنی
@@ -175,7 +207,8 @@ cd frontend && npm i
 npm run build && npm run preview        # پورت 4173 با proxy به :8000 → http://localhost:4173
 
 # گیت‌های کیفیت (همه محلی)
-python manage.py test shop              # 402 backend tests
+python manage.py test shop              # 583 backend tests
+npm run test:unit                       # 163 unit/integration tests (بدون مرورگر)
 npm run test:all                        # LHCI + playwright
 npm run test:perf:desktop               # نسخه‌ی دسکتاپ LHCI
 ```
@@ -185,6 +218,51 @@ npm run test:perf:desktop               # نسخه‌ی دسکتاپ LHCI
 | `DB_ENGINE` | `sqlite` لوکال / `postgresql` در deploy |
 | `MEDIA_STORAGE_BACKEND` | `local` (پیش‌فرض) / `s3` (با channel تنظیمات جدا) |
 | `PLAYWRIGHT_BASE_URL` | اورراید مبدأ تست‌های E2E (پیش‌فرض: preview خودکار 5173) |
+| `E2E_IMAGE_PIPELINE` | `1` یعنی renditionهای AVIF وعده داده شده‌اند و نبودشان خطاست |
+| `E2E_MODERATOR_USERNAME` / `E2E_MODERATOR_PASSWORD` | حساب سطح ۳ برای کنسول نظارت؛ بدون آن تست‌ها skip می‌شوند |
+
+---
+
+## ۶. قرارداد CSRF — کوکی‌ای که سرور باید بدهد تا بتواند بخواهدش
+
+مرورگر با کوکیِ HttpOnly توکن (`garinkood_auth`) احراز هویت می‌شود و
+`shop.authentication.CookieTokenAuthentication` برای هر درخواست ناایمن
+(POST/PUT/PATCH/DELETE) توکن CSRF مطالبه می‌کند — درست، چون اعتبارِ ambient
+دقیقاً همان چیزی است که CSRF در برابرش محافظت می‌کند. اما **هیچ endpointی آن
+کوکی را صادر نمی‌کرد**: جنگو فقط وقتی `csrftoken` را می‌نویسد که جایی
+`get_token()` صدا زده شود، و هیچ view از DRF قالب `{% csrf_token %}` رندر
+نمی‌کند.
+
+نتیجه‌ای که روی سرورِ در حال اجرا اندازه‌گیری شد:
+
+```console
+$ curl -c jar -X POST .../api/auth/register/ …      → 201، تنها کوکی: garinkood_auth
+$ curl -b jar -X POST .../api/marketplace/storefront/ …
+  {"code":"permission_denied","status":403,"error":"شما اجازه دسترسی به این بخش را ندارید."}
+```
+
+یعنی **هر نوشتنِ مرورگرِ واردشده ۴۰۳ می‌گرفت** — سبد خرید، پرداخت، پیام، ساخت
+غرفه. و چون پاکت خطا `fields` نداشت، فرم هم چیزی برای نمایش نداشت؛ تنها
+سطحِ خطای برنامه یک toast زودگذر بود و اگر interceptor آن را هندل کرده بود،
+فرم **کاملاً ساکت** می‌ماند. ده تست e2e دقیقاً همین را گزارش می‌کردند:
+«the stall was not created — the form said nothing».
+
+چرا ۵۷۹ تست backend سبز بود و این را ندید: کلاینت تست جنگو به‌صورت پیش‌فرض
+CSRF را خاموش می‌کند، و `APIRequestFactory` اصلاً به لایه‌ی کوکی نمی‌رسد.
+
+درمان، دو نیمه:
+
+1. `garinkood/middleware.py::IssueCsrfCookieMiddleware` — بعد از
+   `CsrfViewMiddleware` در `MIDDLEWARE` می‌نشیند و `get_token(request)` را صدا
+   می‌زند، تا میدل‌ور بالا کوکی را در پاسخ بنویسد. محافظت دست‌نخورده است:
+   بدون هدر ۴۰۳، با هدرِ غلط هم ۴۰۳.
+2. `StorefrontForm` خطای بدون-فیلد را داخل خود فرم با `role="alert"` نشان
+   می‌دهد. فرمی که دلیل شکستش را نمی‌گوید هم باگ UX است هم باگ a11y.
+
+پاسگاه‌ها: `shop/tests_security.py::CsrfCookieIssuedTests` (کوکی صادر می‌شود، و
+یک مرورگرِ واردشده با **فقط کوکی‌هایی که سرور خودش داده** می‌تواند غرفه بسازد)
+و `src/pages/StorefrontCreateJourney.test.tsx` (سفر کامل در jsdom). هر دو با
+برداشتنِ درمان قرمز می‌شوند — آزموده شد.
 
 ---
 

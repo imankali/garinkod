@@ -156,10 +156,10 @@ export default function LegalHub() {
               className="group flex min-h-16 items-center gap-3 rounded-2xl border border-slate-100 bg-white p-3 shadow-sm transition hover:border-emerald-200 hover:shadow dark:border-emerald-900 dark:bg-emerald-950 dark:hover:border-emerald-700"
             >
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-fluid-xs font-extrabold text-slate-800 dark:text-white">
+                <span className="block min-w-0 truncate text-fluid-xs font-extrabold text-slate-800 dark:text-white">
                   {row.question}
                 </span>
-                <span className="mt-0.5 block truncate text-fluid-2xs text-slate-500 dark:text-emerald-300/80">
+                <span className="mt-0.5 block min-w-0 truncate text-fluid-2xs text-slate-500 dark:text-emerald-300/80">
                   {row.label}
                 </span>
               </span>

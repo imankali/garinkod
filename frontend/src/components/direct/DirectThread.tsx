@@ -127,6 +127,7 @@ export default function DirectThread({
   const attachedLand = useDirectStore((state) => state.attachedLand);
   const attachLand = useDirectStore((state) => state.attachLand);
   const setConversationId = useDirectStore((state) => state.setConversationId);
+  const closeDirect = useDirectStore((state) => state.closeDirect);
 
   const [messages, setMessages] = useState<StorefrontMessage[]>([]);
   const [conversation, setConversation] = useState<StorefrontConversation | null>(null);
@@ -604,7 +605,7 @@ export default function DirectThread({
             <HeaderTitle identity={identity} />
           </>
         ) : (
-          <span className="flex-1 truncate text-sm font-extrabold text-slate-800 dark:text-white">
+          <span className="flex-1 min-w-0 truncate text-sm font-extrabold text-slate-800 dark:text-white">
             {t('direct.title')}
           </span>
         )}
@@ -622,6 +623,18 @@ export default function DirectThread({
             <CloseThreadButton conversation={conversation} onChanged={() => void load(true)} />
           </span>
         )}
+
+        {/* A small × so the drawer can be dismissed from the thread itself —
+            the back arrow only returns to the inbox list, and the overlay tap
+            is not discoverable once a conversation is on screen. */}
+        <button
+          type="button"
+          onClick={closeDirect}
+          aria-label={t('common.close')}
+          className="-me-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-emerald-50 hover:text-slate-600 dark:hover:bg-emerald-900 dark:hover:text-emerald-100"
+        >
+          <X size={15} />
+        </button>
       </header>
 
       {/* Messages */}
@@ -1045,7 +1058,14 @@ function MessageBubble({
                       // own overflow, so the first item's menu lost its top rows.
                       'fixed inset-x-3 bottom-4 z-40 flex flex-col gap-0.5 overflow-hidden rounded-2xl border border-slate-100 bg-white p-1.5 text-start shadow-2xl dark:border-emerald-800 dark:bg-emerald-950',
                       'sm:absolute sm:inset-x-auto sm:bottom-full sm:z-30 sm:mb-1 sm:w-max sm:shadow-xl',
-                      mine ? 'sm:end-0' : 'sm:start-0',
+                      /*
+                        The menu grows away from the near edge: a «mine» trigger
+                        sits at the row's start-side (right in RTL), so the menu's
+                        start edge pins to it and the body extends inward; the
+                        counterpart mirrors that. The previous mapping did the
+                        opposite and pushed the popover out of the drawer.
+                      */
+                      mine ? 'sm:start-0' : 'sm:end-0',
                     )}
                   >
                     <MenuItem icon={Reply} label={t('direct.reply')} onClick={onReply} />
@@ -1087,7 +1107,7 @@ function MessageBubble({
                 <span className="min-w-0 flex-1">
                   <span
                     className={cn(
-                      'block truncate text-fluid-2xs font-extrabold',
+                      'block min-w-0 truncate text-fluid-2xs font-extrabold',
                       mine ? 'text-lime-100' : 'text-emerald-700 dark:text-lime-300',
                     )}
                   >
@@ -1095,7 +1115,7 @@ function MessageBubble({
                   </span>
                   <span
                     className={cn(
-                      'block truncate text-fluid-2xs',
+                      'block min-w-0 truncate text-fluid-2xs',
                       mine ? 'text-white/85' : 'text-slate-500 dark:text-emerald-200',
                       message.reply_to.is_deleted && 'italic',
                     )}
@@ -1270,10 +1290,21 @@ function ComposerBanner({
     >
       <div
         className={cn(
-          'mb-2 flex items-center gap-2 rounded-xl border-s-4 px-3 py-2',
+          // A hairline ring instead of a 4px accent bar on the inline start.
+          //
+          // The tone is already carried twice here — by the icon and by the
+          // tinted background — so the thick bar was a third way of saying the
+          // same thing, and the loudest of the three. It also sat awkwardly in
+          // RTL: a start-edge border puts the bar on the right, which is where
+          // the icon already is, so the leading edge carried two accents at once.
+          //
+          // (This comment deliberately does not spell the Tailwind class name it
+          // is describing: the design linter scans text, not the class list, and
+          // naming it here re-triggers the very rule the change was made for.)
+          'mb-2 flex items-center gap-2 rounded-xl border px-3 py-2',
           tone === 'amber'
-            ? 'border-amber-400 bg-amber-50 dark:bg-amber-950/30'
-            : 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/40',
+            ? 'border-amber-200 bg-amber-50 dark:border-amber-900/60 dark:bg-amber-950/30'
+            : 'border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-900/40',
         )}
       >
         <span
@@ -1287,13 +1318,13 @@ function ComposerBanner({
         <span className="min-w-0 flex-1">
           <span
             className={cn(
-              'block truncate text-fluid-2xs font-extrabold',
+              'block min-w-0 truncate text-fluid-2xs font-extrabold',
               tone === 'amber' ? 'text-amber-700 dark:text-amber-200' : 'text-emerald-700 dark:text-lime-300',
             )}
           >
             {title}
           </span>
-          <span className="block truncate text-fluid-2xs text-slate-500 dark:text-emerald-200">
+          <span className="block min-w-0 truncate text-fluid-2xs text-slate-500 dark:text-emerald-200">
             {text || <CornerUpLeft size={11} className="inline" />}
           </span>
         </span>
@@ -1319,7 +1350,7 @@ function ComposerBanner({
 function HeaderTitle({ identity }: { identity: ReturnType<typeof conversationIdentity> }) {
   const inner = (
     <>
-      <span className="block truncate text-fluid-sm font-extrabold text-slate-800 dark:text-white">
+      <span className="block min-w-0 truncate text-fluid-sm font-extrabold text-slate-800 dark:text-white">
         {identity.title}
       </span>
       <span
@@ -1370,7 +1401,7 @@ function AttachedProductCard({ listing, compact = false }: { listing: AttachedLi
         loading="lazy"
       />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-fluid-xs font-bold">{listing.title}</span>
+        <span className="block min-w-0 truncate text-fluid-xs font-bold">{listing.title}</span>
         <span className={`block text-fluid-2xs ${compact ? 'text-slate-500 dark:text-emerald-300' : 'text-white/80'}`}>
           {formatPrice(listing.discounted_price)} / {listing.unit}
         </span>

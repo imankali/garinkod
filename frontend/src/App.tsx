@@ -13,11 +13,11 @@ import { Toaster } from "react-hot-toast";
 import Header from "./components/Header";
 import MobileBottomNav from "./components/MobileBottomNav";
 import SiteFooter from "./components/SiteFooter";
-import CartDrawer from "./components/CartDrawer";
-import ProductDetailModal from "./components/ProductDetailModal";
-import WishlistModal from "./components/WishlistModal";
+
+
+
 import CompareBar from "./components/CompareBar";
-import CompareModal from "./components/CompareModal";
+
 import CategorySections from "./components/home/CategorySections";
 import ContentRails from "./components/home/ContentRails";
 import WeatherWidget from "./components/WeatherWidget";
@@ -31,10 +31,10 @@ import ServiceShortcuts from "./components/home/ServiceShortcuts";
 import CategoryGrid from "./components/home/CategoryGrid";
 import FeaturedStorefronts from "./components/home/FeaturedStorefronts";
 import StorefrontAds from "./components/home/StorefrontAds";
-import DirectMessagesDrawer from "./components/direct/DirectMessagesDrawer";
+
 import RouteSeo from "./components/RouteSeo";
-import LoginModal from "./components/LoginModal";
-import CookieJarNotice from "./components/CookieJarNotice";
+
+
 import PrivacyAnalytics from "./components/PrivacyAnalytics";
 import ScrollToTop from "./components/ScrollToTop";
 import BackToTopButton from "./components/BackToTopButton";
@@ -43,6 +43,35 @@ import BackButton from "./components/BackButton";
 // ========================================
 // Pages (Lazy Loaded)
 // ========================================
+
+/*
+ * The global overlays, loaded on their own.
+ *
+ * These seven are mounted on every page but invisible on first paint — a cart
+ * drawer, a compare sheet, a sign-in dialog. They were eagerly imported, which
+ * put all of their code in the entry chunk: a visitor who never opens the cart
+ * still downloaded and parsed it, on a phone, before first paint.
+ *
+ * They stay MOUNTED rather than being gated behind their open flag, and that
+ * choice is deliberate. Six of the seven render through AnimatePresence and own
+ * their exit animation internally, so unmounting on close would cut the close
+ * animation off mid-flight. The win here is a smaller entry chunk, not fewer
+ * components; taking the second win means moving the exit animations into the
+ * parent, which is a larger change than it is worth for the difference.
+ *
+ * `fallback={null}` is safe precisely because these are overlays: nothing is on
+ * screen for the fallback to shift. The same treatment applied to an inline
+ * content section — AgriCalculator, CropSelector — would move the page as the
+ * chunk landed, which is why those two are left eager.
+ */
+const CartDrawer = lazy(() => import("./components/CartDrawer"));
+const ProductDetailModal = lazy(() => import("./components/ProductDetailModal"));
+const WishlistModal = lazy(() => import("./components/WishlistModal"));
+const CompareModal = lazy(() => import("./components/CompareModal"));
+const LoginModal = lazy(() => import("./components/LoginModal"));
+const CookieJarNotice = lazy(() => import("./components/CookieJarNotice"));
+const DirectMessagesDrawer = lazy(() => import("./components/direct/DirectMessagesDrawer"));
+
 const Login = lazy(() => import("./pages/Login"));
 const Profile = lazy(() => import("./pages/Profile"));
 const ProductPage = lazy(() => import("./pages/ProductPage"));
@@ -585,35 +614,41 @@ export default function App() {
         {/* ======================================== */}
         {/* Direct Messages Drawer */}
         {/* ======================================== */}
-        <DirectMessagesDrawer />
+        <Suspense fallback={null}><DirectMessagesDrawer /></Suspense>
 
         {/* ======================================== */}
         {/* Cart Drawer */}
         {/* ======================================== */}
-        <CartDrawer isOpen={cartOpen} onClose={() => setCartOpen(false)} />
+        <Suspense fallback={null}>
+          <CartDrawer isOpen={cartOpen} onClose={() => setCartOpen(false)} />
+        </Suspense>
 
         {/* ======================================== */}
         {/* Product Detail Modal */}
         {/* ======================================== */}
-        <ProductDetailModal
-          product={selectedProduct}
-          onClose={() => setSelectedProduct(null)}
-          onAddToCart={handleAddToCart}
-          isWishlisted={selectedProduct ? wishlist.some((p) => p.id === selectedProduct.id) : false}
-          onToggleWishlist={handleToggleWishlist}
-        />
+        <Suspense fallback={null}>
+          <ProductDetailModal
+            product={selectedProduct}
+            onClose={() => setSelectedProduct(null)}
+            onAddToCart={handleAddToCart}
+            isWishlisted={selectedProduct ? wishlist.some((p) => p.id === selectedProduct.id) : false}
+            onToggleWishlist={handleToggleWishlist}
+          />
+        </Suspense>
 
         {/* ======================================== */}
         {/* Wishlist Modal */}
         {/* ✅ فقط وقتی wishlistOpen true است render می‌شود */}
         {/* ======================================== */}
         {wishlistOpen && (
-          <WishlistModal
-            wishlist={wishlist}
-            onClose={() => setWishlistOpen(false)}
-            onRemove={removeFromWishlist}
-            onAddToCart={handleAddToCart}
-          />
+          <Suspense fallback={null}>
+            <WishlistModal
+              wishlist={wishlist}
+              onClose={() => setWishlistOpen(false)}
+              onRemove={removeFromWishlist}
+              onAddToCart={handleAddToCart}
+            />
+          </Suspense>
         )}
 
         {/* ======================================== */}
@@ -629,12 +664,14 @@ export default function App() {
         {/* ======================================== */}
         {/* Compare Modal */}
         {/* ======================================== */}
-        <CompareModal
-          isOpen={compareOpen}
-          items={compareItems}
-          onClose={() => setCompareOpen(false)}
-          onAddToCart={(product) => handleAddToCart(product, 1)}
-        />
+        <Suspense fallback={null}>
+          <CompareModal
+            isOpen={compareOpen}
+            items={compareItems}
+            onClose={() => setCompareOpen(false)}
+            onAddToCart={(product) => handleAddToCart(product, 1)}
+          />
+        </Suspense>
 
         {/* Global return-to-top control. */}
         <BackToTopButton />
@@ -647,12 +684,12 @@ export default function App() {
         {/* ======================================== */}
         {/* Sign-in dialog used by every gated action (reviews, consult) */}
         {/* ======================================== */}
-        <LoginModal />
+        <Suspense fallback={null}><LoginModal /></Suspense>
 
         {/* ======================================== */}
         {/* A sign-in the browser cannot keep is explained, never looped */}
         {/* ======================================== */}
-        <CookieJarNotice />
+        <Suspense fallback={null}><CookieJarNotice /></Suspense>
       </div>
     </BrowserRouter>
   );

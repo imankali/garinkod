@@ -174,10 +174,10 @@ export default function Profile() {
               <AvatarUploader fallback={fullName.charAt(0)} />
               <div className="min-w-0 flex-1">
                 <p className="text-fluid-xs text-lime-200">{t("account.title")}</p>
-                <h1 className="mt-1 truncate text-fluid-xl font-extrabold">{fullName}</h1>
-                <p className="mt-1 truncate text-fluid-xs text-emerald-100">{user?.email || user?.username}</p>
+                <h1 className="mt-1 min-w-0 truncate text-fluid-xl font-extrabold">{fullName}</h1>
+                <p className="mt-1 min-w-0 truncate text-fluid-xs text-emerald-100">{user?.email || user?.username}</p>
                 {account?.next_level && (
-                  <p className="mt-1 truncate text-fluid-2xs text-lime-200/90">
+                  <p className="mt-1 min-w-0 truncate text-fluid-2xs text-lime-200/90">
                     پله بعد: {account.next_level.label.replace(/^سطح [^—]+— */, '')} — {account.next_level.how}
                   </p>
                 )}
@@ -192,13 +192,15 @@ export default function Profile() {
         </section>
 
         {/*
-          حساب فقط همین پنج تب نیست: پاداش، دفتر مالی، استودیو غرفه و پیام‌ها مقصد‌هایی
-          هستند که کاربر همین‌جا انتظارشان را دارد. از همان فهرستِ منو خوانده می‌شوند تا
-          هیچ‌وقت از هم جدا نیفتند، و در موبایل در یک ردیف کشویی می‌ایستند تا چیزی پشت
-          لبه پنهان نماند.
+          حساب فقط همین پنج تب نیست: پاداش، دفتر مالی و استودیو غرفه مقصد‌هایی
+          هستند که کاربر همین‌جا انتظارشان را دارد. از همان فهرستِ منو خوانده
+          می‌شوند تا هیچ‌وقت از هم جدا نیفتند. پیام‌ها عمداً اینجا نیست: دکمهٔ
+          سراسری پیام‌رسان همیشه روی صفحه است و چیپ تکراری فقط ردیف را پهن‌تر
+          می‌کرد. ردیف به‌جای اسکرولِ بی‌نشانه wrap می‌شود تا هیچ چیپ نیمه‌بریده‌ای
+          پشت لبه نماند.
         */}
-        <nav aria-label="میان‌برهای حساب" className="no-scrollbar mt-5 flex snap-x gap-2 overflow-x-auto pb-1">
-          {visibleItems(ACCOUNT_ITEMS, { level, isAuthenticated }).filter((item) => item.id !== "profile").map((item) => (
+        <nav aria-label="میان‌برهای حساب" className="mt-5 flex flex-wrap gap-2">
+          {visibleItems(ACCOUNT_ITEMS, { level, isAuthenticated }).filter((item) => item.id !== "profile" && item.id !== "messages").map((item) => (
             <Link
               key={item.id}
               to={item.to}
@@ -213,7 +215,7 @@ export default function Profile() {
         <div className="mt-4 grid min-w-0 gap-5 md:mt-6 md:gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
           <aside className="h-fit min-w-0 rounded-3xl border border-emerald-100 bg-white p-2.5 shadow-sm dark:border-emerald-900 dark:bg-emerald-950 sm:p-3 lg:sticky lg:top-[calc(var(--header-height)+1rem)]">
             <nav
-              className="no-scrollbar flex snap-x gap-2 overflow-x-auto lg:flex-col lg:overflow-visible"
+              className="flex flex-wrap gap-2 lg:flex-col"
               aria-label="Account sections"
             >
               {navItems.map(({ id, label, icon: Icon }) => (
@@ -303,7 +305,7 @@ function SellerPanel({ storefront, listings, loading, onStoreCreated, t }: { sto
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h2 className="truncate text-xl font-extrabold text-slate-800 dark:text-white">{storefront.name}</h2>
+              <h2 className="min-w-0 truncate text-xl font-extrabold text-slate-800 dark:text-white">{storefront.name}</h2>
               {storefront.is_verified ? <BadgeCheck className="shrink-0 text-emerald-600" size={20} /> : null}
             </div>
             <p className="mt-2 text-sm text-slate-500 dark:text-emerald-200">
@@ -351,7 +353,7 @@ function SellerPanel({ storefront, listings, loading, onStoreCreated, t }: { sto
               <li key={listing.id} className="rounded-2xl border border-rose-300 bg-rose-50/50 p-4 dark:border-rose-800 dark:bg-rose-950/20">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <h3 className="truncate font-bold text-slate-800 dark:text-white">{listing.title}</h3>
+                    <h3 className="min-w-0 truncate font-bold text-slate-800 dark:text-white">{listing.title}</h3>
                     <p className="mt-1 text-xs text-slate-500">{listing.quantity_available} {listing.unit} · {formatPrice(listing.price)}</p>
                   </div>
                   <Link to={storeUrl} className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl border border-rose-300 px-3 text-fluid-xs font-bold text-rose-700 transition hover:bg-rose-100 dark:border-rose-700 dark:text-rose-200 dark:hover:bg-rose-950/50">
@@ -390,7 +392,7 @@ function SellerPanel({ storefront, listings, loading, onStoreCreated, t }: { sto
               <article key={listing.id} className="rounded-2xl border border-slate-100 p-4 dark:border-emerald-900">
                 <div className="flex justify-between gap-3">
                   <div className="min-w-0">
-                    <h3 className="truncate font-bold text-slate-800 dark:text-white">{listing.title}</h3>
+                    <h3 className="min-w-0 truncate font-bold text-slate-800 dark:text-white">{listing.title}</h3>
                     <p className="mt-1 text-xs text-slate-500">{listing.quantity_available} {listing.unit} · {formatPrice(listing.price)}</p>
                   </div>
                   <span className={`h-fit shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${listing.status === "rejected" ? "bg-rose-100 text-rose-700 dark:bg-rose-900 dark:text-rose-100" : listing.status === "published" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-lime-300" : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-100"}`}>

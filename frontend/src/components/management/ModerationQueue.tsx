@@ -328,7 +328,7 @@ export default function ModerationQueue() {
                       <span className="rounded-full bg-slate-200 px-2 py-0.5 text-fluid-2xs font-bold text-slate-700 dark:bg-emerald-800 dark:text-lime-200">
                         {CONTENT_TYPES.find((entry) => entry.value === row.type)?.label ?? row.type}
                       </span>
-                      <strong className="truncate text-sm text-slate-800 dark:text-white">{row.title}</strong>
+                      <strong className="min-w-0 truncate text-sm text-slate-800 dark:text-white">{row.title}</strong>
                       <span className="text-fluid-2xs text-slate-400">{row.status_label}</span>
                     </div>
                     {row.storefront && (

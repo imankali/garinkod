@@ -7,7 +7,7 @@ from django.utils import timezone
 from django.conf import settings
 import uuid
 from django.db.models import Q, Sum
-from .catalog import Product
+from .catalog import Product, best_price_tier, tiered_price
 
 
 
@@ -124,12 +124,61 @@ class CartItem(models.Model):
         return self.product_package.label if self.product_package_id else ''
 
     @property
-    def unit_price(self) -> int:
+    def base_unit_price(self) -> int:
+        """The row's price before any quantity ladder.
+
+        This is the *discounted* price — the number the catalogue page, the
+        product card and the storefront all show as the price. Until it was,
+        the site advertised `discount_percent` everywhere and charged the raw
+        `price` at checkout, so a buyer told «۲۰٪ تخفیف» paid full price the
+        moment they added to cart. Every screen that shows a price goes through
+        `discounted_price`; charging through a different path is what let the
+        two disagree for as long as they did.
+
+        Order of operations, deliberately: the site-wide discount lands first,
+        then the quantity ladder comes off that. That is the order a buyer
+        reads them in — "this is 20% off, and 40 of them is cheaper again" —
+        and it is the cheaper reading for them, which is the direction a
+        pricing ambiguity should always resolve in.
+        """
         if self.listing_id:
-            return int(self.listing.price or 0)
+            return int(self.listing.discounted_price or 0)
         if self.product_package_id:
-            return int(self.product_package.effective_price or 0)
-        return int(self.product.price or 0)
+            return int(self.product_package.discounted_price or 0)
+        return int(self.product.discounted_price or 0)
+
+    @property
+    def price_tiers(self):
+        """The ladder this row is priced against.
+
+        A packaging row inherits its product's ladder: «کیسه ۲۵ کیلویی» and the
+        loose sack are the same goods at two pack sizes, and a buyer who is told
+        "40 is cheaper" on the product page must get that on whichever packaging
+        they actually put in the cart.
+        """
+        if self.listing_id:
+            return list(self.listing.price_tiers.all())
+        return list(self.product.price_tiers.all())
+
+    @property
+    def applied_price_tier(self):
+        """The rung this quantity reached, or ``None``."""
+        return best_price_tier(self.price_tiers, self.quantity)
+
+    @property
+    def next_price_tier(self):
+        """The next rung up, so the cart can say what it would take to reach it."""
+        tiers = self.price_tiers
+        higher = [t for t in tiers if t.min_quantity > self.quantity]
+        return min(higher, key=lambda t: t.min_quantity) if higher else None
+
+    @property
+    def unit_price(self) -> int:
+        # Two discounts, one after the other: the site-wide `discount_percent`
+        # is already folded into `base_unit_price`, and the quantity ladder then
+        # comes off that. A row with neither is priced exactly as it was priced
+        # before either feature existed.
+        return tiered_price(self.base_unit_price, self.price_tiers, self.quantity)
 
     @property
     def total_price(self):

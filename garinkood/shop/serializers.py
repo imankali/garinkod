@@ -21,6 +21,7 @@ from .models import (
     SiteArticle, Service, SitePage, SitePageBlock,
     TeamMember, BrandPartner, SiteContact, NewsletterSubscriber, PRODUCT_ATTRIBUTE_TEMPLATE,
     DeskAgent, DeskSettings, QuickReply, ConversationRating,
+    PriceTier,
 )
 from django.core.exceptions import ValidationError as DjangoValidationError
 
@@ -168,6 +169,41 @@ class ProductImageSerializer(serializers.ModelSerializer):
 
     def get_image_srcset(self, obj) -> dict:
         return obj.get_image_srcset()
+class PriceTierSerializer(serializers.ModelSerializer):
+    """One rung of a quantity ladder, as the buyer reads it.
+
+    ``unit_price`` is included so the ladder is a table of prices rather than a
+    table of percentages: "40 → 12٪" still makes the buyer do arithmetic on a
+    number they have to trust, and arithmetic on a phone in a field is where
+    abandoned carts come from.
+    """
+
+    unit_price = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PriceTier
+        fields = ['id', 'min_quantity', 'discount_percent', 'unit_price']
+
+    def get_unit_price(self, obj) -> int:
+        """The price this rung actually charges.
+
+        This must stay identical to what ``CartItem.unit_price`` computes, and
+        it very nearly was not: an earlier version read the raw ``price`` field
+        here while the cart applied the rung to ``discounted_price``. The ladder
+        table would then have promised one number and the checkout charged
+        another — the precise bug the cart itself was only just fixed of, and
+        the worse version of it, because a ladder that lies is worse than no
+        ladder at all.
+
+        Reading ``discounted_price`` is what keeps the two in step: it is the
+        same property the product page, the product card and the cart all read.
+        """
+        base = obj.product.discounted_price if obj.product_id else (obj.listing.discounted_price or 0)
+        return max(int(int(base or 0) * (100 - obj.discount_percent) / 100), 0)
+
+
+
+
 
 
 class ProductSerializer(serializers.ModelSerializer):
@@ -191,6 +227,8 @@ class ProductSerializer(serializers.ModelSerializer):
     discounted_price = serializers.SerializerMethodField()
     rating_summary = serializers.SerializerMethodField()
 
+    price_tiers = PriceTierSerializer(many=True, read_only=True)
+
     class Meta:
         model = Product
         fields = [
@@ -205,7 +243,7 @@ class ProductSerializer(serializers.ModelSerializer):
             'seed_detail', 'equipment_detail', 'attributes', 'rating_summary',
             'images', 'gallery', 'packages', 'tags', 'views',
             'production_date', 'expiry_date', 'expiry_days_left', 'is_expiring_soon',
-            'min_order_quantity', 'bulk_note', 'video_url',
+            'min_order_quantity', 'bulk_note', 'video_url', 'price_tiers',
         ]
 
     def get_gallery(self, obj) -> list[dict]:
@@ -289,8 +327,6 @@ def rating_breakdown(product) -> tuple[float | None, int, dict[str, int]]:
         distribution[str(row['rating'])] = row['total']
         total += row['rating'] * row['total']
     return total / count, count, distribution
-
-
 class ProductListSerializer(serializers.ModelSerializer):
     """Serializer سبک‌تر برای لیست محصولات"""
     category = serializers.StringRelatedField(read_only=True)
@@ -304,6 +340,7 @@ class ProductListSerializer(serializers.ModelSerializer):
     image_alt_url = serializers.SerializerMethodField()
     is_expiring_soon = serializers.SerializerMethodField()
     tags = TagSerializer(many=True, read_only=True)
+    price_tiers = PriceTierSerializer(many=True, read_only=True)
 
     class Meta:
         model = Product
@@ -313,6 +350,7 @@ class ProductListSerializer(serializers.ModelSerializer):
             'discount_percent', 'sales_count', 'discounted_price', 'brand', 'sku',
             'package_weight', 'price_on_request', 'avg_rating', 'reviews_count',
             'image_alt_url', 'is_expiring_soon', 'views', 'brand_slug', 'tags',
+            'price_tiers',
         ]
 
     def get_image_url(self, obj) -> str:
@@ -538,6 +576,12 @@ class CartItemSerializer(serializers.ModelSerializer):
     is_in_stock = serializers.BooleanField(read_only=True)
     min_order_quantity = serializers.SerializerMethodField()
     package_label = serializers.CharField(read_only=True)
+    # The ladder, stated on the row where the quantity is changed: what rung this
+    # quantity reached, what it saved, and what the next rung would take.
+    base_unit_price = serializers.IntegerField(read_only=True)
+    tier_discount_percent = serializers.SerializerMethodField()
+    tier_saving = serializers.SerializerMethodField()
+    next_tier = serializers.SerializerMethodField()
 
     class Meta:
         model = CartItem
@@ -545,7 +589,21 @@ class CartItemSerializer(serializers.ModelSerializer):
             'id', 'kind', 'product', 'listing', 'title', 'quantity', 'unit_price',
             'total_price', 'available_quantity', 'min_order_quantity', 'is_in_stock',
             'product_package', 'package_label',
+            'base_unit_price', 'tier_discount_percent', 'tier_saving', 'next_tier',
         ]
+
+    def get_tier_discount_percent(self, obj) -> int:
+        tier = obj.applied_price_tier
+        return tier.discount_percent if tier else 0
+
+    def get_tier_saving(self, obj) -> int:
+        # Per unit × quantity: the number a buyer compares against the rung they
+        # were offered, not a percentage they have to apply themselves.
+        return (obj.base_unit_price - obj.unit_price) * obj.quantity
+
+    def get_next_tier(self, obj):
+        tier = obj.next_price_tier
+        return PriceTierSerializer(tier).data if tier else None
 
     def get_min_order_quantity(self, obj) -> int:
         if obj.listing_id:

@@ -213,13 +213,13 @@ export default function PostCard({
             to={storeUrl}
             className="flex items-center gap-1 text-fluid-sm font-extrabold text-slate-800 hover:underline dark:text-white"
           >
-            <span className="truncate">{post.storefront_name}</span>
+            <span className="min-w-0 truncate">{post.storefront_name}</span>
             {post.storefront_is_verified && (
               <BadgeCheck size={14} className="shrink-0 text-emerald-500" aria-label="غرفه تأییدشده" />
             )}
           </Link>
           {/* The handle: the غرفه's unique address, the stable identifier. */}
-          <p className="truncate text-fluid-2xs text-slate-500 dark:text-emerald-300">
+          <p className="min-w-0 truncate text-fluid-2xs text-slate-500 dark:text-emerald-300">
             <bdi>@{post.storefront_slug}</bdi> · {timeAgo(post.created_at)}
           </p>
         </div>

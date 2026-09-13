@@ -209,7 +209,7 @@ export default function MobileMenu({
                     )}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-fluid-sm font-bold text-slate-800 dark:text-white">
+                    <span className="block min-w-0 truncate text-fluid-sm font-bold text-slate-800 dark:text-white">
                       {fullName}
                     </span>
                     <span className="block text-fluid-2xs text-emerald-700 dark:text-lime-300">
@@ -284,7 +284,7 @@ export default function MobileMenu({
                             {item.description && (
                               <span
                                 className={cn(
-                                  'block truncate text-fluid-2xs',
+                                  'block min-w-0 truncate text-fluid-2xs',
                                   isActive ? 'text-emerald-50' : 'text-slate-500 dark:text-emerald-300/70',
                                 )}
                               >

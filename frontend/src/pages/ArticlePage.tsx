@@ -289,7 +289,7 @@ export default function ArticlePage() {
                           }}
                         />
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-fluid-xs font-bold text-slate-700 dark:text-white">
+                          <span className="block min-w-0 truncate text-fluid-xs font-bold text-slate-700 dark:text-white">
                             {product.title}
                           </span>
                           <span className="block text-fluid-2xs text-emerald-700 dark:text-lime-300">
@@ -338,7 +338,7 @@ export default function ArticlePage() {
                           }}
                         />
                         <span className="min-w-0">
-                          <span className="block truncate text-fluid-sm font-bold text-slate-800 dark:text-white">
+                          <span className="block min-w-0 truncate text-fluid-sm font-bold text-slate-800 dark:text-white">
                             {listing.title}
                           </span>
                           <span className="block text-fluid-2xs text-slate-500 dark:text-emerald-300">

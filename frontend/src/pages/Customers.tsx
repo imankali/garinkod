@@ -113,7 +113,7 @@ export default function Customers() {
 
               <footer className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3 dark:border-emerald-900">
                 <div className="min-w-0">
-                  <p className="truncate text-fluid-sm font-extrabold text-slate-800 dark:text-white">{item.name}</p>
+                  <p className="min-w-0 truncate text-fluid-sm font-extrabold text-slate-800 dark:text-white">{item.name}</p>
                   <p className="mt-0.5 flex flex-wrap items-center gap-2 text-fluid-2xs text-slate-400">
                     <Link to={item.product.url} className="font-bold text-emerald-700 hover:underline dark:text-lime-300">
                       {item.product.title}

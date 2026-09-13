@@ -77,7 +77,7 @@ export default function Brands() {
                     className="flex min-h-16 items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition hover:border-emerald-200 hover:shadow dark:border-emerald-900 dark:bg-emerald-950 dark:hover:border-emerald-700"
                   >
                     <span className="min-w-0">
-                      <span className="block truncate text-fluid-sm font-extrabold text-slate-800 dark:text-white">
+                      <span className="block min-w-0 truncate text-fluid-sm font-extrabold text-slate-800 dark:text-white">
                         {brand.title}
                       </span>
                       <span className="mt-0.5 block text-fluid-2xs text-slate-400">

@@ -56,6 +56,65 @@ class CookieTokenCsrfTests(TestCase):
         self.assertEqual(response.status_code, 200, response.content)
 
 
+@override_settings(SECURE_SSL_REDIRECT=False)
+class CsrfCookieIssuedTests(TestCase):
+    """The server must hand out the cookie it then demands.
+
+    These two tests are the reason a broken write path can no longer hide.
+
+    `CookieTokenCsrfTests` above proves the check fires; it seeds the cookie by
+    hand, so it passed for years while no endpoint in the API ever issued one. A
+    browser that cannot obtain the cookie cannot echo it, and every unsafe request
+    it made came back 403 `permission_denied` — cart, checkout, messaging, opening
+    a stall. Django's test client hides this (CSRF checks off by default) and
+    `APIRequestFactory` never reaches the cookie layer, which is how it stayed green.
+
+    So the cookie is asserted where it is produced, and the write path is walked
+    with nothing but what the server itself returned.
+    """
+
+    def test_a_plain_get_issues_the_csrf_cookie(self):
+        client = APIClient(enforce_csrf_checks=True)
+        response = client.get("/api/auth/session/")
+        # 401 is the honest answer for a visitor who has no session; what matters
+        # is that the response still carries the token the page has to echo back.
+        self.assertIn(settings.CSRF_COOKIE_NAME, response.cookies, response.content)
+
+    def test_a_signed_in_browser_can_write_using_only_cookies_the_server_gave_it(self):
+        client = APIClient(enforce_csrf_checks=True)
+        register = client.post(
+            "/api/auth/register/",
+            {
+                "username": "browser-seller",
+                "email": "browser-seller@example.test",
+                "password": "SafePassword!234",
+                "password2": "SafePassword!234",
+            },
+            format="json",
+        )
+        self.assertEqual(register.status_code, 201, register.content)
+
+        # The cookie jar is the only state carried forward — exactly the browser's.
+        csrf_token = client.cookies[settings.CSRF_COOKIE_NAME].value
+        self.assertTrue(csrf_token, "registration issued no CSRF cookie to echo back")
+
+        created = client.post(
+            "/api/marketplace/storefront/",
+            {
+                "name": "غرفه مرورگر",
+                "seller_type": "farmer",
+                "province": "فارس",
+                "city": "شیراز",
+                "owner_first_name": "زهرا",
+                "owner_last_name": "بهاران",
+                "national_id": "3971857299",
+            },
+            format="json",
+            HTTP_X_CSRFTOKEN=csrf_token,
+        )
+        self.assertEqual(created.status_code, 201, created.content)
+
+
 class ApiPermissionPolicyTests(TestCase):
     """Pin the registry policy: public routes are explicit, all others fail closed."""
 

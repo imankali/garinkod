@@ -52,8 +52,8 @@ export default function ConsultCard({
           }}
         />
         <div className="min-w-0">
-          <p className="truncate text-fluid-sm font-extrabold text-slate-800 dark:text-white">{expertName}</p>
-          <p className="truncate text-fluid-2xs text-slate-500 dark:text-emerald-200">{expertRole}</p>
+          <p className="min-w-0 truncate text-fluid-sm font-extrabold text-slate-800 dark:text-white">{expertName}</p>
+          <p className="min-w-0 truncate text-fluid-2xs text-slate-500 dark:text-emerald-200">{expertRole}</p>
         </div>
       </div>
 

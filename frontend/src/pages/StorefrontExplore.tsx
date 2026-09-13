@@ -125,7 +125,7 @@ export default function StorefrontExplore() {
                   </span>
                 )}
                 <span className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-gradient-to-t from-black/70 to-transparent px-2 pb-1.5 pt-6 text-fluid-2xs font-bold text-white opacity-0 transition group-hover:opacity-100 group-focus-visible:opacity-100">
-                  <span className="truncate">{post.storefront_name}</span>
+                  <span className="min-w-0 truncate">{post.storefront_name}</span>
                   <span className="flex shrink-0 items-center gap-2">
                     <span className="flex items-center gap-0.5">
                       <Heart size={11} aria-hidden="true" />

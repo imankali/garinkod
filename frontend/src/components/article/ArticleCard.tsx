@@ -51,7 +51,7 @@ export default function ArticleCard({
           }}
         />
         <span className="min-w-0">
-          <span className="block truncate text-fluid-sm font-bold text-slate-800 group-hover:text-emerald-700 dark:text-white dark:group-hover:text-lime-300">
+          <span className="block min-w-0 truncate text-fluid-sm font-bold text-slate-800 group-hover:text-emerald-700 dark:text-white dark:group-hover:text-lime-300">
             {article.title}
           </span>
           <span className="mt-1 block text-fluid-2xs text-slate-400">
