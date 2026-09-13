@@ -548,3 +548,75 @@ class PriceTierAdminTests(TestCase):
             except IntegrityError:
                 transaction.set_rollback(True)
         self.assertEqual(PriceTier.objects.filter(product=self.product).count(), 1)
+
+class OrderCeilingTests(TestCase):
+    """A ladder the cart refuses to reach is a promise with a button on it.
+
+    The bug: catalogue products were capped at ten units per cart line, while
+    the ladder offered rungs at twenty and forty. The strip offered «برو به ۲۰»,
+    the server clamped the request to ten *without responding*, and the buyer
+    got ten units at the undiscounted price after being shown a cheaper one.
+
+    Three things are pinned here, because fixing any one of them alone leaves a
+    way to lie: the ladder raises the ceiling, products without a ladder are
+    untouched, and an over-the-ceiling request is refused rather than rewritten.
+    """
+
+    def setUp(self):
+        self.client = APIClient()
+        self.buyer = User.objects.create_user(username="ceiling-buyer", password="x12345678")
+        self.client.force_login(self.buyer)
+        self.author = User.objects.create_user(username="ceiling-vendor", password="x12345678")
+
+    def _product(self, slug, stock=500, **kwargs):
+        return Product.objects.create(
+            title=f"کود {slug}", slug=slug, author=self.author, description="تست",
+            price=10000, stock=stock, status="published", **kwargs,
+        )
+
+    def test_a_product_without_a_ladder_is_still_capped_at_ten(self):
+        """The fat-finger guard must survive for the whole existing catalogue."""
+        product = self._product("no-ladder-cap")
+        response = self.client.post(
+            "/api/cart/add/", {"product_id": product.id, "quantity": 30}, format="json",
+        )
+        self.assertEqual(response.status_code, 201, response.content.decode())
+        row = CartItem.objects.get(product=product)
+        self.assertEqual(row.quantity, 10)
+
+    def test_a_ladder_above_the_cap_makes_its_own_rung_reachable(self):
+        product = self._product("with-ladder-cap")
+        PriceTier.objects.create(product=product, min_quantity=20, discount_percent=15)
+
+        response = self.client.post(
+            "/api/cart/add/", {"product_id": product.id, "quantity": 20}, format="json",
+        )
+        self.assertEqual(response.status_code, 201, response.content.decode())
+        row = CartItem.objects.get(product=product)
+        self.assertEqual(row.quantity, 20)
+        # ...and the promised price is the one actually charged.
+        self.assertEqual(row.unit_price, 8500)
+
+    def test_an_over_the_ceiling_update_is_refused_not_silently_rewritten(self):
+        """The clamp is the reason nobody noticed. It has to answer instead."""
+        product = self._product("refuse-clamp")
+        self.client.post("/api/cart/add/", {"product_id": product.id, "quantity": 2}, format="json")
+
+        response = self.client.post(
+            "/api/cart/update_quantity/",
+            {"item_id": CartItem.objects.get(product=product).id, "quantity": 40},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 409, response.content.decode())
+        self.assertEqual(CartItem.objects.get(product=product).quantity, 2)
+
+    def test_stock_still_wins_over_the_ladder(self):
+        """Raising the ceiling must not let a buyer order stock that is absent."""
+        product = self._product("low-stock-ladder", stock=15)
+        PriceTier.objects.create(product=product, min_quantity=20, discount_percent=15)
+        response = self.client.post(
+            "/api/cart/add/", {"product_id": product.id, "quantity": 20}, format="json",
+        )
+        row = CartItem.objects.filter(product=product).first()
+        if row is not None:
+            self.assertLessEqual(row.quantity, 15)

@@ -31,6 +31,9 @@ from .pest_vision import analyze_crop_image
 from .filters import ProductFilter
 from .listing_filters import apply_listing_filters, category_facet_rows, csv_values, facet_rows
 from .search import ResilientProductSearchFilter
+# `max_order_quantity` lives with the ladder it derives from, not on the model
+# namespace, mirroring how orders.py imports `tiered_price`.
+from .models.catalog import max_order_quantity
 from .models import (
     Category, Product, Comment, UserAccount, Cart, CartItem, Order, OrderItem, PriceTier,
     ProductPackage, ProductImage, Tag, CommentVote, ReturnPolicySettings,
@@ -847,7 +850,7 @@ class CartViewSet(viewsets.ViewSet):
                 status=status.HTTP_409_CONFLICT,
             )
 
-        max_qty = min(10, limit)
+        max_qty = min(max_order_quantity(product), limit)
         quantity = min(quantity, max_qty)
 
         # Locking the cart item makes repeated clicks and concurrent requests
@@ -1010,8 +1013,22 @@ class CartViewSet(viewsets.ViewSet):
                     cart_item.quantity = quantity
                     cart_item.save(update_fields=['quantity'])
                 else:
-                    max_qty = min(10, cart_item.product.stock)
-                    cart_item.quantity = min(quantity, max_qty)
+                    max_qty = min(max_order_quantity(cart_item.product), cart_item.product.stock)
+                    # Refuse rather than clamp. This used to silently rewrite the
+                    # requested quantity down to the cap, which is exactly how a
+                    # buyer could be shown «برو به ۲۰ · هر واحد ۸۵۰ تومان», click
+                    # it, and end up with 10 units at the undiscounted price and
+                    # no message at all. A request the cart will not honour has to
+                    # say so.
+                    if quantity > max_qty:
+                        return Response(
+                            {
+                                'error': f'حداکثر {max_qty} عدد از این کالا قابل سفارش است.',
+                                'fields': {'quantity': [f'حداکثر {max_qty} عدد قابل سفارش است.']},
+                            },
+                            status=status.HTTP_409_CONFLICT,
+                        )
+                    cart_item.quantity = quantity
                     cart_item.save(update_fields=['quantity'])
 
         serializer = CartSerializer(cart, context={'request': request})

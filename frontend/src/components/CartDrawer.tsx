@@ -157,6 +157,31 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
     item.product?.category?.toString().toLowerCase().includes("pesticide")
   );
 
+
+/**
+ * A catalogue product is capped at ten units per cart line — a guard against a
+ * fat-fingered bulk order on a shop that sells sachets.
+ */
+const PRODUCT_ORDER_CEILING = 10;
+
+/**
+ * The ceiling for one product, mirroring `max_order_quantity` on the server.
+ *
+ * A product that declares a quantity ladder starting above ten is explicitly
+ * telling the platform it sells in bulk, so its own ladder is what raises the
+ * cap. Keeping the two in step matters: if the client capped at ten while the
+ * ladder offered twenty, the plus button would stop responding at ten and the
+ * ladder nudge would be a control that does nothing.
+ *
+ * Every product *without* a ladder is still capped at exactly ten, so this
+ * changes nothing for the existing catalogue.
+ */
+function productOrderCeiling(item: CartItem): number {
+  const tiers = item.product?.price_tiers ?? [];
+  const topRung = tiers.reduce((highest, rung) => Math.max(highest, rung.min_quantity), 0);
+  return Math.max(PRODUCT_ORDER_CEILING, topRung);
+}
+
   // ========================================
   // Handlers
   // ========================================
@@ -179,7 +204,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
     const max =
       item.kind === 'listing'
         ? item.available_quantity
-        : Math.min(10, item.available_quantity || 10);
+        : Math.min(productOrderCeiling(item), item.available_quantity || PRODUCT_ORDER_CEILING);
     return { min, max };
   }
 
@@ -454,6 +479,14 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                                 tierSaving={item.tier_saving}
                                 nextTier={item.next_tier}
                                 availableQuantity={item.available_quantity}
+                                maxQuantity={
+                                  item.kind === 'listing'
+                                    ? item.available_quantity
+                                    : Math.min(
+                                        productOrderCeiling(item),
+                                        item.available_quantity || PRODUCT_ORDER_CEILING,
+                                      )
+                                }
                                 onSetQuantity={(qty) => void handleUpdateQty(item.id, qty)}
                               />
                             </div>

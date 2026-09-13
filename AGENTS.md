@@ -56,9 +56,9 @@ change, review the code and then run the full matrix in detail.
 
 | Suite | Command | Last verified |
 |---|---|---|
-| Backend unit + integration | `cd garinkood && source /tmp/env.sh && ../.venv/bin/python manage.py test` | **620 tests, OK** |
-| Backend, tier module only | `... manage.py test shop.tests_price_tiers` | 37 tests, OK |
-| Frontend unit + integration | `cd frontend && CI=true npx vitest run` | **188 tests / 24 files** |
+| Backend unit + integration | `cd garinkood && source /tmp/env.sh && ../.venv/bin/python manage.py test` | **624 tests, OK** |
+| Backend, tier module only | `... manage.py test shop.tests_price_tiers` | 41 tests, OK |
+| Frontend unit + integration | `cd frontend && CI=true npx vitest run` | **190 tests / 24 files** |
 | Type check | `cd frontend && npx tsc --noEmit` | clean |
 | Build | `cd frontend && npm run build` | ✓ |
 | Design linter | `.agents-tmp/node_modules/.bin/impeccable detect frontend/src` | 125 (see §6) |
@@ -101,6 +101,19 @@ ladder off the result. That is the order a buyer reads them in, and it is the
 cheaper of the two readings — the direction a pricing ambiguity should always
 resolve in. Pinned by
 `CartTierPricingTests.test_the_two_discounts_stack_in_a_defined_order`.
+
+**The order ceiling must agree with the ladder.** A catalogue product is capped
+at ten units per cart line (`max_order_quantity`, `catalog.py`) — a fat-finger
+guard, not a business rule. `max_order_quantity` raises it to the product's top
+rung when the product declares a ladder, because a merchant who sets a rung at
+40 is explicitly saying the product sells in bulk. The client mirrors this in
+`CartDrawer.productOrderCeiling`; if the two disagree the plus button stops
+responding at ten and the ladder nudge becomes a control that does nothing.
+
+**Never clamp a request silently.** The cart used to rewrite an over-ceiling
+quantity down without responding, which is precisely how the ladder bug stayed
+hidden: the buyer was offered 20 at a discounted price, got 10 at the full
+price, and saw no message. An over-ceiling update now returns 409.
 
 **Ladder semantics.** Rungs never stack; only the highest reached applies.
 `min_quantity` is inclusive and ≥ 2. Rounding is down. A packaging row inherits

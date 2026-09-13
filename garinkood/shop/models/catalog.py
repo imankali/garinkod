@@ -656,6 +656,37 @@ class PriceTier(models.Model):
         return f"≥{self.min_quantity} → {self.discount_percent}٪ ({target})"
 
 
+# Retail products are capped at ten units per cart line. The number is a guard
+# against a fat-fingered bulk order on a shop that sells sachets, not a business
+# rule about demand.
+DEFAULT_MAX_ORDER_QUANTITY = 10
+
+
+def max_order_quantity(product) -> int:
+    """How many of this product one cart line may hold.
+
+    Ten, unless the product declares a quantity ladder that starts higher.
+
+    The two rules were written separately and contradict each other: a merchant
+    who sets a rung at 40 units is explicitly telling the platform the product
+    sells in bulk, and capping the cart at 10 makes that published price ladder
+    unreachable — the buyer is offered «برو به ۲۰», the server clamps it to 10
+    without complaint, and the promised unit price never applies. A silent clamp
+    behind a button that promised a price is worse than having no ladder.
+
+    Raising the ceiling only where a ladder exists keeps the fat-finger guard
+    for the entire existing catalogue — every product without a ladder is still
+    capped at exactly ten — and makes the ladder reachable exactly where the
+    merchant declared it.
+    """
+    top_rung = 0
+    try:
+        top_rung = max((tier.min_quantity for tier in product.price_tiers.all()), default=0)
+    except (ValueError, AttributeError):
+        top_rung = 0
+    return max(DEFAULT_MAX_ORDER_QUANTITY, int(top_rung or 0))
+
+
 def best_price_tier(tiers, quantity: int):
     """The highest rung ``quantity`` reaches, or ``None``.
 

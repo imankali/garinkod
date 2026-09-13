@@ -16,6 +16,13 @@ type Props = {
   onSetQuantity?: (quantity: number) => void;
   /** Stock ceiling; the nudge is suppressed when it cannot be honoured. */
   availableQuantity?: number;
+  /**
+   * What the cart will actually accept for this line — the order ceiling, not
+   * the stock. Stock and ceiling are different limits and both can refuse: a
+   * rung the cart caps below is just as unreachable as one the warehouse cannot
+   * cover.
+   */
+  maxQuantity?: number;
 };
 
 /**
@@ -50,13 +57,22 @@ export default function CartTierStrip({
   nextTier,
   onSetQuantity,
   availableQuantity,
+  maxQuantity,
 }: Props) {
   const reached = tierDiscountPercent > 0;
   const shortfall = nextTier ? nextTier.min_quantity - quantity : 0;
+
+  // Both ceilings have to clear the rung. Checking only stock was the bug this
+  // component shipped with: the cart caps a catalogue line at ten units, so a
+  // rung at twenty looked reachable, the button offered it, and the server
+  // clamped the request to ten without a word — the buyer got ten units at the
+  // undiscounted price after being promised a cheaper one. A nudge that cannot
+  // be honoured must not be offered at all.
   const reachable =
     nextTier != null &&
     shortfall > 0 &&
-    (availableQuantity == null || nextTier.min_quantity <= availableQuantity);
+    (availableQuantity == null || nextTier.min_quantity <= availableQuantity) &&
+    (maxQuantity == null || nextTier.min_quantity <= maxQuantity);
 
   if (!reached && !reachable) return null;
 

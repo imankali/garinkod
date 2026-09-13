@@ -103,4 +103,36 @@ describe('CartTierStrip', () => {
     await user.click(screen.getByRole('button', { name: /برو به ۲۰/ }));
     expect(onSetQuantity).toHaveBeenCalledWith(20);
   });
+
+  it('does not offer a rung the cart ceiling refuses, even with stock to spare', () => {
+    // This is the bug the component shipped with. Stock was 500, so the rung at
+    // 20 looked reachable — but the cart caps a catalogue line at ten units, so
+    // clicking it produced ten units at the UNDISCOUNTED price, with no error,
+    // after the buyer had been promised a cheaper one.
+    render(
+      <CartTierStrip
+        quantity={5}
+        baseUnitPrice={1000}
+        nextTier={nextTier}
+        availableQuantity={500}
+        maxQuantity={10}
+      />,
+    );
+    expect(screen.queryByText('۱۵ عدد دیگر')).not.toBeInTheDocument();
+  });
+
+  it('does offer the rung once the product’s own ladder raises the ceiling', () => {
+    // A ladder at 20 is what lifts the cap to 20 on the server; the client has
+    // to agree or the button stops responding at ten.
+    render(
+      <CartTierStrip
+        quantity={5}
+        baseUnitPrice={1000}
+        nextTier={nextTier}
+        availableQuantity={500}
+        maxQuantity={20}
+      />,
+    );
+    expect(screen.getByText('۱۵ عدد دیگر')).toBeInTheDocument();
+  });
 });
