@@ -185,7 +185,7 @@ export default function LandFormModal({
                   className={inputClass}
                 />
               </Field>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <Field label="مساحت" required>
                   <input
                     value={form.area}

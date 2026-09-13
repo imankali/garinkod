@@ -180,7 +180,7 @@ export default function HealthPanel() {
             تا وقتی این کلید خاموش است، هیچ کاربری معطل نمی‌شود؛ حتی اگر ظرفیت پر شده باشد. روشن‌کردنش یعنی
             «وقتی سرور نفس تنگ کرد، تازه‌واردها چند لحظه صبر کنند» — و تا {fa(data.queue.max_minutes)} دقیقه.
           </p>
-          <div className="mt-4 grid grid-cols-3 gap-3 text-center">
+          <div className="mt-4 grid grid-cols-1 gap-3 text-center sm:grid-cols-3">
             <Fact label="در صف" value={fa(data.queue.waiting)} />
             <Fact label="تازه وارد شده‌اند" value={fa(data.queue.admitted_recently)} />
             <Fact label="سقف صبر" value={`${fa(data.queue.max_minutes)} دقیقه`} />

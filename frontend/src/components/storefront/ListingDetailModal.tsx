@@ -236,7 +236,7 @@ export default function ListingDetailModal({
               <span className="text-fluid-xs text-slate-400">/ {listing.unit}</span>
             </div>
 
-            <dl className="mt-4 grid grid-cols-2 gap-2 text-fluid-xs">
+            <dl className="mt-4 grid grid-cols-1 gap-2 text-fluid-xs sm:grid-cols-2">
               <Fact label="موجودی" value={`${listing.quantity_available} ${listing.unit}`} />
               <Fact label="حداقل سفارش" value={`${listing.minimum_order} ${listing.unit}`} />
               <Fact label="محصول" value={listing.crop_name} />
