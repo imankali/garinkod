@@ -189,7 +189,7 @@ export default function HealthPanel() {
             <ul className="mt-4 space-y-2">
               {data.queue.next_positions.map((row) => (
                 <li key={row.position} className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-2.5 text-xs dark:bg-emerald-900/40">
-                  <span dir="ltr" className="truncate font-mono text-slate-600 dark:text-emerald-100">{row.path}</span>
+                  <span dir="ltr" className="min-w-0 truncate font-mono text-slate-600 dark:text-emerald-100">{row.path}</span>
                   <span className="shrink-0 text-slate-500 dark:text-emerald-200">
                     نفر {fa(row.position)} · {fa(row.waiting_minutes)} دقیقه
                   </span>
@@ -252,7 +252,7 @@ function OnlinePeople() {
             <div className="min-w-0">
               <strong className="text-slate-800 dark:text-white">{row.full_name || row.username}</strong>
               <span className="ms-2 text-slate-500 dark:text-emerald-200">{row.level_label}</span>
-              <p className="mt-1 truncate text-slate-500 dark:text-emerald-200" dir="ltr">
+              <p className="mt-1 min-w-0 truncate text-slate-500 dark:text-emerald-200" dir="ltr">
                 {row.current_path || '/'}
               </p>
             </div>
@@ -578,7 +578,7 @@ function Fact({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl bg-slate-50 px-3 py-2.5 dark:bg-emerald-900/40">
       <dt className="text-fluid-2xs text-slate-500 dark:text-emerald-200">{label}</dt>
-      <dd className="mt-0.5 truncate text-sm font-bold text-slate-800 dark:text-white" title={value}>{value}</dd>
+      <dd className="mt-0.5 min-w-0 truncate text-sm font-bold text-slate-800 dark:text-white" title={value}>{value}</dd>
     </div>
   );
 }

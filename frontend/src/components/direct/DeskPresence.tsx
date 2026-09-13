@@ -67,11 +67,11 @@ export function DeskIdentity({
 
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-1.5">
-          <span className="block truncate text-fluid-sm font-extrabold text-slate-800 dark:text-white">
+          <span className="block min-w-0 truncate text-fluid-sm font-extrabold text-slate-800 dark:text-white">
             {name}
           </span>
           {agent?.title && (
-            <span className="hidden truncate rounded-full bg-emerald-50 px-2 py-0.5 text-fluid-2xs font-bold text-emerald-700 sm:inline dark:bg-emerald-900 dark:text-lime-300">
+            <span className="hidden min-w-0 truncate rounded-full bg-emerald-50 px-2 py-0.5 text-fluid-2xs font-bold text-emerald-700 sm:inline dark:bg-emerald-900 dark:text-lime-300">
               {agent.title}
             </span>
           )}

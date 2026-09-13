@@ -451,7 +451,7 @@ function productOrderCeiling(item: CartItem): number {
                                     <span className="rounded-full bg-lime-100 px-2 py-0.5 font-bold text-emerald-700 dark:bg-emerald-800 dark:text-lime-200">
                                       غرفه
                                     </span>
-                                    <span className="truncate">{item.listing?.storefront_name}</span>
+                                    <span className="min-w-0 truncate">{item.listing?.storefront_name}</span>
                                   </>
                                 ) : (
                                   <span className="rounded-full bg-slate-100 px-2 py-0.5 font-bold text-slate-500 dark:bg-emerald-800/70 dark:text-emerald-100">
@@ -599,7 +599,7 @@ function productOrderCeiling(item: CartItem): number {
                         <p className="mb-0.5 flex items-center gap-1 text-fluid-2xs font-bold text-emerald-600 dark:text-lime-300">
                           <Gift size={11} /> {suggestion.reason}
                         </p>
-                        <p className="truncate text-xs font-semibold text-slate-600 dark:text-emerald-50">
+                        <p className="min-w-0 truncate text-xs font-semibold text-slate-600 dark:text-emerald-50">
                           {suggestion.name}
                         </p>
                         <p className="mt-0.5 flex items-baseline gap-1.5 text-fluid-2xs">

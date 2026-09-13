@@ -167,7 +167,7 @@ export default function MarketplaceListingCard({
         >
           {listing.title}
         </Link>
-        <p className="mt-1 truncate text-fluid-2xs text-slate-500 dark:text-emerald-300/70">
+        <p className="mt-1 min-w-0 truncate text-fluid-2xs text-slate-500 dark:text-emerald-300/70">
           {listing.storefront.name}
           {' · '}
           {listing.category_label || listing.crop_name}

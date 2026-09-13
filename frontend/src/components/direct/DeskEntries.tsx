@@ -159,7 +159,7 @@ export default function DeskEntries({
 
             <span className="min-w-0 flex-1">
               <span className="flex items-center gap-1.5">
-                <span className="truncate text-fluid-xs font-extrabold text-slate-800 dark:text-white">
+                <span className="min-w-0 truncate text-fluid-xs font-extrabold text-slate-800 dark:text-white">
                   {desk.title}
                 </span>
                 {unread > 0 && (
@@ -177,7 +177,7 @@ export default function DeskEntries({
               <span
                 className={cn(
                   'mt-1 block text-fluid-2xs leading-5 text-slate-500 dark:text-emerald-200',
-                  blocked ? 'line-clamp-3' : 'truncate',
+                  blocked ? 'line-clamp-3' : 'min-w-0 truncate',
                 )}
               >
                 {blocked && !thread ? state!.customer_denied_reason : thread ? thread.last_message?.body || desk.hint : desk.hint}

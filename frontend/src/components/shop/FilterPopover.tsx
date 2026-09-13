@@ -92,7 +92,7 @@ export function FilterShell({
             : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-300 hover:text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-100 dark:hover:border-emerald-600',
         )}
       >
-        <span className="truncate">{summary || label}</span>
+        <span className="min-w-0 truncate">{summary || label}</span>
         {badge ? (
           <span className="rounded-full bg-emerald-600 px-1.5 text-fluid-2xs font-extrabold leading-5 text-white">
             {badge.toLocaleString('fa-IR')}

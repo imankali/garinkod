@@ -79,8 +79,8 @@ export default function LandDetailDrawer({
                   {land.land_type === 'orchard' ? '🌳' : land.land_type === 'greenhouse' ? '🏡' : '🌾'}
                 </span>
                 <div className="min-w-0">
-                  <h2 className="truncate text-sm font-extrabold text-slate-800 dark:text-white">{land.name}</h2>
-                  <p className="truncate text-fluid-xs text-slate-400">
+                  <h2 className="min-w-0 truncate text-sm font-extrabold text-slate-800 dark:text-white">{land.name}</h2>
+                  <p className="min-w-0 truncate text-fluid-xs text-slate-400">
                     {land.land_type_label} · {land.crop_type}
                     {land.crop_variety ? ` (${land.crop_variety})` : ''}
                   </p>

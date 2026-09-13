@@ -143,14 +143,14 @@ function RequestsView() {
                     )}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <p className="truncate text-xs font-extrabold text-slate-800 dark:text-white">
+                      <p className="min-w-0 truncate text-xs font-extrabold text-slate-800 dark:text-white">
                         {request.farmer_name}
                       </p>
                       {request.status === 'pending' && (
                         <span className="h-2 w-2 shrink-0 rounded-full bg-amber-400" />
                       )}
                     </div>
-                    <p className="mt-0.5 truncate text-fluid-xs text-slate-400">
+                    <p className="mt-0.5 min-w-0 truncate text-fluid-xs text-slate-400">
                       {request.subject_label} · {request.land.name}
                     </p>
                     <p className="mt-1 line-clamp-2 text-fluid-xs leading-5 text-slate-500 dark:text-emerald-200">
@@ -450,10 +450,10 @@ function FarmersDirectory() {
                         : 'border-transparent hover:bg-emerald-50/60 dark:hover:bg-emerald-900/30',
                     )}
                   >
-                    <p className="truncate pe-32 text-xs font-extrabold text-slate-800 dark:text-white">
+                    <p className="min-w-0 truncate pe-32 text-xs font-extrabold text-slate-800 dark:text-white">
                       {farmer.full_name}
                     </p>
-                    <p className="mt-0.5 truncate text-fluid-xs text-slate-400" dir="ltr">
+                    <p className="mt-0.5 min-w-0 truncate text-fluid-xs text-slate-400" dir="ltr">
                       @{farmer.username}
                     </p>
                     <p className="mt-1 flex items-center gap-2 text-fluid-2xs text-slate-500 dark:text-emerald-200">
@@ -612,7 +612,7 @@ function LandDossierCard({ land }: { land: FarmLand & { events: FarmCalendarEven
                 >
                   {event.kind_label}
                 </span>
-                <span className="truncate">{event.title}</span>
+                <span className="min-w-0 truncate">{event.title}</span>
               </span>
               <span className="shrink-0 text-fluid-2xs text-slate-400">{formatFaDate(event.date)}</span>
             </li>

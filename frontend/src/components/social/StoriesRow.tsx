@@ -110,7 +110,7 @@ export default function StoriesRow({
                 </span>
                 <span
                   className={cn(
-                    'w-full truncate text-center text-fluid-2xs',
+                    'w-full min-w-0 truncate text-center text-fluid-2xs',
                     group.allSeen
                       ? 'text-slate-400 dark:text-emerald-400'
                       : 'font-bold text-slate-700 dark:text-emerald-100',

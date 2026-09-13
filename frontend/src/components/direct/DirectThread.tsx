@@ -604,7 +604,7 @@ export default function DirectThread({
             <HeaderTitle identity={identity} />
           </>
         ) : (
-          <span className="flex-1 truncate text-sm font-extrabold text-slate-800 dark:text-white">
+          <span className="flex-1 min-w-0 truncate text-sm font-extrabold text-slate-800 dark:text-white">
             {t('direct.title')}
           </span>
         )}
@@ -1087,7 +1087,7 @@ function MessageBubble({
                 <span className="min-w-0 flex-1">
                   <span
                     className={cn(
-                      'block truncate text-fluid-2xs font-extrabold',
+                      'block min-w-0 truncate text-fluid-2xs font-extrabold',
                       mine ? 'text-lime-100' : 'text-emerald-700 dark:text-lime-300',
                     )}
                   >
@@ -1095,7 +1095,7 @@ function MessageBubble({
                   </span>
                   <span
                     className={cn(
-                      'block truncate text-fluid-2xs',
+                      'block min-w-0 truncate text-fluid-2xs',
                       mine ? 'text-white/85' : 'text-slate-500 dark:text-emerald-200',
                       message.reply_to.is_deleted && 'italic',
                     )}
@@ -1298,13 +1298,13 @@ function ComposerBanner({
         <span className="min-w-0 flex-1">
           <span
             className={cn(
-              'block truncate text-fluid-2xs font-extrabold',
+              'block min-w-0 truncate text-fluid-2xs font-extrabold',
               tone === 'amber' ? 'text-amber-700 dark:text-amber-200' : 'text-emerald-700 dark:text-lime-300',
             )}
           >
             {title}
           </span>
-          <span className="block truncate text-fluid-2xs text-slate-500 dark:text-emerald-200">
+          <span className="block min-w-0 truncate text-fluid-2xs text-slate-500 dark:text-emerald-200">
             {text || <CornerUpLeft size={11} className="inline" />}
           </span>
         </span>
@@ -1330,7 +1330,7 @@ function ComposerBanner({
 function HeaderTitle({ identity }: { identity: ReturnType<typeof conversationIdentity> }) {
   const inner = (
     <>
-      <span className="block truncate text-fluid-sm font-extrabold text-slate-800 dark:text-white">
+      <span className="block min-w-0 truncate text-fluid-sm font-extrabold text-slate-800 dark:text-white">
         {identity.title}
       </span>
       <span
@@ -1381,7 +1381,7 @@ function AttachedProductCard({ listing, compact = false }: { listing: AttachedLi
         loading="lazy"
       />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-fluid-xs font-bold">{listing.title}</span>
+        <span className="block min-w-0 truncate text-fluid-xs font-bold">{listing.title}</span>
         <span className={`block text-fluid-2xs ${compact ? 'text-slate-500 dark:text-emerald-300' : 'text-white/80'}`}>
           {formatPrice(listing.discounted_price)} / {listing.unit}
         </span>

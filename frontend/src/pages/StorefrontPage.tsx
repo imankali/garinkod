@@ -461,7 +461,7 @@ export default function StorefrontPage() {
                       <img src={stories[0]?.image_url} alt="" className="h-full w-full object-cover" />
                     </span>
                   </span>
-                  <span className="w-full truncate text-center text-fluid-2xs text-slate-600 dark:text-emerald-100">
+                  <span className="w-full min-w-0 truncate text-center text-fluid-2xs text-slate-600 dark:text-emerald-100">
                     {t('storefront.tab.stories')}
                   </span>
                 </button>
@@ -487,7 +487,7 @@ export default function StorefrontPage() {
                   <span className="block h-14 w-14 overflow-hidden rounded-full border-2 border-slate-200 dark:border-emerald-800">
                     <img src={highlight.cover_url} alt="" className="h-full w-full object-cover" />
                   </span>
-                  <span className="w-full truncate text-center text-fluid-2xs text-slate-600 dark:text-emerald-100">
+                  <span className="w-full min-w-0 truncate text-center text-fluid-2xs text-slate-600 dark:text-emerald-100">
                     {highlight.title}
                   </span>
                 </button>
@@ -674,11 +674,11 @@ export default function StorefrontPage() {
                     )}
                   </button>
                   <div className="p-3">
-                    <h3 className="truncate text-sm font-bold text-slate-800 dark:text-white">
+                    <h3 className="min-w-0 truncate text-sm font-bold text-slate-800 dark:text-white">
                       <button
                         type="button"
                         onClick={() => openListing(listing.slug)}
-                        className="max-w-full truncate text-start hover:text-emerald-700 hover:underline dark:hover:text-lime-300"
+                        className="max-w-full min-w-0 truncate text-start hover:text-emerald-700 hover:underline dark:hover:text-lime-300"
                       >
                         {listing.title}
                       </button>

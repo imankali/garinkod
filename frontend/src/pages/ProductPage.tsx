@@ -603,7 +603,7 @@ export default function ProductPage() {
                 <h3 className="text-fluid-sm font-extrabold text-slate-800 dark:text-white">{replyTo ? 'پاسخ به دیدگاه' : 'ثبت دیدگاه'}</h3>
                 {replyTo && (
                   <div className="flex items-center justify-between rounded-xl bg-emerald-50 p-2.5 text-fluid-2xs text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-100">
-                    <span className="truncate">در پاسخ به {replyTo.name}</span>
+                    <span className="min-w-0 truncate">در پاسخ به {replyTo.name}</span>
                     <button type="button" onClick={() => setReplyTo(null)} aria-label="لغو پاسخ"><X size={15} /></button>
                   </div>
                 )}

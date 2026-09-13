@@ -69,10 +69,10 @@ export function AttachedLandChip({
         <Sprout size={18} />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-fluid-xs font-bold text-slate-700 dark:text-emerald-50">
+        <span className="block min-w-0 truncate text-fluid-xs font-bold text-slate-700 dark:text-emerald-50">
           {land.name}
         </span>
-        <span className="block truncate text-fluid-2xs text-slate-500 dark:text-emerald-200">
+        <span className="block min-w-0 truncate text-fluid-2xs text-slate-500 dark:text-emerald-200">
           {land.land_type_label} · {land.area_label}
           {land.crop_type ? ` · ${land.crop_type}` : ''}
         </span>

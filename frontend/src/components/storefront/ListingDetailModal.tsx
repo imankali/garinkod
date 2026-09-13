@@ -291,12 +291,12 @@ export default function ListingDetailModal({
               </span>
               <span className="min-w-0 flex-1">
                 <span className="flex items-center gap-1 text-fluid-sm font-extrabold text-slate-800 dark:text-white">
-                  <span className="truncate">{listing.storefront.name}</span>
+                  <span className="min-w-0 truncate">{listing.storefront.name}</span>
                   {listing.storefront.is_verified && (
                     <BadgeCheck size={15} className="shrink-0 text-emerald-600" aria-label="غرفه تأییدشده" />
                   )}
                 </span>
-                <span className="block truncate text-fluid-2xs text-slate-500 dark:text-emerald-200">
+                <span className="block min-w-0 truncate text-fluid-2xs text-slate-500 dark:text-emerald-200">
                   {listing.storefront.seller_type_label}
                   {(listing.storefront.city || listing.storefront.province) &&
                     ` · ${[listing.storefront.city, listing.storefront.province].filter(Boolean).join('، ')}`}

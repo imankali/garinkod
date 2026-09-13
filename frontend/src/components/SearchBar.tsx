@@ -641,7 +641,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
                           />
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-medium text-slate-700 dark:text-white">{product.name}</span>
+                          <span className="block min-w-0 truncate text-sm font-medium text-slate-700 dark:text-white">{product.name}</span>
                           <span className="block text-xs text-slate-400">
                             {product.brand} · {product.category}
                           </span>
@@ -800,7 +800,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
                           className="h-12 w-12 shrink-0 rounded-lg object-cover"
                         />
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-fluid-xs font-bold text-slate-800 dark:text-white">
+                          <p className="min-w-0 truncate text-fluid-xs font-bold text-slate-800 dark:text-white">
                             {p.title}
                           </p>
                           <p className="text-fluid-2xs font-extrabold text-emerald-700 dark:text-lime-300">
