@@ -127,6 +127,7 @@ export default function DirectThread({
   const attachedLand = useDirectStore((state) => state.attachedLand);
   const attachLand = useDirectStore((state) => state.attachLand);
   const setConversationId = useDirectStore((state) => state.setConversationId);
+  const closeDirect = useDirectStore((state) => state.closeDirect);
 
   const [messages, setMessages] = useState<StorefrontMessage[]>([]);
   const [conversation, setConversation] = useState<StorefrontConversation | null>(null);
@@ -622,6 +623,18 @@ export default function DirectThread({
             <CloseThreadButton conversation={conversation} onChanged={() => void load(true)} />
           </span>
         )}
+
+        {/* A small × so the drawer can be dismissed from the thread itself —
+            the back arrow only returns to the inbox list, and the overlay tap
+            is not discoverable once a conversation is on screen. */}
+        <button
+          type="button"
+          onClick={closeDirect}
+          aria-label={t('common.close')}
+          className="-me-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-emerald-50 hover:text-slate-600 dark:hover:bg-emerald-900 dark:hover:text-emerald-100"
+        >
+          <X size={15} />
+        </button>
       </header>
 
       {/* Messages */}
@@ -1045,7 +1058,14 @@ function MessageBubble({
                       // own overflow, so the first item's menu lost its top rows.
                       'fixed inset-x-3 bottom-4 z-40 flex flex-col gap-0.5 overflow-hidden rounded-2xl border border-slate-100 bg-white p-1.5 text-start shadow-2xl dark:border-emerald-800 dark:bg-emerald-950',
                       'sm:absolute sm:inset-x-auto sm:bottom-full sm:z-30 sm:mb-1 sm:w-max sm:shadow-xl',
-                      mine ? 'sm:end-0' : 'sm:start-0',
+                      /*
+                        The menu grows away from the near edge: a «mine» trigger
+                        sits at the row's start-side (right in RTL), so the menu's
+                        start edge pins to it and the body extends inward; the
+                        counterpart mirrors that. The previous mapping did the
+                        opposite and pushed the popover out of the drawer.
+                      */
+                      mine ? 'sm:start-0' : 'sm:end-0',
                     )}
                   >
                     <MenuItem icon={Reply} label={t('direct.reply')} onClick={onReply} />

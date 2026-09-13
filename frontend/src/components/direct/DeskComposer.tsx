@@ -82,13 +82,15 @@ export default function DeskComposer({
               className={cn('shrink-0 transition-transform', expanded && 'rotate-180')}
             />
           </button>
-          {/* Scrollable rather than wrapped: the composer is the last place that
-              should grow taller because a chip row needed a second line. The vertical
-              padding is for the focus ring, which a scroller would otherwise cut. */}
+          {/* Wrapped rather than scrolled: a half-cut chip at a hidden-scrollbar
+              edge read as "spilled out of the page", and nothing said the row
+              moves. The section collapses to one control once the thread starts,
+              so a second line of chips costs height only while the chat is still
+              empty — exactly when there is room for it. */}
           {expanded && (
           <div
             id="desk-quick-replies"
-            className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1.5 pt-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            className="flex flex-wrap gap-1.5 px-2.5 pb-2.5 pt-0.5"
           >
             {replies.map((reply) => (
               <button
