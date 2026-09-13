@@ -59,6 +59,7 @@ from .payments import (
     Coupon,
     Wallet,
     WalletTransaction,
+    WithdrawalRequest,
 )
 from .trust import (
     PlatformFeedback,
@@ -160,6 +161,7 @@ __all__ = [
     "Coupon",
     "Wallet",
     "WalletTransaction",
+    "WithdrawalRequest",
     "PlatformFeedback",
     "StorefrontComplaint",
     "VisualSearchRequest",

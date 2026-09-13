@@ -107,6 +107,10 @@ async function openAndFill(user: ReturnType<typeof userEvent.setup>, name: strin
   await user.type(within(dialog).getByLabelText('نام', { exact: true }), 'زهرا');
   await user.type(within(dialog).getByLabelText(/^نام خانوادگی/), 'بهاران');
   await user.type(within(dialog).getByLabelText('کد ملی'), NATIONAL_ID);
+  // The payout card and the rules acceptance are part of opening a stall now,
+  // the same way the identity is; without them the submit never enables.
+  await user.type(within(dialog).getByLabelText('شماره کارت'), '6037991234567890');
+  await user.click(within(dialog).getByLabelText(/قوانین غرفه‌داری را می‌پذیرم/));
   return dialog;
 }
 

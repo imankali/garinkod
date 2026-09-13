@@ -725,6 +725,7 @@ class StorefrontNamingTests(TestCase):
             'name': 'گلخانه بهاران', 'seller_type': 'farmer',
             'owner_first_name': 'زهرا', 'owner_last_name': 'بهاران',
             'national_id': '3971857299',
+            'card_number': '6037991234567890', 'rules_accepted': True,
         }, format='json')
 
         self.assertEqual(response.status_code, 201)
@@ -759,6 +760,8 @@ class StorefrontNamingTests(TestCase):
             'name': 'غرفه کد درست', 'seller_type': 'farmer',
             'owner_first_name': 'رضا', 'owner_last_name': 'کریمی',
             'national_id': '۱۵۵۱۵۵۳۱۰۴',  # Persian digits, and only the mask comes back
+            'card_number': '6037991234567890',  # only the mask comes back
+            'rules_accepted': True,
         }, format='json')
         self.assertEqual(good.status_code, 201, good.data)
         self.assertEqual(good.data['owner_national_id_masked'], '155*****4')

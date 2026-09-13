@@ -13,7 +13,7 @@ from .models import (
     PriceTier,
     Comment, UserAccount, Order, OrderItem, ServiceRequest, ProcurementRequest,
     Storefront, MarketplaceListing, PaymentAttempt, AffiliateProfile,
-    AffiliateConversion, FinancialLedgerEntry, PlatformFeedback,
+    AffiliateConversion, FinancialLedgerEntry, PlatformFeedback, WithdrawalRequest,
     StorefrontComplaint, VisualSearchRequest, Coupon, Wallet, WalletTransaction,
     StorefrontPost, FarmLand, FarmCalendarEvent, FarmConsultationRequest,
     AdminAuditLog, OneTimePassword, NotificationTemplate,
@@ -578,6 +578,40 @@ class AdminFinancialLedgerEntry(admin.ModelAdmin):
     search_fields = ('user__username', 'storefront__name', 'order__code', 'description')
     list_editable = ('status',)
     readonly_fields = ('created_at',)
+
+
+@admin.register(WithdrawalRequest)
+class AdminWithdrawalRequest(admin.ModelAdmin):
+    """Approving or refusing a withdrawal moves its ledger entries with it."""
+
+    list_display = (
+        'id', 'storefront', 'amount', 'commission_amount', 'net_amount',
+        'card_number_masked', 'status', 'created_at',
+    )
+    list_filter = ('status', 'created_at')
+    search_fields = ('storefront__name', 'user__username', 'card_number')
+    readonly_fields = (
+        'user', 'storefront', 'amount', 'commission_rate', 'commission_amount',
+        'net_amount', 'card_number', 'created_at', 'updated_at',
+    )
+    actions = ('mark_paid', 'mark_rejected')
+
+    @admin.display(description='شماره کارت')
+    def card_number_masked(self, obj):
+        from .cards import mask_card_number
+        return mask_card_number(obj.card_number)
+
+    @admin.action(description='تأیید و ثبت واریز به کارت')
+    def mark_paid(self, request, queryset):
+        from .settlements import settle_withdrawal
+        for withdrawal in queryset.filter(status='pending'):
+            settle_withdrawal(withdrawal, paid=True, note=request.user.username)
+
+    @admin.action(description='رد درخواست')
+    def mark_rejected(self, request, queryset):
+        from .settlements import settle_withdrawal
+        for withdrawal in queryset.filter(status='pending'):
+            settle_withdrawal(withdrawal, paid=False, note=request.user.username)
 
 
 @admin.register(PlatformFeedback)

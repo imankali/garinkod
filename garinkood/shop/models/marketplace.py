@@ -35,6 +35,12 @@ class Storefront(models.Model):
     is_verified = models.BooleanField(default=False, db_index=True)
     is_active = models.BooleanField(default=True, db_index=True)
     commission_rate = models.DecimalField(max_digits=5, decimal_places=2, default=8)
+    # The card withdrawals are paid to, collected at registration together with
+    # the rules checkbox and editable later from the finance page. Stored as
+    # plain 16 digits; every display goes through mask_card_number.
+    card_number = models.CharField(max_length=16, blank=True, default='', verbose_name='شماره کارت')
+    rules_accepted = models.BooleanField(default=False, verbose_name='پذیرش قوانین غرفه‌داری')
+    rules_accepted_at = models.DateTimeField(null=True, blank=True, verbose_name='تاریخ پذیرش قوانین')
     rating = models.DecimalField(max_digits=3, decimal_places=2, default=0)
     sales_count = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)

@@ -12,6 +12,7 @@ from .models import (
     UserAccount, Comment, Cart, CartItem, Order, OrderItem,
     ServiceRequest, ProcurementRequest, Storefront, MarketplaceListing,
     PaymentAttempt, AffiliateProfile, AffiliateConversion, FinancialLedgerEntry,
+    WithdrawalRequest,
     PlatformFeedback, StorefrontComplaint, VisualSearchRequest, Coupon, Wallet,
     WalletTransaction, StorefrontPost, StorefrontConversation, StorefrontMessage,
     StorefrontPostLike, StorefrontPostComment, StorefrontStoryView,
@@ -26,6 +27,7 @@ from .models import (
 from django.core.exceptions import ValidationError as DjangoValidationError
 
 from .desk import agent_payload, desk_channel
+from .cards import mask_card_number, normalize_card_number
 from .national_id import mask_national_id, validate_national_id
 from .phone_numbers import normalize_iranian_mobile
 from .slugs import slugify_fa, unique_storefront_slug
@@ -881,6 +883,7 @@ class StorefrontSerializer(serializers.ModelSerializer):
             'has_active_stories', 'has_unseen_stories', 'owner_name', 'created_at',
             'owner_first_name', 'owner_last_name', 'national_id',
             'owner_national_id_masked', 'profile_complete',
+            'card_number', 'card_number_masked', 'rules_accepted',
         ]
         read_only_fields = [
             'id', 'is_verified', 'is_active', 'commission_rate', 'rating', 'sales_count',
@@ -1015,10 +1018,23 @@ class StorefrontSerializer(serializers.ModelSerializer):
     )
     owner_national_id_masked = serializers.SerializerMethodField()
     profile_complete = serializers.SerializerMethodField()
+    # --- payout destination and rules acceptance, asked for at registration ---
+    # A stall with no card on file can never be paid out, and a stall that has
+    # not accepted the rules has not actually agreed to them; both are part of
+    # *opening* a storefront, the same way the national code is. The card is
+    # editable later (finance page) and only ever shown masked.
+    card_number = serializers.CharField(
+        max_length=25, required=False, allow_blank=True, write_only=True,
+    )
+    card_number_masked = serializers.SerializerMethodField()
+    rules_accepted = serializers.BooleanField(required=False, write_only=True)
 
     def get_owner_national_id_masked(self, obj) -> str:
         account = getattr(obj.user, 'account', None)
         return mask_national_id(getattr(account, 'national_id', '')) if account else ''
+
+    def get_card_number_masked(self, obj) -> str:
+        return mask_card_number(obj.card_number)
 
     def get_profile_complete(self, obj) -> bool:
         """Whether the owner has the two facts a seller must have declared."""
@@ -1035,6 +1051,22 @@ class StorefrontSerializer(serializers.ModelSerializer):
         if not self.instance and not attrs.get('slug'):
             attrs['slug'] = unique_storefront_slug(attrs.get('name', ''))
 
+        # A present-but-invalid code or card is reported before the
+        # missing-field refusal, so a wrong check digit is never hidden
+        # behind «fill in more».
+        code = attrs.get('national_id')
+        if code:
+            try:
+                attrs['national_id'] = validate_national_id(code)
+            except DjangoValidationError as error:
+                raise serializers.ValidationError({'national_id': list(error.messages)}) from error
+        card_raw = attrs.get('card_number')
+        if card_raw is not None:
+            cleaned = normalize_card_number(card_raw)
+            if cleaned and len(cleaned) != 16:
+                raise serializers.ValidationError({'card_number': 'شماره کارت باید ۱۶ رقم باشد.'})
+            attrs['card_number'] = cleaned
+
         if self.instance is None:
             # Identity is only demanded on creation. An existing seller whose
             # record predates this rule must still be able to edit their bio,
@@ -1047,27 +1079,28 @@ class StorefrontSerializer(serializers.ModelSerializer):
             missing = []
             if not first or not last:
                 missing.append('name')
-            code = attrs.get('national_id') or getattr(account, 'national_id', '')
-            if not code:
+            if not (attrs.get('national_id') or getattr(account, 'national_id', '')):
                 missing.append('national_id')
+            if not attrs.get('card_number'):
+                missing.append('card_number')
+            if not attrs.get('rules_accepted'):
+                missing.append('rules_accepted')
             if missing:
                 messages = {
                     'name': 'برای ساخت غرفه نام و نام خانوادگی خود را در پروفایل وارد کنید.',
                     'national_id': 'برای ساخت غرفه وارد کردن کد ملی الزامی است.',
+                    'card_number': 'شماره کارت برای تسویه‌های آینده الزامی است.',
+                    'rules_accepted': 'پذیرش قوانین غرفه‌داری الزامی است.',
                 }
                 raise serializers.ValidationError({key: messages[key] for key in missing})
-        code = attrs.get('national_id')
-        if code:
-            try:
-                attrs['national_id'] = validate_national_id(code)
-            except DjangoValidationError as error:
-                raise serializers.ValidationError({'national_id': list(error.messages)}) from error
         return attrs
 
     def create(self, validated_data):
         first = validated_data.pop('owner_first_name', '')
         last = validated_data.pop('owner_last_name', '')
         code = validated_data.pop('national_id', '')
+        if validated_data.get('rules_accepted'):
+            validated_data['rules_accepted_at'] = timezone.now()
         storefront = super().create(validated_data)
         if first or last:
             user = storefront.user
@@ -1409,6 +1442,22 @@ class FinancialLedgerEntrySerializer(serializers.ModelSerializer):
 
     def get_reference(self, obj):
         return f'GKF-{obj.id:08d}'
+
+
+class WithdrawalRequestSerializer(serializers.ModelSerializer):
+    status_label = serializers.CharField(source='get_status_display', read_only=True)
+    card_number_masked = serializers.SerializerMethodField()
+
+    class Meta:
+        model = WithdrawalRequest
+        fields = [
+            'id', 'amount', 'commission_rate', 'commission_amount', 'net_amount',
+            'card_number_masked', 'status', 'status_label', 'created_at',
+        ]
+        read_only_fields = fields
+
+    def get_card_number_masked(self, obj) -> str:
+        return mask_card_number(obj.card_number)
 
 
 class AffiliateProfileSerializer(serializers.ModelSerializer):

@@ -180,3 +180,115 @@ def restore_listing_quantities(order: Order) -> None:
             status='published',
             updated_at=timezone.now(),
         )
+
+
+# --- Seller withdrawals -------------------------------------------------
+#
+# A withdrawal is a request against the seller's *available* ledger balance.
+# Sale entries never leave «available» on their own, so the withdrawable
+# amount is the seller's available total minus what earlier requests have
+# already claimed (pending or paid). The platform's share of each withdrawal
+# is its commission, snapshotted at request time so a later rate change can
+# not rewrite history.
+
+class WithdrawalError(ValueError):
+    """A withdrawal the ledger refuses, worded for the seller."""
+
+
+def seller_balance_totals(storefront) -> dict:
+    """The seller's own ledger totals by status.
+
+    Platform rows (sale commissions) also carry the storefront for auditing,
+    but they are the platform's money — including them here once inflated the
+    «قابل تسویه» balance a seller could withdraw against.
+    """
+    rows = (
+        FinancialLedgerEntry.objects.filter(storefront=storefront, owner_type='seller')
+        .values('status').annotate(total=Sum('amount'))
+    )
+    return {row['status']: row['total'] or 0 for row in rows}
+
+
+def storefront_balances(storefront) -> dict:
+    """What the finance screen reports: seller totals, withdrawals deducted."""
+    from .models import WithdrawalRequest
+
+    totals = seller_balance_totals(storefront)
+    claimed = (
+        WithdrawalRequest.objects.filter(storefront=storefront, status__in=('pending', 'paid'))
+        .aggregate(total=Sum('amount'))['total'] or 0
+    )
+    return {
+        'pending': totals.get('pending', 0),
+        'available': max(totals.get('available', 0) - claimed, 0),
+        'held': totals.get('held', 0),
+        'paid': totals.get('paid', 0),
+    }
+
+
+def request_withdrawal(*, storefront, amount: int):
+    """Register a withdrawal request against the available balance.
+
+    The gross leaves the seller's ledger as a pending «payout» entry and the
+    platform commission lands beside it; the net is what the card receives.
+    """
+    from .cards import mask_card_number, normalize_card_number
+    from .models import WithdrawalRequest
+
+    card = normalize_card_number(storefront.card_number)
+    if len(card) != 16:
+        raise WithdrawalError('ابتدا یک شماره کارت معتبر در دفتر مالی ثبت کنید.')
+    if not isinstance(amount, int) or amount <= 0:
+        raise WithdrawalError('مبلغ برداشت معتبر نیست.')
+
+    available = storefront_balances(storefront)['available']
+    if amount > available:
+        raise WithdrawalError('مبلغ برداشت بیشتر از موجودی قابل تسویه است.')
+
+    rate = storefront.commission_rate or 0
+    commission = int(amount * rate / 100)
+    net = amount - commission
+
+    with transaction.atomic():
+        request = WithdrawalRequest.objects.create(
+            user=storefront.user,
+            storefront=storefront,
+            amount=amount,
+            commission_rate=rate,
+            commission_amount=commission,
+            net_amount=net,
+            card_number=card,
+        )
+        FinancialLedgerEntry.objects.create(
+            owner_type='seller',
+            user=storefront.user,
+            storefront=storefront,
+            entry_type='payout',
+            status='pending',
+            amount=-amount,
+            currency='IRT',
+            description=f'درخواست برداشت #{request.id} به کارت {mask_card_number(card)}',
+            metadata={'withdrawal_id': request.id},
+        )
+        FinancialLedgerEntry.objects.create(
+            owner_type='platform',
+            storefront=storefront,
+            entry_type='commission',
+            status='pending',
+            amount=commission,
+            currency='IRT',
+            description=f'کمیسیون برداشت #{request.id} ({rate}٪)',
+            metadata={'withdrawal_id': request.id},
+        )
+    return request
+
+
+def settle_withdrawal(request, *, paid: bool, note: str = '') -> None:
+    """Mark a withdrawal paid or rejected; the ledger follows, never deletes."""
+    with transaction.atomic():
+        request.status = 'paid' if paid else 'rejected'
+        request.admin_note = note
+        request.save()
+        FinancialLedgerEntry.objects.filter(
+            metadata__withdrawal_id=request.id
+        ).update(status='paid' if paid else 'reversed')

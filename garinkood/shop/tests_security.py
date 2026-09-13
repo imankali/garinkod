@@ -108,6 +108,7 @@ class CsrfCookieIssuedTests(TestCase):
                 "owner_first_name": "زهرا",
                 "owner_last_name": "بهاران",
                 "national_id": "3971857299",
+                "card_number": "6037991234567890", "rules_accepted": True,
             },
             format="json",
             HTTP_X_CSRFTOKEN=csrf_token,

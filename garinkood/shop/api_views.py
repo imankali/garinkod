@@ -40,6 +40,7 @@ from .models import (
     CapacitySettings, PresenceBeat,
     ServiceRequest, ProcurementRequest, Storefront, MarketplaceListing,
     PaymentAttempt, AffiliateProfile, AffiliateConversion, FinancialLedgerEntry,
+    WithdrawalRequest,
     PlatformFeedback, StorefrontComplaint, VisualSearchRequest, Coupon, Wallet,
     WalletTransaction, StorefrontPost, AdminAuditLog, Location, AgriInput,
     AgriInputDose, StorefrontFollow, StorefrontHighlight, StorefrontHighlightItem,
@@ -53,7 +54,8 @@ from .serializers import (
     CheckoutSerializer, OrderSerializer,
     ServiceRequestSerializer, ProcurementRequestSerializer, StorefrontSerializer,
     MarketplaceListingSerializer, PaymentAttemptSerializer, AffiliateProfileSerializer,
-    AffiliateConversionSerializer, FinancialLedgerEntrySerializer, PlatformFeedbackSerializer,
+    AffiliateConversionSerializer, FinancialLedgerEntrySerializer, WithdrawalRequestSerializer,
+    PlatformFeedbackSerializer,
     StorefrontComplaintSerializer, VisualSearchRequestSerializer, CouponSerializer,
     WalletSerializer, StorefrontPostSerializer, AdminAuditLogSerializer,
     LocationSerializer, AgriInputSerializer, StorefrontHighlightSerializer,
@@ -72,7 +74,10 @@ from .payments import (
     verify_zarinpal_payment,
 )
 from .rewards import mark_order_paid_and_reward
-from .settlements import record_marketplace_sale, reverse_marketplace_sale, restore_listing_quantities
+from .settlements import (
+    record_marketplace_sale, reverse_marketplace_sale, restore_listing_quantities,
+    storefront_balances, request_withdrawal, WithdrawalError,
+)
 from .shipping import (
     ShippingServiceUnavailable, create_initial_shipment, record_tracking_event,
     select_shipping_quote, shipping_options,
@@ -1940,8 +1945,11 @@ def storefront_finance(request):
 
     # Balances are always computed over the *unfiltered* ledger: a filtered
     # view must not make a seller think their available balance changed.
-    totals = FinancialLedgerEntry.objects.filter(storefront=storefront).values('status').annotate(total=Sum('amount'))
-    balances = {row['status']: row['total'] or 0 for row in totals}
+    # Only the seller's own rows count — platform commission rows carry the
+    # storefront for auditing but are not the seller's money — and earlier
+    # withdrawal requests are deducted so «قابل تسویه» never offers the same
+    # toman twice.
+    balances = storefront_balances(storefront)
 
     params = request.query_params
     status_filter = params.get('status', '').strip()
@@ -1983,8 +1991,36 @@ def storefront_finance(request):
         'entry_types': [{'value': value, 'label': label} for value, label in FinancialLedgerEntry.ENTRY_TYPE_CHOICES],
         'statuses': [{'value': value, 'label': label} for value, label in FinancialLedgerEntry.STATUS_CHOICES],
         'entries': FinancialLedgerEntrySerializer(entries[start:start + page_size], many=True).data,
+        'withdrawals': WithdrawalRequestSerializer(
+            WithdrawalRequest.objects.filter(storefront=storefront)[:10], many=True
+        ).data,
         'notice': 'مبالغ «قابل تسویه» پس از پایان دوره رسیدگی به شکایت قابل برداشت خواهند بود.'
     })
+
+
+@documented_api
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def storefront_finance_withdraw(request):
+    """Register a withdrawal request against the seller's available balance.
+
+    The platform commission is deducted at request time (rate snapshotted on
+    the request) and the net is what the card on file receives; the paired
+    ledger entries keep the trail through approval or refusal.
+    """
+    storefront = get_object_or_404(Storefront, user=request.user)
+    try:
+        amount = int(request.data.get('amount'))
+    except (TypeError, ValueError):
+        return Response({'error': 'مبلغ برداشت معتبر نیست.'}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        withdrawal = request_withdrawal(storefront=storefront, amount=amount)
+    except WithdrawalError as error:
+        return Response({'error': str(error)}, status=status.HTTP_400_BAD_REQUEST)
+    return Response({
+        'withdrawal': WithdrawalRequestSerializer(withdrawal).data,
+        'balances': storefront_balances(storefront),
+    }, status=status.HTTP_201_CREATED)
 
 
 @documented_api

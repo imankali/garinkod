@@ -151,6 +151,7 @@ urlpatterns = [
     path('farm/consulting/farmers/<int:user_id>/', farm_views.consulting_farmer_dossier, name='api_consulting_farmer_dossier'),
     path('farm/consulting/lands/<int:land_id>/events/', farm_views.consulting_land_event, name='api_consulting_land_event'),
     path('marketplace/finance/', api_views.storefront_finance, name='api_storefront_finance'),
+    path('marketplace/finance/withdraw/', api_views.storefront_finance_withdraw, name='api_storefront_finance_withdraw'),
     path('marketplace/finance/export/', api_views.storefront_finance_export, name='api_storefront_finance_export'),
     # Editorial/landing content, contact channels and the newsletter
     path('site/contact/', content_views.site_contact, name='api_site_contact'),

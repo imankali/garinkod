@@ -69,6 +69,10 @@ async function createStorefront(page: Page, name: string) {
   await dialog.getByLabel('نام', { exact: true }).fill('زهرا');
   await dialog.getByLabel('نام خانوادگی').fill('بهاران');
   await dialog.getByLabel('کد ملی').fill('3971857299');
+  // Withdrawals pay to a card and a stall opens only under the rules, so the
+  // form refuses to submit without both.
+  await dialog.getByLabel('شماره کارت').fill('6037991234567890');
+  await dialog.getByLabel(/قوانین غرفه‌داری را می‌پذیرم/).check();
 
   // The live availability check has to answer before submitting.
   await expect(dialog.locator('#store-name-status')).toContainText('آزاد است', { timeout: 8000 });
