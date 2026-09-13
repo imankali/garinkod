@@ -26,7 +26,12 @@ import FlyToCart, { type FlyingItem } from "./components/FlyToCart";
 import GlobalMessengerButton from "./components/GlobalMessengerButton";
 import CropSelector from "./components/CropSelector";
 import AgriCalculator from "./components/AgriCalculator";
-import HomeHero from "./components/home/HomeHero";
+import HeroSlider from "./components/home/HeroSlider";
+import StoryStrip from "./components/home/StoryStrip";
+import AmazingOffers from "./components/home/AmazingOffers";
+import BannerGrid from "./components/home/BannerGrid";
+import BestSellers from "./components/home/BestSellers";
+import Reveal from "./components/motion/Reveal";
 import ServiceShortcuts from "./components/home/ServiceShortcuts";
 import CategoryGrid from "./components/home/CategoryGrid";
 import FeaturedStorefronts from "./components/home/FeaturedStorefronts";
@@ -362,25 +367,53 @@ export default function App() {
                     <h1 className="sr-only">گرین کود، فروشگاه تخصصی نهاده‌های کشاورزی</h1>
 
                     {/*
-                      Shop-window order, chosen deliberately:
-                      1. Hero  — what this site is and where to start.
-                      2. Services — the nine things the platform does beyond
-                         the catalogue, none of which were visible before.
-                      3. Categories — how buyers actually think about produce.
-                      4. Storefronts — the marketplace, our differentiator.
-                      5. Weather/crop/installments — helpful context, but not
-                         the first thing a stranger should meet.
-                      6. Catalogue — the deep browse, with filters.
-                      7. Calculator — a tool for people who already know what
-                         they need.
+                      Digikala-style shop-window order, rebuilt for this
+                      marketplace (each section scrolls into view via Reveal):
+                      1. Story rings — live storefront activity, the very
+                         first strip under the header.
+                      2. Hero slider — autoplaying brand slides with arrows,
+                         dots, swipe and pause-on-hover.
+                      3. خرید بر اساس دسته‌بندی — the circle row.
+                      4. پیشنهادهای شگفت‌انگیز — flash deals + countdown.
+                      5. Banner grid + seller campaign strip.
+                      6. پرفروش‌ترین کالاها — the best-seller rail.
+                      7. Storefronts — the marketplace, our differentiator.
+                      8. Services, weather/crop/installments — context.
+                      9. Catalogue rails + magazine + calculator.
                     */}
-                    <HomeHero />
+                    <StoryStrip />
 
-                    <ServiceShortcuts />
+                    <div className="page-shell pt-4">
+                      <HeroSlider />
+                    </div>
 
-                    <CategoryGrid />
+                    <Reveal>
+                      <CategoryGrid />
+                    </Reveal>
 
-                    <FeaturedStorefronts />
+                    <Reveal>
+                      <div className="page-shell py-4">
+                        <AmazingOffers />
+                      </div>
+                    </Reveal>
+
+                    <Reveal>
+                      <BannerGrid />
+                    </Reveal>
+
+                    <Reveal>
+                      <div className="page-shell pb-4">
+                        <BestSellers />
+                      </div>
+                    </Reveal>
+
+                    <Reveal>
+                      <FeaturedStorefronts />
+                    </Reveal>
+
+                    <Reveal>
+                      <ServiceShortcuts />
+                    </Reveal>
 
                     {/* Weather Widget */}
                     <WeatherWidget />
@@ -393,11 +426,13 @@ export default function App() {
                     {/* Installment Banner */}
                     <InstallmentBanner />
 
-                    {/* Exact merchandising order: fresh, discounts, four core
-                        departments, then the specialist ranges (آبیاری و گلخانه),
-                        then the magazine with the sellers' ads under it. */}
+                    {/* Exact merchandising order: fresh stock first (the
+                        discounted rail now lives in the flash-deal panel),
+                        four core departments, then the specialist ranges
+                        (آبیاری و گلخانه), then the magazine with the sellers'
+                        ads under it. */}
                     <ContentRails
-                      railIds={["newest", "discounted"]}
+                      railIds={["newest"]}
                       wishlistIds={wishlistIds}
                       compareIds={compareIds}
                       compareDisabled={compareItems.length >= 3}
