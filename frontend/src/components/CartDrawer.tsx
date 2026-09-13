@@ -259,12 +259,13 @@ function productOrderCeiling(item: CartItem): number {
             animate={{ opacity: 1, y: 0 }}
             exit={reduceMotion ? undefined : { opacity: 0, y: 80 }}
             transition={{ type: "spring", damping: 30, stiffness: 280 }}
-            className="fixed inset-x-0 bottom-0 z-[70] [&_button]:min-h-11 [&_button]:min-w-11 flex max-h-[90vh] w-full flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl outline-none dark:bg-emerald-950 sm:inset-x-auto sm:inset-y-0 sm:end-0 sm:max-h-none sm:max-w-md sm:rounded-none"
+            className="fixed inset-x-0 bottom-0 z-[70] [&_button]:min-h-11 [&_button]:min-w-11 flex max-h-[90vh] w-full flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl outline-none supports-[height:100dvh]:max-h-dvh dark:bg-emerald-950 sm:inset-x-auto sm:inset-y-0 sm:end-0 sm:max-h-none sm:max-w-md sm:rounded-none"
           >
             {/* ======================================== */}
             {/* Header */}
             {/* ======================================== */}
-            <div className="relative overflow-hidden bg-gradient-to-l from-emerald-600 to-lime-500 px-5 py-5 text-white">
+            {/* shrink-0: a squeezed header used to clip its trust strip mid-line. */}
+            <div className="relative shrink-0 overflow-hidden bg-gradient-to-l from-emerald-600 to-lime-500 px-5 py-4 text-white sm:py-5">
               <div className="relative flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20 backdrop-blur">
@@ -313,7 +314,7 @@ function productOrderCeiling(item: CartItem): number {
               )}
 
               {/* Trust mini strip */}
-              <div className="relative mt-3 flex items-center justify-between text-fluid-2xs text-white/85">
+              <div className="relative mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 text-fluid-2xs text-white/85">
                 <span className="flex items-center gap-1">
                   <Truck size={11} /> زمان ارسال پس از هماهنگی
                 </span>
@@ -326,10 +327,17 @@ function productOrderCeiling(item: CartItem): number {
               </div>
             </div>
 
-            {/* Keep the checkout journey visible from its first stage. */}
-            {items.length > 0 && (
-              <PurchaseSteps currentStep="cart" compact className="mx-4 mt-3" />
-            )}
+            {/*
+              Journey, safety note and rows share one scrollable middle. When
+              each lived outside the scroll region, header + footer could eat
+              the sheet's height and leave the list a slit tall enough to clip
+              a row mid-card.
+            */}
+            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+              {/* Keep the checkout journey visible from its first stage. */}
+              {items.length > 0 && (
+                <PurchaseSteps currentStep="cart" compact className="mx-4 mt-3 shrink-0" />
+              )}
 
             {/* ======================================== */}
             {/* Pesticide Safety Warning */}
@@ -346,10 +354,10 @@ function productOrderCeiling(item: CartItem): number {
               </motion.div>
             )}
 
-            {/* ======================================== */}
-            {/* Items List */}
-            {/* ======================================== */}
-            <div className="flex-1 overflow-y-auto px-4 py-4">
+              {/* ======================================== */}
+              {/* Items List */}
+              {/* ======================================== */}
+              <div className="flex-1 px-4 py-4">
               {items.length === 0 ? (
                 <motion.div
                   initial={reduceMotion ? false : { opacity: 0, scale: 0.96 }}
@@ -632,6 +640,7 @@ function productOrderCeiling(item: CartItem): number {
                   )}
                 </ul>
               )}
+              </div>
             </div>
 
             {/* ======================================== */}
@@ -640,7 +649,7 @@ function productOrderCeiling(item: CartItem): number {
             {items.length > 0 && (
               <div className="shrink-0 border-t border-slate-100 bg-gradient-to-br from-white to-emerald-50/30 p-4 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] dark:border-emerald-800 dark:from-emerald-950 dark:to-emerald-900/30 sm:p-5">
                 {/* Price Breakdown */}
-                <div className="mb-4 space-y-2 rounded-2xl bg-white/60 p-3 backdrop-blur dark:bg-emerald-900/50">
+                <div className="mb-3 space-y-2 rounded-2xl bg-white/60 p-3 backdrop-blur dark:bg-emerald-900/50 sm:mb-4">
                   <div className="flex justify-between text-sm text-slate-500 dark:text-emerald-200">
                     <span>جمع کالاها ({totalItems} عدد)</span>
                     <span className="font-semibold text-slate-700 dark:text-white">{formatPrice(subtotal)}</span>
@@ -679,7 +688,7 @@ function productOrderCeiling(item: CartItem): number {
                   </span>
                 </motion.a>
 
-                <p className="mt-3 text-center text-fluid-2xs text-slate-400 dark:text-emerald-400">
+                <p className="mt-2 text-center text-fluid-2xs text-slate-400 dark:text-emerald-400 sm:mt-3">
                   مبلغ و موجودی نهایی پیش از تأیید سفارش توسط کارشناس بررسی می‌شود.
                 </p>
               </div>
