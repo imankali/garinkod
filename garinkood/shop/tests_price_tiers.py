@@ -8,10 +8,14 @@ the highest, or compounding the ladder with the display-only ``discount_percent`
 — so each is pinned separately rather than by one happy-path test.
 """
 
+import re
+from unittest.mock import MagicMock
+
 from django.contrib.auth import get_user_model
+from django.contrib import admin
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
 from .models import (
@@ -404,3 +408,143 @@ class ListEndpointQueryCountTests(TestCase):
         self.assertEqual(len(rows), 1)
         thresholds = [rung["min_quantity"] for rung in rows[0]["price_tiers"]]
         self.assertEqual(thresholds, sorted(thresholds))
+
+# The project serves statics through CompressedManifestStaticFilesStorage,
+# which resolves `{% static %}` against a manifest that only `collectstatic`
+# writes. Rendering an admin page without one raises
+# "Missing staticfiles manifest entry", which is a property of the test
+# environment and says nothing about the admin. Swapping in the plain storage
+# backend for these tests is the standard remedy; it changes how a filename is
+# produced, not what the page contains.
+@override_settings(STORAGES={
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+})
+class PriceTierAdminTests(TestCase):
+    """The ladder must be settable by an operator, and must show what it costs.
+
+    Until this existed the ladder could only be created through the ORM, which
+    means it existed in the schema and nowhere an operator could reach. These
+    tests drive the real admin: they render the change form and post a rung
+    through it, so the inline's formset, its exclusivity constraint and its
+    computed-price column are all executed rather than merely imported.
+    """
+
+    def setUp(self):
+        self.admin_user = User.objects.create_superuser(
+            username="ladder-admin", password="x12345678", email="a@example.com",
+        )
+        # force_login, not login(): django-axes rejects authenticate() without
+        # a request, which is the repo-wide convention for admin tests.
+        self.client.force_login(self.admin_user)
+        self.author = User.objects.create_user(username="ladder-vendor", password="x12345678")
+        self.product = Product.objects.create(
+            title="کود پنل ادمین", slug="kood-admin-panel", author=self.author,
+            description="تست", price=10000, discount_percent=20, stock=500,
+            status="published",
+        )
+
+    def test_the_change_form_renders_the_ladder_inline(self):
+        response = self.client.get(f"/admin/shop/product/{self.product.id}/change/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "تخفیف پلکانی")
+        self.assertContains(response, "min_quantity")
+
+    def test_an_existing_rung_shows_the_price_it_produces(self):
+        """The whole reason the inline exists: percent in, price out, in one row."""
+        PriceTier.objects.create(product=self.product, min_quantity=40, discount_percent=10)
+        response = self.client.get(f"/admin/shop/product/{self.product.id}/change/")
+        # 10000 - 20% = 8000, then - 10% = 7200
+        self.assertContains(response, "7,200 تومان")
+
+    def test_a_rung_can_be_created_through_the_admin_formset(self):
+        """The save path, driven through the inline's own formset.
+
+        Deliberately not an HTML scrape. Scraping the admin change page means
+        the test depends on attribute order, on `extra = 0` rendering no blank
+        row, and on round-tripping every unrelated field — all of which can
+        break the test while the admin still works. Going through
+        `get_formset()` exercises the same formset the admin POSTs into,
+        including its validation and the model's constraints.
+        """
+        from shop.admin import ProductPriceTierInline
+
+        inline = ProductPriceTierInline(Product, admin.site)
+        formset_class = inline.get_formset(request=MagicMock(), obj=self.product)
+        formset = formset_class(
+            data={
+                "price_tiers-TOTAL_FORMS": "1",
+                "price_tiers-INITIAL_FORMS": "0",
+                "price_tiers-MIN_NUM_FORMS": "0",
+                "price_tiers-MAX_NUM_FORMS": "1000",
+                "price_tiers-0-min_quantity": "40",
+                "price_tiers-0-discount_percent": "10",
+            },
+            instance=self.product,
+        )
+        self.assertTrue(formset.is_valid(), formset.errors)
+        formset.save()
+
+        rung = PriceTier.objects.get(product=self.product)
+        self.assertEqual(rung.min_quantity, 40)
+        self.assertEqual(rung.discount_percent, 10)
+        # And the row the operator was looking at quoted the price the buyer
+        # will actually be charged.
+        self.assertEqual(
+            inline.resulting_unit_price(rung),
+            f"{int(8000 * 90 / 100):,} تومان",
+        )
+
+    def test_the_formset_refuses_a_rung_below_the_minimum(self):
+        """The >=2 rule reaches the admin form, not just the database."""
+        from shop.admin import ProductPriceTierInline
+
+        inline = ProductPriceTierInline(Product, admin.site)
+        formset_class = inline.get_formset(request=MagicMock(), obj=self.product)
+        formset = formset_class(
+            data={
+                "price_tiers-TOTAL_FORMS": "1",
+                "price_tiers-INITIAL_FORMS": "0",
+                "price_tiers-MIN_NUM_FORMS": "0",
+                "price_tiers-MAX_NUM_FORMS": "1000",
+                "price_tiers-0-min_quantity": "1",
+                "price_tiers-0-discount_percent": "10",
+            },
+            instance=self.product,
+        )
+        self.assertFalse(formset.is_valid())
+        self.assertFalse(PriceTier.objects.filter(product=self.product).exists())
+
+    def test_the_formset_refuses_two_rungs_at_the_same_threshold(self):
+        from shop.admin import ProductPriceTierInline
+
+        PriceTier.objects.create(product=self.product, min_quantity=40, discount_percent=5)
+        inline = ProductPriceTierInline(Product, admin.site)
+        formset_class = inline.get_formset(request=MagicMock(), obj=self.product)
+        formset = formset_class(
+            data={
+                "price_tiers-TOTAL_FORMS": "2",
+                "price_tiers-INITIAL_FORMS": "1",
+                "price_tiers-MIN_NUM_FORMS": "0",
+                "price_tiers-MAX_NUM_FORMS": "1000",
+                "price_tiers-0-min_quantity": "40",
+                "price_tiers-0-discount_percent": "5",
+                "price_tiers-0-id": str(PriceTier.objects.get(product=self.product).id),
+                "price_tiers-1-min_quantity": "40",
+                "price_tiers-1-discount_percent": "15",
+            },
+            instance=self.product,
+        )
+        # Either the formset rejects it or the unique constraint does; both are
+        # acceptable, silently saving both is not. The save runs inside its own
+        # atomic block so that when the constraint fires, the rollback is
+        # contained — an IntegrityError escaping into the test's transaction
+        # would poison it and every later query would raise
+        # TransactionManagementError instead of answering.
+        with transaction.atomic():
+            try:
+                if formset.is_valid():
+                    formset.save()
+            except IntegrityError:
+                transaction.set_rollback(True)
+        self.assertEqual(PriceTier.objects.filter(product=self.product).count(), 1)

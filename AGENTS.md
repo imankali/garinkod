@@ -56,9 +56,9 @@ change, review the code and then run the full matrix in detail.
 
 | Suite | Command | Last verified |
 |---|---|---|
-| Backend unit + integration | `cd garinkood && source /tmp/env.sh && ../.venv/bin/python manage.py test` | **615 tests, OK** |
-| Backend, tier module only | `... manage.py test shop.tests_price_tiers` | 32 tests, OK |
-| Frontend unit + integration | `cd frontend && CI=true npx vitest run` | **179 tests / 22 files** |
+| Backend unit + integration | `cd garinkood && source /tmp/env.sh && ../.venv/bin/python manage.py test` | **620 tests, OK** |
+| Backend, tier module only | `... manage.py test shop.tests_price_tiers` | 37 tests, OK |
+| Frontend unit + integration | `cd frontend && CI=true npx vitest run` | **186 tests / 23 files** |
 | Type check | `cd frontend && npx tsc --noEmit` | clean |
 | Build | `cd frontend && npm run build` | ✓ |
 | Design linter | `.agents-tmp/node_modules/.bin/impeccable detect frontend/src` | 125 (see §6) |
@@ -235,10 +235,18 @@ per-row pattern cannot silently return.
       `shop_product`). Cache headers, gzip/brotli and connection pooling are
       untouched and unmeasured. No production-scale measurement has been taken —
       these are dev-SQLite numbers.
-- [ ] Cart row UI for "buy N more to save X%" — the backend already exposes
-      `next_tier` on `CartItemSerializer`; no component reads it yet.
-- [ ] Admin surface for creating/editing `PriceTier` rows. The ladder is
-      currently only settable through the ORM.
+- [x] **Cart row UI** — `CartTierStrip` in every `CartDrawer` row. States the
+      next price, not a percentage; suppresses the nudge when the next rung
+      exceeds available stock; sets an absolute quantity.
+- [x] **Admin surface** — `PriceTierInlineBase` with a read-only *resulting
+      unit price* column, wired as inlines on both `ProductAdmin` and
+      `AdminMarketplaceListing`. The computed price is read-only on purpose:
+      it is derived from `discounted_price`, and letting it be typed in would
+      recreate the drift that column exists to prevent.
+      Note `extra = 0` renders no blank row, and admin tests need
+      `force_login` (django-axes rejects `client.login`) plus a plain
+      staticfiles backend (`CompressedManifestStaticFilesStorage` needs a
+      manifest that only `collectstatic` writes).
 - [ ] Remove `continue-on-error: true` from the Django workflow.
 - [ ] Retighten the axe contrast ceilings that were relaxed.
 - [ ] Visual/architecture review — **blocked on §7**; needs a browser.

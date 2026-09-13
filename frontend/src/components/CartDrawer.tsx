@@ -23,6 +23,7 @@ import { productsApi } from "../api/services";
 import type { ProductList } from '@/types/shop';
 import type { CartItem } from '@/types/commerce';
 import { formatPrice } from "../utils/formatPrice";
+import CartTierStrip from "./shop/CartTierStrip";
 import { cn } from "../utils/cn";
 
 // ========================================
@@ -439,6 +440,22 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                                   </span>
                                 )}
                               </div>
+
+                              {/*
+                                The ladder, at the moment the quantity can still
+                                be changed. A discount the buyer has to go back
+                                to the product page to discover does not change
+                                how much anyone orders.
+                              */}
+                              <CartTierStrip
+                                quantity={item.quantity}
+                                baseUnitPrice={item.base_unit_price}
+                                tierDiscountPercent={item.tier_discount_percent}
+                                tierSaving={item.tier_saving}
+                                nextTier={item.next_tier}
+                                availableQuantity={item.available_quantity}
+                                onSetQuantity={(qty) => void handleUpdateQty(item.id, qty)}
+                              />
                             </div>
 
                             <button
