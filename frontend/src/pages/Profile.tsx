@@ -192,13 +192,15 @@ export default function Profile() {
         </section>
 
         {/*
-          حساب فقط همین پنج تب نیست: پاداش، دفتر مالی، استودیو غرفه و پیام‌ها مقصد‌هایی
-          هستند که کاربر همین‌جا انتظارشان را دارد. از همان فهرستِ منو خوانده می‌شوند تا
-          هیچ‌وقت از هم جدا نیفتند، و در موبایل در یک ردیف کشویی می‌ایستند تا چیزی پشت
-          لبه پنهان نماند.
+          حساب فقط همین پنج تب نیست: پاداش، دفتر مالی و استودیو غرفه مقصد‌هایی
+          هستند که کاربر همین‌جا انتظارشان را دارد. از همان فهرستِ منو خوانده
+          می‌شوند تا هیچ‌وقت از هم جدا نیفتند. پیام‌ها عمداً اینجا نیست: دکمهٔ
+          سراسری پیام‌رسان همیشه روی صفحه است و چیپ تکراری فقط ردیف را پهن‌تر
+          می‌کرد. ردیف به‌جای اسکرولِ بی‌نشانه wrap می‌شود تا هیچ چیپ نیمه‌بریده‌ای
+          پشت لبه نماند.
         */}
-        <nav aria-label="میان‌برهای حساب" className="no-scrollbar mt-5 flex snap-x gap-2 overflow-x-auto pb-1">
-          {visibleItems(ACCOUNT_ITEMS, { level, isAuthenticated }).filter((item) => item.id !== "profile").map((item) => (
+        <nav aria-label="میان‌برهای حساب" className="mt-5 flex flex-wrap gap-2">
+          {visibleItems(ACCOUNT_ITEMS, { level, isAuthenticated }).filter((item) => item.id !== "profile" && item.id !== "messages").map((item) => (
             <Link
               key={item.id}
               to={item.to}
@@ -213,7 +215,7 @@ export default function Profile() {
         <div className="mt-4 grid min-w-0 gap-5 md:mt-6 md:gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
           <aside className="h-fit min-w-0 rounded-3xl border border-emerald-100 bg-white p-2.5 shadow-sm dark:border-emerald-900 dark:bg-emerald-950 sm:p-3 lg:sticky lg:top-[calc(var(--header-height)+1rem)]">
             <nav
-              className="no-scrollbar flex snap-x gap-2 overflow-x-auto lg:flex-col lg:overflow-visible"
+              className="flex flex-wrap gap-2 lg:flex-col"
               aria-label="Account sections"
             >
               {navItems.map(({ id, label, icon: Icon }) => (
