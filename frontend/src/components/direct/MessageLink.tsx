@@ -58,10 +58,10 @@ export default function MessageLink({
         <Icon size={19} />
       </span>
       <span className="min-w-0 flex-1 text-start">
-        <span className="block truncate text-fluid-xs font-extrabold">{link.label}</span>
+        <span className="block min-w-0 truncate text-fluid-xs font-extrabold">{link.label}</span>
         <span
           className={cn(
-            'mt-0.5 block truncate text-fluid-2xs font-bold',
+            'mt-0.5 block min-w-0 truncate text-fluid-2xs font-bold',
             tone === 'dark' ? 'text-white/80' : 'text-emerald-100/90 dark:text-emerald-200/80',
           )}
         >

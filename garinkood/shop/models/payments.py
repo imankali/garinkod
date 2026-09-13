@@ -296,3 +296,41 @@ class WalletTransaction(models.Model):
     def __str__(self):
         return f'{self.wallet.user.username} {self.amount}'
 
+
+class WithdrawalRequest(models.Model):
+    """A seller's request to pay their available balance out to their card.
+
+    The gross amount leaves the seller's ledger as a ``payout`` entry and the
+    platform's withdrawal commission is recorded next to it; the net is what
+    the bank transfer owes the card on file. Approval and refusal never edit
+    rows — the paired ledger entries change status instead, so the books keep
+    the trail the same way sale reversals do.
+    """
+
+    STATUS_CHOICES = (
+        ('pending', 'در انتظار بررسی'),
+        ('paid', 'واریز شده به کارت'),
+        ('rejected', 'رد شده'),
+    )
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='withdrawal_requests'
+    )
+    storefront = models.ForeignKey(Storefront, on_delete=models.CASCADE, related_name='withdrawal_requests')
+    amount = models.PositiveBigIntegerField(help_text='برداشت ناخالص از موجودی قابل تسویه.')
+    commission_rate = models.DecimalField(max_digits=5, decimal_places=2, help_text='نرخ کمیسیون در لحظه درخواست.')
+    commission_amount = models.PositiveBigIntegerField(help_text='کمیسیون پلتفرم از این برداشت.')
+    net_amount = models.PositiveBigIntegerField(help_text='مبلغ واریزی به کارت فروشنده.')
+    card_number = models.CharField(max_length=16, help_text='کارت مقصد واریز.')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending', db_index=True)
+    admin_note = models.CharField(max_length=300, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ('-created_at',)
+        verbose_name = 'درخواست برداشت'
+        verbose_name_plural = 'درخواست‌های برداشت'
+
+    def __str__(self):
+        return f'برداشت {self.amount} — {self.get_status_display()}'

@@ -13,28 +13,34 @@ import { Toaster } from "react-hot-toast";
 import Header from "./components/Header";
 import MobileBottomNav from "./components/MobileBottomNav";
 import SiteFooter from "./components/SiteFooter";
-import CartDrawer from "./components/CartDrawer";
-import ProductDetailModal from "./components/ProductDetailModal";
-import WishlistModal from "./components/WishlistModal";
+
+
+
 import CompareBar from "./components/CompareBar";
-import CompareModal from "./components/CompareModal";
+
 import CategorySections from "./components/home/CategorySections";
-import ContentRails from "./components/home/ContentRails";
 import WeatherWidget from "./components/WeatherWidget";
 import InstallmentBanner from "./components/InstallmentBanner";
 import FlyToCart, { type FlyingItem } from "./components/FlyToCart";
 import GlobalMessengerButton from "./components/GlobalMessengerButton";
 import CropSelector from "./components/CropSelector";
 import AgriCalculator from "./components/AgriCalculator";
-import HomeHero from "./components/home/HomeHero";
+import HeroSlider from "./components/home/HeroSlider";
+import StoryStrip from "./components/home/StoryStrip";
+import AmazingOffers from "./components/home/AmazingOffers";
+import BannerGrid from "./components/home/BannerGrid";
+import RankedRail from "./components/home/RankedRail";
+import HomeMagazine from "./components/home/HomeMagazine";
+import { Sparkles, Star, TrendingUp } from "lucide-react";
+import Reveal from "./components/motion/Reveal";
 import ServiceShortcuts from "./components/home/ServiceShortcuts";
 import CategoryGrid from "./components/home/CategoryGrid";
 import FeaturedStorefronts from "./components/home/FeaturedStorefronts";
 import StorefrontAds from "./components/home/StorefrontAds";
-import DirectMessagesDrawer from "./components/direct/DirectMessagesDrawer";
+
 import RouteSeo from "./components/RouteSeo";
-import LoginModal from "./components/LoginModal";
-import CookieJarNotice from "./components/CookieJarNotice";
+
+
 import PrivacyAnalytics from "./components/PrivacyAnalytics";
 import ScrollToTop from "./components/ScrollToTop";
 import BackToTopButton from "./components/BackToTopButton";
@@ -43,6 +49,35 @@ import BackButton from "./components/BackButton";
 // ========================================
 // Pages (Lazy Loaded)
 // ========================================
+
+/*
+ * The global overlays, loaded on their own.
+ *
+ * These seven are mounted on every page but invisible on first paint — a cart
+ * drawer, a compare sheet, a sign-in dialog. They were eagerly imported, which
+ * put all of their code in the entry chunk: a visitor who never opens the cart
+ * still downloaded and parsed it, on a phone, before first paint.
+ *
+ * They stay MOUNTED rather than being gated behind their open flag, and that
+ * choice is deliberate. Six of the seven render through AnimatePresence and own
+ * their exit animation internally, so unmounting on close would cut the close
+ * animation off mid-flight. The win here is a smaller entry chunk, not fewer
+ * components; taking the second win means moving the exit animations into the
+ * parent, which is a larger change than it is worth for the difference.
+ *
+ * `fallback={null}` is safe precisely because these are overlays: nothing is on
+ * screen for the fallback to shift. The same treatment applied to an inline
+ * content section — AgriCalculator, CropSelector — would move the page as the
+ * chunk landed, which is why those two are left eager.
+ */
+const CartDrawer = lazy(() => import("./components/CartDrawer"));
+const ProductDetailModal = lazy(() => import("./components/ProductDetailModal"));
+const WishlistModal = lazy(() => import("./components/WishlistModal"));
+const CompareModal = lazy(() => import("./components/CompareModal"));
+const LoginModal = lazy(() => import("./components/LoginModal"));
+const CookieJarNotice = lazy(() => import("./components/CookieJarNotice"));
+const DirectMessagesDrawer = lazy(() => import("./components/direct/DirectMessagesDrawer"));
+
 const Login = lazy(() => import("./pages/Login"));
 const Profile = lazy(() => import("./pages/Profile"));
 const ProductPage = lazy(() => import("./pages/ProductPage"));
@@ -333,25 +368,60 @@ export default function App() {
                     <h1 className="sr-only">گرین کود، فروشگاه تخصصی نهاده‌های کشاورزی</h1>
 
                     {/*
-                      Shop-window order, chosen deliberately:
-                      1. Hero  — what this site is and where to start.
-                      2. Services — the nine things the platform does beyond
-                         the catalogue, none of which were visible before.
-                      3. Categories — how buyers actually think about produce.
-                      4. Storefronts — the marketplace, our differentiator.
-                      5. Weather/crop/installments — helpful context, but not
-                         the first thing a stranger should meet.
-                      6. Catalogue — the deep browse, with filters.
-                      7. Calculator — a tool for people who already know what
-                         they need.
+                      Digikala-style shop-window order, rebuilt for this
+                      marketplace (each section scrolls into view via Reveal):
+                      1. Story rings — live storefront activity, the very
+                         first strip under the header.
+                      2. Hero slider — autoplaying brand slides with arrows,
+                         dots, swipe and pause-on-hover.
+                      3. خرید بر اساس دسته‌بندی — the circle row.
+                      4. پیشنهادهای شگفت‌انگیز — flash deals + countdown.
+                      5. Banner grid + seller campaign strip.
+                      6. پرفروش‌ترین کالاها — the best-seller rail.
+                      7. Storefronts — the marketplace, our differentiator.
+                      8. Services, weather/crop/installments — context.
+                      9. Catalogue rails + magazine + calculator.
                     */}
-                    <HomeHero />
+                    <StoryStrip />
 
-                    <ServiceShortcuts />
+                    <div className="page-shell pt-4">
+                      <HeroSlider />
+                    </div>
 
-                    <CategoryGrid />
+                    <Reveal>
+                      <CategoryGrid />
+                    </Reveal>
 
-                    <FeaturedStorefronts />
+                    <Reveal>
+                      <div className="page-shell py-4">
+                        <AmazingOffers />
+                      </div>
+                    </Reveal>
+
+                    <Reveal>
+                      <BannerGrid />
+                    </Reveal>
+
+                    <Reveal>
+                      <div className="page-shell pb-4">
+                        <RankedRail
+                          railId="best_sellers"
+                          title="پرفروش‌ترین کالاها"
+                          hint="بر اساس تعداد سفارش ثبت‌شده در گرین کود"
+                          icon={TrendingUp}
+                          params={{ ordering: "-sales_count" }}
+                          moreTo="/products?ordering=-sales_count"
+                        />
+                      </div>
+                    </Reveal>
+
+                    <Reveal>
+                      <FeaturedStorefronts />
+                    </Reveal>
+
+                    <Reveal>
+                      <ServiceShortcuts />
+                    </Reveal>
 
                     {/* Weather Widget */}
                     <WeatherWidget />
@@ -364,19 +434,23 @@ export default function App() {
                     {/* Installment Banner */}
                     <InstallmentBanner />
 
-                    {/* Exact merchandising order: fresh, discounts, four core
-                        departments, then the specialist ranges (آبیاری و گلخانه),
-                        then the magazine with the sellers' ads under it. */}
-                    <ContentRails
-                      railIds={["newest", "discounted"]}
-                      wishlistIds={wishlistIds}
-                      compareIds={compareIds}
-                      compareDisabled={compareItems.length >= 3}
-                      onToggleWishlist={handleToggleWishlist}
-                      onAddToCart={(product, event) => handleAddToCart(product, 1, event)}
-                      onQuickView={setSelectedProduct}
-                      onToggleCompare={handleToggleCompare}
-                    />
+                    {/* Exact merchandising order: fresh stock first (the
+                        discounted rail now lives in the flash-deal panel),
+                        four core departments, then the specialist ranges
+                        (آبیاری و گلخانه), then the magazine with the sellers'
+                        ads under it. */}
+                    <Reveal>
+                      <div className="page-shell py-4">
+                        <RankedRail
+                          railId="newest"
+                          title="تازه‌های انبار"
+                          hint="نهادهایی که در هفته‌های اخیر به گرین کود اضافه شده‌اند."
+                          icon={Sparkles}
+                          params={{ ordering: "-publish" }}
+                          moreTo="/products?ordering=-publish"
+                        />
+                      </div>
+                    </Reveal>
                     <CategorySections
                       group="primary"
                       featuredOnly={featuredOnly}
@@ -401,17 +475,19 @@ export default function App() {
                       onQuickView={setSelectedProduct}
                       onToggleCompare={handleToggleCompare}
                     />
-                    <ContentRails
-                      railIds={["best_rated"]}
-                      showMagazine
-                      wishlistIds={wishlistIds}
-                      compareIds={compareIds}
-                      compareDisabled={compareItems.length >= 3}
-                      onToggleWishlist={handleToggleWishlist}
-                      onAddToCart={(product, event) => handleAddToCart(product, 1, event)}
-                      onQuickView={setSelectedProduct}
-                      onToggleCompare={handleToggleCompare}
-                    />
+                    <Reveal>
+                      <div className="page-shell space-y-4 py-4">
+                        <RankedRail
+                          railId="best_rated"
+                          title="بیشترین امتیاز خریداران"
+                          hint="میانگین ستاره‌ها فقط از دیدگاه تأییدشده کشاورزان محاسبه می‌شود."
+                          icon={Star}
+                          params={{ ordering: "-avg_rating" }}
+                          moreTo="/products?ordering=-avg_rating"
+                        />
+                        <HomeMagazine />
+                      </div>
+                    </Reveal>
 
                     {/* آگهی‌های غرفه‌داران — the sellers' own products, right
                         after the magazine and before the calculator. */}
@@ -585,35 +661,41 @@ export default function App() {
         {/* ======================================== */}
         {/* Direct Messages Drawer */}
         {/* ======================================== */}
-        <DirectMessagesDrawer />
+        <Suspense fallback={null}><DirectMessagesDrawer /></Suspense>
 
         {/* ======================================== */}
         {/* Cart Drawer */}
         {/* ======================================== */}
-        <CartDrawer isOpen={cartOpen} onClose={() => setCartOpen(false)} />
+        <Suspense fallback={null}>
+          <CartDrawer isOpen={cartOpen} onClose={() => setCartOpen(false)} />
+        </Suspense>
 
         {/* ======================================== */}
         {/* Product Detail Modal */}
         {/* ======================================== */}
-        <ProductDetailModal
-          product={selectedProduct}
-          onClose={() => setSelectedProduct(null)}
-          onAddToCart={handleAddToCart}
-          isWishlisted={selectedProduct ? wishlist.some((p) => p.id === selectedProduct.id) : false}
-          onToggleWishlist={handleToggleWishlist}
-        />
+        <Suspense fallback={null}>
+          <ProductDetailModal
+            product={selectedProduct}
+            onClose={() => setSelectedProduct(null)}
+            onAddToCart={handleAddToCart}
+            isWishlisted={selectedProduct ? wishlist.some((p) => p.id === selectedProduct.id) : false}
+            onToggleWishlist={handleToggleWishlist}
+          />
+        </Suspense>
 
         {/* ======================================== */}
         {/* Wishlist Modal */}
         {/* ✅ فقط وقتی wishlistOpen true است render می‌شود */}
         {/* ======================================== */}
         {wishlistOpen && (
-          <WishlistModal
-            wishlist={wishlist}
-            onClose={() => setWishlistOpen(false)}
-            onRemove={removeFromWishlist}
-            onAddToCart={handleAddToCart}
-          />
+          <Suspense fallback={null}>
+            <WishlistModal
+              wishlist={wishlist}
+              onClose={() => setWishlistOpen(false)}
+              onRemove={removeFromWishlist}
+              onAddToCart={handleAddToCart}
+            />
+          </Suspense>
         )}
 
         {/* ======================================== */}
@@ -629,12 +711,14 @@ export default function App() {
         {/* ======================================== */}
         {/* Compare Modal */}
         {/* ======================================== */}
-        <CompareModal
-          isOpen={compareOpen}
-          items={compareItems}
-          onClose={() => setCompareOpen(false)}
-          onAddToCart={(product) => handleAddToCart(product, 1)}
-        />
+        <Suspense fallback={null}>
+          <CompareModal
+            isOpen={compareOpen}
+            items={compareItems}
+            onClose={() => setCompareOpen(false)}
+            onAddToCart={(product) => handleAddToCart(product, 1)}
+          />
+        </Suspense>
 
         {/* Global return-to-top control. */}
         <BackToTopButton />
@@ -647,12 +731,12 @@ export default function App() {
         {/* ======================================== */}
         {/* Sign-in dialog used by every gated action (reviews, consult) */}
         {/* ======================================== */}
-        <LoginModal />
+        <Suspense fallback={null}><LoginModal /></Suspense>
 
         {/* ======================================== */}
         {/* A sign-in the browser cannot keep is explained, never looped */}
         {/* ======================================== */}
-        <CookieJarNotice />
+        <Suspense fallback={null}><CookieJarNotice /></Suspense>
       </div>
     </BrowserRouter>
   );

@@ -213,6 +213,7 @@ class OrderAndPlatformTests(TestCase):
                 # Opening a stall requires a named owner with a valid national code.
                 "owner_first_name": "مریم", "owner_last_name": "رضایی",
                 "national_id": "3971857299",
+                "card_number": "6037991234567890", "rules_accepted": True,
             },
             format="json",
         )

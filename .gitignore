@@ -327,3 +327,6 @@ dump.rdb
 
 # Webpack
 frontend/webpack-stats.json
+
+# scratch npm prefix used to run the skill installer CLIs (binaries, not source)
+.agents-tmp/

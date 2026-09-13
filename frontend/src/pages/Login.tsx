@@ -376,7 +376,7 @@ className={`${AUTH_INPUT_CLASS} ps-10`}
 
               {isRegister && (
                 <>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <PlainField label="نام" htmlFor="login-first-name">
                       <input id="login-first-name" type="text" name="first_name" value={passwordForm.first_name} onChange={handlePasswordChange} className={`${AUTH_INPUT_CLASS} px-4`} autoComplete="given-name" />
                     </PlainField>

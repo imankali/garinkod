@@ -10,9 +10,10 @@ from simple_history.admin import SimpleHistoryAdmin
 from .models import Category, Product
 from .models import FertilizerDetail, PesticideDetail, SeedDetail, EquipmentDetail
 from .models import (
+    PriceTier,
     Comment, UserAccount, Order, OrderItem, ServiceRequest, ProcurementRequest,
     Storefront, MarketplaceListing, PaymentAttempt, AffiliateProfile,
-    AffiliateConversion, FinancialLedgerEntry, PlatformFeedback,
+    AffiliateConversion, FinancialLedgerEntry, PlatformFeedback, WithdrawalRequest,
     StorefrontComplaint, VisualSearchRequest, Coupon, Wallet, WalletTransaction,
     StorefrontPost, FarmLand, FarmCalendarEvent, FarmConsultationRequest,
     AdminAuditLog, OneTimePassword, NotificationTemplate,
@@ -65,6 +66,61 @@ class ProductImageInline(admin.TabularInline):
     fields = ('order', 'image', 'caption')
     verbose_name = 'تصویر'
     verbose_name_plural = 'گالری تصاویر محصول'
+
+
+class PriceTierInlineBase(admin.TabularInline):
+    """Shared admin for the quantity ladder (تخفیف پلکانی).
+
+    The inline shows the *resulting unit price* next to the percentage, which
+    is the whole point: an operator typing "15" into a percent box cannot see
+    what the buyer will be charged, and this feature has already produced two
+    bugs where the ladder shown and the price charged disagreed. Showing the
+    computed number in the same row makes that disagreement visible at the
+    moment it is created rather than in a support ticket.
+
+    The price is deliberately read-only. It is derived from
+    ``discounted_price`` — the same property the product page, the cart and the
+    structured data all read — and letting it be typed in would recreate
+    exactly the drift this column exists to prevent.
+    """
+
+    extra = 0
+    fields = ('min_quantity', 'discount_percent', 'resulting_unit_price')
+    readonly_fields = ('resulting_unit_price',)
+    ordering = ('min_quantity',)
+    verbose_name = 'پلهٔ تخفیف'
+    verbose_name_plural = 'تخفیف پلکانی'
+
+    def get_formset(self, request, obj=None, **kwargs):
+        # New inline rows have no parent FK yet, so the computed price for a
+        # not-yet-saved rung has to come from the formset's parent object.
+        self._parent_obj = obj
+        return super().get_formset(request, obj, **kwargs)
+
+    @admin.display(description='قیمت هر واحد در این پله')
+    def resulting_unit_price(self, obj):
+        parent = obj.product or obj.listing or getattr(self, '_parent_obj', None)
+        if parent is None or not obj.discount_percent:
+            return '—'
+        base = getattr(parent, 'discounted_price', None)
+        if base is None:
+            return '—'
+        return f'{int(int(base) * (100 - obj.discount_percent) / 100):,} تومان'
+
+
+class ProductPriceTierInline(PriceTierInlineBase):
+    model = PriceTier
+    fk_name = 'product'
+    # A product ladder must not be settable from the listing admin and vice
+    # versa; the model's exclusivity constraint enforces it, and this keeps the
+    # two forms from offering a field the save will reject.
+    exclude = ('listing',)
+
+
+class ListingPriceTierInline(PriceTierInlineBase):
+    model = PriceTier
+    fk_name = 'listing'
+    exclude = ('product',)
 
 
 class ProductPackageInline(admin.TabularInline):
@@ -196,7 +252,7 @@ class AdminProduct(ImportExportMixin, SimpleHistoryAdmin):
     save_as = True
     actions = [make_published, make_draft, 'add_standard_attribute_rows', 'copy_packaging']
 
-    inlines = [ProductAttributeInline, ProductImageInline, ProductPackageInline]
+    inlines = [ProductAttributeInline, ProductImageInline, ProductPackageInline, ProductPriceTierInline]
     fieldsets = (
         ('اطلاعات اصلی', {'fields': ('title', 'slug', 'author', 'status')}),
         ('دسته‌بندی و قیمت', {'fields': ('category', 'subcategory', 'price', 'stock', 'available', 'is_featured', 'discount_percent', 'package_weight', 'price_on_request', 'tags')}),
@@ -479,7 +535,7 @@ class AdminStorefront(admin.ModelAdmin):
 
 @admin.register(MarketplaceListing)
 class AdminMarketplaceListing(admin.ModelAdmin):
-    inlines = [ListingAttributeInline]
+    inlines = [ListingAttributeInline, ListingPriceTierInline]
     list_display = ('title', 'storefront', 'crop_name', 'price', 'unit', 'quantity_available', 'status', 'created_at')
     list_filter = ('status', 'harvest_date', 'created_at')
     search_fields = ('title', 'slug', 'crop_name', 'storefront__name')
@@ -522,6 +578,40 @@ class AdminFinancialLedgerEntry(admin.ModelAdmin):
     search_fields = ('user__username', 'storefront__name', 'order__code', 'description')
     list_editable = ('status',)
     readonly_fields = ('created_at',)
+
+
+@admin.register(WithdrawalRequest)
+class AdminWithdrawalRequest(admin.ModelAdmin):
+    """Approving or refusing a withdrawal moves its ledger entries with it."""
+
+    list_display = (
+        'id', 'storefront', 'amount', 'commission_amount', 'net_amount',
+        'card_number_masked', 'status', 'created_at',
+    )
+    list_filter = ('status', 'created_at')
+    search_fields = ('storefront__name', 'user__username', 'card_number')
+    readonly_fields = (
+        'user', 'storefront', 'amount', 'commission_rate', 'commission_amount',
+        'net_amount', 'card_number', 'created_at', 'updated_at',
+    )
+    actions = ('mark_paid', 'mark_rejected')
+
+    @admin.display(description='شماره کارت')
+    def card_number_masked(self, obj):
+        from .cards import mask_card_number
+        return mask_card_number(obj.card_number)
+
+    @admin.action(description='تأیید و ثبت واریز به کارت')
+    def mark_paid(self, request, queryset):
+        from .settlements import settle_withdrawal
+        for withdrawal in queryset.filter(status='pending'):
+            settle_withdrawal(withdrawal, paid=True, note=request.user.username)
+
+    @admin.action(description='رد درخواست')
+    def mark_rejected(self, request, queryset):
+        from .settlements import settle_withdrawal
+        for withdrawal in queryset.filter(status='pending'):
+            settle_withdrawal(withdrawal, paid=False, note=request.user.username)
 
 
 @admin.register(PlatformFeedback)

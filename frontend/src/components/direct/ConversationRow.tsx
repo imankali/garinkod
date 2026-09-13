@@ -66,7 +66,7 @@ export default function ConversationRow({
         <span className="flex items-center justify-between gap-2">
           <span
             className={cn(
-              'truncate text-fluid-sm',
+              'min-w-0 truncate text-fluid-sm',
               unread > 0
                 ? 'font-extrabold text-slate-900 dark:text-white'
                 : 'font-bold text-slate-800 dark:text-white',
@@ -103,7 +103,7 @@ export default function ConversationRow({
           )}
           <span
             className={cn(
-              'truncate text-fluid-xs',
+              'min-w-0 truncate text-fluid-xs',
               unread > 0
                 ? 'font-semibold text-slate-700 dark:text-emerald-100'
                 : 'text-slate-500 dark:text-emerald-200',

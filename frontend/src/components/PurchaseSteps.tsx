@@ -92,7 +92,15 @@ export default function PurchaseSteps({
           />
         </div>
 
-        <ol className="relative grid grid-cols-5">
+        <ol className="relative grid min-w-0 grid-cols-5">
+        {/*
+          Five columns at every breakpoint, on purpose. This is a progress
+          indicator: stacking it to one column on a phone would turn "step 2
+          of 5" into a list you have to scroll to read, which destroys the
+          one thing the component is for. What has to change on a narrow
+          screen is not the column count but whether the cells can shrink —
+          so each cell gets min-w-0 and the label gets a wrap rule instead.
+        */}
           {STEPS.map((step, index) => {
             const Icon = step.icon;
             const isCurrent = index === currentIndex;
@@ -134,7 +142,10 @@ export default function PurchaseSteps({
 
                 <span
                   className={cn(
-                    "mt-1.5 max-w-full px-0.5 font-bold leading-5 sm:mt-2",
+                    // break-words, not just max-w-full: a Persian label like «سبد خرید» has a
+                    // min-content width, and without an explicit wrap rule the
+                    // column grows to fit it and the whole track overflows.
+                    "mt-1.5 min-w-0 max-w-full break-words px-0.5 font-bold leading-5 sm:mt-2",
                     compact ? "text-fluid-2xs" : "text-fluid-2xs sm:text-sm",
                     isCurrent
                       ? "text-emerald-700 dark:text-lime-300"

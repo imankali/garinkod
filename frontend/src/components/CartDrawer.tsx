@@ -23,6 +23,7 @@ import { productsApi } from "../api/services";
 import type { ProductList } from '@/types/shop';
 import type { CartItem } from '@/types/commerce';
 import { formatPrice } from "../utils/formatPrice";
+import CartTierStrip from "./shop/CartTierStrip";
 import { cn } from "../utils/cn";
 
 // ========================================
@@ -77,6 +78,18 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
     wait instead of a toast the shopper has to look for.
   */
   const [busyItem, setBusyItem] = useState<number | null>(null);
+  /**
+   * Which rows have been told "this is the stall's floor" since the buyer
+   * pressed decrease there.
+   *
+   * The decrease button used to be `disabled` at the minimum, which is the
+   * quietest possible way to refuse someone: the control greys out, nothing
+   * says why, and the explanatory line below it — `min > 1 && quantity < min` —
+   * could never render, because the clamp made `quantity < min` unreachable
+   * through the UI. A rule the interface enforces but never states is the rule
+   * a buyer files as a bug. So the control stays live and explains itself.
+   */
+  const [atFloor, setAtFloor] = useState<Record<number, boolean>>({});
   const navigate = useNavigate();
 
   // دریافت توابع و state از cartStore
@@ -144,6 +157,31 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
     item.product?.category?.toString().toLowerCase().includes("pesticide")
   );
 
+
+/**
+ * A catalogue product is capped at ten units per cart line — a guard against a
+ * fat-fingered bulk order on a shop that sells sachets.
+ */
+const PRODUCT_ORDER_CEILING = 10;
+
+/**
+ * The ceiling for one product, mirroring `max_order_quantity` on the server.
+ *
+ * A product that declares a quantity ladder starting above ten is explicitly
+ * telling the platform it sells in bulk, so its own ladder is what raises the
+ * cap. Keeping the two in step matters: if the client capped at ten while the
+ * ladder offered twenty, the plus button would stop responding at ten and the
+ * ladder nudge would be a control that does nothing.
+ *
+ * Every product *without* a ladder is still capped at exactly ten, so this
+ * changes nothing for the existing catalogue.
+ */
+function productOrderCeiling(item: CartItem): number {
+  const tiers = item.product?.price_tiers ?? [];
+  const topRung = tiers.reduce((highest, rung) => Math.max(highest, rung.min_quantity), 0);
+  return Math.max(PRODUCT_ORDER_CEILING, topRung);
+}
+
   // ========================================
   // Handlers
   // ========================================
@@ -166,8 +204,22 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
     const max =
       item.kind === 'listing'
         ? item.available_quantity
-        : Math.min(10, item.available_quantity || 10);
+        : Math.min(productOrderCeiling(item), item.available_quantity || PRODUCT_ORDER_CEILING);
     return { min, max };
+  }
+
+  /**
+   * Going down from the stall's floor. The order stays valid either way — the
+   * quantity is never sent below the minimum — but the buyer is told the rule
+   * instead of being shown a control that has stopped working.
+   */
+  function handleDecrease(item: CartItem, min: number) {
+    if (item.quantity <= min) {
+      setAtFloor((current) => ({ ...current, [item.id]: true }));
+      return;
+    }
+    setAtFloor((current) => ({ ...current, [item.id]: false }));
+    void handleUpdateQty(item.id, item.quantity - 1);
   }
 
   async function handleRemove(itemId: number) {
@@ -207,12 +259,13 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
             animate={{ opacity: 1, y: 0 }}
             exit={reduceMotion ? undefined : { opacity: 0, y: 80 }}
             transition={{ type: "spring", damping: 30, stiffness: 280 }}
-            className="fixed inset-x-0 bottom-0 z-[70] [&_button]:min-h-11 [&_button]:min-w-11 flex max-h-[90vh] w-full flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl outline-none dark:bg-emerald-950 sm:inset-x-auto sm:inset-y-0 sm:end-0 sm:max-h-none sm:max-w-md sm:rounded-none"
+            className="fixed inset-x-0 bottom-0 z-[70] [&_button]:min-h-11 [&_button]:min-w-11 flex max-h-[90vh] w-full flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl outline-none supports-[height:100dvh]:max-h-dvh dark:bg-emerald-950 sm:inset-x-auto sm:inset-y-0 sm:end-0 sm:max-h-none sm:max-w-md sm:rounded-none"
           >
             {/* ======================================== */}
             {/* Header */}
             {/* ======================================== */}
-            <div className="relative overflow-hidden bg-gradient-to-l from-emerald-600 to-lime-500 px-5 py-5 text-white">
+            {/* shrink-0: a squeezed header used to clip its trust strip mid-line. */}
+            <div className="relative shrink-0 overflow-hidden bg-gradient-to-l from-emerald-600 to-lime-500 px-5 py-4 text-white sm:py-5">
               <div className="relative flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20 backdrop-blur">
@@ -261,7 +314,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
               )}
 
               {/* Trust mini strip */}
-              <div className="relative mt-3 flex items-center justify-between text-fluid-2xs text-white/85">
+              <div className="relative mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 text-fluid-2xs text-white/85">
                 <span className="flex items-center gap-1">
                   <Truck size={11} /> زمان ارسال پس از هماهنگی
                 </span>
@@ -274,10 +327,17 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
               </div>
             </div>
 
-            {/* Keep the checkout journey visible from its first stage. */}
-            {items.length > 0 && (
-              <PurchaseSteps currentStep="cart" compact className="mx-4 mt-3" />
-            )}
+            {/*
+              Journey, safety note and rows share one scrollable middle. When
+              each lived outside the scroll region, header + footer could eat
+              the sheet's height and leave the list a slit tall enough to clip
+              a row mid-card.
+            */}
+            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+              {/* Keep the checkout journey visible from its first stage. */}
+              {items.length > 0 && (
+                <PurchaseSteps currentStep="cart" compact className="mx-4 mt-3 shrink-0" />
+              )}
 
             {/* ======================================== */}
             {/* Pesticide Safety Warning */}
@@ -294,10 +354,10 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
               </motion.div>
             )}
 
-            {/* ======================================== */}
-            {/* Items List */}
-            {/* ======================================== */}
-            <div className="flex-1 overflow-y-auto px-4 py-4">
+              {/* ======================================== */}
+              {/* Items List */}
+              {/* ======================================== */}
+              <div className="flex-1 px-4 py-4">
               {items.length === 0 ? (
                 <motion.div
                   initial={reduceMotion ? false : { opacity: 0, scale: 0.96 }}
@@ -399,7 +459,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                                     <span className="rounded-full bg-lime-100 px-2 py-0.5 font-bold text-emerald-700 dark:bg-emerald-800 dark:text-lime-200">
                                       غرفه
                                     </span>
-                                    <span className="truncate">{item.listing?.storefront_name}</span>
+                                    <span className="min-w-0 truncate">{item.listing?.storefront_name}</span>
                                   </>
                                 ) : (
                                   <span className="rounded-full bg-slate-100 px-2 py-0.5 font-bold text-slate-500 dark:bg-emerald-800/70 dark:text-emerald-100">
@@ -413,6 +473,30 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                                   </span>
                                 )}
                               </div>
+
+                              {/*
+                                The ladder, at the moment the quantity can still
+                                be changed. A discount the buyer has to go back
+                                to the product page to discover does not change
+                                how much anyone orders.
+                              */}
+                              <CartTierStrip
+                                quantity={item.quantity}
+                                baseUnitPrice={item.base_unit_price}
+                                tierDiscountPercent={item.tier_discount_percent}
+                                tierSaving={item.tier_saving}
+                                nextTier={item.next_tier}
+                                availableQuantity={item.available_quantity}
+                                maxQuantity={
+                                  item.kind === 'listing'
+                                    ? item.available_quantity
+                                    : Math.min(
+                                        productOrderCeiling(item),
+                                        item.available_quantity || PRODUCT_ORDER_CEILING,
+                                      )
+                                }
+                                onSetQuantity={(qty) => void handleUpdateQty(item.id, qty)}
+                              />
                             </div>
 
                             <button
@@ -449,9 +533,10 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                               <motion.button
                                 whileTap={reduceMotion ? undefined : { scale: 0.97 }}
                                 type="button"
-                                disabled={busyItem === item.id || item.quantity <= min}
+                                disabled={busyItem === item.id}
                                 aria-label={`کاهش تعداد ${item.title}`}
-                                onClick={() => void handleUpdateQty(item.id, Math.max(min, item.quantity - 1))}
+                                aria-describedby={min > 1 ? `min-order-${item.id}` : undefined}
+                                onClick={() => handleDecrease(item, min)}
                                 className="flex min-h-11 min-w-11 items-center justify-center rounded-e-xl text-slate-500 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-35 dark:text-emerald-400 dark:hover:bg-emerald-800"
                               >
                                 <Minus size={15} />
@@ -463,8 +548,11 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                           </div>
 
                           {/* Stock and seller rules, said once and where they apply. */}
-                          {min > 1 && item.quantity < min && (
-                            <p className="mt-2 flex items-start gap-1 rounded-lg bg-amber-50 px-2 py-1 text-fluid-2xs font-semibold text-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
+                          {min > 1 && (item.quantity < min || atFloor[item.id]) && (
+                            <p
+                              id={`min-order-${item.id}`}
+                              role="status"
+                              className="mt-2 flex items-start gap-1 rounded-lg bg-amber-50 px-2 py-1 text-fluid-2xs font-semibold text-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
                               <AlertTriangle size={12} className="mt-0.5 shrink-0" />
                               <span>
                                 حداقل سفارش این غرفه {min.toLocaleString('fa-IR')} {unit || 'عدد'} است.
@@ -519,7 +607,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                         <p className="mb-0.5 flex items-center gap-1 text-fluid-2xs font-bold text-emerald-600 dark:text-lime-300">
                           <Gift size={11} /> {suggestion.reason}
                         </p>
-                        <p className="truncate text-xs font-semibold text-slate-600 dark:text-emerald-50">
+                        <p className="min-w-0 truncate text-xs font-semibold text-slate-600 dark:text-emerald-50">
                           {suggestion.name}
                         </p>
                         <p className="mt-0.5 flex items-baseline gap-1.5 text-fluid-2xs">
@@ -552,6 +640,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                   )}
                 </ul>
               )}
+              </div>
             </div>
 
             {/* ======================================== */}
@@ -560,7 +649,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
             {items.length > 0 && (
               <div className="shrink-0 border-t border-slate-100 bg-gradient-to-br from-white to-emerald-50/30 p-4 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] dark:border-emerald-800 dark:from-emerald-950 dark:to-emerald-900/30 sm:p-5">
                 {/* Price Breakdown */}
-                <div className="mb-4 space-y-2 rounded-2xl bg-white/60 p-3 backdrop-blur dark:bg-emerald-900/50">
+                <div className="mb-3 space-y-2 rounded-2xl bg-white/60 p-3 backdrop-blur dark:bg-emerald-900/50 sm:mb-4">
                   <div className="flex justify-between text-sm text-slate-500 dark:text-emerald-200">
                     <span>جمع کالاها ({totalItems} عدد)</span>
                     <span className="font-semibold text-slate-700 dark:text-white">{formatPrice(subtotal)}</span>
@@ -599,7 +688,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                   </span>
                 </motion.a>
 
-                <p className="mt-3 text-center text-fluid-2xs text-slate-400 dark:text-emerald-400">
+                <p className="mt-2 text-center text-fluid-2xs text-slate-400 dark:text-emerald-400 sm:mt-3">
                   مبلغ و موجودی نهایی پیش از تأیید سفارش توسط کارشناس بررسی می‌شود.
                 </p>
               </div>

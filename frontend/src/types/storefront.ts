@@ -32,6 +32,8 @@ export interface Storefront {
   created_at: string;
   /** The masked code the owner's account carries; the full one never leaves. */
   owner_national_id_masked?: string;
+  /** The masked payout card on file; the full number never returns. */
+  card_number_masked?: string;
   /** Whether the owner has declared a name and a national code. */
   profile_complete?: boolean;
 }

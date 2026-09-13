@@ -126,7 +126,7 @@ export default function HighlightManager({ storefrontSlug, stories }: HighlightM
                   <Trash2 size={11} />
                 </button>
               </div>
-              <p className="mt-1 truncate text-fluid-xs text-slate-600 dark:text-emerald-100">{highlight.title}</p>
+              <p className="mt-1 min-w-0 truncate text-fluid-xs text-slate-600 dark:text-emerald-100">{highlight.title}</p>
               <p className="text-fluid-2xs text-slate-400">{highlight.items.length} استوری</p>
             </li>
           ))}

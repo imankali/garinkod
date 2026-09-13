@@ -1,10 +1,11 @@
 // frontend/src/pages/Finance.tsx
 
-import { useCallback, useEffect, useState } from 'react';
-import { Download, Landmark, Loader2, ShieldCheck, Store, WalletCards } from 'lucide-react';
+import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { Banknote, Download, Landmark, Loader2, ShieldCheck, Store, WalletCards } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-import { financeApi } from '../api/services';
+import { agricultureApi, financeApi, type WithdrawalRequest } from '../api/services';
+import { isValidCardNumber, normalizeCardNumber } from '../utils/cardNumber';
 import { parseApiError } from '../api/errors';
 import { useAuthStore } from '../store/authStore';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
@@ -47,6 +48,16 @@ export default function Finance() {
   const [count, setCount] = useState(0);
   const [exporting, setExporting] = useState(false);
 
+  // Withdrawal: the seller asks for a slice of the available balance, the
+  // platform commission is shown before they commit, and the card on file is
+  // where the net lands.
+  const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [withdrawing, setWithdrawing] = useState(false);
+  const [cardEdit, setCardEdit] = useState('');
+  const [editingCard, setEditingCard] = useState(false);
+  const [savingCard, setSavingCard] = useState(false);
+
   const load = useCallback(async () => {
     if (!isAuthenticated) {
       setState('no-store');
@@ -68,6 +79,7 @@ export default function Finance() {
       setEntryTypes(response.data.entry_types ?? []);
       setStatuses(response.data.statuses ?? []);
       setNotice(response.data.notice);
+      setWithdrawals(response.data.withdrawals ?? []);
       setCount(response.data.count ?? response.data.entries.length);
       setTotalPages(response.data.total_pages ?? 1);
       setState('ready');
@@ -111,6 +123,53 @@ export default function Finance() {
     }
   }
 
+  // Persian digits typed on a phone keypad count as the same number.
+  const amountValue = Number(
+    withdrawAmount.replace(/[۰-۹٠-٩]/g, (digit) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit) > -1 ? '۰۱۲۳۴۵۶۷۸۹'.indexOf(digit) : '٠١٢٣٤٥٦٧٨٩'.indexOf(digit))),
+  );
+  const commissionRate = Number(storefront?.commission_rate ?? 0) || 0;
+  const withdrawCommission = Math.floor((amountValue * commissionRate) / 100);
+  const available = balances.available || 0;
+  const canWithdraw =
+    Number.isFinite(amountValue) && amountValue > 0 && amountValue <= available;
+
+  async function handleSaveCard(event: FormEvent) {
+    event.preventDefault();
+    setSavingCard(true);
+    try {
+      await agricultureApi.updateStorefront({ card_number: normalizeCardNumber(cardEdit) });
+      toast.success('شماره کارت ثبت شد؛ برداشت‌ها به همین کارت واریز می‌شوند.');
+      setCardEdit('');
+      setEditingCard(false);
+      await load();
+    } catch (error) {
+      const parsed = parseApiError(error);
+      if (!parsed.handled) toast.error(parsed.message);
+    } finally {
+      setSavingCard(false);
+    }
+  }
+
+  async function handleWithdraw(event: FormEvent) {
+    event.preventDefault();
+    if (!canWithdraw) return;
+    setWithdrawing(true);
+    try {
+      const response = await financeApi.withdraw({ amount: amountValue });
+      toast.success(
+        `درخواست برداشت ثبت شد؛ ${formatPrice(response.data.withdrawal.net_amount)} به کارت ${response.data.withdrawal.card_number_masked} واریز می‌شود.`,
+      );
+      setWithdrawAmount('');
+      setWithdrawals((current) => [response.data.withdrawal, ...current]);
+      setBalances(response.data.balances);
+    } catch (error) {
+      const parsed = parseApiError(error);
+      if (!parsed.handled) toast.error(parsed.message);
+    } finally {
+      setWithdrawing(false);
+    }
+  }
+
   const hasFilters = Boolean(statusFilter || typeFilter || dateFrom || dateTo || search);
 
   return (
@@ -141,6 +200,124 @@ export default function Finance() {
             <Balance icon={WalletCards} label="در انتظار تأیید" value={balances.pending || 0} />
             <Balance icon={Landmark} label="قابل تسویه" value={balances.available || 0} />
             <Balance icon={ShieldCheck} label="مسدود برای رسیدگی" value={balances.held || 0} />
+          </section>
+
+          {/* Withdrawal: the request is capped at the available balance, the
+              commission is printed before the seller commits, and the net is
+              what the card on file receives. */}
+          <section
+            aria-label="برداشت از کیف پول"
+            className="mt-6 rounded-3xl border border-slate-100 bg-white p-6 shadow-sm dark:border-emerald-900 dark:bg-emerald-950"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="flex items-center gap-2 text-xl font-extrabold text-slate-800 dark:text-white">
+                <Banknote size={18} className="text-emerald-600 dark:text-lime-300" />
+                برداشت از کیف پول
+              </h2>
+              <p className="text-xs font-bold text-slate-500 dark:text-emerald-200">
+                کارت مقصد: {storefront?.card_number_masked || 'هنوز ثبت نشده'}
+                {storefront?.card_number_masked && (
+                  <button
+                    type="button"
+                    onClick={() => setEditingCard((value) => !value)}
+                    className="ms-2 font-bold text-emerald-700 underline underline-offset-2 dark:text-lime-300"
+                  >
+                    {editingCard ? 'بستن' : 'تغییر کارت'}
+                  </button>
+                )}
+              </p>
+            </div>
+
+            {(editingCard || !storefront?.card_number_masked) && (
+              <form onSubmit={handleSaveCard} className="mt-4">
+                <label htmlFor="payout-card" className="block text-fluid-xs font-bold text-slate-500 dark:text-emerald-200">
+                  شماره کارت صاحب غرفه (۱۶ رقم)
+                </label>
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  <input
+                    id="payout-card"
+                    value={cardEdit}
+                    onChange={(event) => setCardEdit(event.target.value)}
+                    inputMode="numeric"
+                    placeholder="6037 **** **** ****"
+                    className="w-56 max-w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-emerald-700 dark:bg-emerald-900"
+                  />
+                  <button
+                    type="submit"
+                    disabled={savingCard || !isValidCardNumber(cardEdit)}
+                    className="flex min-h-11 items-center rounded-xl bg-emerald-600 px-4 text-xs font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+                  >
+                    {savingCard ? 'در حال ثبت…' : 'ثبت کارت'}
+                  </button>
+                </div>
+                {cardEdit.trim() !== '' && !isValidCardNumber(cardEdit) && (
+                  <p role="alert" className="mt-1 text-fluid-2xs font-semibold text-rose-600">
+                    شماره کارت باید ۱۶ رقم باشد.
+                  </p>
+                )}
+              </form>
+            )}
+
+            <form onSubmit={handleWithdraw} className="mt-5 grid items-end gap-3 sm:grid-cols-[minmax(0,16rem)_auto]">
+              <div>
+                <label htmlFor="withdraw-amount" className="block text-fluid-xs font-bold text-slate-500 dark:text-emerald-200">
+                  مبلغ برداشت از موجودی قابل تسویه (تومان)
+                </label>
+                <input
+                  id="withdraw-amount"
+                  value={withdrawAmount}
+                  onChange={(event) => setWithdrawAmount(event.target.value)}
+                  inputMode="numeric"
+                  placeholder={`حداکثر ${available.toLocaleString('fa-IR')}`}
+                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-emerald-700 dark:bg-emerald-900"
+                />
+                <p className="mt-2 text-fluid-2xs font-semibold text-slate-500 dark:text-emerald-200" aria-live="polite">
+                  {canWithdraw ? (
+                    <>
+                      کمیسیون پلتفرم ({commissionRate.toLocaleString('fa-IR')}٪): {formatPrice(withdrawCommission)} · واریزی به کارت: {formatPrice(amountValue - withdrawCommission)}
+                    </>
+                  ) : withdrawAmount.trim() !== '' && amountValue > available ? (
+                    'مبلغ برداشت بیشتر از موجودی قابل تسویه است.'
+                  ) : (
+                    'کمیسیون به‌صورت خودکار از مبلغ برداشت کسر می‌شود.'
+                  )}
+                </p>
+              </div>
+              <button
+                type="submit"
+                disabled={!canWithdraw || withdrawing || !storefront?.card_number_masked}
+                className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-5 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {withdrawing ? <Loader2 size={15} className="animate-spin" /> : <Banknote size={15} />}
+                ثبت درخواست برداشت
+              </button>
+            </form>
+
+            {withdrawals.length > 0 && (
+              <ul className="mt-5 divide-y divide-slate-100 dark:divide-emerald-900">
+                {withdrawals.map((withdrawal) => (
+                  <li key={withdrawal.id} className="flex flex-wrap items-center justify-between gap-2 py-3 text-fluid-xs font-semibold text-slate-600 dark:text-emerald-100">
+                    <span>
+                      #{withdrawal.id.toLocaleString('fa-IR')} · {new Date(withdrawal.created_at).toLocaleDateString('fa-IR')} · {withdrawal.card_number_masked}
+                    </span>
+                    <span>
+                      برداشت {formatPrice(withdrawal.amount)} · کمیسیون {formatPrice(withdrawal.commission_amount)} · واریزی {formatPrice(withdrawal.net_amount)}
+                    </span>
+                    <span
+                      className={
+                        withdrawal.status === 'paid'
+                          ? 'rounded-full bg-emerald-100 px-2.5 py-1 font-bold text-emerald-700 dark:bg-emerald-900 dark:text-lime-300'
+                          : withdrawal.status === 'rejected'
+                            ? 'rounded-full bg-rose-100 px-2.5 py-1 font-bold text-rose-700 dark:bg-rose-950 dark:text-rose-200'
+                            : 'rounded-full bg-amber-100 px-2.5 py-1 font-bold text-amber-800 dark:bg-amber-950 dark:text-amber-100'
+                      }
+                    >
+                      {withdrawal.status_label}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
 
           <section className="mt-6 rounded-3xl border border-slate-100 bg-white p-6 shadow-sm dark:border-emerald-900 dark:bg-emerald-950">

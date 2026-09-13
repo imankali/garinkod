@@ -114,6 +114,12 @@ jobs:
           python manage.py seed_agri_inputs
           python manage.py bootstrap_management_roles
           python manage.py seed_demo_marketplace
+          # Responsive renditions: the backfill only queues an outbox task per
+          # row, the worker does the encodes. Both, in this order, or the job is
+          # green and the srcsets are empty. See ARCHITECTURE.md §2.3.
+          python manage.py backfill_image_variants --model product
+          python manage.py backfill_image_variants --model gallery
+          python manage.py process_async_tasks --limit 500
           # A level-3 account so the moderation specs have somewhere to sign in.
           python manage.py shell -c "
           from django.contrib.auth.models import User
@@ -151,6 +157,8 @@ jobs:
         env:
           E2E_MODERATOR_USERNAME: e2e-moderator
           E2E_MODERATOR_PASSWORD: E2eModerator!234
+          # Renditions exist, so demand them: at least one AVIF answered 200.
+          E2E_IMAGE_PIPELINE: "1"
 
       - name: Upload Playwright report
         if: always()

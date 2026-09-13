@@ -161,10 +161,10 @@ export default function ShareLandSheet({
                       <Sprout size={18} />
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-fluid-xs font-extrabold text-slate-800 dark:text-white">
+                      <span className="block min-w-0 truncate text-fluid-xs font-extrabold text-slate-800 dark:text-white">
                         {land.name}
                       </span>
-                      <span className="mt-0.5 block truncate text-fluid-2xs text-slate-500 dark:text-emerald-200">
+                      <span className="mt-0.5 block min-w-0 truncate text-fluid-2xs text-slate-500 dark:text-emerald-200">
                         {land.land_type_label} · {land.area_label}
                         {land.crop_type ? ` · ${land.crop_type}` : ''}
                       </span>

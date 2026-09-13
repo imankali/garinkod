@@ -76,6 +76,12 @@ async function fillBasics() {
   await userEvent.click(screen.getByTestId('pick-city-store'));
 }
 
+/** The payout card and the rules acceptance, required since withdrawals exist. */
+async function fillPayout() {
+  await userEvent.type(screen.getByLabelText('شماره کارت'), '6037991234567890');
+  await userEvent.click(screen.getByLabelText(/قوانین غرفه‌داری را می‌پذیرم/));
+}
+
 beforeEach(() => {
   // Most of this form is a seller's form; the signed-out case names itself.
   signIn();
@@ -97,6 +103,12 @@ describe('the identity block', () => {
     expect(submit).toBeDisabled();
 
     await userEvent.type(screen.getByLabelText('کد ملی'), '3971857299');
+    // Identity alone is not enough since withdrawals exist: the payout card
+    // and the rules acceptance are part of opening a stall too.
+    expect(submit).toBeDisabled();
+    await userEvent.type(screen.getByLabelText('شماره کارت'), '6037991234567890');
+    expect(submit).toBeDisabled();
+    await userEvent.click(screen.getByLabelText(/قوانین غرفه‌داری را می‌پذیرم/));
     expect(submit).toBeEnabled();
   });
 
@@ -120,6 +132,7 @@ describe('the identity block', () => {
     await userEvent.type(screen.getByLabelText('نام'), 'زهرا');
     await userEvent.type(screen.getByLabelText('نام خانوادگی'), 'بهاران');
     await userEvent.type(screen.getByLabelText('کد ملی'), '۳۹۷۱۸۵۷۲۹۹');
+    await fillPayout();
     expect(screen.getByRole('button', { name: 'ساخت غرفه' })).toBeEnabled();
   });
 
@@ -168,6 +181,7 @@ describe('submitting', () => {
 
     await fillBasics();
     await userEvent.type(screen.getByLabelText('کد ملی'), ' 3971857299 ');
+    await fillPayout();
     await userEvent.click(screen.getByRole('button', { name: 'ساخت غرفه' }));
 
     expect(agricultureApi.createStorefront).toHaveBeenCalledWith({
@@ -180,6 +194,8 @@ describe('submitting', () => {
       owner_first_name: 'زهرا',
       owner_last_name: 'بهاران',
       national_id: '3971857299',
+      card_number: '6037991234567890',
+      rules_accepted: true,
     });
     expect(onCreated).toHaveBeenCalledWith(created);
   });
@@ -198,6 +214,7 @@ describe('submitting', () => {
     renderForm();
     await fillBasics();
     await userEvent.type(screen.getByLabelText('کد ملی'), '3971857299');
+    await fillPayout();
     await userEvent.click(screen.getByRole('button', { name: 'ساخت غرفه' }));
 
     const status = await screen.findByText('این نام قبلاً ثبت شده است.');
@@ -215,6 +232,7 @@ describe('signing in from the middle of the form', () => {
     await userEvent.type(screen.getByLabelText('نام'), 'زهرا');
     await userEvent.type(screen.getByLabelText('نام خانوادگی'), 'بهاران');
     await userEvent.type(screen.getByLabelText('کد ملی'), '3971857299');
+    await fillPayout();
     await userEvent.click(screen.getByRole('button', { name: 'ورود و ساخت غرفه' }));
 
     const login = await screen.findByTestId('login-marker');

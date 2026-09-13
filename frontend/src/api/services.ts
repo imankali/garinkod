@@ -343,8 +343,10 @@ export const agricultureApi = {
     owner_first_name: string;
     owner_last_name: string;
     national_id: string;
+    card_number: string;
+    rules_accepted: boolean;
   }) => apiClient.post<Storefront>('/marketplace/storefront/', data),
-  updateStorefront: (data: Partial<Storefront> | FormData) =>
+  updateStorefront: (data: (Partial<Storefront> & { card_number?: string }) | FormData) =>
     apiClient.patch<Storefront>('/marketplace/storefront/', data),
 
   /** بررسی زنده آزاد بودن نام و آدرس غرفه هنگام تایپ */
@@ -522,6 +524,19 @@ export interface LedgerQueryParams {
   page_size?: number;
 }
 
+/** One withdrawal request as the finance endpoint reports it. */
+export interface WithdrawalRequest {
+  id: number;
+  amount: number;
+  commission_rate: string;
+  commission_amount: number;
+  net_amount: number;
+  card_number_masked: string;
+  status: 'pending' | 'paid' | 'rejected';
+  status_label: string;
+  created_at: string;
+}
+
 export const financeApi = {
   storefront: (params?: LedgerQueryParams) =>
     apiClient.get<{
@@ -533,8 +548,16 @@ export const financeApi = {
       count: number;
       page: number;
       total_pages: number;
+      withdrawals: WithdrawalRequest[];
       notice: string;
     }>('/marketplace/finance/', { params }),
+
+  /** Register a withdrawal request against the available balance. */
+  withdraw: (data: { amount: number }) =>
+    apiClient.post<{ withdrawal: WithdrawalRequest; balances: Record<string, number> }>(
+      '/marketplace/finance/withdraw/',
+      data,
+    ),
 
   /** Download the ledger as CSV; the response is a blob, not JSON. */
   exportLedger: (params?: Omit<LedgerQueryParams, 'page' | 'page_size'>) =>

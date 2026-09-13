@@ -282,7 +282,7 @@ function GroupCard({ card, compact = false }: { card: { kind: CatalogKind; title
         </span>
       )}
       <span className="min-w-0">
-        <span className="block truncate text-fluid-sm font-extrabold text-slate-800 dark:text-white">{card.title}</span>
+        <span className="block min-w-0 truncate text-fluid-sm font-extrabold text-slate-800 dark:text-white">{card.title}</span>
         {!compact && card.description && (
           <span className="mt-1 line-clamp-2 block text-fluid-2xs leading-6 text-slate-500 dark:text-emerald-200">
             {card.description}

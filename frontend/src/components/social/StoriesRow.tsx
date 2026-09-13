@@ -8,6 +8,9 @@
 // ephemeral story from a permanent post. They are now a distinct section, and
 // the ring carries the state: a gradient ring means unwatched, grey means
 // already seen — the convention people already know from Instagram.
+//
+// Instagram parity in the viewer: swiping past the last story of a غرفه
+// slides into the next circle in this strip (and back), instead of closing.
 
 import { useMemo, useState } from 'react';
 
@@ -59,7 +62,11 @@ export default function StoriesRow({
   // Seen state is tracked locally as well as on the server so the ring greys
   // out the moment the viewer closes, without waiting for a refetch.
   const [seenIds, setSeenIds] = useState<Set<number>>(new Set());
-  const [activeGroup, setActiveGroup] = useState<StoryGroup | null>(null);
+  // The open viewer is identified by slug (not by group object) because the
+  // groups array is rebuilt whenever a story is marked seen.
+  const [activeSlug, setActiveSlug] = useState<string | null>(null);
+  // Stepping BACK into a group should land on its last story, like Instagram.
+  const [enteredBackwards, setEnteredBackwards] = useState(false);
 
   const groups = useMemo(() => {
     const withLocalSeen = stories.map((story) =>
@@ -70,6 +77,9 @@ export default function StoriesRow({
 
   if (groups.length === 0) return null;
 
+  const activeIndex = activeSlug === null ? -1 : groups.findIndex((g) => g.slug === activeSlug);
+  const activeGroup = activeIndex >= 0 ? groups[activeIndex] : null;
+
   function markSeen(story: StorefrontPost) {
     if (seenIds.has(story.id)) return;
     setSeenIds((current) => new Set(current).add(story.id));
@@ -77,6 +87,20 @@ export default function StoriesRow({
     // the next page load, which is far better than blocking the viewer.
     void storefrontPostsApi.markSeen(story.id).catch(() => undefined);
   }
+
+  const goNextGroup = (): boolean => {
+    if (activeIndex < 0 || activeIndex >= groups.length - 1) return false;
+    setActiveSlug(groups[activeIndex + 1]!.slug);
+    setEnteredBackwards(false);
+    return true;
+  };
+
+  const goPrevGroup = (): boolean => {
+    if (activeIndex <= 0) return false;
+    setActiveSlug(groups[activeIndex - 1]!.slug);
+    setEnteredBackwards(true);
+    return true;
+  };
 
   return (
     <>
@@ -87,7 +111,10 @@ export default function StoriesRow({
             <li key={group.slug}>
               <button
                 type="button"
-                onClick={() => setActiveGroup(group)}
+                onClick={() => {
+                  setActiveSlug(group.slug);
+                  setEnteredBackwards(false);
+                }}
                 className="flex w-[4.5rem] flex-col items-center gap-1.5"
                 aria-label={`استوری‌های ${group.name}${group.allSeen ? '، دیده‌شده' : ''}`}
               >
@@ -110,7 +137,7 @@ export default function StoriesRow({
                 </span>
                 <span
                   className={cn(
-                    'w-full truncate text-center text-fluid-2xs',
+                    'w-full min-w-0 truncate text-center text-fluid-2xs',
                     group.allSeen
                       ? 'text-slate-400 dark:text-emerald-400'
                       : 'font-bold text-slate-700 dark:text-emerald-100',
@@ -126,11 +153,18 @@ export default function StoriesRow({
 
       {activeGroup && (
         <StoryViewer
+          // Remount on group change so the timer and index restart cleanly.
+          key={activeGroup.slug}
           stories={activeGroup.posts}
           storefrontName={activeGroup.name}
           storefrontSlug={activeGroup.slug}
+          initialIndex={
+            enteredBackwards ? Math.max(activeGroup.posts.length - 1, 0) : 0
+          }
           onSeen={markSeen}
-          onClose={() => setActiveGroup(null)}
+          onClose={() => setActiveSlug(null)}
+          onNextGroup={goNextGroup}
+          onPrevGroup={goPrevGroup}
         />
       )}
     </>

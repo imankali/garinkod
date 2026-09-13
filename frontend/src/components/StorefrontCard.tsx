@@ -141,12 +141,12 @@ export default function StorefrontCard({ storefront }: { storefront: Storefront 
             aria-label={`رفتن به غرفه ${storefront.name}`}
           >
             <h3 className="flex min-w-0 items-center gap-1 text-sm font-extrabold text-slate-800 dark:text-white">
-              <span className="truncate">{storefront.name}</span>
+              <span className="min-w-0 truncate">{storefront.name}</span>
               {storefront.is_verified && (
                 <BadgeCheck size={14} className="shrink-0 text-emerald-500" />
               )}
             </h3>
-            <p className="mt-0.5 truncate text-fluid-xs text-slate-500 dark:text-emerald-200">
+            <p className="mt-0.5 min-w-0 truncate text-fluid-xs text-slate-500 dark:text-emerald-200">
               {storefront.seller_type_label}
               {storefront.city && (
                 <>

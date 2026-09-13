@@ -236,7 +236,7 @@ export default function UserLevels({ viewerLevel }: { viewerLevel: number }) {
                       {user.username}
                       {isOwner && <ShieldCheck size={14} className="text-amber-500" aria-label="مالک سیستم" />}
                     </strong>
-                    <p className="truncate text-fluid-xs text-slate-500 dark:text-emerald-200">
+                    <p className="min-w-0 truncate text-fluid-xs text-slate-500 dark:text-emerald-200">
                       {user.full_name || user.email || 'بدون اطلاعات تکمیلی'}
                       {user.groups.length > 0 && ` · ${user.groups.join('، ')}`}
                     </p>

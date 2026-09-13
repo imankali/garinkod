@@ -196,7 +196,7 @@ export default function OrderTrackingPage() {
                     <p className="text-fluid-2xs text-slate-400 dark:text-emerald-200/70">
                       {shipment.carrier_name}
                     </p>
-                    <p className="truncate text-fluid-base font-extrabold text-slate-800 dark:text-white" dir="ltr">
+                    <p className="min-w-0 truncate text-fluid-base font-extrabold text-slate-800 dark:text-white" dir="ltr">
                       {shipment.tracking_code}
                     </p>
                   </div>

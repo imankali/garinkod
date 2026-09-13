@@ -252,7 +252,7 @@ export default function AgriCalculator({ onAddToCart }: AgriCalculatorProps) {
                     ) : (
                       <Leaf size={14} className="shrink-0 text-emerald-500" />
                     )}
-                    <span className="flex-1 truncate text-slate-700 dark:text-emerald-50">{item.name}</span>
+                    <span className="flex-1 min-w-0 truncate text-slate-700 dark:text-emerald-50">{item.name}</span>
                     <span className="shrink-0 text-fluid-2xs text-slate-400">{item.active_ingredient}</span>
                   </button>
                 </li>

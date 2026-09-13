@@ -34,6 +34,24 @@ export interface CartItem {
   /** The chosen packaging, when the product declares more than one. */
   product_package?: number | null;
   package_label?: string;
+
+  /**
+   * The unit price before the quantity ladder, in تومان. Present so the row can
+   * show what the ladder took off; equal to `unit_price` when there is no ladder
+   * or the cart has not reached the first rung.
+   */
+  base_unit_price?: number;
+  /** The discount percent of the rung currently in force; 0 when none. */
+  tier_discount_percent?: number;
+  /** What the ladder saved on this row, in تومان, across all units. */
+  tier_saving?: number;
+  /** The next rung up, or null at the top of the ladder. */
+  next_tier?: {
+    id: number;
+    min_quantity: number;
+    discount_percent: number;
+    unit_price: number;
+  } | null;
 }
 
 export interface Cart {

@@ -20,6 +20,7 @@ from .catalog import (
     Tag,
     ProductImage,
     ProductPackage,
+    PriceTier,
     FertilizerDetail,
     PesticideDetail,
     SeedDetail,
@@ -58,6 +59,7 @@ from .payments import (
     Coupon,
     Wallet,
     WalletTransaction,
+    WithdrawalRequest,
 )
 from .trust import (
     PlatformFeedback,
@@ -127,6 +129,7 @@ __all__ = [
     "Tag",
     "ProductImage",
     "ProductPackage",
+    "PriceTier",
     "FertilizerDetail",
     "PesticideDetail",
     "SeedDetail",
@@ -158,6 +161,7 @@ __all__ = [
     "Coupon",
     "Wallet",
     "WalletTransaction",
+    "WithdrawalRequest",
     "PlatformFeedback",
     "StorefrontComplaint",
     "VisualSearchRequest",

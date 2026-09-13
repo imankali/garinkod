@@ -4,20 +4,31 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
     <meta name="theme-color" content="#0f8a5f" />
-    <meta name="description" content="گرین کود، فروشگاه تخصصی خرید کود، سم، بذر و تجهیزات کشاورزی با مشاوره برای کشاورزان ایرانی." />
-    <meta name="robots" content="index,follow,max-image-preview:large" />
     <meta name="author" content="گرین کود" />
 
+    <!--
+      Everything below this point that describes *this route* — description,
+      robots, canonical, the og:/twitter: title/description/url — is owned by
+      `src/components/RouteSeo.tsx` and must not be repeated here.
+
+      react-helmet-async only de-duplicates tags it added itself, so a hardcoded
+      tag survives alongside the one the app appends. That is what produced two
+      `<meta name="robots">` on every page, and the pair disagreed: this file
+      said `index,follow` while RouteSeo said `noindex,nofollow` for /orders,
+      /profile, /checkout and the rest of the account routes. A crawler that
+      reads both is being told to index a page the site means to keep private,
+      and Playwright's strict mode caught the duplication before a crawler did.
+
+      The tags that stay are the ones no route ever varies: the charset, the
+      viewport, the theme colour, the author, the locale and site name, and the
+      two share images. `<title>` stays too — Helmet rewrites `document.title`
+      in place rather than appending a second element, and it is what a
+      JavaScript-less scraper sees.
+    -->
+
     <meta property="og:locale" content="fa_IR" />
-    <meta property="og:type" content="website" />
     <meta property="og:site_name" content="گرین کود" />
-    <meta property="og:title" content="گرین کود | فروشگاه تخصصی نهاده‌های کشاورزی" />
-    <meta property="og:description" content="خرید کود، سم، بذر و تجهیزات کشاورزی با مشاوره تخصصی." />
-    <meta property="og:url" content="https://garinkood.ir/" />
     <meta property="og:image" content="https://garinkood.ir/images/hero-farm.jpg" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="گرین کود | فروشگاه تخصصی نهاده‌های کشاورزی" />
-    <meta name="twitter:description" content="خرید کود، سم، بذر و تجهیزات کشاورزی با مشاوره تخصصی." />
     <meta name="twitter:image" content="https://garinkood.ir/images/hero-farm.jpg" />
 
     <link rel="preconnect" href="https://cdn.fontcdn.ir" crossorigin />

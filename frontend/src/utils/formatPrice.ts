@@ -14,8 +14,22 @@
  * formatPrice(0) // "۰ تومان"
  * formatPrice(1250000) // "۱٬۲۵٬۰۰۰ تومان"
  */
-export function formatPrice(price: number): string {
-  return price.toLocaleString("fa-IR") + " تومان";
+/**
+ * A missing amount is not a reason for a page to stop rendering.
+ *
+ * `price.toLocaleString` throws on `undefined`, and every caller of this helper
+ * is a receipt or a card reading a field the API may legitimately omit — an
+ * order whose total has not been computed yet, a listing with no price. A blank
+ * checkout that has to be recovered by a reload is a worse answer than «—».
+ */
+function amount(price: number | null | undefined): string {
+  return typeof price === "number" && Number.isFinite(price)
+    ? price.toLocaleString("fa-IR")
+    : "—";
+}
+
+export function formatPrice(price: number | null | undefined): string {
+  return amount(price) + " تومان";
 }
 
 /**
@@ -28,8 +42,8 @@ export function formatPrice(price: number): string {
  * @example
  * formatPriceOnly(385000) // "۳۸۵٬۰۰"
  */
-export function formatPriceOnly(price: number): string {
-  return price.toLocaleString("fa-IR");
+export function formatPriceOnly(price: number | null | undefined): string {
+  return amount(price);
 }
 
 /**

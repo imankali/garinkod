@@ -42,6 +42,7 @@ import { useSiteContact, whatsappHref } from "../hooks/useSiteContact";
 import type { ProductList } from '@/types/shop';
 import type { Comment } from '@/types/content';
 import { formatPrice } from "../utils/formatPrice";
+import PriceLadder from "../components/shop/PriceLadder";
 import { cn } from "../utils/cn";
 
 const FALLBACK_IMAGE = "/images/hero-farm.jpg";
@@ -206,6 +207,16 @@ export default function ProductPage() {
   const whatsappDraft = whatsappDigits
     ? whatsappHref(whatsappDigits, `سلام، درباره «${product.title}» و قیمت عمده سؤال دارم: ${productUrl}`)
     : '';
+  /**
+   * The quantity ladder, sorted by threshold so rung 0 is the cheapest entry
+   * point. Sorted here rather than trusted from the API: the published
+   * `minValue` has to be the *lowest* threshold, and "lowest" is a property the
+   * caller should not have to assume about someone else's query order.
+   */
+  const priceTiers = [...(product.price_tiers ?? [])].sort(
+    (a, b) => a.min_quantity - b.min_quantity,
+  );
+
   const structuredData = {
     '@context': 'https://schema.org',
     '@graph': [
@@ -229,12 +240,47 @@ export default function ProductPage() {
           ...(priceOnRequest
             ? { priceSpecification: { '@type': 'PriceSpecification', price: undefined, priceCurrency: 'IRR' }, availability: 'https://schema.org/InStock' }
             : {
-                price: product.price * 10,
+                // The *discounted* price. This used to publish `product.price`,
+                // which is the same mistake the cart was making: every screen a
+                // human reads showed `discounted_price` while this — the one
+                // thing a machine reads — declared the full amount. Google flags
+                // that as a price mismatch and an AI buyer prices the order
+                // wrong. One number, published everywhere.
+                price: (product.discounted_price ?? product.price) * 10,
                 availability: product.is_in_stock
                   ? 'https://schema.org/InStock'
                   : 'https://schema.org/OutOfStock',
                 itemCondition: 'https://schema.org/NewCondition',
               }),
+          // Publish the quantity ladder as data, not as prose in the description.
+          //
+          // This is the whole point of the tiered-discount feature for a
+          // non-human buyer: schema.org has a first-class way to say "40 of
+          // these cost 800 each" (`UnitPriceSpecification` +
+          // `eligibleQuantity`), and if the ladder is only drawn as a table of
+          // Persian text then a machine has to guess — and a guess about a
+          // price is the one guess it should never be allowed to make.
+          // `cheapestRung` rather than `priceTiers[0]`: under
+          // `noUncheckedIndexedAccess` an index into an array is always
+          // possibly undefined, and a `length > 0` check does not narrow it.
+          // Naming the value narrows it honestly instead of asserting it away.
+          ...(() => {
+            const cheapestRung = priceTiers[0];
+            return cheapestRung
+              ? {
+                  priceSpecification: {
+                    '@type': 'UnitPriceSpecification',
+                    priceCurrency: 'IRR',
+                    price: (product.discounted_price ?? product.price) * 10,
+                    eligibleQuantity: {
+                      '@type': 'QuantitativeValue',
+                      minValue: cheapestRung.min_quantity,
+                      unitCode: 'C62',
+                    },
+                  },
+                }
+              : {};
+          })(),
         },
         // Only publish an aggregate the platform actually has: a product with no
         // scored review must not advertise empty stars to Google.
@@ -411,6 +457,20 @@ export default function ProductPage() {
               <p className="mt-1.5 text-fluid-sm font-extrabold text-emerald-700 dark:text-lime-300">{formatPrice(displayDiscounted)} تومان</p>
             )}
 
+            {/*
+              The ladder sits directly under the price, not in a tab or a
+              tooltip. A quantity discount a buyer has to go looking for is a
+              discount that does not change how much anyone orders.
+            */}
+            {!priceOnRequest && priceTiers.length > 0 && (
+              <div className="mt-4">
+                <PriceLadder
+                  tiers={priceTiers}
+                  basePrice={product.discounted_price ?? product.price}
+                />
+              </div>
+            )}
+
             {priceOnRequest ? (
               <div className="mt-5 flex flex-wrap gap-2">
                 {whatsappDraft && (
@@ -543,7 +603,7 @@ export default function ProductPage() {
                 <h3 className="text-fluid-sm font-extrabold text-slate-800 dark:text-white">{replyTo ? 'پاسخ به دیدگاه' : 'ثبت دیدگاه'}</h3>
                 {replyTo && (
                   <div className="flex items-center justify-between rounded-xl bg-emerald-50 p-2.5 text-fluid-2xs text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-100">
-                    <span className="truncate">در پاسخ به {replyTo.name}</span>
+                    <span className="min-w-0 truncate">در پاسخ به {replyTo.name}</span>
                     <button type="button" onClick={() => setReplyTo(null)} aria-label="لغو پاسخ"><X size={15} /></button>
                   </div>
                 )}
@@ -553,7 +613,7 @@ export default function ProductPage() {
                     <StarPicker value={rating} onChange={setRating} disabled={!isAuthenticated} />
                   </div>
                 )}
-                <textarea value={commentBody} onChange={(event) => setCommentBody(event.target.value)} rows={4} placeholder={isAuthenticated ? "تجربه خرید، نحوه بسته‌بندی و نتیجه در مزرعه را بنویسید..." : "برای ثبت نظر یا پاسخ ابتدا وارد حساب کاربری شوید"} className="w-full rounded-xl border border-slate-200 bg-white p-3 text-sm outline-none focus:border-emerald-500 dark:border-emerald-700 dark:bg-emerald-900" />
+                <textarea value={commentBody} onChange={(event) => setCommentBody(event.target.value)} rows={4} aria-label="متن دیدگاه شما" placeholder={isAuthenticated ? "تجربه خرید، نحوه بسته‌بندی و نتیجه در مزرعه را بنویسید..." : "برای ثبت نظر یا پاسخ ابتدا وارد حساب کاربری شوید"} className="w-full rounded-xl border border-slate-200 bg-white p-3 text-sm outline-none focus:border-emerald-500 dark:border-emerald-700 dark:bg-emerald-900" />
                 <div className="flex flex-wrap items-center gap-2">{STICKERS.map((item) => <button key={item} type="button" onClick={() => setSticker(sticker === item ? "" : item)} className={cn("rounded-lg px-2 py-1 text-lg", sticker === item ? "bg-emerald-100 ring-1 ring-emerald-400 dark:bg-emerald-900" : "bg-slate-50 dark:bg-emerald-900/40")}>{item}</button>)}
                   <input ref={imageRef} type="file" aria-label="افزودن تصویر به دیدگاه" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => setCommentImage(event.target.files?.[0] || null)} />
                   <button type="button" onClick={() => imageRef.current?.click()} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 dark:border-emerald-700 dark:text-emerald-100"><ImagePlus size={15} />{commentImage ? commentImage.name : "افزودن عکس"}</button>

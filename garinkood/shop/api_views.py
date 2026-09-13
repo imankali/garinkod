@@ -31,12 +31,16 @@ from .pest_vision import analyze_crop_image
 from .filters import ProductFilter
 from .listing_filters import apply_listing_filters, category_facet_rows, csv_values, facet_rows
 from .search import ResilientProductSearchFilter
+# `max_order_quantity` lives with the ladder it derives from, not on the model
+# namespace, mirroring how orders.py imports `tiered_price`.
+from .models.catalog import max_order_quantity
 from .models import (
-    Category, Product, Comment, UserAccount, Cart, CartItem, Order, OrderItem,
+    Category, Product, Comment, UserAccount, Cart, CartItem, Order, OrderItem, PriceTier,
     ProductPackage, ProductImage, Tag, CommentVote, ReturnPolicySettings,
     CapacitySettings, PresenceBeat,
     ServiceRequest, ProcurementRequest, Storefront, MarketplaceListing,
     PaymentAttempt, AffiliateProfile, AffiliateConversion, FinancialLedgerEntry,
+    WithdrawalRequest,
     PlatformFeedback, StorefrontComplaint, VisualSearchRequest, Coupon, Wallet,
     WalletTransaction, StorefrontPost, AdminAuditLog, Location, AgriInput,
     AgriInputDose, StorefrontFollow, StorefrontHighlight, StorefrontHighlightItem,
@@ -50,7 +54,8 @@ from .serializers import (
     CheckoutSerializer, OrderSerializer,
     ServiceRequestSerializer, ProcurementRequestSerializer, StorefrontSerializer,
     MarketplaceListingSerializer, PaymentAttemptSerializer, AffiliateProfileSerializer,
-    AffiliateConversionSerializer, FinancialLedgerEntrySerializer, PlatformFeedbackSerializer,
+    AffiliateConversionSerializer, FinancialLedgerEntrySerializer, WithdrawalRequestSerializer,
+    PlatformFeedbackSerializer,
     StorefrontComplaintSerializer, VisualSearchRequestSerializer, CouponSerializer,
     WalletSerializer, StorefrontPostSerializer, AdminAuditLogSerializer,
     LocationSerializer, AgriInputSerializer, StorefrontHighlightSerializer,
@@ -69,7 +74,10 @@ from .payments import (
     verify_zarinpal_payment,
 )
 from .rewards import mark_order_paid_and_reward
-from .settlements import record_marketplace_sale, reverse_marketplace_sale, restore_listing_quantities
+from .settlements import (
+    record_marketplace_sale, reverse_marketplace_sale, restore_listing_quantities,
+    storefront_balances, request_withdrawal, WithdrawalError,
+)
 from .shipping import (
     ShippingServiceUnavailable, create_initial_shipment, record_tracking_event,
     select_shipping_quote, shipping_options,
@@ -417,18 +425,48 @@ class ProductViewSet(viewsets.ReadOnlyModelViewSet):
                 reviews_count=Count('comments', filter=review_rows, distinct=True),
             )
         )
+        # Ordered so the ladder reads top-to-bottom in one pass, and filtered to
+        # the three columns the serializer actually emits. Shared by both
+        # branches: a ladder that sorts differently on the detail page than on
+        # the card is the kind of inconsistency nobody notices until a buyer
+        # complains the two pages disagree.
+        price_tier_prefetch = Prefetch(
+            'price_tiers',
+            queryset=PriceTier.objects.only(
+                'id', 'product_id', 'listing_id', 'min_quantity', 'discount_percent',
+            ).order_by('min_quantity'),
+        )
+
         if self.action == 'retrieve':
             # The detail page renders the spec table, the gallery and the package
             # picker; prefetch all three instead of one query per row.
             queryset = queryset.prefetch_related(
                 Prefetch('images', queryset=ProductImage.objects.only('image', 'caption', 'order')),
-                'packages', 'tags', 'attributes',
+                'packages', 'tags', 'attributes', price_tier_prefetch,
             )
         else:
             # The LIST serializer embeds each card's tags
             # (ProductListSerializer.tags) — without this prefetch that is
             # one M2M query PER ROW on every catalogue page.
-            queryset = queryset.prefetch_related('tags')
+            #
+            # `price_tiers` is here for exactly the same reason, and it is worth
+            # naming the mistake: the ladder was added to ProductListSerializer
+            # without a matching prefetch, which silently cost one extra query
+            # per row on every catalogue page. A nested `many=True` relation is
+            # the easiest way to add an N+1 in DRF, because nothing warns you.
+            #
+            # `images` and `packages` were the bigger half of the same problem
+            # and had been there longer: `image_url`, `image_srcset` and
+            # `image_alt_url` are SerializerMethodFields that reach into
+            # `obj.images`, and the packaging badge reads `obj.packages`, so a
+            # twelve-row page was firing 24 queries that one prefetch removes.
+            # Measured by counting queries grouped by table, which is the only
+            # way to see this — the total looks plausible either way.
+            queryset = queryset.prefetch_related(
+                'tags', 'packages',
+                Prefetch('images', queryset=ProductImage.objects.only('image', 'caption', 'order')),
+                price_tier_prefetch,
+            )
         return queryset
 
     def get_serializer_class(self):
@@ -817,7 +855,7 @@ class CartViewSet(viewsets.ViewSet):
                 status=status.HTTP_409_CONFLICT,
             )
 
-        max_qty = min(10, limit)
+        max_qty = min(max_order_quantity(product), limit)
         quantity = min(quantity, max_qty)
 
         # Locking the cart item makes repeated clicks and concurrent requests
@@ -980,8 +1018,22 @@ class CartViewSet(viewsets.ViewSet):
                     cart_item.quantity = quantity
                     cart_item.save(update_fields=['quantity'])
                 else:
-                    max_qty = min(10, cart_item.product.stock)
-                    cart_item.quantity = min(quantity, max_qty)
+                    max_qty = min(max_order_quantity(cart_item.product), cart_item.product.stock)
+                    # Refuse rather than clamp. This used to silently rewrite the
+                    # requested quantity down to the cap, which is exactly how a
+                    # buyer could be shown «برو به ۲۰ · هر واحد ۸۵۰ تومان», click
+                    # it, and end up with 10 units at the undiscounted price and
+                    # no message at all. A request the cart will not honour has to
+                    # say so.
+                    if quantity > max_qty:
+                        return Response(
+                            {
+                                'error': f'حداکثر {max_qty} عدد از این کالا قابل سفارش است.',
+                                'fields': {'quantity': [f'حداکثر {max_qty} عدد قابل سفارش است.']},
+                            },
+                            status=status.HTTP_409_CONFLICT,
+                        )
+                    cart_item.quantity = quantity
                     cart_item.save(update_fields=['quantity'])
 
         serializer = CartSerializer(cart, context={'request': request})
@@ -1257,7 +1309,11 @@ def checkout(request):
                     storefront_name=storefront.name,
                     storefront_slug=storefront.slug,
                     unit=listing.unit,
-                    unit_price=listing.price,
+                    # The advertised price, matching what the cart charged. This
+                    # line is what the seller's payout and the commission are
+                    # both computed from, so recording the raw price here would
+                    # overstate the commission on every discounted listing.
+                    unit_price=item.unit_price,
                     quantity=item.quantity,
                     commission_rate=commission_rate,
                     commission_amount=int(line_total * commission_rate / 100),
@@ -1889,8 +1945,11 @@ def storefront_finance(request):
 
     # Balances are always computed over the *unfiltered* ledger: a filtered
     # view must not make a seller think their available balance changed.
-    totals = FinancialLedgerEntry.objects.filter(storefront=storefront).values('status').annotate(total=Sum('amount'))
-    balances = {row['status']: row['total'] or 0 for row in totals}
+    # Only the seller's own rows count — platform commission rows carry the
+    # storefront for auditing but are not the seller's money — and earlier
+    # withdrawal requests are deducted so «قابل تسویه» never offers the same
+    # toman twice.
+    balances = storefront_balances(storefront)
 
     params = request.query_params
     status_filter = params.get('status', '').strip()
@@ -1932,8 +1991,36 @@ def storefront_finance(request):
         'entry_types': [{'value': value, 'label': label} for value, label in FinancialLedgerEntry.ENTRY_TYPE_CHOICES],
         'statuses': [{'value': value, 'label': label} for value, label in FinancialLedgerEntry.STATUS_CHOICES],
         'entries': FinancialLedgerEntrySerializer(entries[start:start + page_size], many=True).data,
+        'withdrawals': WithdrawalRequestSerializer(
+            WithdrawalRequest.objects.filter(storefront=storefront)[:10], many=True
+        ).data,
         'notice': 'مبالغ «قابل تسویه» پس از پایان دوره رسیدگی به شکایت قابل برداشت خواهند بود.'
     })
+
+
+@documented_api
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def storefront_finance_withdraw(request):
+    """Register a withdrawal request against the seller's available balance.
+
+    The platform commission is deducted at request time (rate snapshotted on
+    the request) and the net is what the card on file receives; the paired
+    ledger entries keep the trail through approval or refusal.
+    """
+    storefront = get_object_or_404(Storefront, user=request.user)
+    try:
+        amount = int(request.data.get('amount'))
+    except (TypeError, ValueError):
+        return Response({'error': 'مبلغ برداشت معتبر نیست.'}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        withdrawal = request_withdrawal(storefront=storefront, amount=amount)
+    except WithdrawalError as error:
+        return Response({'error': str(error)}, status=status.HTTP_400_BAD_REQUEST)
+    return Response({
+        'withdrawal': WithdrawalRequestSerializer(withdrawal).data,
+        'balances': storefront_balances(storefront),
+    }, status=status.HTTP_201_CREATED)
 
 
 @documented_api

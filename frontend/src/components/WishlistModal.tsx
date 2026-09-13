@@ -129,7 +129,7 @@ export default function WishlistModal({
 
                     {/* Product Info */}
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-slate-700 dark:text-white">
+                      <p className="min-w-0 truncate text-sm font-semibold text-slate-700 dark:text-white">
                         {product.name}
                       </p>
                       <p className="text-xs text-slate-500 dark:text-emerald-300">

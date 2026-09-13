@@ -99,7 +99,7 @@ function Overview({ data, onOpenModeration }: { data: ManagementDashboard; onOpe
             <li key={`listing-${listing.id}`} className="flex items-center gap-3 rounded-2xl bg-white/70 p-3 dark:bg-emerald-950/40">
               <img src={listing.image_url} alt="" loading="lazy" className="h-10 w-10 shrink-0 rounded-lg object-cover" />
               <div className="min-w-0 flex-1">
-                <strong className="block truncate text-sm text-slate-800 dark:text-white">{listing.title}</strong>
+                <strong className="block min-w-0 truncate text-sm text-slate-800 dark:text-white">{listing.title}</strong>
                 <span className="text-fluid-xs text-slate-500 dark:text-emerald-200">آگهی · غرفه {listing.storefront.name}</span>
               </div>
             </li>
@@ -108,7 +108,7 @@ function Overview({ data, onOpenModeration }: { data: ManagementDashboard; onOpe
             <li key={`post-${post.id}`} className="flex items-center gap-3 rounded-2xl bg-white/70 p-3 dark:bg-emerald-950/40">
               <img src={post.image_url} alt="" loading="lazy" className="h-10 w-10 shrink-0 rounded-lg object-cover" />
               <div className="min-w-0 flex-1">
-                <strong className="block truncate text-sm text-slate-800 dark:text-white">{post.caption}</strong>
+                <strong className="block min-w-0 truncate text-sm text-slate-800 dark:text-white">{post.caption}</strong>
                 <span className="text-fluid-xs text-slate-500 dark:text-emerald-200">{post.post_type_label} · غرفه {post.storefront_name}</span>
               </div>
             </li>

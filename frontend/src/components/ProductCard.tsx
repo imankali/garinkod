@@ -303,10 +303,10 @@ export default function ProductCard({
             {/* The short label keeps the button on one line in narrow grid
                 columns (two-up on a phone, five-up on desktop); the full
                 wording stays available to screen readers. */}
-            <span className="truncate 2xl:hidden">
+            <span className="min-w-0 truncate 2xl:hidden">
               {product.inStock ? "افزودن" : "اطلاع"}
             </span>
-            <span className="hidden truncate 2xl:inline">
+            <span className="hidden min-w-0 truncate 2xl:inline">
               {product.inStock ? "افزودن به سبد" : "اطلاع از موجودی"}
             </span>
             <span className="sr-only 2xl:hidden">

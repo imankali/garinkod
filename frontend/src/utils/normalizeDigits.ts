@@ -17,6 +17,18 @@ export function toEnglishDigits(str: string | number | null | undefined): string
 }
 
 /**
+ * Convert ASCII digits in a string to Persian (۰-۹) for display.
+ *
+ * The mirror of `toEnglishDigits`: inputs are normalised on the way in, and
+ * anything the UI shows back to a Persian-speaking user should render in
+ * Persian digits — countdown timers, discount badges, ranking numbers.
+ */
+export function toPersianDigits(str: string | number | null | undefined): string {
+  if (str === null || str === undefined) return '';
+  return String(str).replace(/[0-9]/g, (d) => String.fromCharCode(1776 + Number(d)));
+}
+
+/**
  * Normalise a phone number: convert digits to ASCII and remove non-digit characters (except leading +).
  */
 export function normalizePhoneNumber(phone: string | null | undefined): string {

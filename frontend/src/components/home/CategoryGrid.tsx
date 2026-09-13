@@ -66,7 +66,7 @@ export default function CategoryGrid() {
           className="flex items-center gap-2 text-fluid-xl font-extrabold text-slate-800 dark:text-white"
         >
           <LayoutGrid size={20} aria-hidden="true" className="text-emerald-600" />
-          دسته‌بندی محصولات
+          خرید بر اساس دسته‌بندی
         </h2>
         <Link
           to="/products"
@@ -77,21 +77,31 @@ export default function CategoryGrid() {
         </Link>
       </div>
 
-      <ul className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-5">
+      {/*
+        Digikala's "خرید بر اساس دسته‌بندی" is a horizontal row of circles,
+        not a grid: one gesture sweeps the whole taxonomy on a phone, and on
+        desktop everything still fits. Scroll-snap keeps each circle aligned
+        to the gutter when it does overflow.
+      */}
+      <ul
+        className="mt-5 flex snap-x snap-mandatory gap-2 overflow-x-auto pb-2 sm:justify-between sm:gap-3 [scrollbar-width:none]"
+        role="region"
+        aria-label="دسته‌بندی‌های محصولات"
+      >
         {tiles.map((tile) => (
-          <li key={tile.slug}>
+          <li key={tile.slug} className="w-20 shrink-0 snap-start text-center sm:w-24">
             <Link
               to={`/products?category=${tile.slug}`}
-              className="flex min-h-11 flex-col items-center gap-1.5 rounded-2xl border border-slate-100 bg-gradient-to-b from-white to-emerald-50/40 p-5 text-center shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md dark:border-emerald-900 dark:from-emerald-950 dark:to-emerald-900/30"
+              className="group flex min-h-11 flex-col items-center gap-2 rounded-2xl p-2 transition focus-visible:outline-2 focus-visible:outline-emerald-600"
             >
-              <span className="text-3xl" aria-hidden="true">
-                {tile.emoji}
+              <span className="flex h-16 w-16 items-center justify-center rounded-full border border-emerald-100 bg-gradient-to-b from-emerald-50 to-white text-3xl shadow-sm transition duration-300 group-hover:-translate-y-1 group-hover:border-emerald-300 group-hover:shadow-md motion-reduce:group-hover:translate-y-0 dark:border-emerald-900 dark:from-emerald-950 dark:to-emerald-900/30 sm:h-20 sm:w-20 sm:text-4xl">
+                <span aria-hidden="true">{tile.emoji}</span>
               </span>
-              <span className="text-fluid-sm font-extrabold text-slate-800 dark:text-white">
+              <span className="line-clamp-2 text-fluid-2xs font-bold text-slate-800 dark:text-white sm:text-fluid-xs">
                 {tile.name}
               </span>
               {tile.count !== undefined && (
-                <span className="text-fluid-2xs text-slate-500 dark:text-emerald-300">
+                <span className="-mt-1 text-fluid-2xs text-slate-500 dark:text-emerald-300">
                   {tile.count.toLocaleString('fa-IR')} محصول
                 </span>
               )}

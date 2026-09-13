@@ -26,6 +26,7 @@ import { agricultureApi } from '../../api/services';
 import { parseApiError } from '../../api/errors';
 import { useAuthStore } from '../../store/authStore';
 import { isValidNationalId, nationalIdError } from '../../utils/nationalId';
+import { cardNumberError, isValidCardNumber, normalizeCardNumber } from '../../utils/cardNumber';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import LocationPicker from '../LocationPicker';
 import type { SellerType, Storefront, StorefrontAvailability } from '../../types/storefront';
@@ -44,6 +45,8 @@ const EMPTY = {
   owner_first_name: '',
   owner_last_name: '',
   national_id: '',
+  card_number: '',
+  rules_accepted: false,
 };
 
 const fieldClass =
@@ -70,6 +73,19 @@ export default function StorefrontForm({
   const [store, setStore] = useState(EMPTY);
   const [creating, setCreating] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  /**
+   * The refusal that belongs to no one field: a 403, a throttle, a dropped
+   * connection, a stall this account is not allowed to open.
+   *
+   * It used to have nowhere to go but a toast — and worse, when the axios
+   * interceptor had already toasted it, `parsed.handled` was true and the form
+   * stayed completely silent. A seller pressed «ساخت غرفه», the button
+   * re-enabled, and nothing on the page said why. That is not only bad manners:
+   * a toast is transient, is not inside the form, and carries no `role="alert"`,
+   * so a screen-reader user gets no announcement at all. The reason now lives in
+   * the form, where the click happened.
+   */
+  const [formError, setFormError] = useState('');
   const [availability, setAvailability] = useState<StorefrontAvailability | null>(null);
   const [checking, setChecking] = useState(false);
 
@@ -138,16 +154,22 @@ export default function StorefrontForm({
   // Silent while the field is still untouched, worded like the server once it is
   // not: the same problem must not read differently in the browser and in the API.
   const nationalIdIssue = store.national_id.trim() ? nationalIdError(store.national_id) : '';
+  // The card is where withdrawals land, so it is asked for once, here, the
+  // same way the national code is; silent until touched like the other digits.
+  const cardIssue = store.card_number.trim() ? cardNumberError(store.card_number) : '';
   const identityIssues = {
     owner_first_name: store.owner_first_name.trim() ? '' : 'نام را وارد کنید.',
     owner_last_name: store.owner_last_name.trim() ? '' : 'نام خانوادگی را وارد کنید.',
     national_id: nationalIdIssue,
+    card_number: cardIssue,
   };
 
   const canSubmit = useMemo(() => {
     if (!store.name.trim() || !store.province || !store.city) return false;
     if (!store.owner_first_name.trim() || !store.owner_last_name.trim()) return false;
     if (!isValidNationalId(store.national_id)) return false;
+    if (!isValidCardNumber(store.card_number)) return false;
+    if (!store.rules_accepted) return false;
     if (nameStatus && !nameStatus.available) return false;
     if (store.slug && slugStatus && !slugStatus.available) return false;
     return true;
@@ -173,6 +195,7 @@ export default function StorefrontForm({
     }
     setCreating(true);
     setFieldErrors({});
+    setFormError('');
     try {
       const response = await agricultureApi.createStorefront({
         name: store.name.trim(),
@@ -184,6 +207,8 @@ export default function StorefrontForm({
         owner_first_name: store.owner_first_name.trim(),
         owner_last_name: store.owner_last_name.trim(),
         national_id: store.national_id.trim(),
+        card_number: normalizeCardNumber(store.card_number),
+        rules_accepted: store.rules_accepted,
       });
       try {
         sessionStorage.removeItem(DRAFT_KEY);
@@ -195,7 +220,13 @@ export default function StorefrontForm({
     } catch (error) {
       const parsed = parseApiError(error);
       setFieldErrors(parsed.fields);
-      if (Object.keys(parsed.fields).length === 0 && !parsed.handled) toast.error(parsed.message);
+      if (Object.keys(parsed.fields).length === 0) {
+        // Not `!parsed.handled`: the interceptor having toasted it is not a
+        // reason for the form to stay mute. The toast may already have faded, and
+        // it is not inside the form a screen reader is reading.
+        setFormError(parsed.message);
+        if (!parsed.handled) toast.error(parsed.message);
+      }
     } finally {
       setCreating(false);
     }
@@ -381,6 +412,53 @@ export default function StorefrontForm({
         </div>
       </fieldset>
 
+      {/*
+        تسویه و قوانین. The card is where withdrawal requests land, so a stall
+        without one could never be paid out; the checkbox is the seller's
+        agreement to the marketplace rules. Both are asked once, here, the same
+        way the identity above is.
+      */}
+      <fieldset className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50/40 p-4 dark:border-emerald-800 dark:bg-emerald-900/30">
+        <legend className="px-1 text-sm font-extrabold text-slate-800 dark:text-white">
+          تسویه درآمد و قوانین <span className="text-rose-500">*</span>
+        </legend>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <IdentityField
+            id="store-card-number"
+            label="شماره کارت"
+            value={store.card_number}
+            inputMode="numeric"
+            placeholder="۱۶ رقم"
+            hint="برای واریز برداشت‌ها در دفتر مالی استفاده می‌شود."
+            error={fieldErrors.card_number || identityIssues.card_number}
+            valid={isValidCardNumber(store.card_number)}
+            onChange={(value) => setStore({ ...store, card_number: value })}
+          />
+          <div className="flex items-end pb-1">
+            <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm font-bold text-slate-700 dark:text-emerald-50">
+              <input
+                type="checkbox"
+                checked={store.rules_accepted}
+                onChange={(event) => setStore({ ...store, rules_accepted: event.target.checked })}
+                className="h-5 w-5 shrink-0 accent-emerald-600"
+              />
+              <span>
+                من{' '}
+                <Link to="/legal/marketplace" className="font-bold text-emerald-700 underline dark:text-lime-300">
+                  قوانین غرفه‌داری
+                </Link>{' '}
+                را می‌پذیرم.
+              </span>
+            </label>
+          </div>
+        </div>
+        {fieldErrors.rules_accepted && (
+          <p role="alert" className="mt-2 text-fluid-xs font-semibold text-rose-600">
+            {fieldErrors.rules_accepted}
+          </p>
+        )}
+      </fieldset>
+
       {!user && (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100">
           <span>
@@ -394,6 +472,20 @@ export default function StorefrontForm({
             ورود یا ثبت‌نام
           </button>
         </div>
+      )}
+
+      {/*
+        The form's own refusal, in the form. `role="alert"` is what makes it
+        announced rather than merely visible, and keeping it inside the dialog is
+        what lets a failing submission be diagnosed from the page alone.
+      */}
+      {formError && (
+        <p
+          role="alert"
+          className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-200"
+        >
+          {formError}
+        </p>
       )}
 
       <motion.button

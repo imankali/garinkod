@@ -154,6 +154,13 @@ export default function LandCalendar({
             value={form.title}
             onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
             placeholder="عنوان رویداد…"
+            // A placeholder is not a label. It disappears the moment the user
+            // types, it is rendered at reduced contrast, and screen readers
+            // announce it inconsistently — so an input whose only name is its
+            // placeholder has no reliable accessible name at all (WCAG 4.1.2).
+            // The select and the date input beside this one already carried an
+            // aria-label; this one was simply missed.
+            aria-label="عنوان رویداد"
             required
             className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs dark:border-emerald-700 dark:bg-emerald-900 dark:text-white"
           />
@@ -186,6 +193,10 @@ export default function LandCalendar({
             value={form.notes}
             onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
             placeholder="دستورالعمل اجرا (دوز، روش، زمان مناسب)…"
+              // Same defect as the title field above, and one a source scan of
+              // `<input>` would never have caught: a textarea named only by its
+              // placeholder.
+              aria-label="دستورالعمل اجرا"
             rows={2}
             className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs dark:border-emerald-700 dark:bg-emerald-900 dark:text-white sm:col-span-4"
           />

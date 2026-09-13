@@ -209,8 +209,8 @@ export default function ServiceDetail() {
                     }}
                   />
                   <div className="min-w-0">
-                    <p className="truncate text-fluid-sm font-extrabold text-slate-800 dark:text-white">{contact.expert_name}</p>
-                    <p className="truncate text-fluid-2xs text-slate-500 dark:text-emerald-200">{contact.expert_role}</p>
+                    <p className="min-w-0 truncate text-fluid-sm font-extrabold text-slate-800 dark:text-white">{contact.expert_name}</p>
+                    <p className="min-w-0 truncate text-fluid-2xs text-slate-500 dark:text-emerald-200">{contact.expert_role}</p>
                   </div>
                 </div>
                 {contact.expert_note && (

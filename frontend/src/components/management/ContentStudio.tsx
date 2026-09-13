@@ -259,7 +259,7 @@ function ProductsPanel({ options }: { options: StudioOptions }) {
                 className="h-12 w-12 shrink-0 rounded-xl bg-slate-100 object-cover dark:bg-emerald-900"
               />
               <div className="min-w-0 flex-1">
-                <strong className="block truncate text-sm text-slate-800 dark:text-white">{row.title}</strong>
+                <strong className="block min-w-0 truncate text-sm text-slate-800 dark:text-white">{row.title}</strong>
                 <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-fluid-2xs text-slate-500 dark:text-emerald-200">
                   <span>{row.category_name || 'بدون دسته'}</span>
                   {row.subcategory_name && <span>· {row.subcategory_name}</span>}
@@ -814,7 +814,7 @@ function ArticlesPanel({ options }: { options: StudioOptions }) {
                 className="h-12 w-16 shrink-0 rounded-xl bg-slate-100 object-cover dark:bg-emerald-900"
               />
               <div className="min-w-0 flex-1">
-                <strong className="block truncate text-sm text-slate-800 dark:text-white">{row.title}</strong>
+                <strong className="block min-w-0 truncate text-sm text-slate-800 dark:text-white">{row.title}</strong>
                 <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-fluid-2xs text-slate-500 dark:text-emerald-200">
                   <span>{options.article_kinds[row.kind] || row.kind}</span>
                   {row.crop && <span>· {row.crop}</span>}
