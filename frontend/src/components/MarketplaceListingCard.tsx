@@ -5,9 +5,10 @@
 // can send the listing straight to the storefront's direct messages so the
 // buyer can ask for advice about that exact product.
 
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router';
-import { MessageCircle, ShoppingCart } from 'lucide-react';
+import { Eye, MessageCircle, ShoppingCart } from 'lucide-react';
 
 import { useCartStore } from '../store/cartStore';
 import { useDirectStore } from '../store/directStore';
@@ -16,6 +17,7 @@ import type { MarketplaceListing } from '@/types/storefront';
 import { formatPrice } from '../utils/formatPrice';
 import { listingHref } from '../utils/listingHref';
 import SkeletonCard from './ui/SkeletonCard';
+import ListingDetailModal from './storefront/ListingDetailModal';
 
 // Shared press physics with ProductCard: crisp 0.2s, soft in-out, and only
 // ever on controls that are actually enabled.
@@ -46,6 +48,9 @@ export default function MarketplaceListingCard({
   const { t } = useTranslation();
   const addListingToCart = useCartStore((state) => state.addListingToCart);
   const openDirect = useDirectStore((state) => state.openDirect);
+  // Quick view parity with the catalogue card: the آگهی is inspected in place,
+  // without leaving the shelf it was found on.
+  const [quickView, setQuickView] = useState(false);
 
   // Hooks above stay unconditional; the skeleton short-circuit lives after
   // them, keeping the call order identical on every render.
@@ -89,7 +94,12 @@ export default function MarketplaceListingCard({
       whileHover={{ y: -4 }}
       className="group flex flex-col overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-sm transition-shadow duration-300 hover:shadow-lg hover:shadow-emerald-900/5 dark:border-emerald-900 dark:bg-[#08392a]"
     >
-      <Link to={listingHref(listing)} className="relative block aspect-[4/3] overflow-hidden bg-emerald-50 dark:bg-emerald-950">
+      <div className="relative aspect-[4/3] overflow-hidden bg-emerald-50 dark:bg-emerald-950">
+        <Link
+          to={listingHref(listing)}
+          className="block h-full w-full"
+          aria-label={`مشاهدهٔ ${listing.title}`}
+        >
         {/* Same <picture> contract as ProductCard: API-provided AVIF/WebP
             variants when the listing image went through the backend pipeline. */}
         <picture>
@@ -117,14 +127,22 @@ export default function MarketplaceListingCard({
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
         </picture>
+        </Link>
         {/*
           Badges that state something checkable, and nothing else:
           «نو» was printed on every card forever, which is how a badge stops
-          being read at all. Stock is the seller's own declaration, and the
-          best-seller mark is a real count — both are kept.
+          being read at all. Stock is the seller's own declaration, the
+          best-seller mark is a real count, and the discount pill mirrors the
+          catalogue card's — a price fact the default row used to hide in a
+          struck-through number.
         */}
         {variant === 'default' ? (
-          <div className="absolute start-2.5 top-2.5 flex max-w-[75%] flex-wrap gap-1">
+          <div className="absolute start-2.5 top-2.5 flex max-w-[75%] flex-col items-start gap-1">
+            {discount > 0 && (
+              <span className="rounded-full bg-slate-900/85 px-2.5 py-1 text-fluid-2xs font-bold text-lime-300 backdrop-blur">
+                {discount.toLocaleString('fa-IR')}٪ تخفیف
+              </span>
+            )}
             {listing.sales_count > 0 && (
               <span className="rounded-full bg-emerald-700 px-2.5 py-1 text-fluid-2xs font-bold text-white shadow-md">
                 پرفروش‌ترین
@@ -158,7 +176,20 @@ export default function MarketplaceListingCard({
             ناموجود
           </span>
         )}
-      </Link>
+
+        {/* Quick view overlay — pointer/hover devices only, the same contract
+            as ProductCard; touch devices keep the deep link, which opens this
+            very dialog on the storefront page. */}
+        <motion.button
+          type="button"
+          onClick={() => setQuickView(true)}
+          tabIndex={-1}
+          className="pointer-events-none absolute inset-x-3 bottom-3 z-[2] hidden translate-y-2 items-center justify-center gap-1.5 rounded-xl bg-white/95 py-2.5 text-xs font-bold text-slate-700 opacity-0 shadow-lg backdrop-blur transition-all duration-300 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:translate-y-0 group-focus-within:opacity-100 [@media(hover:hover)]:flex"
+          aria-label={`نمای سریع ${listing.title}`}
+        >
+          <Eye size={14} aria-hidden="true" /> نمای سریع
+        </motion.button>
+      </div>
 
       <div className="flex flex-1 flex-col p-3.5">
         <Link
@@ -214,6 +245,15 @@ export default function MarketplaceListingCard({
           </motion.button>
         </div>
       </div>
+
+      {/* The detail view, in place: «نمای سریع» opens it without leaving the
+          shelf; the title/image deep link opens the same dialog on the
+          storefront page for touch devices. */}
+      <ListingDetailModal
+        slug={quickView ? listing.slug : null}
+        initial={listing}
+        onClose={() => setQuickView(false)}
+      />
     </motion.article>
   );
 }
