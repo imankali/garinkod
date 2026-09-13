@@ -19,7 +19,6 @@ import SiteFooter from "./components/SiteFooter";
 import CompareBar from "./components/CompareBar";
 
 import CategorySections from "./components/home/CategorySections";
-import ContentRails from "./components/home/ContentRails";
 import WeatherWidget from "./components/WeatherWidget";
 import InstallmentBanner from "./components/InstallmentBanner";
 import FlyToCart, { type FlyingItem } from "./components/FlyToCart";
@@ -30,7 +29,9 @@ import HeroSlider from "./components/home/HeroSlider";
 import StoryStrip from "./components/home/StoryStrip";
 import AmazingOffers from "./components/home/AmazingOffers";
 import BannerGrid from "./components/home/BannerGrid";
-import BestSellers from "./components/home/BestSellers";
+import RankedRail from "./components/home/RankedRail";
+import HomeMagazine from "./components/home/HomeMagazine";
+import { Sparkles, Star, TrendingUp } from "lucide-react";
 import Reveal from "./components/motion/Reveal";
 import ServiceShortcuts from "./components/home/ServiceShortcuts";
 import CategoryGrid from "./components/home/CategoryGrid";
@@ -403,7 +404,14 @@ export default function App() {
 
                     <Reveal>
                       <div className="page-shell pb-4">
-                        <BestSellers />
+                        <RankedRail
+                          railId="best_sellers"
+                          title="پرفروش‌ترین کالاها"
+                          hint="بر اساس تعداد سفارش ثبت‌شده در گرین کود"
+                          icon={TrendingUp}
+                          params={{ ordering: "-sales_count" }}
+                          moreTo="/products?ordering=-sales_count"
+                        />
                       </div>
                     </Reveal>
 
@@ -431,16 +439,18 @@ export default function App() {
                         four core departments, then the specialist ranges
                         (آبیاری و گلخانه), then the magazine with the sellers'
                         ads under it. */}
-                    <ContentRails
-                      railIds={["newest"]}
-                      wishlistIds={wishlistIds}
-                      compareIds={compareIds}
-                      compareDisabled={compareItems.length >= 3}
-                      onToggleWishlist={handleToggleWishlist}
-                      onAddToCart={(product, event) => handleAddToCart(product, 1, event)}
-                      onQuickView={setSelectedProduct}
-                      onToggleCompare={handleToggleCompare}
-                    />
+                    <Reveal>
+                      <div className="page-shell py-4">
+                        <RankedRail
+                          railId="newest"
+                          title="تازه‌های انبار"
+                          hint="نهادهایی که در هفته‌های اخیر به گرین کود اضافه شده‌اند."
+                          icon={Sparkles}
+                          params={{ ordering: "-publish" }}
+                          moreTo="/products?ordering=-publish"
+                        />
+                      </div>
+                    </Reveal>
                     <CategorySections
                       group="primary"
                       featuredOnly={featuredOnly}
@@ -465,17 +475,19 @@ export default function App() {
                       onQuickView={setSelectedProduct}
                       onToggleCompare={handleToggleCompare}
                     />
-                    <ContentRails
-                      railIds={["best_rated"]}
-                      showMagazine
-                      wishlistIds={wishlistIds}
-                      compareIds={compareIds}
-                      compareDisabled={compareItems.length >= 3}
-                      onToggleWishlist={handleToggleWishlist}
-                      onAddToCart={(product, event) => handleAddToCart(product, 1, event)}
-                      onQuickView={setSelectedProduct}
-                      onToggleCompare={handleToggleCompare}
-                    />
+                    <Reveal>
+                      <div className="page-shell space-y-4 py-4">
+                        <RankedRail
+                          railId="best_rated"
+                          title="بیشترین امتیاز خریداران"
+                          hint="میانگین ستاره‌ها فقط از دیدگاه تأییدشده کشاورزان محاسبه می‌شود."
+                          icon={Star}
+                          params={{ ordering: "-avg_rating" }}
+                          moreTo="/products?ordering=-avg_rating"
+                        />
+                        <HomeMagazine />
+                      </div>
+                    </Reveal>
 
                     {/* آگهی‌های غرفه‌داران — the sellers' own products, right
                         after the magazine and before the calculator. */}

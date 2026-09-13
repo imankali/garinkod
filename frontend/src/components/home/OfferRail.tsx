@@ -3,7 +3,7 @@
 import { useRef } from 'react';
 import { Link } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Star } from 'lucide-react';
 
 import { formatPrice } from '../../utils/formatPrice';
 import { toPersianDigits } from '../../utils/normalizeDigits';
@@ -74,6 +74,17 @@ export default function OfferRail({ products }: { products: ProductList[] }) {
           <p className="mt-2 line-clamp-2 text-fluid-xs leading-6 group-hover:text-emerald-800">
             {product.title}
           </p>
+          {typeof product.avg_rating === 'number' && product.avg_rating > 0 && (
+            <p className="mt-1 flex items-center gap-1 text-fluid-2xs font-bold text-amber-500">
+              <Star size={12} aria-hidden="true" className="fill-current" />
+              <span className="tabular-nums">{toPersianDigits(product.avg_rating.toFixed(1))}</span>
+              {typeof product.reviews_count === 'number' && product.reviews_count > 0 && (
+                <span className="font-normal text-slate-400">
+                  ({toPersianDigits(product.reviews_count)})
+                </span>
+              )}
+            </p>
+          )}
           <div className="mt-2">
             {product.discount_percent > 0 ? (
               <>
