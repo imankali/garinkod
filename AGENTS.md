@@ -58,7 +58,7 @@ change, review the code and then run the full matrix in detail.
 |---|---|---|
 | Backend unit + integration | `cd garinkood && source /tmp/env.sh && ../.venv/bin/python manage.py test` | **620 tests, OK** |
 | Backend, tier module only | `... manage.py test shop.tests_price_tiers` | 37 tests, OK |
-| Frontend unit + integration | `cd frontend && CI=true npx vitest run` | **186 tests / 23 files** |
+| Frontend unit + integration | `cd frontend && CI=true npx vitest run` | **188 tests / 24 files** |
 | Type check | `cd frontend && npx tsc --noEmit` | clean |
 | Build | `cd frontend && npm run build` | ✓ |
 | Design linter | `.agents-tmp/node_modules/.bin/impeccable detect frontend/src` | 125 (see §6) |
@@ -258,6 +258,39 @@ per-row pattern cannot silently return.
   detector binary works offline; only the skill markdown cannot be fetched.
 
 ---
+
+## 8b. Accessibility — check the DOM, never the source text
+
+**A source-text scan for missing labels cannot work on this codebase.** Three
+separate attempts produced false positives, and each is worth recording because
+the next agent will be tempted to try the same shortcut:
+
+1. `<img ... alt="…">` spans multiple lines, so a per-line grep reports 47
+   images without `alt`. The real number is **0**.
+2. `onChange={(event) => …}` contains a `>` character, so a regex tag match
+   truncates mid-attribute and misses the `aria-label` further down.
+3. `<Field label="…">` renders a `<label>` **at runtime**. No amount of regular
+   expressions can see that, so every input inside `Field` / `LabeledField`
+   looks unlabelled and is not. `LandFormModal` (11 inputs) and `ContentStudio`
+   (7) are entirely false positives.
+
+The only reliable check is the accessibility tree: render the component and ask
+whether the control has a name. `LandCalendar.test.tsx` is the template — it
+walks every `input, select, textarea` in the rendered DOM and asserts each
+resolves a label through `aria-label`, `aria-labelledby`, a wrapping `<label>`,
+or `label[for]`.
+
+That DOM check found a `<textarea>` the `<input>`-only scan could not, and it
+is the only reason the fix is complete.
+
+Fixed in this pass: 9 controls named only by a placeholder (a placeholder
+vanishes on input, renders at reduced contrast, and is announced inconsistently
+— so such a control has no reliable accessible name at all, WCAG 4.1.2). The
+worst was the review textarea on `ProductPage`, the highest-traffic page, whose
+neighbouring file input already had an `aria-label`.
+
+Note: `type="file"` inputs with `className="hidden"` are correct — they are out
+of the accessibility tree and triggered by a styled `<button>`.
 
 ## 9. Reporting discipline
 

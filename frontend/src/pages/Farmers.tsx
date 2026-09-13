@@ -298,6 +298,7 @@ function RequestWorkspace({
                 ))}
               </select>
               <input
+                aria-label="عنوان رویداد"
                 value={eventForm.title}
                 onChange={(event) => setEventForm((current) => ({ ...current, title: event.target.value }))}
                 placeholder="عنوان (مثلاً سمپاشی کنه‌کش)"
@@ -319,6 +320,7 @@ function RequestWorkspace({
                 {t('common.save')}
               </button>
               <textarea
+                aria-label="یادداشت رویداد"
                 value={eventForm.notes}
                 onChange={(event) => setEventForm((current) => ({ ...current, notes: event.target.value }))}
                 placeholder="دستورالعمل اجرا (دوز، روش، زمان مناسب)…"
@@ -333,6 +335,7 @@ function RequestWorkspace({
         <form onSubmit={submitReply} className="rounded-2xl border border-emerald-100 bg-white p-3 dark:border-emerald-900 dark:bg-emerald-950">
           <h3 className="text-xs font-extrabold text-slate-800 dark:text-white">پاسخ به کشاورز</h3>
           <textarea
+                aria-label="متن پاسخ"
             value={reply}
             onChange={(event) => setReply(event.target.value)}
             rows={3}
@@ -413,6 +416,7 @@ function FarmersDirectory() {
         <div className="relative border-b border-emerald-100 p-3 dark:border-emerald-900">
           <Search size={14} className="pointer-events-none absolute start-6 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
+            aria-label="جستجوی کشاورز"
             type="search"
             value={search}
             onChange={(event) => setSearch(event.target.value)}

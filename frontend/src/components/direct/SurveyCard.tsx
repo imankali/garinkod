@@ -117,6 +117,7 @@ export default function SurveyCard({
       </div>
 
       <textarea
+            aria-label="توضیح تکمیلی"
         value={comment}
         onChange={(event) => setComment(event.target.value)}
         rows={2}

@@ -437,6 +437,7 @@ function LogNotebook() {
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <input
+              aria-label="جستجو در سیاهه"
           value={searchInput}
           onChange={(event) => setSearchInput(event.target.value)}
           placeholder="جستجو در متن خطا، نشانی صفحه یا نام بخش"
@@ -514,6 +515,7 @@ function LogRow({ row, onAct }: { row: OpsLogRow; onAct: (row: OpsLogRow, action
         <div className="flex shrink-0 flex-col items-end gap-2">
           {row.is_open ? (
             <input
+              aria-label="یادداشت"
               value={note}
               onChange={(event) => setNote(event.target.value)}
               placeholder="یادداشت رفع (اختیاری)"
