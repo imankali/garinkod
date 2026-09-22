@@ -357,6 +357,12 @@ if PREVIEW_IFRAME_COOKIES:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SAMESITE = "None"
     CSRF_COOKIE_SECURE = True
+    # Arena serves the Vite preview from a per-sandbox HTTPS subdomain. The
+    # frontend still proxies API calls to Django, but the browser's Origin is
+    # that preview host; without this trust entry every unsafe request (cart,
+    # profile, checkout) is rejected by CSRF after a successful login.
+    if "https://*.e2b.app" not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS = [*CSRF_TRUSTED_ORIGINS, "https://*.e2b.app"]
 
 # Structured logging. Throttle events go to their own logger so a monitoring
 # system can alert on a spike of blocked requests (a sign of either an attack

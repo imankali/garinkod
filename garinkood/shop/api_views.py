@@ -924,8 +924,12 @@ class CartViewSet(viewsets.ViewSet):
                         cart=cart, product=product, product_package=package, quantity=quantity
                     )
 
-        serializer = CartSerializer(cart, context={'request': request})
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+            # SQLite serializes writes, but the serializer also reads cart items.
+            # Keep that read under the same process lock so a concurrent writer
+            # cannot turn a successful add into a 500 while the response is built.
+            cart_data = CartSerializer(cart, context={'request': request}).data
+
+        return Response(cart_data, status=status.HTTP_201_CREATED)
 
     @action(detail=False, methods=['post'], url_path='add-listing')
     def add_listing(self, request):
@@ -992,10 +996,11 @@ class CartViewSet(viewsets.ViewSet):
                 else:
                     CartItem.objects.create(cart=cart, listing=listing, quantity=quantity)
 
-        return Response(
-            CartSerializer(cart, context={'request': request}).data,
-            status=status.HTTP_201_CREATED,
-        )
+            # See the catalogue add path above: response serialization reads
+            # CartItem rows and must not race another SQLite writer.
+            cart_data = CartSerializer(cart, context={'request': request}).data
+
+        return Response(cart_data, status=status.HTTP_201_CREATED)
 
     @action(detail=False, methods=['post'])
     def remove(self, request):
@@ -1085,8 +1090,9 @@ class CartViewSet(viewsets.ViewSet):
                     cart_item.quantity = quantity
                     cart_item.save(update_fields=['quantity'])
 
-        serializer = CartSerializer(cart, context={'request': request})
-        return Response(serializer.data)
+            cart_data = CartSerializer(cart, context={'request': request}).data
+
+        return Response(cart_data)
 
 
 # ========================================

@@ -192,6 +192,7 @@ ci/workflows/              repaired CI awaiting activation by a maintainer
 - [مرکز فرمان مدیریت](docs/management-command-centre-fa.md)
 - [استانداردهای UI/UX](docs/ui-ux-standards-fa.md)
 - [ممیزی مقیاس‌پذیری، تکرار کد و پوشه‌بندی](docs/scalability-audit-fa.md)
+- [ممیزی باگ‌های runtime سایت](docs/site-bug-audit-fa.md)
 
 ## مجوز
 

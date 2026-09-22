@@ -333,20 +333,21 @@ class ListingConcurrencyTests(TransactionTestCase):
         Cart.objects.create(user=buyer)
 
         barrier = threading.Barrier(4)
+        statuses = []
 
         def add():
             try:
                 client = APIClient()
                 client.force_authenticate(user=buyer)
                 barrier.wait(timeout=15)
-                client.post(
+                response = client.post(
                     '/api/cart/add-listing/', {'listing_id': listing.id, 'quantity': 4}, format='json'
                 )
+                statuses.append(response.status_code)
             except OperationalError:
-                # SQLite allows a single writer, so a losing thread may be
-                # refused outright. That is an acceptable outcome here: what
-                # matters is that no thread manages to exceed the stock.
-                pass
+                # Keep the worker alive so the assertion below reports a clear
+                # regression instead of silently accepting an HTTP 500.
+                statuses.append('OperationalError')
             finally:
                 connections.close_all()
 
@@ -356,6 +357,8 @@ class ListingConcurrencyTests(TransactionTestCase):
         for thread in threads:
             thread.join(timeout=30)
 
+        self.assertEqual(len(statuses), 4, f'every concurrent add should return a response: {statuses}')
+        self.assertTrue(all(code == 201 for code in statuses), f'cart additions must not return 5xx: {statuses}')
         # Four concurrent clicks of four units must clamp at the ten available,
         # never accumulate to sixteen.
         item = CartItem.objects.get(cart__user=buyer, listing=listing)
