@@ -10,9 +10,10 @@ is a valid answer and is never padded with placeholder claims.
 
 from django.db.models import Count, F, Q
 from django.utils import timezone
-from rest_framework import permissions, status, viewsets
+from rest_framework import permissions, serializers, status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes, throttle_classes
 from rest_framework.response import Response
+from drf_spectacular.utils import extend_schema
 
 from .models import (
     BrandPartner, HeroSlide, MarketplaceListing, Product, Service, SiteArticle, SiteContact,
@@ -29,14 +30,29 @@ from .serializers import (
 from .throttling import FeedbackRateThrottle, SearchRateThrottle
 
 
+class HeroSlidePublicSerializer(serializers.Serializer):
+    """Read-only contract consumed by the home-page slider."""
+
+    id = serializers.IntegerField(read_only=True)
+    kicker = serializers.CharField(allow_blank=True)
+    title = serializers.CharField()
+    body = serializers.CharField(allow_blank=True)
+    cta_label = serializers.CharField(allow_blank=True)
+    cta_url = serializers.CharField(allow_blank=True)
+    background_url = serializers.CharField(allow_blank=True, allow_null=True)
+    gradient = serializers.CharField(allow_blank=True)
+
+
 class HeroSlideViewSet(viewsets.ViewSet):
     """Active home-page hero slides, in display order — read-only, public."""
 
+    serializer_class = HeroSlidePublicSerializer
     permission_classes = [permissions.AllowAny]
     # The home page is the hottest page on the site; standard user throttling
     # fits a small uncached read.
     throttle_classes = [SearchRateThrottle]
 
+    @extend_schema(responses=HeroSlidePublicSerializer(many=True))
     def list(self, request):
         slides = HeroSlide.objects.filter(is_active=True).exclude(title='').order_by('order', 'id')
         payload = [
@@ -307,6 +323,7 @@ def newsletter_unsubscribe(request):
 # Legal documents
 # ========================================
 @documented_api
+@extend_schema(operation_id='legal_index')
 @api_view(['GET'])
 @permission_classes([permissions.AllowAny])
 def legal_index(request):
@@ -324,6 +341,7 @@ def legal_index(request):
 
 
 @documented_api
+@extend_schema(operation_id='legal_document')
 @api_view(['GET'])
 @permission_classes([permissions.AllowAny])
 def legal_document(request, slug: str):

@@ -33,6 +33,8 @@ from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema
 
 from .models import (
     Category, HeroSlide, MarketplaceListing, Product, ProductAttribute, ProductImage,
@@ -738,6 +740,7 @@ class StudioOptionsView(viewsets.ViewSet):
 
     permission_classes = [IsModerator]
 
+    @extend_schema(responses=OpenApiTypes.OBJECT)
     def list(self, request):
         categories = Category.objects.prefetch_related('subcategories').order_by('name')
         brands = (

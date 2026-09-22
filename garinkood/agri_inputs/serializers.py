@@ -7,12 +7,14 @@ shop serializer can never silently change the AgriInputs API.
 """
 
 from rest_framework import serializers
+from drf_spectacular.utils import extend_schema_serializer
 
 from shop.models import Product
 
 from .models import Fertilizer, Pesticide, Seed, Seedling
 
 
+@extend_schema_serializer(component_name='AgriInputProductSummary')
 class ProductSummarySerializer(serializers.ModelSerializer):
     """Minimal, stable subset of shop.Product that the inputs UI needs."""
 

@@ -19,7 +19,7 @@
 | P0 برای preview | اصلاح شد | login پاسخ `200` می‌داد ولی `/auth/session/` بعدی `401` می‌شد | `GK_PREVIEW_IFRAME_COOKIES` خاموش بود و iframe cookie را نگه نمی‌داشت | API با flag روشن اجرا شد؛ response اکنون `preview_token` و cookieهای `SameSite=None; Secure` دارد |
 | P0 برای preview | اصلاح شد | درخواست‌های unsafe از Origin دامنهٔ preview، مثل cart/profile/checkout، `403` می‌گرفتند | `CSRF_TRUSTED_ORIGINS` فقط localhost را می‌شناخت | در `settings.py`، فقط وقتی preview flag و DEBUG روشن است، `https://*.e2b.app` به trusted origins اضافه می‌شود |
 | P1 توسعه/SQLite | اصلاح شد | concurrent `/api/cart/add-listing/` در زمان ساخت response با `500` و `database table is locked: shop_cartitem` دیده شد | write با lock انجام می‌شد اما `CartSerializer` بعد از خروج از lock دوباره CartItemها را می‌خواند | serialize پاسخ داخل همان SQLite process lock انجام می‌شود؛ تست اکنون هر ۴ پاسخ را بررسی می‌کند و 5xx را silently قبول نمی‌کند |
-| P1 قرارداد API | باز | schema generation با ۱۳ warning و ۲۰ error گزارش می‌شود | APIView/function viewها serializer صریح ندارند، دو `ProductSummary` همنام وجود دارد و `legal_retrieve` collision دارد | backlog مستقل OpenAPI؛ روی اجرای frontend اثر مستقیم ندارد اما SDK/مستندسازی را شکننده می‌کند |
+| P1 قرارداد API | اصلاح شد | schema generation قبلاً ۱۳ warning و ۲۰ error گزارش می‌کرد | APIView/function viewها serializer صریح نداشتند، دو `ProductSummary` همنام وجود داشت و `legal_retrieve` collision داشت | serializer/annotation صریح، نام componentهای bounded-context، guard برای anonymous queryset و operationId مشخص اضافه شد؛ اکنون schema با صفر warning و صفر error تولید می‌شود |
 | P2 production config | باز، محیطی | `check --deploy` دربارهٔ DEBUG، SECRET_KEY، HSTS و SSL redirect هشدار می‌دهد | اجرای فعلی development است | قبل از deploy باید secret واقعی، `DEBUG=False`، TLS termination و HSTS طبق محیط production تنظیم شوند |
 | P2 عملیات | باز، محیطی | warning مربوط به نبود `staticfiles/` و خالی بودن `OPERATIONS_TOKEN` | سرور فعلی برای preview با collectstatic/ops token اجرا نشده است | در deployment pipeline، `collectstatic` و token/monitoring واقعی تنظیم شوند |
 
@@ -52,6 +52,7 @@ endpointهای عمومی‌ای که صفحهٔ خانه، کاتالوگ و ma
 
 ```text
 manage.py test shop                                      PASS (۵۹۹ تست)
+manage.py spectacular --validate                         PASS (۰ warning، ۰ error)
 ListingConcurrencyTests.test_concurrent_cart_additions   PASS
 npm run test:unit                                       PASS (۲۲۴ تست)
 npm run build                                           PASS (۲۶۱۲ ماژول)
@@ -68,4 +69,4 @@ npx playwright install chromium -> ECONNRESET
 
 ## نتیجهٔ اجرایی
 
-نسخهٔ فعلی برای مشاهدهٔ preview آماده است و مشکل ورود/کوکی و خطای concurrent cart اصلاح شده‌اند. مهم‌ترین کار بعدی برای محیط واقعی، تکمیل schema قرارداد API و اجرای Playwright روی runner دارای browser است؛ سپس باید production security checks با تنظیمات واقعی deployment اجرا شوند.
+نسخهٔ فعلی برای مشاهدهٔ preview آماده است و مشکل ورود/کوکی، خطای concurrent cart و warning/errorهای schema قرارداد API اصلاح شده‌اند. مهم‌ترین کار بعدی برای محیط واقعی، اجرای Playwright روی runner دارای browser است؛ سپس باید production security checks با تنظیمات واقعی deployment اجرا شوند.

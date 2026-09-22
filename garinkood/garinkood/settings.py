@@ -289,7 +289,9 @@ SPECTACULAR_SETTINGS = {
     # Several resources call their choice field `status`; give the shipment
     # lifecycle a stable client-facing component name instead of a hash.
     "ENUM_NAME_OVERRIDES": {
+        "ProductStatusEnum": "shop.models.Product.STATUS_CHOICES",
         "ShipmentStatusEnum": "shop.models.Shipment.STATUS_CHOICES",
+        "LogisticsShipmentStatusEnum": "logistics.models.Shipment.STATUS_CHOICES",
         # Articles and geography both name their choice field ``kind``.
         "ArticleKindEnum": "shop.models.SiteArticle.KIND_CHOICES",
         "LocationKindEnum": "shop.models.Location.KIND_CHOICES",

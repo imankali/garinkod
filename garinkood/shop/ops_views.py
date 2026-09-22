@@ -48,6 +48,7 @@ from .models import (
     ResourceSample, SystemLogEntry,
 )
 from .operational import has_operations_access
+from .schema import documented_api
 
 # Per worker, so «چند دقیقه است بالا ست» means what it says.
 PROCESS_STARTED_AT = timezone.now()
@@ -261,6 +262,7 @@ def _user_label(beat) -> str:
 # the system log
 # --------------------------------------------------------------------------
 
+@documented_api
 @api_view(['get'])
 @permission_classes([permissions.AllowAny])
 def log_list(request):
@@ -352,6 +354,7 @@ def _log_row(entry) -> dict:
     }
 
 
+@documented_api
 @api_view(['post'])
 @permission_classes([permissions.AllowAny])
 def log_resolve(request, pk: int):
@@ -376,6 +379,7 @@ def log_resolve(request, pk: int):
     return Response(_log_row(entry))
 
 
+@documented_api
 @api_view(['post'])
 @throttle_classes([ClientReportThrottle])
 @permission_classes([permissions.AllowAny])

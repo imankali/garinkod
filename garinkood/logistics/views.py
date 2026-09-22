@@ -24,6 +24,7 @@ from .serializers import ShipmentSerializer
 class ShipmentViewSet(viewsets.ReadOnlyModelViewSet):
     """Shipments visible to their owner; every verb staff sees everything."""
 
+    queryset = Shipment.objects.none()
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = ShipmentSerializer
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
@@ -45,6 +46,9 @@ class ShipmentViewSet(viewsets.ReadOnlyModelViewSet):
                 queryset=ShipmentEvent.objects.order_by("-timestamp", "-id"),
             )
         )
-        if self.request.user.is_staff:
+        user = getattr(self.request, 'user', None)
+        if not user or not user.is_authenticated:
+            return queryset.none()
+        if user.is_staff:
             return queryset
-        return queryset.filter(order__user=self.request.user)
+        return queryset.filter(order__user=user)

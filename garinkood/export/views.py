@@ -44,6 +44,7 @@ class IsAuthenticatedReadOnlyOrStaffWrite(permissions.BasePermission):
 class ExportOrderViewSet(viewsets.ModelViewSet):
     """Export case files; a buyer sees only files backed by their own order."""
 
+    queryset = ExportOrder.objects.none()
     permission_classes = [IsAuthenticatedReadOnlyOrStaffWrite]
     serializer_class = ExportOrderSerializer
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
@@ -66,9 +67,12 @@ class ExportOrderViewSet(viewsets.ModelViewSet):
                 queryset=ExportDocument.objects.order_by("-created_at", "-id"),
             )
         )
-        if self.request.user.is_staff:
+        user = getattr(self.request, 'user', None)
+        if not user or not user.is_authenticated:
+            return queryset.none()
+        if user.is_staff:
             return queryset
-        return queryset.filter(order__user=self.request.user)
+        return queryset.filter(order__user=user)
 
 
 class ExportDocumentViewSet(viewsets.ModelViewSet):

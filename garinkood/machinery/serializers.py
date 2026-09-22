@@ -7,12 +7,14 @@ other. Cross-module DRY stops at the context border by design.
 """
 
 from rest_framework import serializers
+from drf_spectacular.utils import extend_schema_serializer
 
 from shop.models import Product
 
 from .models import Implement, Tractor
 
 
+@extend_schema_serializer(component_name='MachineryProductSummary')
 class ProductSummarySerializer(serializers.ModelSerializer):
     """Minimal, stable subset of shop.Product that the machinery UI needs."""
 

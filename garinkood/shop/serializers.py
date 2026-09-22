@@ -610,7 +610,7 @@ class CartItemSerializer(serializers.ModelSerializer):
         # were offered, not a percentage they have to apply themselves.
         return (obj.base_unit_price - obj.unit_price) * obj.quantity
 
-    def get_next_tier(self, obj):
+    def get_next_tier(self, obj) -> dict | None:
         tier = obj.next_price_tier
         return PriceTierSerializer(tier).data if tier else None
 
