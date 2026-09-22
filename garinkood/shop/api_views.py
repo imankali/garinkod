@@ -712,11 +712,11 @@ class CommentViewSet(viewsets.ModelViewSet):
         except (TypeError, ValueError):
             direction = 1
         user = request.user if request.user.is_authenticated else None
-        votes = CommentVote.objects.filter(comment=comment)
-        if user:
-            votes = votes.filter(user=user)
-        else:
-            votes = votes.filter(user__isnull=True, visitor_key=self._visitor_key(request))
+        vote_scope = {'user': user} if user else {
+            'user__isnull': True,
+            'visitor_key': self._visitor_key(request),
+        }
+        votes = CommentVote.objects.filter(comment=comment, **vote_scope)
         existing = votes.first()
         if existing and existing.value == direction:
             existing.delete()  # same button twice = withdraw
@@ -728,8 +728,11 @@ class CommentViewSet(viewsets.ModelViewSet):
                 comment=comment, user=user,
                 visitor_key=self._visitor_key(request), value=direction,
             )
-        mine = votes.first()
-        my_value = mine.value if mine else (None if existing is None else direction)
+        # Query again after the mutation. Reusing the evaluated QuerySet here
+        # returns its stale cached row after a delete, making a withdrawn vote
+        # report `voted=True` until the next request.
+        mine = CommentVote.objects.filter(comment=comment, **vote_scope).first()
+        my_value = mine.value if mine else None
         # Recompute both tallies from the rows.
         ups = CommentVote.objects.filter(comment=comment, value=1).count()
         downs = CommentVote.objects.filter(comment=comment, value=-1).count()

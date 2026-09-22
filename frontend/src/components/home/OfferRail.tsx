@@ -1,6 +1,6 @@
 // frontend/src/components/home/OfferRail.tsx
 
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import { Link } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, ShoppingCart, Star } from 'lucide-react';
@@ -11,6 +11,7 @@ import { useCartStore } from '../../store/cartStore';
 import { productsApi } from '../../api/services';
 import toast from 'react-hot-toast';
 import type { ProductList } from '@/types/shop';
+import { useHorizontalRail } from '../../hooks/useHorizontalRail';
 
 /**
  * The horizontal card rail shared by the flash-deal, best-seller, new-stock
@@ -37,144 +38,28 @@ const AUTOPLAY_MS = 2000;
 
 export default function OfferRail({ products }: { products: ProductList[] }) {
   const queryClient = useQueryClient();
-  const railRef = useRef<HTMLDivElement>(null);
-  const hoverPause = useRef(false);
-  const touchPause = useRef(false);
-  const busyId = useRef<number | null>(null);
-  const cancelTween = useRef<(() => void) | null>(null);
   const addToCart = useCartStore((state) => state.addToCart);
+  const busyId = useRef<number | null>(null);
+  const {
+    railRef,
+    move,
+    onPointerEnter,
+    onPointerLeave,
+    onTouchStart,
+    onTouchEnd,
+  } = useHorizontalRail({
+    itemCount: products.length,
+    autoplayMs: AUTOPLAY_MS,
+    fallbackRatio: 0.8,
+    minimumStep: 280,
+  });
 
-  // Pair the products into two-row columns: [0,1], [2,3], … The leftover
-  // product of an odd list fills the top row of the last column alone.
+  // Pair products into two-row columns so the rail keeps the intended card
+  // density on both mobile and desktop.
   const columns: ProductList[][] = [];
-  for (let i = 0; i < products.length; i += 2) {
-    columns.push(products.slice(i, i + 2));
+  for (let index = 0; index < products.length; index += 2) {
+    columns.push(products.slice(index, index + 2));
   }
-
-  /** rAF tween of the rail's own scrollLeft — the only horizontal scroll
-   *  primitive that behaves identically in every engine we tested AND never
-   *  touches the page's vertical scroll. (scrollIntoView used to drag the
-   *  whole document toward the rail whenever the next card sat at the
-   *  viewport edge, which read as the site scrolling itself up and down.)
-   *
-   *  The rail carries `snap-mandatory`, and Chromium rewrites every
-   *  programmatic scrollLeft assignment to the nearest snap point — which
-   *  collapses this tween into a single-frame jump (measured: intermediate
-   *  values never land). So the tween suspends snap for its 450 ms and hands
-   *  it back afterwards; manual swipes still snap. */
-  const animateTo = (targetLeft: number) => {
-    const rail = railRef.current;
-    if (!rail) return;
-    cancelTween.current?.();
-    const start = rail.scrollLeft;
-    const delta = targetLeft - start;
-    if (Math.abs(delta) < 1) return;
-    rail.style.scrollSnapType = 'none';
-    const duration = 450;
-    const startedAt = performance.now();
-    let raf = 0;
-    const done = () => {
-      rail.style.scrollSnapType = '';
-      cancelTween.current = null;
-    };
-    const step = (now: number) => {
-      const progress = Math.min((now - startedAt) / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      rail.scrollLeft = start + delta * eased;
-      if (progress < 1) raf = window.requestAnimationFrame(step);
-      else done();
-    };
-    raf = window.requestAnimationFrame(step);
-    cancelTween.current = () => {
-      window.cancelAnimationFrame(raf);
-      done();
-    };
-  };
-
-  /** Pixel advance of one column (column + gap). Without layout (jsdom,
-   *  hidden node) it falls back to the ~80%-viewport page step. */
-  const cardStep = (rail: HTMLDivElement): number => {
-    const first = rail.children[0] as HTMLElement | undefined;
-    const width = first ? first.getBoundingClientRect().width : 0;
-    return width > 0 ? width + 12 : Math.max(rail.clientWidth * 0.8, 280);
-  };
-
-  /** Bring column `index` flush to the start edge. The RTL sign comes from the
-   *  live scroll position (negative while scrolled in Chromium RTL), falling
-   *  back to the computed direction when the rail sits at 0. */
-  const scrollToCard = (index: number) => {
-    const rail = railRef.current;
-    if (!rail) return;
-    const unit = Math.max(cardStep(rail), 1);
-    const at = rail.scrollLeft;
-    const sign =
-      at < 0 ? -1
-      : at > 0 ? 1
-      : getComputedStyle(rail).direction === 'rtl' ? -1 : 1;
-    animateTo(sign * index * unit);
-  };
-
-  const move = (direction: -1 | 1) => {
-    const rail = railRef.current;
-    if (!rail) return;
-    const unit = Math.max(cardStep(rail), 1);
-    // Current column index from scroll offset (scrollLeft is negative in RTL).
-    const travelled = Math.abs(rail.scrollLeft);
-    const currentIndex = Number.isFinite(travelled / unit)
-      ? Math.round(travelled / unit)
-      : 0;
-    const nextIndex = Math.min(
-      Math.max(currentIndex + direction, 0),
-      rail.children.length - 1,
-    );
-    scrollToCard(nextIndex);
-  };
-
-  // Autoplay runs only while the rail is actually on screen: a rail parked
-  // far down the page neither moves itself nor nudges the reader's place.
-  const inViewRef = useRef(false);
-  useEffect(() => {
-    const rail = railRef.current;
-    if (!rail || typeof IntersectionObserver === 'undefined') {
-      inViewRef.current = true;
-      return;
-    }
-    const observer = new IntersectionObserver(
-      ([entry]) => { inViewRef.current = Boolean(entry?.isIntersecting); },
-      { threshold: 0.35 },
-    );
-    observer.observe(rail);
-    return () => observer.disconnect();
-  }, []);
-
-  // Autoplay: one column per 2s. Pointer hover or an active touch pauses it —
-  // the standard carousel contract; moving the pointer away resumes.
-  useEffect(() => {
-    if (products.length < 2) return;
-    const reduceMotion =
-      typeof window !== 'undefined' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (reduceMotion) return;
-
-    const timer = window.setInterval(() => {
-      const rail = railRef.current;
-      if (!rail || !inViewRef.current || hoverPause.current || touchPause.current) return;
-      const maxScroll = rail.scrollWidth - rail.clientWidth;
-      if (maxScroll <= 4) return;
-      const unit = Math.max(cardStep(rail), 1);
-      const travelled = Math.abs(rail.scrollLeft);
-      const atEnd = travelled >= maxScroll - 4;
-      const currentIndex = Number.isFinite(travelled / unit)
-        ? Math.round(travelled / unit)
-        : 0;
-      if (atEnd) {
-        scrollToCard(0); // loop back to the start
-      } else {
-        scrollToCard(Math.min(currentIndex + 1, rail.children.length - 1));
-      }
-    }, AUTOPLAY_MS);
-    return () => window.clearInterval(timer);
-  }, [products.length]);
 
   async function quickAdd(product: ProductList) {
     if (busyId.current === product.id) return;
@@ -271,18 +156,10 @@ export default function OfferRail({ products }: { products: ProductList[] }) {
     <div className="group/rail relative">
       <div
         ref={railRef}
-        onPointerEnter={() => { hoverPause.current = true; }}
-        onPointerLeave={() => { hoverPause.current = false; }}
-        onTouchStart={() => {
-          // A finger on the rail takes over from any running animation:
-          // cancel it and hand snap back before the browser records the swipe.
-          cancelTween.current?.();
-          touchPause.current = true;
-        }}
-        onTouchEnd={() => {
-          // Give momentum scrolling a beat to settle before autoplay resumes.
-          window.setTimeout(() => { touchPause.current = false; }, 2500);
-        }}
+        onPointerEnter={onPointerEnter}
+        onPointerLeave={onPointerLeave}
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
         className="rail-scroll mt-4 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-4 pb-4 touch-pan-x sm:px-6"
         role="region"
         aria-label="کارت‌های قابل پیمایش افقی"

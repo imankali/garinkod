@@ -13,6 +13,7 @@ import {useDirectStore} from '../store/directStore';
 import {useDebouncedValue} from '../hooks/useDebouncedValue';
 import {useTranslation} from '../i18n';
 import {formatPrice} from '../utils/formatPrice';
+import {toAttachedListing} from '../utils/listingPayload';
 import ListingComposer from '../components/storefront/ListingComposer';
 import ListingDetailModal from '../components/storefront/ListingDetailModal';
 import ListingRail from '../components/storefront/ListingRail';
@@ -208,17 +209,7 @@ export default function StorefrontPage() {
   function sendListingToDirect(listing: StorefrontProfile['listings'][number]) {
     openDirect({
       storefrontSlug: listing.storefront.slug,
-      listing: {
-        id: listing.id,
-        title: listing.title,
-        slug: listing.slug,
-        price: listing.price,
-        discounted_price: listing.discounted_price,
-        unit: listing.unit,
-        image_url: listing.image_url,
-        storefront_name: listing.storefront.name,
-        storefront_slug: listing.storefront.slug,
-      },
+      listing: toAttachedListing(listing),
     });
   }
 

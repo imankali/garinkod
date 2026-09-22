@@ -8,7 +8,7 @@
 // rAF tween the home rails use so the whole site shares one scroll personality:
 // snap on touch, tweened on the arrow buttons, pause on hover.
 
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import { ChevronLeft, ChevronRight, ShoppingCart } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -16,6 +16,7 @@ import { useCartStore } from '../../store/cartStore';
 import { formatPrice } from '../../utils/formatPrice';
 import { cn } from '../../utils/cn';
 import type { MarketplaceListing } from '@/types/storefront';
+import { useHorizontalRail } from '../../hooks/useHorizontalRail';
 
 type Listing = MarketplaceListing;
 
@@ -43,117 +44,21 @@ export default function ListingRail({
   onDelete?: (listing: Listing) => void;
   onSendToDirect?: (listing: Listing) => void;
 }) {
-  const railRef = useRef<HTMLDivElement>(null);
-  const hoverPause = useRef(false);
-  const touchPause = useRef(false);
-  const busyId = useRef<number | null>(null);
-  const cancelTween = useRef<(() => void) | null>(null);
   const addToCart = useCartStore((state) => state.addToCart);
-
-  /** rAF tween of the rail's own scrollLeft — identical to the home rails so
-   *  every carousel on the site moves the same way. */
-  const animateTo = (targetLeft: number) => {
-    const rail = railRef.current;
-    if (!rail) return;
-    cancelTween.current?.();
-    const start = rail.scrollLeft;
-    const delta = targetLeft - start;
-    if (Math.abs(delta) < 1) return;
-    rail.style.scrollSnapType = 'none';
-    const duration = 450;
-    const startedAt = performance.now();
-    let raf = 0;
-    const done = () => {
-      rail.style.scrollSnapType = '';
-      cancelTween.current = null;
-    };
-    const step = (now: number) => {
-      const progress = Math.min((now - startedAt) / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      rail.scrollLeft = start + delta * eased;
-      if (progress < 1) raf = window.requestAnimationFrame(step);
-      else done();
-    };
-    raf = window.requestAnimationFrame(step);
-    cancelTween.current = () => {
-      window.cancelAnimationFrame(raf);
-      done();
-    };
-  };
-
-  const cardStep = (rail: HTMLDivElement): number => {
-    const first = rail.children[0] as HTMLElement | undefined;
-    const width = first ? first.getBoundingClientRect().width : 0;
-    return width > 0 ? width + 12 : Math.max(rail.clientWidth * 0.7, 240);
-  };
-
-  const scrollToCard = (index: number) => {
-    const rail = railRef.current;
-    if (!rail) return;
-    const unit = Math.max(cardStep(rail), 1);
-    const at = rail.scrollLeft;
-    const sign =
-      at < 0 ? -1
-      : at > 0 ? 1
-      : getComputedStyle(rail).direction === 'rtl' ? -1 : 1;
-    animateTo(sign * index * unit);
-  };
-
-  const move = (direction: -1 | 1) => {
-    const rail = railRef.current;
-    if (!rail) return;
-    const unit = Math.max(cardStep(rail), 1);
-    const travelled = Math.abs(rail.scrollLeft);
-    const currentIndex = Number.isFinite(travelled / unit)
-      ? Math.round(travelled / unit)
-      : 0;
-    const nextIndex = Math.min(
-      Math.max(currentIndex + direction, 0),
-      rail.children.length - 1,
-    );
-    scrollToCard(nextIndex);
-  };
-
-  const inViewRef = useRef(false);
-  useEffect(() => {
-    const rail = railRef.current;
-    if (!rail || typeof IntersectionObserver === 'undefined') {
-      inViewRef.current = true;
-      return;
-    }
-    const observer = new IntersectionObserver(
-      ([entry]) => { inViewRef.current = Boolean(entry?.isIntersecting); },
-      { threshold: 0.35 },
-    );
-    observer.observe(rail);
-    return () => observer.disconnect();
-  }, []);
-
-  // Autoplay like the home rails, slower here: a storefront shelf is content
-  // the visitor is browsing, not a flash-deal strip to chase.
-  useEffect(() => {
-    if (items.length < 2) return;
-    const reduceMotion =
-      typeof window !== 'undefined' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (reduceMotion) return;
-
-    const timer = window.setInterval(() => {
-      const rail = railRef.current;
-      if (!rail || !inViewRef.current || hoverPause.current || touchPause.current) return;
-      const maxScroll = rail.scrollWidth - rail.clientWidth;
-      if (maxScroll <= 4) return;
-      const unit = Math.max(cardStep(rail), 1);
-      const travelled = Math.abs(rail.scrollLeft);
-      const atEnd = travelled >= maxScroll - 4;
-      const currentIndex = Number.isFinite(travelled / unit)
-        ? Math.round(travelled / unit)
-        : 0;
-      if (atEnd) scrollToCard(0);
-      else scrollToCard(Math.min(currentIndex + 1, rail.children.length - 1));
-    }, AUTOPLAY_MS);
-    return () => window.clearInterval(timer);
-  }, [items.length]);
+  const busyId = useRef<number | null>(null);
+  const {
+    railRef,
+    move,
+    onPointerEnter,
+    onPointerLeave,
+    onTouchStart,
+    onTouchEnd,
+  } = useHorizontalRail({
+    itemCount: items.length,
+    autoplayMs: AUTOPLAY_MS,
+    fallbackRatio: 0.7,
+    minimumStep: 240,
+  });
 
   async function quickAdd(listing: Listing) {
     if (busyId.current === listing.id) return;
@@ -199,15 +104,10 @@ export default function ListingRail({
       <div className="relative mt-3">
         <div
           ref={railRef}
-          onPointerEnter={() => { hoverPause.current = true; }}
-          onPointerLeave={() => { hoverPause.current = false; }}
-          onTouchStart={() => {
-            cancelTween.current?.();
-            touchPause.current = true;
-          }}
-          onTouchEnd={() => {
-            window.setTimeout(() => { touchPause.current = false; }, 2500);
-          }}
+          onPointerEnter={onPointerEnter}
+          onPointerLeave={onPointerLeave}
+          onTouchStart={onTouchStart}
+          onTouchEnd={onTouchEnd}
           className="rail-scroll flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-2 touch-pan-x"
           role="region"
           aria-label={`کارت‌های دسته ${title}`}

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { BadgeCheck, ChevronDown, Loader2, ShieldCheck, UserCog } from 'lucide-react';
 import toast from 'react-hot-toast';
+import Pagination from '@/components/ui/Pagination';
 
 import { managementApi, type ManagedUser } from '../../api/services';
 import type { LevelRank } from '@/types/user';
@@ -287,29 +288,7 @@ export default function UserLevels({ viewerLevel }: { viewerLevel: number }) {
             })}
           </ul>
 
-          {totalPages > 1 && (
-            <nav aria-label="صفحه‌بندی کاربران" className="mt-5 flex items-center justify-center gap-2">
-              <button
-                type="button"
-                disabled={page <= 1}
-                onClick={() => setPage(page - 1)}
-                className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold disabled:opacity-40 dark:border-emerald-800 dark:text-emerald-100"
-              >
-                قبلی
-              </button>
-              <span className="text-xs text-slate-500 dark:text-emerald-200">
-                صفحه {page} از {totalPages}
-              </span>
-              <button
-                type="button"
-                disabled={page >= totalPages}
-                onClick={() => setPage(page + 1)}
-                className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold disabled:opacity-40 dark:border-emerald-800 dark:text-emerald-100"
-              >
-                بعدی
-              </button>
-            </nav>
-          )}
+          <Pagination page={page} totalPages={totalPages} onPageChange={setPage} ariaLabel="صفحه‌بندی کاربران" />
         </>
       )}
     </section>

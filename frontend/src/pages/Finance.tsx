@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Banknote, Download, Landmark, Loader2, ShieldCheck, Store, WalletCards } from 'lucide-react';
 import toast from 'react-hot-toast';
+import Pagination from '@/components/ui/Pagination';
 
 import { agricultureApi, financeApi, type WithdrawalRequest } from '../api/services';
 import { isValidCardNumber, normalizeCardNumber } from '../utils/cardNumber';
@@ -457,29 +458,7 @@ export default function Finance() {
                   ))}
                 </ul>
 
-                {totalPages > 1 && (
-                  <nav aria-label="صفحه‌بندی دفتر مالی" className="mt-5 flex items-center justify-center gap-2">
-                    <button
-                      type="button"
-                      disabled={page <= 1}
-                      onClick={() => setPage(page - 1)}
-                      className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold disabled:opacity-40 dark:border-emerald-800 dark:text-emerald-100"
-                    >
-                      قبلی
-                    </button>
-                    <span className="text-xs text-slate-500 dark:text-emerald-200">
-                      صفحه {page} از {totalPages}
-                    </span>
-                    <button
-                      type="button"
-                      disabled={page >= totalPages}
-                      onClick={() => setPage(page + 1)}
-                      className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold disabled:opacity-40 dark:border-emerald-800 dark:text-emerald-100"
-                    >
-                      بعدی
-                    </button>
-                  </nav>
-                )}
+                <Pagination page={page} totalPages={totalPages} onPageChange={setPage} ariaLabel="صفحه‌بندی دفتر مالی" />
               </>
             ) : (
               <p className="mt-5 rounded-2xl bg-slate-50 p-5 text-sm text-slate-500 dark:bg-emerald-900/40 dark:text-emerald-200">

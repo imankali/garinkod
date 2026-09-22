@@ -119,6 +119,19 @@ export interface UserAccount {
 // Comment (مطابق با CommentSerializer)
 // ========================================
 
+/** Payload accepted by both the API service and the auth store register action. */
+export interface RegisterPayload {
+  username: string;
+  email?: string;
+  first_name?: string;
+  last_name?: string;
+  password: string;
+  password2: string;
+  phone?: string;
+  gender?: 'male' | 'female';
+  address?: string;
+}
+
 export interface AuthResponse {
   user: User;
   account: UserAccount | null;

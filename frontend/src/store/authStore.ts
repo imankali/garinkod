@@ -5,7 +5,15 @@ import { authApi, avatarApi } from '../api/services';
 import { clearPreviewToken, writePreviewToken } from '../api/previewSession';
 import { parseApiError } from '../api/errors';
 import { USER_LEVEL, STAFF_LEVEL_FLOOR } from '@/types/user';
-import type { OtpRequestResponse, User, UserAccount, UserCapability, UserCapabilities, UserLevel } from '@/types/user';
+import type {
+  OtpRequestResponse,
+  RegisterPayload,
+  User,
+  UserAccount,
+  UserCapability,
+  UserCapabilities,
+  UserLevel,
+} from '@/types/user';
 
 interface AuthState {
   user: User | null;
@@ -23,17 +31,7 @@ interface AuthState {
     first_name?: string;
     last_name?: string;
   }) => Promise<void>;
-  register: (data: {
-    username: string;
-    email?: string;
-    first_name?: string;
-    last_name?: string;
-    password: string;
-    password2: string;
-    phone?: string;
-    gender?: 'male' | 'female';
-    address?: string;
-  }) => Promise<void>;
+  register: (data: RegisterPayload) => Promise<void>;
   logout: () => Promise<void>;
   fetchProfile: () => Promise<void>;
   updateProfile: (data: Partial<{

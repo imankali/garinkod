@@ -24,6 +24,7 @@ import { useCartStore } from '../../store/cartStore';
 import { useDirectStore } from '../../store/directStore';
 import { useTranslation } from '../../i18n';
 import { formatShamsi } from '../../utils/shamsiDate';
+import { toAttachedListing } from '../../utils/listingPayload';
 import type { MarketplaceListing } from '@/types/storefront';
 import { formatPrice } from '../../utils/formatPrice';
 import { cn } from '../../utils/cn';
@@ -121,17 +122,7 @@ export default function ListingDetailModal({
     onClose();
     openDirect({
       storefrontSlug: listing.storefront.slug,
-      listing: {
-        id: listing.id,
-        title: listing.title,
-        slug: listing.slug,
-        price: listing.price,
-        discounted_price: listing.discounted_price,
-        unit: listing.unit,
-        image_url: listing.image_url,
-        storefront_name: listing.storefront.name,
-        storefront_slug: listing.storefront.slug,
-      },
+      listing: toAttachedListing(listing),
     });
   }
 

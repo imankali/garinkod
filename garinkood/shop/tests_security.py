@@ -149,6 +149,7 @@ class ApiPermissionPolicyTests(TestCase):
         "StorefrontPostViewSet",
         "StorefrontDirectoryViewSet",
         "StorefrontHighlightViewSet",
+        "HeroSlideViewSet",
         "SiteArticleViewSet",
         "SitePageViewSet",
         "ServiceViewSet",

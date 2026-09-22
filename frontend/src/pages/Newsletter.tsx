@@ -7,7 +7,7 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import { CheckCircle2, Loader2, Mail, Newspaper, Smartphone } from 'lucide-react';
+import { CheckCircle2, Loader2, Newspaper } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 import RouteSeo from '../components/RouteSeo';
@@ -17,6 +17,7 @@ import { parseApiError } from '../api/errors';
 import { normalizePhoneNumber, toEnglishDigits } from '../utils/normalizeDigits';
 import { useQuery } from '@tanstack/react-query';
 import { cn } from '../utils/cn';
+import ChannelToggle, { type NewsletterChannel } from '../components/newsletter/ChannelToggle';
 
 const TOPICS = [
   'قیمت روزنه‌اده‌ها',
@@ -41,10 +42,8 @@ const PROMISES = [
   },
 ];
 
-type Channel = 'email' | 'mobile';
-
 export default function Newsletter() {
-  const [channel, setChannel] = useState<Channel>('mobile');
+  const [channel, setChannel] = useState<NewsletterChannel>('mobile');
   const [email, setEmail] = useState('');
   const [mobile, setMobile] = useState('');
   const [selected, setSelected] = useState<string[]>([TOPICS[0]!]);
@@ -201,29 +200,7 @@ export default function Newsletter() {
             ) : (
               <form onSubmit={join} className="space-y-3">
                 <p className="text-fluid-sm font-extrabold text-slate-800 dark:text-white">عضویت در خبرنامه</p>
-                <div className="flex gap-1 rounded-xl bg-slate-100 p-1 dark:bg-emerald-900/60">
-                  {(
-                    [
-                      { id: 'mobile', label: 'موبایل', icon: Smartphone },
-                      { id: 'email', label: 'ایمیل', icon: Mail },
-                    ] as const
-                  ).map((option) => (
-                    <button
-                      key={option.id}
-                      type="button"
-                      onClick={() => setChannel(option.id)}
-                      className={cn(
-                        'flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg text-fluid-xs font-bold transition-colors',
-                        channel === option.id
-                          ? 'bg-white text-emerald-700 shadow-sm dark:bg-emerald-950 dark:text-lime-300'
-                          : 'text-slate-500 dark:text-emerald-300',
-                      )}
-                    >
-                      <option.icon size={15} />
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
+                <ChannelToggle channel={channel} onChange={setChannel} />
 
                 {channel === 'mobile' ? (
                   <input

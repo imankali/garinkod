@@ -16,6 +16,7 @@ import { useTranslation } from '../i18n';
 import type { MarketplaceListing } from '@/types/storefront';
 import { formatPrice } from '../utils/formatPrice';
 import { listingHref } from '../utils/listingHref';
+import { toAttachedListing } from '../utils/listingPayload';
 import SkeletonCard from './ui/SkeletonCard';
 import ListingDetailModal from './storefront/ListingDetailModal';
 
@@ -69,17 +70,7 @@ export default function MarketplaceListingCard({
   function sendToDirect() {
     openDirect({
       storefrontSlug: listing.storefront.slug,
-      listing: {
-        id: listing.id,
-        title: listing.title,
-        slug: listing.slug,
-        price: listing.price,
-        discounted_price: listing.discounted_price,
-        unit: listing.unit,
-        image_url: listing.image_url,
-        storefront_name: listing.storefront.name,
-        storefront_slug: listing.storefront.slug,
-      },
+      listing: toAttachedListing(listing),
     });
   }
 

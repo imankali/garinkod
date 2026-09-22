@@ -12,18 +12,17 @@ import { useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { Helmet } from 'react-helmet-async';
 import {
-  AlertTriangle,
   CalendarClock,
   ClipboardList,
   PackageSearch,
-  RefreshCw,
   Truck,
 } from 'lucide-react';
 
-import { parseApiError } from '../api/errors';
 import { getShipmentByTrackingCode } from '../services/logistics';
 import TrackingTimeline from '../components/TrackingTimeline';
 import Button from '../components/ui/Button';
+import QueryErrorState from '../components/ui/QueryErrorState';
+import { parseApiError } from '../api/errors';
 import type { LogisticsShipmentStatus } from '../types/logistics';
 
 /** Overall-status pill tones; page-local, mirroring Orders.tsx conventions. */
@@ -159,30 +158,12 @@ export default function OrderTrackingPage() {
         ) : isPending ? (
           <TrackingSkeleton />
         ) : isError ? (
-          <section
-            role="alert"
-            className="rounded-3xl border border-rose-100 bg-white p-8 text-center shadow-sm dark:border-rose-900 dark:bg-emerald-950"
-          >
-            <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-100 text-rose-700 dark:bg-rose-900 dark:text-rose-200">
-              <AlertTriangle size={26} aria-hidden="true" />
-            </span>
-            <h2 className="mt-4 text-fluid-lg font-extrabold text-slate-800 dark:text-white">
-              اطلاعات رهگیری دریافت نشد
-            </h2>
-            <p className="mx-auto mt-2 max-w-md text-fluid-sm leading-7 text-slate-500 dark:text-emerald-200">
-              {parseApiError(error).message}
-            </p>
-            <div className="mt-5 flex justify-center">
-              <Button
-                variant="primary"
-                icon={RefreshCw}
-                loading={isRefetching}
-                onClick={() => void refetch()}
-              >
-                تلاش دوباره
-              </Button>
-            </div>
-          </section>
+          <QueryErrorState
+            title="اطلاعات رهگیری دریافت نشد"
+            message={parseApiError(error).message}
+            isRetrying={isRefetching}
+            onRetry={() => void refetch()}
+          />
         ) : shipment ? (
           <>
             {/* Shipment summary: carrier, code, overall state, the promise. */}

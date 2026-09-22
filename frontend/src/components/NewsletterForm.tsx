@@ -6,15 +6,14 @@
 // not send.
 
 import { useState, type FormEvent } from 'react';
-import { CheckCircle2, Loader2, Mail, Smartphone } from 'lucide-react';
+import { CheckCircle2, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 import { newsletterApi } from '../api/services';
 import { parseApiError } from '../api/errors';
 import { normalizePhoneNumber, toEnglishDigits } from '../utils/normalizeDigits';
 import { cn } from '../utils/cn';
-
-type Channel = 'email' | 'mobile';
+import ChannelToggle, { type NewsletterChannel } from './newsletter/ChannelToggle';
 
 export default function NewsletterForm({
   source = 'footer',
@@ -28,7 +27,7 @@ export default function NewsletterForm({
   /** Optional topic chips the visitor can tick. */
   topics?: string[];
 }) {
-  const [channel, setChannel] = useState<Channel>(variant === 'footer' ? 'email' : 'mobile');
+  const [channel, setChannel] = useState<NewsletterChannel>(variant === 'footer' ? 'email' : 'mobile');
   const [email, setEmail] = useState('');
   const [mobile, setMobile] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
@@ -88,29 +87,7 @@ export default function NewsletterForm({
   return (
     <form onSubmit={submit} className="space-y-2.5">
       {variant === 'panel' && (
-        <div className="flex gap-1 rounded-xl bg-slate-100 p-1 dark:bg-emerald-900/60">
-          {(
-            [
-              { id: 'mobile', label: 'موبایل', icon: Smartphone },
-              { id: 'email', label: 'ایمیل', icon: Mail },
-            ] as const
-          ).map((option) => (
-            <button
-              key={option.id}
-              type="button"
-              onClick={() => setChannel(option.id)}
-              className={cn(
-                'flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg text-fluid-xs font-bold transition-colors',
-                channel === option.id
-                  ? 'bg-white text-emerald-700 shadow-sm dark:bg-emerald-950 dark:text-lime-300'
-                  : 'text-slate-500 dark:text-emerald-300',
-              )}
-            >
-              <option.icon size={15} />
-              {option.label}
-            </button>
-          ))}
-        </div>
+        <ChannelToggle channel={channel} onChange={setChannel} />
       )}
 
       <div className="flex flex-col gap-2 sm:flex-row">
