@@ -255,6 +255,32 @@ export interface ServiceRequestPayload {
   crop?: string;
   farm_area_hectare?: number;
   description: string;
+  /** File against a registered land (مزرعه من). Server validates ownership. */
+  land?: number | null;
+}
+
+export interface ServiceRequestResult {
+  request: {
+    id: number;
+    code: string;
+    service_type: ServiceRequestPayload['service_type'];
+    service_label: string;
+    customer_name: string;
+    phone: string;
+    province: string;
+    city: string;
+    crop: string;
+    farm_area_hectare: number | null;
+    land: number | null;
+    land_label: string;
+    description: string;
+    status: string;
+    status_label: string;
+    created_at: string;
+  };
+  message: string;
+  /** Present when signed in: the consulting thread the request was posted to. */
+  conversation_id?: number;
 }
 
 export interface ProcurementRequestPayload {
@@ -268,6 +294,8 @@ export interface ProcurementRequestPayload {
   province: string;
   city: string;
   harvest_date?: string;
+  production_date?: string | null;
+  expiry_date?: string | null;
   description?: string;
 }
 

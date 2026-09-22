@@ -105,14 +105,23 @@ export function FilterShell({
         />
       </button>
 
+      {/* Two placements for one panel. On a pointer screen it is the classic
+          popover under the button. On a phone the button often sits right
+          under the sticky header/search — an absolutely positioned panel then
+          opens UPWARD under the header chrome and its top rows («مرتب‌سازی»،
+          «کشاورز») are unreadably clipped. So on <sm the same panel becomes a
+          fixed bottom sheet: anchored to the viewport, above the mobile nav,
+          never clipped by anything. The desktop panel keeps its inline
+          position so the layout of the page does not change. */}
       {open && (
         <div
           id={panelId}
           role="dialog"
           aria-label={label}
           className={cn(
-            'absolute z-40 mt-2 max-h-[min(70vh,26rem)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-xl dark:border-emerald-800 dark:bg-[#06301f]',
-            align === 'end' ? 'end-0' : 'start-0',
+            'max-h-[min(70vh,26rem)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-xl dark:border-emerald-800 dark:bg-[#06301f]',
+            'fixed inset-x-2 bottom-[calc(var(--mobile-nav-clearance,84px)+0.5rem)] z-[75] w-auto! max-w-[calc(100vw-1rem)] sm:absolute sm:inset-x-auto sm:bottom-auto sm:mt-2 sm:max-h-[min(70vh,26rem)] sm:max-w-none sm:w-auto!',
+            align === 'end' ? 'sm:end-0' : 'sm:start-0',
             width,
           )}
         >

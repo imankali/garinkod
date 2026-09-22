@@ -34,11 +34,12 @@ const UNREAD_POLL_MS = 30000;
  *
  * On the messaging screens it sat directly on top of the message composer,
  * hiding the control the page exists for — and offering a second, redundant
- * way to start a conversation.
+ * way to start a conversation. Checkout gets the same courtesy: the buyer
+ * mid-payment is the one person who must not be re-intercepted.
  */
 const HIDDEN_ON = ['/messages', '/checkout'];
 
-export default function GlobalMessengerButton() {
+export default function GlobalMessengerButton({ cartDrawerOpen = false }: { cartDrawerOpen?: boolean }) {
   const [open, setOpen] = useState(false);
   const { pathname } = useLocation();
   const { isAuthenticated, isSessionChecked } = useAuthStore();
@@ -46,6 +47,9 @@ export default function GlobalMessengerButton() {
   const drawerOpen = useDirectStore((state) => state.open);
   const unreadTotal = useDirectStore((state) => state.unreadTotal);
   const setUnreadTotal = useDirectStore((state) => state.setUnreadTotal);
+  // Over the open cart the button only covers the checkout CTA. The cart
+  // drawer is state-lifted in App (its `isOpen` store slice is write-only),
+  // so it arrives as a prop.
 
   const hidden = HIDDEN_ON.some(
     (route) => pathname === route || pathname.startsWith(`${route}/`),
@@ -64,14 +68,21 @@ export default function GlobalMessengerButton() {
     }
   }, [setUnreadTotal]);
 
-  useBackgroundPolling(refreshUnread, UNREAD_POLL_MS, !hidden && isSessionChecked && isAuthenticated);
+  // The open drawer polls conversations itself; skip the duplicate badge poll.
+  useBackgroundPolling(
+    refreshUnread,
+    UNREAD_POLL_MS,
+    !hidden && !drawerOpen && !cartDrawerOpen && isSessionChecked && isAuthenticated,
+  );
 
   // The sheet is a chooser for the drawer; never leave both stacked open.
   useEffect(() => {
     if (drawerOpen) setOpen(false);
   }, [drawerOpen]);
 
-  if (hidden) return null;
+  // While the cart or messages drawer is open the page already offers that
+  // action; the floating button would just sit on top of the sheet.
+  if (hidden || drawerOpen || cartDrawerOpen) return null;
 
   function openInbox() {
     setOpen(false);

@@ -57,6 +57,7 @@ change, review the code and then run the full matrix in detail.
 | Suite | Command | Last verified |
 |---|---|---|
 | Backend unit + integration | `cd garinkood && source /tmp/env.sh && ../.venv/bin/python manage.py test` | **624 tests, OK** |
+| Backend, parallel | `... manage.py test --parallel 4` (needs `tblib`, now in requirements-dev) | **636 tests, OK in ~264s** |
 | Backend, tier module only | `... manage.py test shop.tests_price_tiers` | 41 tests, OK |
 | Frontend unit + integration | `cd frontend && CI=true npx vitest run` | **190 tests / 24 files** |
 | Type check | `cd frontend && npx tsc --noEmit` | clean |
@@ -244,10 +245,13 @@ per-row pattern cannot silently return.
 
 ### Open
 
-- [ ] Latency, remaining: 43 queries for a list is still high (33 of them touch
-      `shop_product`). Cache headers, gzip/brotli and connection pooling are
-      untouched and unmeasured. No production-scale measurement has been taken —
-      these are dev-SQLite numbers.
+- [ ] Latency, remaining: 25 queries for a list on the dev dataset (was 43,
+      then 70 before that; the second pass killed the per-(product, tag) COUNT
+      in `TagSerializer` via an annotated tag prefetch, and completed the image
+      `only()` columns so no rendered image re-fetched its row — probe scenario
+      24). Cache headers, gzip/brotli and connection pooling are untouched and
+      unmeasured. No production-scale measurement has been taken — these are
+      dev-SQLite numbers.
 - [x] **Cart row UI** — `CartTierStrip` in every `CartDrawer` row. States the
       next price, not a percentage; suppresses the nudge when the next rung
       exceeds available stock; sets an absolute quantity.
@@ -263,6 +267,24 @@ per-row pattern cannot silently return.
 - [ ] Remove `continue-on-error: true` from the Django workflow.
 - [ ] Retighten the axe contrast ceilings that were relaxed.
 - [ ] Visual/architecture review — **blocked on §7**; needs a browser.
+
+### Fixed in this pass — parallel-suite throttle bleed
+
+`manage.py test --parallel` used to fail 4 tests (in `tests_messaging` and
+`tests_inventory_race`) with 429s whose `retry_after` counted thousands of
+seconds; every one passed serially and in isolation. Root cause: Django's
+`ParallelTestSuite` runs subsuites with its own `RemoteTestRunner`, which never
+calls a custom runner's `setup_test_environment` — so the DummyCache override
+existed only in the parent. On fork platforms (Linux CI) workers inherited the
+parent's overridden module state and stayed correct by accident; on spawn
+platforms (Windows) each worker re-imported settings and got the real
+`LocMemCache`, where DRF counters accumulate under one shared client IP. Fixed
+in `shop/test_runner.py` (`GarinKoodParallelTestSuite.run_subsuite` wraps each
+subsuite in the shared `shop/test_environment.py` overrides) and pinned by the
+full-parallel run above. Two incidental defects fixed en route:
+`garinkood/test_api.py` was a module-level smoke script with committed
+credentials that test discovery imported (now `smoke_api.py`, credentials from
+env), and `tblib` was missing for parallel failure reporting.
 
 ### Blocked in this environment
 

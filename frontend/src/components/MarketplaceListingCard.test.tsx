@@ -33,6 +33,8 @@ function listing(overrides: Partial<MarketplaceListing> = {}): MarketplaceListin
     min_order_quantity: '2',
     minimum_order: 2,
     harvest_date: null,
+    production_date: null,
+    expiry_date: null,
     image: null,
     image_url: '/media/gojeh.jpg',
     status: 'published',

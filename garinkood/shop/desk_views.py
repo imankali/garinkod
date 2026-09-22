@@ -29,17 +29,100 @@ from . import desk
 from .schema import documented_api
 from .models import (
     ConversationRating, DeskAgent, DeskSettings, StorefrontConversation, StorefrontMessage,
+    FarmLand,
 )
 from .notifications import get_or_create_service_thread, post_system_message
 from .serializers import (
     ConversationRatingSerializer, StorefrontConversationSerializer, StorefrontMessageSerializer,
 )
+from .models.accounts import account_level, UserAccount
+from .levels import LEVEL_DESK_AGENT
 
 
 def _conversation_or_none(conversation_id: int):
     return StorefrontConversation.objects.select_related(
         'storefront', 'storefront__user', 'customer', 'agent',
     ).filter(pk=conversation_id).first()
+
+
+@documented_api
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def conversation_customer_card(request, conversation_id):
+    """The profile card of the customer behind one thread, for operators.
+
+    «زنیم روی پروفایلش تو چت و اطلاعات‌شو ببینیم» — an operator reading a
+    service thread taps the counterpart's name and gets the same facts the
+    farmer dossier shows: contact details, access level, the lands registered
+    in مزرعه من and the service requests filed so far. Only staff who can
+    already read the thread may call it; a customer asking for their own card
+    gets their own profile instead.
+    """
+    conversation = _conversation_or_none(conversation_id)
+    if conversation is None:
+        return Response({'error': 'گفتگو پیدا نشد.'}, status=status.HTTP_404_NOT_FOUND)
+    if not conversation.is_participant(request.user):
+        return Response({'error': 'شما عضو این گفتگو نیستید.'}, status=status.HTTP_403_FORBIDDEN)
+
+    customer = conversation.customer
+    if customer.id == request.user.id:
+        # The customer tapping their own name: their profile, nothing staff-only.
+        return Response({'customer': _customer_card_payload(customer), 'is_staff_view': False})
+    if account_level(request.user) < LEVEL_DESK_AGENT:
+        return Response(
+            {'error': 'دیدن پروفایل طرف مقابل نیازمند سطح کارشناس است.'},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    return Response({'customer': _customer_card_payload(customer), 'is_staff_view': True})
+
+
+def _customer_card_payload(customer):
+    """One compact dossier of a chat counterpart.
+
+    Deliberately narrow: identity and contact, the level label the account
+    ladder already publishes, their lands (the consultant's working set) and
+    the service requests they filed. No wallet, no orders — this card answers
+    «که هست و با چه زمینی کار می‌کند», not the whole account.
+    """
+    account = getattr(customer, 'account', None)
+    lands = FarmLand.objects.filter(owner=customer, is_active=True).order_by('-updated_at')
+    requests = customer.service_requests.all().order_by('-created_at')[:10]
+    return {
+        'id': customer.id,
+        'username': customer.username,
+        'full_name': customer.get_full_name() or customer.username,
+        'email': customer.email,
+        'phone': getattr(account, 'phone', '') or '',
+        'phone_verified': bool(getattr(account, 'phone_verified_at', None)),
+        'address': getattr(account, 'address', '') or '',
+        'avatar_url': getattr(account, 'avatar_url', '') if account is not None else '',
+        'level_label': getattr(getattr(customer, 'account', None), 'level_label', ''),
+        'created': getattr(account, 'created', None).isoformat() if getattr(account, 'created', None) else None,
+        'lands': [
+            {
+                'id': land.id,
+                'name': land.name,
+                'land_type_label': land.get_land_type_display(),
+                'area_label': land.area_label,
+                'crop_type': land.crop_type,
+                'province': land.province,
+                'city': land.city,
+            }
+            for land in lands
+        ],
+        'service_requests': [
+            {
+                'id': row.id,
+                'code': row.code,
+                'service_label': row.get_service_type_display(),
+                'status': row.status,
+                'status_label': row.get_status_display(),
+                'created_at': row.created_at.isoformat(),
+            }
+            for row in requests
+        ],
+    }
 
 
 @documented_api

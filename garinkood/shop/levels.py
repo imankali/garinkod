@@ -292,6 +292,16 @@ def may_contact_desk(user, channel: str, *, staff_of_desk: bool = False) -> tupl
                 'برای یک ایراد فنی «گزارش خطا» و برای باقی موارد «بازخورد پلتفرم» را استفاده کنید.'
             )
         return True, ''
+    if channel == StorefrontConversation.CHANNEL_PROCUREMENT:
+        # The procurement desk is the farmers' storefront to the buying team;
+        # staff file and follow their cases from the queue, not as customers.
+        from .desk import is_operator_for as _desk_op
+        if _desk_op(user, channel):
+            return False, (
+                'شما در میز خرید محصول هستید؛ درخواست‌ها را از همان صف پیگیری کنید، '
+                'نه به‌عنوان مشتری.'
+            )
+        return True, ''
     if is_operator_for_channel(user, channel):
         return False, (
             'شما خودتان در این میز حضور دارید؛ پیام شما به همکارانتان می‌رسد، نه به کشاورز دیگری. '

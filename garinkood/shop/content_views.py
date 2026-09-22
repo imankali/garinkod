@@ -15,7 +15,7 @@ from rest_framework.decorators import action, api_view, permission_classes, thro
 from rest_framework.response import Response
 
 from .models import (
-    BrandPartner, MarketplaceListing, Product, Service, SiteArticle, SiteContact,
+    BrandPartner, HeroSlide, MarketplaceListing, Product, Service, SiteArticle, SiteContact,
     SitePage, Storefront, TeamMember, NewsletterSubscriber, Order,
 )
 from . import legal
@@ -27,6 +27,32 @@ from .serializers import (
     SitePageSerializer, TeamMemberSerializer,
 )
 from .throttling import FeedbackRateThrottle, SearchRateThrottle
+
+
+class HeroSlideViewSet(viewsets.ViewSet):
+    """Active home-page hero slides, in display order — read-only, public."""
+
+    permission_classes = [permissions.AllowAny]
+    # The home page is the hottest page on the site; standard user throttling
+    # fits a small uncached read.
+    throttle_classes = [SearchRateThrottle]
+
+    def list(self, request):
+        slides = HeroSlide.objects.filter(is_active=True).exclude(title='').order_by('order', 'id')
+        payload = [
+            {
+                'id': slide.id,
+                'kicker': slide.kicker,
+                'title': slide.title,
+                'body': slide.body,
+                'cta_label': slide.cta_label,
+                'cta_url': slide.cta_url,
+                'background_url': slide.background_url,
+                'gradient': slide.gradient,
+            }
+            for slide in slides
+        ]
+        return Response(payload)
 
 
 class SiteArticleViewSet(viewsets.ReadOnlyModelViewSet):

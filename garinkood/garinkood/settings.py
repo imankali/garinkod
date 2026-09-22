@@ -22,7 +22,7 @@ ALLOWED_HOSTS = config(
 # Arena's development preview uses a generated subdomain. It is accepted only
 # in DEBUG mode; production hosts remain explicitly allowlisted above.
 if DEBUG:
-    ALLOWED_HOSTS = [*ALLOWED_HOSTS, ".e2b.app"]
+    ALLOWED_HOSTS = [*ALLOWED_HOSTS, ".e2b.app","*"]
 
 INSTALLED_APPS = [
     # django-prometheus must precede Django's apps to instrument ORM/cache use.

@@ -193,6 +193,22 @@ export interface ArticleListParams {
 
 type Writable<T> = Partial<T>;
 
+export interface HeroSlideWork {
+  id: number;
+  kicker: string;
+  title: string;
+  body: string;
+  cta_label: string;
+  cta_url: string;
+  background_image: string | null;
+  background_url: string;
+  gradient: string;
+  order: number;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export const contentStudioApi = {
   options: () => apiClient.get<StudioOptions>('/management/content/options/'),
 
@@ -248,5 +264,15 @@ export const contentStudioApi = {
     update: (slug: string, data: { name?: string; slug?: string }) =>
       apiClient.patch<TaxonomyTag>(`/management/content/tags/${slug}/`, data),
     remove: (slug: string) => apiClient.delete(`/management/content/tags/${slug}/`),
+  },
+
+  /** Home-page hero slider rows — CRUD with photo upload (multipart). */
+  heroSlides: {
+    list: () => apiClient.get<HeroSlideWork[]>('/management/content/hero-slides/'),
+    create: (data: FormData) =>
+      apiClient.post<HeroSlideWork>('/management/content/hero-slides/', data),
+    update: (id: number, data: FormData) =>
+      apiClient.patch<HeroSlideWork>(`/management/content/hero-slides/${id}/`, data),
+    remove: (id: number) => apiClient.delete(`/management/content/hero-slides/${id}/`),
   },
 };

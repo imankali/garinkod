@@ -177,6 +177,15 @@ class StorefrontDirectoryViewSet(viewsets.ReadOnlyModelViewSet):
         if not is_owner:
             stories = stories.filter(status='published')
         stories = stories.order_by('created_at')
+        if request.user.is_authenticated:
+            # The header's story ring greys out when everything is watched, so
+            # the per-story seen flag must ride along with the profile payload
+            # rather than costing the client one request per story.
+            stories = stories.annotate(
+                seen_by_me=Exists(
+                    StorefrontStoryView.objects.filter(post=OuterRef('pk'), user=request.user)
+                ),
+            )
         highlights = StorefrontHighlight.objects.filter(
             storefront=storefront
         ).prefetch_related(Prefetch('items', queryset=StorefrontHighlightItem.objects.select_related('post')))
@@ -198,10 +207,12 @@ class StorefrontDirectoryViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=True, methods=['get'], url_path='search-content')
     def search_content(self, request, slug=None):
-        """Search inside one storefront's published posts and live stories.
+        """Search inside one storefront's ads, posts and live stories.
 
-        Buyers search the page (e.g. «اصلاح درخت») and find the matching
-        post/story article or video regardless of how old it is.
+        Buyers search the page (e.g. «اصلاح درخت») and find the matching ad,
+        post or story regardless of how old it is. Listings search their
+        title, crop and description; posts search their caption and the title
+        of the listing they were attached to.
         """
         storefront = get_object_or_404(Storefront, slug=slug, is_active=True)
         query = request.query_params.get('q', '').strip()
@@ -213,15 +224,24 @@ class StorefrontDirectoryViewSet(viewsets.ReadOnlyModelViewSet):
             storefront=storefront, status='published', post_type='story',
             expires_at__gt=timezone.now(),
         )
+        listings = MarketplaceListing.objects.filter(
+            storefront=storefront, status='published'
+        )
         if query:
             posts = posts.filter(Q(caption__icontains=query) | Q(listing__title__icontains=query))
             stories = stories.filter(Q(caption__icontains=query))
+            listings = listings.filter(
+                Q(title__icontains=query)
+                | Q(crop_name__icontains=query)
+                | Q(description__icontains=query)
+            )
 
         context = {'request': request}
         return Response({
             'query': query,
             'posts': StorefrontPostSerializer(posts.order_by('-created_at')[:24], many=True, context=context).data,
             'stories': StorefrontPostSerializer(stories.order_by('created_at')[:24], many=True, context=context).data,
+            'listings': MarketplaceListingSerializer(listings.order_by('-created_at')[:24], many=True, context=context).data,
         })
 
     @action(
@@ -603,6 +623,7 @@ def service_conversation(request, channel):
         StorefrontConversation.CHANNEL_SUPPORT,
         StorefrontConversation.CHANNEL_CONSULTING,
         StorefrontConversation.CHANNEL_COMMENT,
+        StorefrontConversation.CHANNEL_PROCUREMENT,
     }
     if channel not in allowed:
         return Response({'error': 'کانال پیام نامعتبر است.'}, status=status.HTTP_400_BAD_REQUEST)

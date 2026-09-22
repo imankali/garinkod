@@ -35,12 +35,18 @@ from .persian import datetime_label
 CHANNEL_LABELS = {
     StorefrontConversation.CHANNEL_CONSULTING: 'مشاوره کشاورزی',
     StorefrontConversation.CHANNEL_SUPPORT: 'پشتیبانی',
+    StorefrontConversation.CHANNEL_PROCUREMENT: 'خرید محصولات کشاورزان',
 }
 
 # The desk channel a thread belongs to, for the two queues operators work.
 DESK_CHANNELS = {
     StorefrontConversation.CHANNEL_CONSULTING: DeskAgent.ROLE_CONSULTING,
     StorefrontConversation.CHANNEL_SUPPORT: DeskAgent.ROLE_SUPPORT,
+    # The procurement desk shares the support roster: the buyer-facing team
+    # works the queue with the same presence/assignment machinery, while the
+    # *channel* — and therefore the customer's thread and its badge — stays
+    # separate so «خرید محصول» never mixes into consulting small talk.
+    StorefrontConversation.CHANNEL_PROCUREMENT: DeskAgent.ROLE_SUPPORT,
 }
 
 
@@ -188,6 +194,7 @@ def desk_state(channel: str, *, user=None) -> dict:
 OPERATOR_PERMISSIONS = {
     StorefrontConversation.CHANNEL_SUPPORT: 'shop.view_platformfeedback',
     StorefrontConversation.CHANNEL_CONSULTING: 'shop.view_farmconsultationrequest',
+    StorefrontConversation.CHANNEL_PROCUREMENT: 'shop.view_procurementrequest',
 }
 
 

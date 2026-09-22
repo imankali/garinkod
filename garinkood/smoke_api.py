@@ -1,8 +1,20 @@
+"""Manual API smoke script — run directly:
+
+    python smoke_api.py    (dev server on 127.0.0.1:8000)
+    SMOKE_USERNAME=... SMOKE_PASSWORD=... python smoke_api.py
+
+Not part of `manage.py test` (name doesn't match the test_*.py discovery
+pattern) and credentials come from the environment, not the repo.
+"""
+
+import os
+
 import requests
-import json
 
 BASE_URL = "http://127.0.0.1:8000/api"
 
+USERNAME = os.environ.get("SMOKE_USERNAME", "")
+PASSWORD = os.environ.get("SMOKE_PASSWORD", "")
 print("=" * 50)
 print("🧪 تست API احراز هویت")
 print("=" * 50)
@@ -11,8 +23,7 @@ print("=" * 50)
 print("\n🔐 تست Login...")
 try:
     response = requests.post(
-        f"{BASE_URL}/auth/login/",
-        json={"username": "iman", "password": "Iman1383"},
+        f"{BASE_URL}/auth/login/",            json={"username": USERNAME, "password": PASSWORD},
         headers={"Content-Type": "application/json"}
     )
     print(f"Status Code: {response.status_code}")

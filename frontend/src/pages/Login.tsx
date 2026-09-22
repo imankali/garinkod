@@ -99,6 +99,13 @@ export default function Login() {
     if (method === 'otp') setIsRegister(false);
   }
 
+  /** Jump straight from the quick (OTP) form to the full username+password form. */
+  function goToClassicRegister() {
+    setAuthMethod('password');
+    setIsRegister(true);
+    setOtpError('');
+  }
+
   function handlePasswordChange(event: React.ChangeEvent<HTMLInputElement>) {
     const { name, value } = event.target;
     const cleanValue = name === 'username' ? toEnglishDigits(value).trim() : value;
@@ -356,6 +363,21 @@ export default function Login() {
                 {/* Entering a phone number creates the account as often as it
                     signs someone in, so the rules are shown right here. */}
                 <LegalDisclosure />
+
+                {/* Classic registration sits directly under the quick one: both
+                    paths stay on the same screen, no tab-hunting required. */}
+                <div className="flex items-center gap-3" role="separator" aria-label="یا روش دیگر">
+                  <span className="h-px flex-1 bg-slate-200 dark:bg-emerald-800" />
+                  <span className="text-xs font-bold text-slate-400 dark:text-emerald-400">یا</span>
+                  <span className="h-px flex-1 bg-slate-200 dark:bg-emerald-800" />
+                </div>
+                <button
+                  type="button"
+                  onClick={goToClassicRegister}
+                  className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border-2 border-emerald-600 bg-white px-4 py-3 text-sm font-extrabold text-emerald-700 transition hover:bg-emerald-50 dark:bg-transparent dark:text-lime-300 dark:hover:bg-emerald-950"
+                >
+                  <UserPlus size={18} /> ثبت‌نام کلاسیک (نام کاربری و رمز عبور)
+                </button>
               </form>
             )
           ) : (
@@ -453,6 +475,18 @@ className={`${AUTH_INPUT_CLASS} ps-10`}
                   className="inline-flex min-h-11 items-center px-1 font-bold text-emerald-700 dark:text-lime-300"
                 >
                   {isRegister ? 'ورود' : 'ثبت‌نام کلاسیک'}
+                </button>
+              </div>
+
+              {/* The way back: quick phone-only registration from the classic form. */}
+              <div className="text-center text-sm text-slate-500 dark:text-emerald-300">
+                فقط با شماره موبایل؟{' '}
+                <button
+                  type="button"
+                  onClick={() => selectMethod('otp')}
+                  className="inline-flex min-h-11 items-center px-1 font-bold text-emerald-700 dark:text-lime-300"
+                >
+                  ثبت‌نام سریع
                 </button>
               </div>
             </form>

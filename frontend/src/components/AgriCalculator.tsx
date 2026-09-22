@@ -253,7 +253,10 @@ export default function AgriCalculator({ onAddToCart }: AgriCalculatorProps) {
                       <Leaf size={14} className="shrink-0 text-emerald-500" />
                     )}
                     <span className="flex-1 min-w-0 truncate text-slate-700 dark:text-emerald-50">{item.name}</span>
-                    <span className="shrink-0 text-fluid-2xs text-slate-400">{item.active_ingredient}</span>
+                    {/* Long latin chemical names must ellipsize, not stretch the row
+                        past the card edge (shrink-0 alone let «Thiophanate-methyl
+                        70% WP» push the list wider than the screen). */}
+                    <span className="min-w-0 max-w-[45%] shrink-0 truncate text-fluid-2xs text-slate-400">{item.active_ingredient}</span>
                   </button>
                 </li>
               ))}

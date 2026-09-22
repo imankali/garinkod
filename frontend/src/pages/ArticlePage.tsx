@@ -293,7 +293,7 @@ export default function ArticlePage() {
                             {product.title}
                           </span>
                           <span className="block text-fluid-2xs text-emerald-700 dark:text-lime-300">
-                            {product.price_on_request ? 'قیمت با تماس' : `${formatPrice(product.discounted_price ?? product.price)} تومان`}
+                            {product.price_on_request ? 'قیمت با تماس' : formatPrice(product.discounted_price ?? product.price)}
                           </span>
                         </span>
                       </Link>
@@ -342,7 +342,7 @@ export default function ArticlePage() {
                             {listing.title}
                           </span>
                           <span className="block text-fluid-2xs text-slate-500 dark:text-emerald-300">
-                            {listing.storefront_name} · {formatPrice(listing.price)} تومان / {listing.unit}
+                            {listing.storefront_name} · {formatPrice(listing.price)} / {listing.unit}
                           </span>
                         </span>
                       </Link>

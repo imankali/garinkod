@@ -31,6 +31,7 @@ export const CHANNEL_TONE: Record<MessageChannel, string> = {
   support: 'bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-200',
   consulting: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200',
   comment: 'bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-200',
+  procurement: 'bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-200',
 };
 
 export function conversationIdentity(

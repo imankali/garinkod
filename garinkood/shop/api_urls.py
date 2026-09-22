@@ -21,6 +21,7 @@ router.register(r'marketplace/highlights', marketplace_views.StorefrontHighlight
 # Services live under ``services/catalog`` so the existing POST
 # ``services/requests`` route keeps resolving to the request form.
 router.register(r'articles', content_views.SiteArticleViewSet, basename='article')
+router.register(r'hero-slides', content_views.HeroSlideViewSet, basename='hero-slide')
 router.register(r'pages', content_views.SitePageViewSet, basename='site-page')
 router.register(r'services/catalog', content_views.ServiceViewSet, basename='service')
 
@@ -33,6 +34,7 @@ router.register(r'management/content/articles', studio_content_views.ArticleWork
 router.register(r'management/content/categories', studio_content_views.CategoryWorkViewSet, basename='content-category')
 router.register(r'management/content/subcategories', studio_content_views.SubCategoryWorkViewSet, basename='content-subcategory')
 router.register(r'management/content/tags', studio_content_views.TagWorkViewSet, basename='content-tag')
+router.register(r'management/content/hero-slides', studio_content_views.HeroSlideWorkViewSet, basename='content-hero-slide')
 
 urlpatterns = [
     # API Routes (از Router)
@@ -119,6 +121,11 @@ urlpatterns = [
     # «کی آنلاین است / ساعت کاری» sentence can never disagree between them.
     path('desk/state/', desk_views.desk_state, name='api_desk_state'),
     path('desk/queue/', desk_views.desk_queue, name='api_desk_queue'),
+    path(
+        'desk/conversations/<int:conversation_id>/customer-card/',
+        desk_views.conversation_customer_card,
+        name='api_desk_customer_card',
+    ),
     path('desk/ratings/', desk_views.desk_ratings, name='api_desk_ratings'),
     path(
         'desk/conversations/<int:conversation_id>/close/',

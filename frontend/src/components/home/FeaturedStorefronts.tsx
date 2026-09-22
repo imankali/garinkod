@@ -71,11 +71,15 @@ export default function FeaturedStorefronts() {
         </Link>
       </div>
 
-      {/* Four cards on a desktop row, two on a tablet, one on a phone: the same
-          rhythm as the directory, so the section is recognisably the same thing. */}
-      <ul className="mt-5 grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Horizontal rail, same pattern as the storefronts directory: one row,
+          swipeable, with the themed scrollbar. Cards start from the right (RTL). */}
+      <ul
+        className="rail-scroll mt-5 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-3 touch-pan-x"
+        role="region"
+        aria-label="غرفه‌های پیشنهادی، قابل پیمایش افقی"
+      >
         {storefronts.map((storefront) => (
-          <li key={storefront.id}>
+          <li key={storefront.id} className="w-64 shrink-0 snap-start sm:w-72">
             <StorefrontCard storefront={storefront} />
           </li>
         ))}

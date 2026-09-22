@@ -369,7 +369,7 @@ export default function Checkout() {
                     >
                       <span className="block text-sm font-extrabold text-slate-800 dark:text-white">{quote.label}</span>
                       <span className="mt-1 block text-fluid-2xs text-slate-500 dark:text-emerald-200">
-                        {quote.amount === 0 ? 'رایگان' : `${formatPrice(quote.amount)} تومان`}
+                        {quote.amount === 0 ? 'رایگان' : formatPrice(quote.amount)}
                         {quote.estimated_days_min && quote.estimated_days_max
                           ? ` · تحویل ${quote.estimated_days_min.toLocaleString('fa-IR')}${quote.estimated_days_max > quote.estimated_days_min ? ` تا ${quote.estimated_days_max.toLocaleString('fa-IR')}` : ''} روز کاری`
                           : ''}
@@ -454,7 +454,7 @@ export default function Checkout() {
                 </span>
               </div>
               <p className="mt-1.5 text-fluid-2xs leading-5 text-slate-500 dark:text-emerald-200">
-                هر {LOYALTY_POINTS_UNIT.toLocaleString("fa-IR")} امتیاز، {formatPrice(LOYALTY_UNIT_VALUE)} تومان از مبلغ قابل پرداخت کم می‌کند
+                هر {LOYALTY_POINTS_UNIT.toLocaleString("fa-IR")} امتیاز، {formatPrice(LOYALTY_UNIT_VALUE)} از مبلغ قابل پرداخت کم می‌کند
                 {loyaltyPoints < LOYALTY_POINTS_UNIT && " — برای استفاده، حداقل یک واحد کامل لازم است."}
               </p>
               <div className="mt-2.5 flex items-center justify-between gap-3">

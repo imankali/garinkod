@@ -173,9 +173,12 @@ export default defineConfig({
     // ✅ همه درخواست‌های /api و /media را به Django می‌فرستد
     // ========================================
     proxy: {
+      // changeOrigin stays false: the phone/host must reach Django with its
+      // real Host header so pagination links, CSRF and absolute URLs in the
+      // API envelope keep pointing at the address the browser actually uses.
       '/api': {
         target: 'http://127.0.0.1:8000',
-        changeOrigin: true,
+        changeOrigin: false,
         secure: false,
 
         // ✅ لاگ کردن درخواست‌ها در console (برای debug)
@@ -191,13 +194,13 @@ export default defineConfig({
 
       '/media': {
         target: 'http://127.0.0.1:8000',
-        changeOrigin: true,
+        changeOrigin: false,
         secure: false,
       },
 
       '/static': {
         target: 'http://127.0.0.1:8000',
-        changeOrigin: true,
+        changeOrigin: false,
         secure: false,
       },
     },

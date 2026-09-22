@@ -3,27 +3,27 @@
 import {useCallback, useEffect, useState} from 'react';
 import {Link, useParams, useSearchParams} from 'react-router';
 import {AnimatePresence, motion, useReducedMotion} from 'framer-motion';
-import {BadgeCheck, Grid3x3, Heart, ImageIcon, MapPin, MessageCircle, Pencil, Plus, Search, Send, ShoppingBasket, Star, Trash2, UserPlus, X} from 'lucide-react';
+import {BadgeCheck, Grid3x3, Heart, MapPin, MessageCircle, Plus, Search, ShoppingBasket, Star, UserPlus, X} from 'lucide-react';
 import toast from 'react-hot-toast';
 import {Helmet} from 'react-helmet-async';
 import {agricultureApi, messagesApi, storefrontPostsApi, storefrontsApi} from '../api/services';
 import {parseApiError} from '../api/errors';
 import {useAuthStore} from '../store/authStore';
-import {useCartStore} from '../store/cartStore';
 import {useDirectStore} from '../store/directStore';
 import {useDebouncedValue} from '../hooks/useDebouncedValue';
 import {useTranslation} from '../i18n';
 import {formatPrice} from '../utils/formatPrice';
-import {cn} from '../utils/cn';
 import ListingComposer from '../components/storefront/ListingComposer';
 import ListingDetailModal from '../components/storefront/ListingDetailModal';
+import ListingRail from '../components/storefront/ListingRail';
 import PostCard from '../components/social/PostCard';
 import type { MarketplaceListing, StorefrontPost, StorefrontProfile } from '@/types/storefront';
 
 import { EmptyState, StoryViewer } from './storefront/Overlays';
+import HighlightManager from './storefront/HighlightManager';
 import { OwnerEditor } from './storefront/OwnerEditor';
 import { OwnerComposer } from './storefront/OwnerComposer';
-import { OwnerContentActions, PostEditor } from './storefront/OwnerActions';
+import { PostEditor } from './storefront/OwnerActions';
 
 /**
  * The viewer only ever renders an image and a caption, so it takes this
@@ -36,20 +36,19 @@ interface ViewableStory {
   caption: string;
 }
 
-type TabKey = 'listings' | 'posts' | 'stories' | 'messages';
+type TabKey = 'listings' | 'posts' | 'messages';
 
 const TABS: { key: TabKey; labelKey: string; icon: typeof Grid3x3 }[] = [
   { key: 'listings', labelKey: 'storefront.tab.listings', icon: ShoppingBasket },
   { key: 'posts', labelKey: 'storefront.tab.posts', icon: Grid3x3 },
-  { key: 'stories', labelKey: 'storefront.tab.stories', icon: ImageIcon },
 ];
 
 /**
- * The public page for one storefront: avatar, name, follow button, highlights
- * and tabbed listings/posts/stories, plus an Instagram-style story viewer.
+ * The public page for one storefront: avatar, name, follow button and tabbed
+ * listings/posts, plus content search and a story viewer for image posts.
  *
  * For the owner the same page doubles as the management surface: name, bio,
- * avatar and cover are editable inline, posts/stories can be published from a
+ * avatar and cover are editable inline, posts can be published from a
  * composer, and the direct-message inbox lives on the same page. Buyers get a
  * "گفتگو با غرفه‌دار" button and can send any listing straight to the direct
  * messages to ask for advice.
@@ -105,12 +104,11 @@ export default function StorefrontPage() {
   // جستجو داخل محتوای غرفه (پست‌ها و استوری‌ها)
   const [contentQuery, setContentQuery] = useState('');
   const debouncedContentQuery = useDebouncedValue(contentQuery, 350);
-  const [contentResults, setContentResults] = useState<StorefrontPost[] | null>(null);
+  const [contentResults, setContentResults] = useState<{ posts: StorefrontPost[]; listings: MarketplaceListing[] } | null>(null);
   const [contentBusy, setContentBusy] = useState(false);
   const [contentError, setContentError] = useState('');
 
   const { isAuthenticated } = useAuthStore();
-  const addListingToCart = useCartStore((state) => state.addListingToCart);
   const openDirect = useDirectStore((state) => state.openDirect);
 
   const load = useCallback(async () => {
@@ -153,7 +151,7 @@ export default function StorefrontPage() {
     setContentBusy(true); setContentError('');
     try {
       const response = await storefrontsApi.searchContent(slug, query);
-      setContentResults([...response.data.posts, ...response.data.stories]);
+      setContentResults({ posts: response.data.posts, listings: response.data.listings ?? [] });
     } catch (error) {
       setContentError(parseApiError(error).message);
     } finally { setContentBusy(false); }
@@ -278,6 +276,20 @@ export default function StorefrontPage() {
 
   const { storefront, listings, posts, stories, highlights, counts } = profile;
 
+  // آگهی‌های غرفه بر اساس دسته‌بندی گروه می‌شوند تا غرفه‌ای که هم سم می‌فروشد و
+  // هم ابزار، هر کدام را زیر برچسب خودش نشان دهد؛ غرفه تک‌دسته‌ای هم هدر دسته
+  // و شمارنده را می‌بیند تا زبان صفحه یکسان بماند. ترتیب دسته‌ها: پرمایه‌ترین اول.
+  const listingGroups: Array<[string, typeof listings]> = (() => {
+    const groups = new Map<string, typeof listings>();
+    listings.forEach((listing) => {
+      const key = listing.category_name?.trim() || 'سایر کالاها';
+      const bucket = groups.get(key);
+      if (bucket) bucket.push(listing);
+      else groups.set(key, [listing]);
+    });
+    return [...groups.entries()].sort((a, b) => b[1].length - a[1].length);
+  })();
+
   const isOwner = storefront.is_owner;
   const siteUrl = (import.meta.env.VITE_SITE_URL || window.location.origin).replace(/\/$/, '');
   const storefrontUrl = `${siteUrl}/storefronts/${encodeURIComponent(storefront.slug)}`;
@@ -334,19 +346,62 @@ export default function StorefrontPage() {
         on top of the avatar and clipped it.
       */}
       <header className="relative z-10 -mt-12 flex flex-col items-center gap-3 px-4 sm:-mt-14 sm:flex-row sm:items-end sm:gap-5">
-        <div className="h-24 w-24 shrink-0 overflow-hidden rounded-full border-4 border-white bg-emerald-100 shadow-lg dark:border-emerald-950 sm:h-28 sm:w-28">
-          {storefront.avatar_url ? (
-            <img
-              src={storefront.avatar_url}
-              alt={`تصویر غرفه ${storefront.name}`}
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center text-2xl font-extrabold text-emerald-700">
-              {storefront.name.slice(0, 2)}
-            </div>
-          )}
-        </div>
+        {/* Instagram story-ring: استوری فقط اینجا — حلقه‌ی دور آواتار هدر،
+            قرمز تا وقتی دیده نشده و خاکستری بعد از دیدن همه استوری‌ها.
+            کل حلقه دکمه است و استوری اول را باز می‌کند. */}
+        {stories.length > 0 ? (() => {
+          const allSeen = stories.every((story) => story.is_seen);
+          const ringClass = allSeen
+            ? 'bg-slate-300 dark:bg-emerald-800'
+            : 'bg-gradient-to-tr from-amber-400 via-rose-500 to-rose-600';
+          return (
+            <button
+              type="button"
+              onClick={() => setViewer({ posts: stories, index: 0 })}
+              className="group relative h-[104px] w-[104px] shrink-0 rounded-full p-[4px] transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-300 sm:h-[120px] sm:w-[120px]"
+              aria-label={
+                allSeen
+                  ? `استوری‌های ${storefront.name} (دیده‌شده)`
+                  : `استوری جدید از ${storefront.name}`
+              }
+            >
+              <span className={`absolute inset-0 rounded-full ${ringClass}`} aria-hidden="true" />
+              <span className="absolute inset-[4px] overflow-hidden rounded-full border-4 border-white bg-emerald-100 dark:border-emerald-950">
+                {storefront.avatar_url ? (
+                  <img
+                    src={storefront.avatar_url}
+                    alt={`تصویر غرفه ${storefront.name}`}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <span className="flex h-full w-full items-center justify-center text-2xl font-extrabold text-emerald-700">
+                    {storefront.name.slice(0, 2)}
+                  </span>
+                )}
+              </span>
+              {!allSeen && (
+                <span
+                  className="absolute end-0 top-0 h-4 w-4 rounded-full border-2 border-white bg-rose-500 dark:border-emerald-950"
+                  aria-hidden="true"
+                />
+              )}
+            </button>
+          );
+        })() : (
+          <div className="h-24 w-24 shrink-0 overflow-hidden rounded-full border-4 border-white bg-emerald-100 shadow-lg dark:border-emerald-950 sm:h-28 sm:w-28">
+            {storefront.avatar_url ? (
+              <img
+                src={storefront.avatar_url}
+                alt={`تصویر غرفه ${storefront.name}`}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-2xl font-extrabold text-emerald-700">
+                {storefront.name.slice(0, 2)}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="flex-1 text-center sm:pb-2 sm:text-start">
           <h1 className="flex items-center justify-center gap-1.5 text-xl font-extrabold text-slate-800 dark:text-white sm:justify-start">
@@ -445,59 +500,26 @@ export default function StorefrontPage() {
         </p>
       )}
 
-      {/* Live stories + highlights */}
-      {(stories.length > 0 || highlights.length > 0) && (
-        <section className="mt-5" aria-label="استوری‌ها و هایلایت‌ها">
-          <ul className="flex gap-4 overflow-x-auto pb-2">
-            {stories.length > 0 && (
-              <li>
-                <button
-                  type="button"
-                  onClick={() => setViewer({ posts: stories, index: 0 })}
-                  className="flex w-16 flex-col items-center gap-1"
-                >
-                  <span className="rounded-full bg-gradient-to-tr from-amber-400 to-rose-500 p-[3px]">
-                    <span className="block h-14 w-14 overflow-hidden rounded-full border-2 border-white dark:border-emerald-950">
-                      <img src={stories[0]?.image_url} alt="" className="h-full w-full object-cover" />
-                    </span>
-                  </span>
-                  <span className="w-full min-w-0 truncate text-center text-fluid-2xs text-slate-600 dark:text-emerald-100">
-                    {t('storefront.tab.stories')}
-                  </span>
-                </button>
-              </li>
-            )}
-            {highlights.map((highlight) => (
-              <li key={highlight.id}>
-                <button
-                  type="button"
-                  disabled={highlight.items.length === 0}
-                  onClick={() =>
-                    setViewer({
-                      posts: highlight.items.map((item) => ({
-                        id: item.post,
-                        image_url: item.image_url,
-                        caption: item.caption,
-                      })),
-                      index: 0,
-                    })
-                  }
-                  className="flex w-16 flex-col items-center gap-1 disabled:opacity-50"
-                >
-                  <span className="block h-14 w-14 overflow-hidden rounded-full border-2 border-slate-200 dark:border-emerald-800">
-                    <img src={highlight.cover_url} alt="" className="h-full w-full object-cover" />
-                  </span>
-                  <span className="w-full min-w-0 truncate text-center text-fluid-2xs text-slate-600 dark:text-emerald-100">
-                    {highlight.title}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      {/* هایلایت‌ها: همه می‌بینند؛ صاحب غرفه ابزار ساخت/ویرایش و آرشیو دارد */}
+      <HighlightManager
+        storefrontSlug={storefront.slug}
+        highlights={highlights}
+        liveStories={stories}
+        isOwner={isOwner}
+        onChanged={load}
+        onOpenHighlight={(highlight) =>
+          setViewer({
+            posts: highlight.items.map((item) => ({
+              id: item.post,
+              image_url: item.image_url,
+              caption: item.caption,
+            })),
+            index: 0,
+          })
+        }
+      />
 
-      {/* جستجو داخل محتوای غرفه: پست، استوری، فیلم و مقاله */}
+      {/* جستجو داخل محتوای غرفه: پست، فیلم و مقاله */}
       <section className="mt-5" aria-label="جستجو در محتوای غرفه">
         <div className="relative">
           <Search
@@ -508,7 +530,7 @@ export default function StorefrontPage() {
             type="search"
             value={contentQuery}
             onChange={(event) => setContentQuery(event.target.value)}
-            placeholder="جستجو در پست‌ها و استوری‌های این غرفه… (مثلاً اصلاح درخت)"
+            placeholder="جستجو در پست‌های این غرفه… (مثلاً اصلاح درخت)"
             className="w-full rounded-2xl border border-emerald-100 bg-white py-3 ps-10 pe-4 text-sm text-slate-700 shadow-sm outline-none transition focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-emerald-800 dark:bg-emerald-950 dark:text-white"
             aria-label="جستجو در محتوای غرفه"
           />
@@ -536,17 +558,49 @@ export default function StorefrontPage() {
             <p className="mb-2 text-fluid-xs font-bold text-slate-500 dark:text-emerald-200">
               {contentBusy
                 ? t('common.loading')
-                : contentResults.length > 0
-                  ? `${contentResults.length} نتیجه برای «${debouncedContentQuery.trim()}»`
+                : contentResults.listings.length + contentResults.posts.length > 0
+                  ? `${(contentResults.listings.length + contentResults.posts.length).toLocaleString('fa-IR')} نتیجه برای «${debouncedContentQuery.trim()}»`
                   : 'نتیجه‌ای پیدا نشد؛ عبارت دیگری را امتحان کنید.'}
             </p>
-            {!contentBusy && contentResults.length > 0 && (
+            {contentResults.listings.length > 0 && (
+              <>
+                <h3 className="mb-2 mt-4 text-fluid-xs font-extrabold text-emerald-700 dark:text-lime-300">
+                  آگهی‌ها
+                </h3>
+                <ul className="grid gap-2 sm:grid-cols-2">
+                  {contentResults.listings.map((listing) => (
+                    <li key={`listing-${listing.id}`}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setContentQuery('');
+                          openListing(listing.slug);
+                        }}
+                        className="flex w-full items-center gap-3 rounded-xl border border-slate-100 bg-white p-2 text-start shadow-sm transition hover:border-emerald-200 hover:shadow dark:border-emerald-900 dark:bg-emerald-950/40 dark:hover:border-emerald-700"
+                      >
+                        <img src={listing.image_url} alt="" className="h-14 w-14 shrink-0 rounded-lg object-cover" />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-xs font-bold text-slate-800 dark:text-white">{listing.title}</span>
+                          <span className="mt-0.5 block text-fluid-2xs text-emerald-700 dark:text-lime-300">
+                            {formatPrice(listing.discounted_price)} / {listing.unit}
+                          </span>
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+            {/* A search result ends the search view: picking a post jumps to
+                the full feed with it deep-linked, exactly like the listings
+                result above jumps to the ad's detail. */}
+            {!contentBusy && contentResults.posts.length > 0 && (
               <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-                {contentResults.map((post, index) => (
+                {contentResults.posts.map((post, index) => (
                   <li key={post.id}>
                     <button
                       type="button"
-                      onClick={() => setViewer({ posts: contentResults, index })}
+                      onClick={() => setViewer({ posts: contentResults.posts, index })}
                       className="group relative block aspect-[4/3] w-full overflow-hidden rounded-xl"
                     >
                       <img
@@ -640,120 +694,111 @@ export default function StorefrontPage() {
           {listings.length === 0 ? (
             <EmptyState text={isOwner ? 'هنوز آگهی‌ای ثبت نکرده‌اید؛ اولین آگهی را از دکمه بالا اضافه کنید.' : 'این غرفه هنوز آگهی منتشرشده‌ای ندارد.'} />
           ) : (
-            <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {listings.map((listing) => (
-                <li
-                  key={listing.id}
-                  className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm dark:border-emerald-900 dark:bg-emerald-950/40"
-                >
-                  <button
-                    type="button"
-                    onClick={() => openListing(listing.slug)}
-                    className="relative block w-full text-start"
-                    aria-label={`مشاهده جزئیات ${listing.title}`}
-                  >
-                    <img src={listing.image_url} alt="" className="h-32 w-full object-cover" />
-                    {listing.discount_percent > 0 && (
-                      <span className="absolute start-2 top-2 rounded-full bg-brand-orange px-2 py-0.5 text-fluid-2xs font-bold text-white">
-                        {listing.discount_percent.toLocaleString('fa-IR')}{t('shop.discount')}
-                      </span>
-                    )}
-                    {/* Only the owner sees moderation state; buyers only ever
-                        get published آگهی‌ها from the API. */}
-                    {isOwner && listing.status !== 'published' && (
-                      <span
-                        className={cn(
-                          'absolute end-2 top-2 rounded-full px-2 py-0.5 text-fluid-2xs font-bold',
-                          listing.status === 'rejected'
-                            ? 'bg-rose-600 text-white'
-                            : 'bg-amber-500 text-white',
-                        )}
-                      >
-                        {listing.status_label}
-                      </span>
-                    )}
-                  </button>
-                  <div className="p-3">
-                    <h3 className="min-w-0 truncate text-sm font-bold text-slate-800 dark:text-white">
-                      <button
-                        type="button"
-                        onClick={() => openListing(listing.slug)}
-                        className="max-w-full min-w-0 truncate text-start hover:text-emerald-700 hover:underline dark:hover:text-lime-300"
-                      >
-                        {listing.title}
-                      </button>
-                    </h3>
-                    <p className="mt-1 flex items-baseline gap-1.5 text-xs text-slate-500 dark:text-emerald-200">
-                      <strong className="text-emerald-700 dark:text-lime-300">
-                        {formatPrice(listing.discounted_price)}
-                      </strong>
-                      {listing.discount_percent > 0 && (
-                        <del className="text-fluid-2xs text-slate-400">{formatPrice(listing.price)}</del>
-                      )}
-                      / {listing.unit}
-                    </p>
-                    <p className="mt-0.5 text-fluid-xs text-slate-400">
-                      موجودی {listing.quantity_available} {listing.unit}
-                      {listing.minimum_order > 1 && ` · حداقل ${listing.minimum_order}`}
-                    </p>
-                    {isOwner && listing.status === 'rejected' && listing.rejection_reason && (
-                      <p role="alert" className="mt-2 rounded-xl bg-rose-50 p-2 text-fluid-2xs leading-5 text-rose-700 dark:bg-rose-950/40 dark:text-rose-200">
-                        <strong className="block">دلیل رد آگهی</strong>
-                        {listing.rejection_reason}
-                      </p>
-                    )}
-
-                    <div className="mt-2 flex gap-2">
-                      {isOwner ? (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => setListingEditor({ open: true, listing })}
-                            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-emerald-300 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-50 dark:border-emerald-700 dark:text-lime-300 dark:hover:bg-emerald-900/50"
-                          >
-                            <Pencil size={13} />
-                            {t('common.edit')}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void deleteListing(listing)}
-                            className="flex w-10 items-center justify-center rounded-xl border border-rose-200 text-rose-600 transition hover:bg-rose-50 dark:border-rose-900 dark:text-rose-300 dark:hover:bg-rose-950/40"
-                            aria-label={`حذف آگهی ${listing.title}`}
-                          >
-                            <Trash2 size={14} aria-hidden="true" />
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                      <button
-                        type="button"
-                        disabled={!listing.is_purchasable}
-                        onClick={() => addListingToCart(listing.id).catch(() => undefined)}
-                        className="flex-1 rounded-xl bg-emerald-600 py-2 text-xs font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-                      >
-                        {listing.is_purchasable ? t('shop.buy') : 'ناموجود'}
-                      </button>
-                      {(
-                        <button
-                          type="button"
-                          title={t('storefront.sendToDirectHint')}
-                          onClick={() => sendListingToDirect(listing)}
-                          className="flex w-10 items-center justify-center rounded-xl border border-sky-200 text-sky-600 transition hover:bg-sky-50 dark:border-sky-900 dark:text-sky-300 dark:hover:bg-sky-950"
-                          aria-label={t('storefront.sendToDirect')}
-                        >
-                          <Send size={14} aria-hidden="true" />
-                        </button>
-                      )}
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </li>
+            <div className="space-y-6">
+              {/* هر دسته یک ریل افقی کاروسلی (الگوی «پرفروش‌ترین‌های بانی‌مد»):
+                  کارت‌ها در یک ردیف می‌لغزند، فلش‌های گرد سر لبه‌اند و «همه»
+                  گرید کامل همان دسته را باز می‌کند. */}
+              {listingGroups.map(([groupName, groupItems]) => (
+                <ListingRail
+                  key={groupName}
+                  title={groupName}
+                  count={groupItems.length}
+                  items={groupItems}
+                  isOwner={isOwner}
+                  onOpen={(listing) => openListing(listing.slug)}
+                  onEdit={isOwner ? (listing) => setListingEditor({ open: true, listing }) : undefined}
+                  onDelete={isOwner ? (listing) => void deleteListing(listing) : undefined}
+                  onSendToDirect={isOwner ? undefined : (listing) => sendListingToDirect(listing)}
+                  onOpenAll={
+                    listings.length > groupItems.length
+                      ? () => {
+                          const next = new URLSearchParams(searchParams);
+                          next.set('tab', 'listings-all');
+                          next.set('category', groupName);
+                          setSearchParams(next, { replace: true });
+                        }
+                      : undefined
+                  }
+                />
               ))}
-            </ul>
+            </div>
           )}
         </div>
       )}
+
+      {/* «همه» view: the full grid of ONE category, reached from a rail's
+          «همه» button. `?tab=listings-all&category=…` — with its own «بازگشت»
+          that returns to the rails. */}
+      {tab === 'listings' && searchParams.get('tab') === 'listings-all' && contentResults === null && (() => {
+        const categoryName = searchParams.get('category') || '';
+        const groupItems = listingGroups.find(([name]) => name === categoryName)?.[1] ?? [];
+        return (
+          <div role="tabpanel" aria-label={`همه آگهی‌های دسته ${categoryName}`} className="mt-4">
+            <button
+              type="button"
+              onClick={() => {
+                const next = new URLSearchParams(searchParams);
+                next.delete('tab');
+                next.delete('category');
+                setSearchParams(next, { replace: true });
+              }}
+              className="mb-4 inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-emerald-200 px-3 text-xs font-bold text-emerald-700 transition hover:bg-emerald-50 dark:border-emerald-800 dark:text-lime-300 dark:hover:bg-emerald-900"
+            >
+              بازگشت به دسته‌بندی‌ها
+            </button>
+            <h2 className="text-fluid-lg font-extrabold text-slate-800 dark:text-white">
+              {categoryName}
+              <span className="ms-2 rounded-full bg-emerald-50 px-2 py-0.5 align-middle text-fluid-2xs font-bold text-emerald-700 dark:bg-emerald-900/60 dark:text-lime-300">
+                {groupItems.length.toLocaleString('fa-IR')} آگهی
+              </span>
+            </h2>
+            {groupItems.length === 0 ? (
+              <EmptyState text="آگهی‌ای در این دسته نیست." />
+            ) : (
+              <ul className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {groupItems.map((listing) => (
+                  <li
+                    key={listing.id}
+                    className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm dark:border-emerald-900 dark:bg-emerald-950/40"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => openListing(listing.slug)}
+                      className="relative block w-full text-start"
+                      aria-label={`مشاهده جزئیات ${listing.title}`}
+                    >
+                      <img src={listing.image_url} alt="" className="h-36 w-full object-cover" loading="lazy" />
+                      {listing.discount_percent > 0 && (
+                        <span className="absolute start-2 top-2 rounded-full bg-brand-orange px-2 py-0.5 text-fluid-2xs font-bold text-white">
+                          {listing.discount_percent.toLocaleString('fa-IR')}٪ تخفیف
+                        </span>
+                      )}
+                    </button>
+                    <div className="p-3">
+                      <button
+                        type="button"
+                        onClick={() => openListing(listing.slug)}
+                        className="min-w-0 truncate text-start text-sm font-bold text-slate-800 hover:text-emerald-700 hover:underline dark:text-white dark:hover:text-lime-300"
+                      >
+                        {listing.title}
+                      </button>
+                      <p className="mt-1 flex items-baseline gap-1.5 text-xs text-slate-500 dark:text-emerald-200">
+                        <strong className="text-emerald-700 dark:text-lime-300">
+                          {formatPrice(listing.discounted_price)}
+                        </strong>
+                        {listing.discount_percent > 0 && (
+                          <del className="text-fluid-2xs text-slate-400">{formatPrice(listing.price)}</del>
+                        )}
+                        / {listing.unit}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Posts */}
       {tab === 'posts' && contentResults === null && (
@@ -781,41 +826,6 @@ export default function StorefrontPage() {
                         }
                       : {})}
                   />
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
-
-      {/* Stories */}
-      {tab === 'stories' && contentResults === null && (
-        <div role="tabpanel" id="panel-stories" aria-labelledby="tab-stories" className="mt-5">
-          {stories.length === 0 ? (
-            <EmptyState text="در حال حاضر استوری فعالی وجود ندارد." />
-          ) : (
-            <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-              {stories.map((story, index) => (
-                <li key={story.id} className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setViewer({ posts: stories, index })}
-                    className="block aspect-[9/16] w-full overflow-hidden rounded-xl"
-                  >
-                    <img
-                      src={story.image_url}
-                      alt={story.caption.slice(0, 60)}
-                      loading="lazy"
-                      className="h-full w-full object-cover"
-                    />
-                  </button>
-                  {isOwner && (
-                    <OwnerContentActions
-                      onEdit={() => setPostEditor(story)}
-                      onDelete={() => void deletePost(story)}
-                      label={story.caption.slice(0, 30) || 'استوری'}
-                    />
-                  )}
                 </li>
               ))}
             </ul>

@@ -71,6 +71,7 @@ from .social import (
     StorefrontPostLike,
     StorefrontPostComment,
     StorefrontStoryView,
+    StorefrontPostSeen,
     StorefrontConversation,
     message_attachment_path,
     StorefrontMessage,
@@ -90,6 +91,7 @@ from .messaging import (
     NotificationDelivery,
 )
 from .content import (
+    HeroSlide,
     SiteArticle,
     Service,
     SitePage,
@@ -169,6 +171,7 @@ __all__ = [
     "StorefrontPostLike",
     "StorefrontPostComment",
     "StorefrontStoryView",
+    "StorefrontPostSeen",
     "StorefrontConversation",
     "message_attachment_path",
     "StorefrontMessage",
@@ -183,6 +186,7 @@ __all__ = [
     "NotificationRecipient",
     "NotificationDelivery",
     "SiteArticle",
+    "HeroSlide",
     "Service",
     "SitePage",
     "SitePageBlock",

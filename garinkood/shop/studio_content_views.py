@@ -35,7 +35,7 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 
 from .models import (
-    Category, MarketplaceListing, Product, ProductAttribute, ProductImage,
+    Category, HeroSlide, MarketplaceListing, Product, ProductAttribute, ProductImage,
     ProductPackage, SiteArticle, SubCategory, Tag,
 )
 from .models.catalog import PRODUCT_ATTRIBUTE_TEMPLATE
@@ -646,6 +646,91 @@ class TagWorkViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         return Tag.objects.order_by('name')
+
+
+class HeroSlideWorkSerializer(serializers.ModelSerializer):
+    """Writable shape of a home-page hero slide.
+
+    ``background_url`` is the read-side echo of the uploaded photo so the
+    console can show a thumbnail; ``gradient`` keeps the original CSS-class
+    look working when no photo exists.
+    """
+
+    background_url = serializers.CharField(read_only=True)
+
+    class Meta:
+        model = HeroSlide
+        fields = [
+            'id', 'kicker', 'title', 'body', 'cta_label', 'cta_url',
+            'background_image', 'background_url', 'gradient',
+            'order', 'is_active', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+        extra_kwargs = {
+            'kicker': {'required': False, 'allow_blank': True},
+            'body': {'required': False, 'allow_blank': True},
+            'cta_label': {'required': False, 'allow_blank': True},
+            'cta_url': {'required': False, 'allow_blank': True},
+            'gradient': {'required': False, 'allow_blank': True},
+            'background_image': {'required': False, 'allow_null': True},
+        }
+
+    def validate_title(self, value):
+        return (value or '').strip()
+
+    def validate_cta_url(self, value):
+        # Internal paths or absolute URLs only — a javascript: href here would
+        # be an XSS the console just published to the home page.
+        value = (value or '').strip()
+        if value and not (value.startswith('/') or value.startswith('http://') or value.startswith('https://')):
+            raise serializers.ValidationError('لینک باید یک مسیر داخلی (/…) یا آدرس http(s) باشد.')
+        return value
+
+
+class HeroSlideWorkViewSet(viewsets.ModelViewSet):
+    """CRUD for the home-page hero slider, owned by the content console."""
+
+    serializer_class = HeroSlideWorkSerializer
+    permission_classes = [IsModerator]
+    lookup_field = 'pk'
+    pagination_class = None  # a slider has a handful of rows; one page
+
+    def get_queryset(self):
+        return HeroSlide.objects.order_by('order', 'id')
+
+    def perform_create(self, serializer):
+        slide = serializer.save()
+        self._audit('create', slide, f"اسلاید هیرو «{slide.title}» ساخته شد")
+
+    def perform_update(self, serializer):
+        slide = serializer.save()
+        self._audit('update', slide, f"اسلاید هیرو «{slide.title}» ویرایش شد")
+
+    def perform_destroy(self, instance):
+        title = instance.title
+        instance.delete()
+        # The shared helper reads pk/type off the target, which is gone after
+        # delete() — so the delete entry carries the frozen values instead.
+        self._audit('delete', instance, f"اسلاید هیرو «{title}» حذف شد")
+
+    def _audit(self, action_name, target, summary):
+        # Same trail as every other console write (api_views._audit); the
+        # helper needs a live pk, and a deleted row keeps its fields but not
+        # its pk — so log deletes through the frozen attribute directly.
+        from .api_views import _audit as audit
+
+        if target is not None and target.pk is None:
+            from .models import AdminAuditLog
+
+            AdminAuditLog.objects.create(
+                actor=self.request.user if self.request.user.is_authenticated else None,
+                action=action_name,
+                target_type=target.__class__.__name__,
+                target_id='deleted',
+                summary=summary,
+            )
+            return
+        audit(self.request.user, action_name, target, summary)
 
 
 class StudioOptionsView(viewsets.ViewSet):

@@ -249,6 +249,39 @@ body {
   scrollbar-width: none;
 }
 
+/*
+ * Horizontal rails (home panels, similar products, guides). Setting the
+ * standard `scrollbar-*` properties alone would make Chromium ignore the
+ * site-wide ::-webkit-scrollbar theming above and fall back to the OS
+ * scrollbar — arrows and all. Both layers are declared together so the rail
+ * gets a slim, emerald-themed bar in every engine.
+ */
+.rail-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #10b981 transparent;
+}
+
+.rail-scroll::-webkit-scrollbar {
+  height: 8px;
+}
+
+.rail-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.rail-scroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(90deg, #10b981, #84cc16);
+  border-radius: 999px;
+}
+
+.dark .rail-scroll {
+  scrollbar-color: #34d399 #0a3d2e;
+}
+
+.dark .rail-scroll::-webkit-scrollbar-track {
+  background: #0a3d2e;
+}
+
 /* ========================================
  * 6. 3D Perspective Helpers
  * ======================================== */
@@ -421,9 +454,15 @@ body {
   overflow-x: clip;
 }
 
+/* Long identifiers (order codes, emails, chemical names like
+   «Thiophanate-methyl») wrap instead of pushing their container past the
+   viewport edge — on every width, and inherited by every element (spans
+   included) rather than only the block tags below. */
+body {
+  overflow-wrap: break-word;
+}
+
 @media (max-width: 767px) {
-  /* Long identifiers (order codes, emails, referral links) wrap instead of
-     pushing their container past the viewport edge. */
   p,
   li,
   dd,
@@ -431,7 +470,7 @@ body {
   h2,
   h3,
   h4 {
-    overflow-wrap: break-word;
+    overflow-wrap: anywhere;
   }
 }
 

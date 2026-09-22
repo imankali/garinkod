@@ -5,7 +5,7 @@ import type { PaginatedResponse } from '@/types/common';
 import type { LevelRank, AuthResponse, OtpRequestResponse, ProfileResponse, WebPushSubscriptionSummary, ManagementDashboard, ManagementStaffMember, ManagementAuditLog, UserAccount, LevelsSnapshot } from '@/types/user';
 import type { BuyerExperiencesResponse, CatalogIndex, CatalogKind, CatalogLanding, SitePolicies, Product, ProductList, Category, ProductQueryParams, ProductFacets, RatingSummary } from '@/types/shop';
 import type { LegalDocument, LegalIndex, Comment, PlatformFeedbackPayload, StorefrontComplaintPayload, VisualSearchResponse, SiteArticleCard, SiteArticleDetail, FarmService, SitePage, AboutResponse, SiteContactInfo } from '@/types/content';
-import type { Cart, Order, CheckoutPayload, ServiceRequestPayload, ProcurementRequestPayload, PaymentProviderOption, PaymentAttempt, ShippingQuote, AffiliateProfile, AffiliateConversion, FinancialLedgerEntry, Coupon, Wallet } from '@/types/commerce';
+import type { Cart, Order, CheckoutPayload, ServiceRequestPayload, ServiceRequestResult, ProcurementRequestPayload, PaymentProviderOption, PaymentAttempt, ShippingQuote, AffiliateProfile, AffiliateConversion, FinancialLedgerEntry, Coupon, Wallet } from '@/types/commerce';
 import type { Storefront, MarketplaceListing, StorefrontPost, StorefrontPostComment, StorefrontProfile, StorefrontAvailability, StorefrontHighlight, FollowedStorefront } from '@/types/storefront';
 import type { DeskState, DeskRatingReport, ServiceConversationResponse, StorefrontConversation, StorefrontMessage, MessageChannel, InboxResponse } from '@/types/messaging';
 import type { Location, AgriInput, DoseCalculation, AreaUnit, FarmLand, FarmCalendarEvent, FarmConsultationRequest, ConsultantFarmerSummary, ConsultantFarmerDossier } from '@/types/farming';
@@ -91,11 +91,17 @@ export const categoriesApi = {
 // ========================================
 export const commentsApi = {
   /**
-   * «مفید بود» را روشن/خاموش می‌کند.
+   * رأی مثبت (+1) یا منفی (-1) می‌دهد؛ تکرار همان رأی آن را پس می‌گیرد.
    * POST /api/comments/{id}/helpful/
    */
-  toggleHelpful: (id: number) => {
-    return apiClient.post<{ voted: boolean; helpful_count: number }>(`/comments/${id}/helpful/`);
+  toggleHelpful: (id: number, value: 1 | -1 = 1) => {
+    return apiClient.post<{
+      voted: boolean;
+      my_value: 1 | -1 | null;
+      helpful_count: number;
+      up_count: number;
+      down_count: number;
+    }>(`/comments/${id}/helpful/`, { value });
   },
 
   /**
@@ -325,7 +331,8 @@ export const ordersApi = {
 // Agriculture services, procurement and marketplace
 // ========================================
 export const agricultureApi = {
-  requestService: (data: ServiceRequestPayload) => apiClient.post('/services/requests/', data),
+  requestService: (data: ServiceRequestPayload) =>
+    apiClient.post<ServiceRequestResult>('/services/requests/', data),
   requestProcurement: (data: ProcurementRequestPayload) => apiClient.post('/procurement/requests/', data),
   getStorefront: () => apiClient.get<Storefront | null>('/marketplace/storefront/'),
   /**
@@ -428,9 +435,9 @@ export const storefrontsApi = {
   profile: (slug: string) =>
     apiClient.get<StorefrontProfile>(`/marketplace/storefronts/${slug}/profile/`),
 
-  /** جستجو داخل پست‌ها و استوری‌های یک غرفه (مثلاً «اصلاح درخت»). */
+  /** جستجو داخل آگهی‌ها، پست‌ها و استوری‌های یک غرفه (مثلاً «اصلاح درخت»). */
   searchContent: (slug: string, query: string) =>
-    apiClient.get<{ query: string; posts: StorefrontPost[]; stories: StorefrontPost[] }>(
+    apiClient.get<{ query: string; posts: StorefrontPost[]; stories: StorefrontPost[]; listings: MarketplaceListing[] }>(
       `/marketplace/storefronts/${slug}/search-content/`,
       { params: { q: query } },
     ),
@@ -450,11 +457,28 @@ export const storefrontsApi = {
       '/marketplace/highlights/',
       { params: { storefront: storefrontSlug } },
     ),
-  createHighlight: (data: { title: string; post_ids: number[] }) =>
-    apiClient.post<StorefrontHighlight>('/marketplace/highlights/', data),
-  updateHighlight: (id: number, data: { title?: string; post_ids?: number[] }) =>
-    apiClient.patch<StorefrontHighlight>(`/marketplace/highlights/${id}/`, data),
+  createHighlight: (data: { title: string; post_ids?: number[]; cover?: File | null }) => {
+    const form = new FormData();
+    form.append('title', data.title);
+    (data.post_ids || []).forEach((id) => form.append('post_ids', String(id)));
+    if (data.cover) form.append('cover', data.cover);
+    return apiClient.post<StorefrontHighlight>('/marketplace/highlights/', form);
+  },
+  updateHighlight: (
+    id: number,
+    data: { title?: string; post_ids?: number[]; cover?: File | null },
+  ) => {
+    const form = new FormData();
+    if (data.title !== undefined) form.append('title', data.title);
+    if (data.post_ids !== undefined) data.post_ids.forEach((id) => form.append('post_ids', String(id)));
+    if (data.cover) form.append('cover', data.cover);
+    return apiClient.patch<StorefrontHighlight>(`/marketplace/highlights/${id}/`, form);
+  },
   deleteHighlight: (id: number) => apiClient.delete(`/marketplace/highlights/${id}/`),
+
+  /** آرشیو استوری‌های غرفه‌دار — منقضی و حذف‌شده‌های نرم، با شناسه هایلایت‌ها. */
+  storyArchive: () =>
+    apiClient.get<Array<StorefrontPost & { highlight_ids?: number[] }>>('/marketplace/posts/story_archive/'),
 };
 
 // ========================================
@@ -765,7 +789,49 @@ export const deskApi = {
   /** Satisfaction numbers, for the desk's managers only. */
   ratings: (params: { channel?: string; agent?: number; days?: number } = {}) =>
     apiClient.get<DeskRatingReport>('/desk/ratings/', { params }),
+
+  /**
+   * The profile card of the customer behind one thread. Operators tap the
+   * counterpart's name in the chat header and get contact details, level,
+   * their مزرعه من lands and the service requests they filed.
+   */
+  customerCard: (conversationId: number) =>
+    apiClient.get<CustomerCardResponse>(`/desk/conversations/${conversationId}/customer-card/`),
 };
+
+/** The counterpart dossier the chat header card renders. */
+export interface CustomerCardResponse {
+  customer: {
+    id: number;
+    username: string;
+    full_name: string;
+    email: string;
+    phone: string;
+    phone_verified: boolean;
+    address: string;
+    avatar_url: string;
+    level_label: string;
+    created: string | null;
+    lands: {
+      id: number;
+      name: string;
+      land_type_label: string;
+      area_label: string;
+      crop_type: string;
+      province: string;
+      city: string;
+    }[];
+    service_requests: {
+      id: number;
+      code: string;
+      service_label: string;
+      status: string;
+      status_label: string;
+      created_at: string;
+    }[];
+  };
+  is_staff_view: boolean;
+}
 
 // ========================================
 // Farm profile: lands, calendars and consultation
@@ -856,6 +922,11 @@ export const storefrontPostsApi = {
      * browser, or the "top five" would just be the five most recent ones.
      */
     ordering?: '-likes_total' | '-comments_total' | '-created_at';
+    /** Shuffled feed: a new mix on every page load, excluding this reader's
+     *  already-served posts (server-side marks) until the pool runs dry. */
+    shuffle?: boolean;
+    /** Pin the shuffle so a paginated scroll keeps one coherent ordering. */
+    seed?: number;
   }) => apiClient.get<PaginatedResponse<StorefrontPost>>('/marketplace/posts/', { params }),
   mine: () => apiClient.get<StorefrontPost[]>('/marketplace/posts/mine/'),
 
@@ -893,6 +964,10 @@ export const storefrontPostsApi = {
     apiClient.delete<{ is_liked: boolean; like_count: number }>(`/marketplace/posts/${id}/like/`),
   /** Mark a story as watched so its ring turns grey. */
   markSeen: (id: number) => apiClient.post<{ is_seen: boolean }>(`/marketplace/posts/${id}/seen/`),
+  /** Record a whole served feed in one call — the storefronts page marks every
+      post it just showed, and one request must not compete with page paint. */
+  markManySeen: (ids: number[]) =>
+    apiClient.post<{ marked: number }>('/marketplace/posts/mark_seen/', { ids }),
 
   comments: (id: number) =>
     apiClient.get<{ count: number; results: StorefrontPostComment[] }>(
@@ -1167,6 +1242,23 @@ export interface ArticleQuery {
   product?: string | number;
   limit?: number;
 }
+
+/** One slide of the home-page hero carousel, as served by /api/hero-slides/. */
+export interface HeroSlideData {
+  id: number;
+  kicker: string;
+  title: string;
+  body: string;
+  cta_label: string;
+  cta_url: string;
+  background_url: string;
+  gradient: string;
+}
+
+export const heroSlidesApi = {
+  /** GET /api/hero-slides/ — active slides in display order. */
+  list: () => apiClient.get<HeroSlideData[]>('/hero-slides/'),
+};
 
 export const articlesApi = {
   /** GET /api/articles/ — published site articles and growing guides. */

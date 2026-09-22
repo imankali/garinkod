@@ -22,7 +22,7 @@ import { agricultureApi, locationsApi, storefrontPostsApi, storefrontsApi } from
 vi.mock('../api/services', () => ({
   agricultureApi: { getStorefront: vi.fn(), listMarketplace: vi.fn() },
   locationsApi: { provinces: vi.fn(), cities: vi.fn() },
-  storefrontPostsApi: { list: vi.fn() },
+  storefrontPostsApi: { list: vi.fn(), markSeen: vi.fn().mockResolvedValue({ data: { is_seen: true } } as never) },
   storefrontsApi: { list: vi.fn(), featured: vi.fn() },
 }));
 
@@ -142,14 +142,16 @@ describe('the product rows', () => {
 });
 
 describe('the posts block', () => {
-  it('ranks by likes on the server, not by what the first page happened to hold', async () => {
+  it('asks for a shuffled feed of eight, so a refresh brings a new set', async () => {
     await renderPage();
     await screen.findByTestId('post-11');
-    expect(storefrontPostsApi.list).toHaveBeenCalledWith({
-      post_type: 'post',
-      ordering: '-likes_total',
-      page_size: 5,
-    });
+    const firstCall = vi.mocked(storefrontPostsApi.list).mock.calls[0];
+    expect(firstCall).toBeDefined();
+    const call = firstCall![0] as { post_type: string; shuffle?: boolean; page_size: number; seed?: number };
+    expect(call.post_type).toBe('post');
+    expect(call.shuffle).toBe(true);
+    expect(call.page_size).toBe(8);
+    expect(typeof call.seed).toBe('number');
   });
 
   it('points at explore for everything beyond the five', async () => {

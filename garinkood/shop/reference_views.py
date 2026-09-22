@@ -9,6 +9,7 @@ from decimal import Decimal, InvalidOperation
 
 from .schema import documented_api
 from django.db.models import Q
+from django.views.decorators.cache import cache_page
 from rest_framework import permissions, status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.response import Response
@@ -37,6 +38,11 @@ AREA_UNIT_LABELS = {
 @api_view(['GET'])
 @permission_classes([permissions.AllowAny])
 @throttle_classes([SearchRateThrottle])
+# Provinces change about as often as the administrative map of Iran: caching
+# the bare province list for an hour keeps the storefronts page — which fetches
+# it on every mount — from paying a query for the same 31 rows again and again.
+# Parameterised calls (cities of one province, search) skip the cache.
+@cache_page(60 * 60, key_prefix='locations-provinces')
 def locations(request):
     """Provinces and cities.
 

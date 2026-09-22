@@ -15,8 +15,14 @@ import toast from 'react-hot-toast';
 import { agricultureApi, categoriesApi } from '../../api/services';
 import { parseApiError } from '../../api/errors';
 import { useTranslation } from '../../i18n';
+import { shamsiHint } from '../../utils/shamsiDate';
 import type { Category } from '@/types/shop';
 import type { MarketplaceListing } from '@/types/storefront';
+
+/** Departments whose goods are MANUFACTURED (a shop owner's world): production
+ *  run and shelf life replace the harvest entirely. Everything else — grown
+ *  crops, and any department without a verdict — keeps the harvest field. */
+const MANUFACTURED_CATEGORY_SLUGS = new Set(['fertilizer', 'pesticide', 'equipment', 'irrigation', 'tools']);
 
 interface ListingDraft {
   title: string;
@@ -32,6 +38,8 @@ interface ListingDraft {
   brand: string;
   package_size: string;
   harvest_date: string;
+  production_date: string;
+  expiry_date: string;
   discount_percent: string;
   is_stock: boolean;
 }
@@ -49,6 +57,8 @@ const EMPTY: ListingDraft = {
   brand: '',
   package_size: '',
   harvest_date: '',
+  production_date: '',
+  expiry_date: '',
   discount_percent: '',
   is_stock: false,
 };
@@ -67,6 +77,8 @@ function draftFrom(listing: MarketplaceListing): ListingDraft {
     brand: listing.brand ?? '',
     package_size: listing.package_size ?? '',
     harvest_date: listing.harvest_date ? listing.harvest_date.slice(0, 10) : '',
+    production_date: listing.production_date ? listing.production_date.slice(0, 10) : '',
+    expiry_date: listing.expiry_date ? listing.expiry_date.slice(0, 10) : '',
     discount_percent: listing.discount_percent ? String(listing.discount_percent) : '',
     is_stock: Boolean(listing.is_stock),
   };
@@ -88,6 +100,18 @@ export default function ListingComposer({
   const { t } = useTranslation();
   const [draft, setDraft] = useState<ListingDraft>(EMPTY);
   const [saving, setSaving] = useState(false);
+
+  /**
+   * Which date inputs this listing needs, from its department.
+   *
+   * A farmer selling میوه fills برداشت; a shop owner selling کود/سم/ادوات
+   * fills تولید و انقضا. bذر is both worlds (grown once, sold for seasons),
+   * so it sees the harvest field — and 'unknown' (no department yet) keeps the
+   * harvest field because the default audience is still the crop seller this
+   * marketplace opened for.
+   */
+  const isManufactured = MANUFACTURED_CATEGORY_SLUGS.has(draft.category);
+  const showHarvest = !isManufactured;
   /**
    * The departments a seller can file under, with their sub-departments.
    *
@@ -130,6 +154,8 @@ export default function ListingComposer({
       brand: draft.brand.trim(),
       package_size: draft.package_size.trim(),
       harvest_date: draft.harvest_date || null,
+      production_date: draft.production_date || null,
+      expiry_date: draft.expiry_date || null,
       discount_percent: draft.discount_percent ? Number(draft.discount_percent) : 0,
       is_stock: draft.is_stock,
     } as Partial<MarketplaceListing>;
@@ -255,13 +281,36 @@ export default function ListingComposer({
                 value={draft.package_size}
                 onChange={(value) => setDraft({ ...draft, package_size: value })}
               />
-              <Field
-                required={false}
-                label="تاریخ برداشت (اختیاری)"
-                type="date"
-                value={draft.harvest_date}
-                onChange={(value) => setDraft({ ...draft, harvest_date: value })}
-              />
+              {showHarvest && (
+                <Field
+                  required={false}
+                  label="تاریخ برداشت (اختیاری)"
+                  type="date"
+                  value={draft.harvest_date}
+                  onChange={(value) => setDraft({ ...draft, harvest_date: value })}
+                  hint={shamsiHint(draft.harvest_date, 'medium')}
+                />
+              )}
+              {isManufactured && (
+                <>
+                  <Field
+                    required={false}
+                    label="تاریخ تولید (اختیاری)"
+                    type="date"
+                    value={draft.production_date}
+                    onChange={(value) => setDraft({ ...draft, production_date: value })}
+                    hint={shamsiHint(draft.production_date, 'medium')}
+                  />
+                  <Field
+                    required={false}
+                    label="تاریخ انقضا (اختیاری)"
+                    type="date"
+                    value={draft.expiry_date}
+                    onChange={(value) => setDraft({ ...draft, expiry_date: value })}
+                    hint={shamsiHint(draft.expiry_date, 'medium')}
+                  />
+                </>
+              )}
               <Field
                 required={false}
                 label="تخفیف (٪)"
@@ -336,12 +385,15 @@ function Field({
   onChange,
   type = 'text',
   required = true,
+  hint,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   type?: string;
   required?: boolean;
+  /** Small helper line under the input — e.g. the Shamsi twin of a date. */
+  hint?: string;
 }) {
   return (
     <label className="block text-sm font-bold text-slate-700 dark:text-emerald-50">
@@ -353,6 +405,7 @@ function Field({
         onChange={(event) => onChange(event.target.value)}
         className="mt-2 min-h-11 min-w-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-normal outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-emerald-700 dark:bg-emerald-900"
       />
+      {hint && <span className="mt-1 block text-fluid-2xs font-semibold text-emerald-600 dark:text-lime-300">{hint}</span>}
     </label>
   );
 }

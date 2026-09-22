@@ -4,7 +4,7 @@
 // thread looks and reads the same wherever it is listed — including the badge
 // that names its source.
 
-import { ArrowRight, LifeBuoy, MessageSquareReply, Sprout, Store } from 'lucide-react';
+import { ArrowRight, LifeBuoy, MessageSquareReply, Sprout, Store, Tractor } from 'lucide-react';
 
 import type { MessageChannel, StorefrontConversation } from '@/types/messaging';
 import { cn } from '../../utils/cn';
@@ -15,6 +15,7 @@ const CHANNEL_ICON: Record<MessageChannel, typeof Store> = {
   support: LifeBuoy,
   consulting: Sprout,
   comment: MessageSquareReply,
+  procurement: Tractor,
 };
 
 export default function ConversationRow({

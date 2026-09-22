@@ -14,7 +14,7 @@
 // is what tells them someone is waiting rather than waiting on a colleague.
 
 import { useCallback, useEffect, useState } from 'react';
-import { Headphones, Sprout } from 'lucide-react';
+import { Headphones, Sprout, Tractor } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 import { deskApi, messagesApi } from '../../api/services';
@@ -36,6 +36,14 @@ const DESKS = [
     hint: 'سفارش، پرداخت، آدرس و هر چیزی که در حساب کاربری گیر کرده.',
     icon: Headphones,
   },
+  {
+    // The buying team's own desk: offers filed in «فروش به تیم خرید» land here,
+    // separate from consulting — a different queue, a different conversation.
+    channel: 'procurement' as const,
+    title: 'خرید محصولات کشاورزان',
+    hint: 'محصولتان را برای خرید عمده عرضه کنید و پیگیری را همین‌جا دنبال کنید.',
+    icon: Tractor,
+  },
 ];
 
 const PRESENCE_REFRESH_MS = 30000;
@@ -52,17 +60,17 @@ export default function DeskEntries({
    * Where the queue for one channel is shown. A staff member is refused as a
    * *customer* of a desk, so their card sends them to the queue instead.
    */
-  onFilterChannel?: (channel: 'consulting' | 'support') => void;
+  onFilterChannel?: (channel: 'consulting' | 'support' | 'procurement') => void;
   className?: string;
 }) {
-  const [states, setStates] = useState<Partial<Record<'consulting' | 'support', DeskState>>>({});
+  const [states, setStates] = useState<Partial<Record<'consulting' | 'support' | 'procurement', DeskState>>>({});
   const [busy, setBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const results = await Promise.allSettled(
       DESKS.map((desk) => deskApi.state(desk.channel)),
     );
-    const next: Partial<Record<'consulting' | 'support', DeskState>> = {};
+    const next: Partial<Record<'consulting' | 'support' | 'procurement', DeskState>> = {};
     results.forEach((result, index) => {
       const channel = DESKS[index]!.channel;
       if (result.status === 'fulfilled') next[channel] = result.value.data;
@@ -76,7 +84,7 @@ export default function DeskEntries({
     return () => clearInterval(interval);
   }, [load]);
 
-  async function open(channel: 'consulting' | 'support') {
+  async function open(channel: 'consulting' | 'support' | 'procurement') {
     const existing = conversations.find((conversation) => conversation.channel === channel);
     if (existing) {
       onOpen(existing.id);
@@ -106,7 +114,7 @@ export default function DeskEntries({
   }
 
   return (
-    <div className={cn('grid gap-2 sm:grid-cols-2', className)}>
+    <div className={cn('grid gap-2 sm:grid-cols-2 lg:grid-cols-3', className)}>
       {DESKS.map((desk) => {
         const state = states[desk.channel];
         const thread = conversations.find((conversation) => conversation.channel === desk.channel);

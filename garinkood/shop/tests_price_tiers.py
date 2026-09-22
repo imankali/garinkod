@@ -387,12 +387,15 @@ class ListEndpointQueryCountTests(TestCase):
         self.assertEqual(response.status_code, 200)
 
         total = len(ctx.captured_queries)
-        # Measured at 43 for a twelve-row page after the prefetch fix, down from
-        # 70. The bound leaves room for legitimate growth while still failing
-        # loudly if the per-row pattern comes back — a linear regression on 12
-        # rows adds at least 12.
+        # Measured at 24 for a twelve-row page after the second pass: the tag
+        # prefetch now carries the published-product count (one grouped COUNT
+        # instead of one per (product, tag) pair) and the image prefetch selects
+        # ``image_variants`` and ``product_id`` so no rendered image re-fetches
+        # its own row. Down from 43, which was itself down from 70. The bound
+        # still fails loudly if the per-row pattern returns — a linear
+        # regression on 12 rows adds at least 12.
         self.assertLess(
-            total, 60,
+            total, 30,
             f"catalogue list ran {total} queries for 12 rows — "
             f"suspect a nested serializer without a prefetch",
         )

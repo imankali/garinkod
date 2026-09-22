@@ -134,7 +134,7 @@ export default function CatalogLanding({ kind }: { kind: CatalogKind }) {
               )}
               {landing.facets.price.max > 0 && (
                 <li>
-                  بازه قیمت فعلی: {formatPrice(landing.facets.price.min)} تا {formatPrice(landing.facets.price.max)} تومان
+                  بازه قیمت فعلی: {formatPrice(landing.facets.price.min)} تا {formatPrice(landing.facets.price.max)}
                 </li>
               )}
             </ul>

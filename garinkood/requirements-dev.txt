@@ -8,3 +8,8 @@
 # Test coverage and dependency vulnerability checks
 coverage==7.10.6
 pip-audit==2.9.0
+
+# Required by ``manage.py test --parallel``: tracebacks of failing tests are
+# pickled from worker processes; without tblib a failure raises
+# "cannot pickle 'traceback' object" instead of reporting the test.
+tblib==3.2.2

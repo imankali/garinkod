@@ -603,6 +603,13 @@ class ServiceRequest(models.Model):
     crop = models.CharField(max_length=120, blank=True)
     farm_area_hectare = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     description = models.TextField(max_length=1500)
+    # A signed-in farmer can file a request against one of their registered
+    # lands — the request then carries the full case file to the operator.
+    # Null for a guest or «بدون زمین».
+    land = models.ForeignKey(
+        'shop.FarmLand', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='service_requests', verbose_name='پرونده زمین',
+    )
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='new', db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

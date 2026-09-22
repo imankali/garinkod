@@ -456,9 +456,10 @@ class Comment(models.Model):
         verbose_name="امتیاز (۱ تا ۵)",
     )
     parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='replies')
-    # «مفید بود» lets buyers rank each other's experience; keeping the tally as a
-    # column means a review list can be ordered by it in one query.
-    helpful_count = models.PositiveIntegerField(default=0, verbose_name="رأی مفید بودن")
+    # «مفید بود / مفید نبود» lets buyers rank each other's experience. The
+    # tally is a SIGNED sum (ups minus downs) kept as a column so a review
+    # list can be ordered by it in one query; it may legitimately go negative.
+    helpful_count = models.IntegerField(default=0, verbose_name="امتیاز مفید بودن (مثبت/منفی)")
     is_reported = models.BooleanField(default=False, verbose_name="گزارش‌شده")
     # A «تجربه خرید مشتریان» page has to be curated: an editor picks which real
     # reviews represent the shop, instead of the newest three at random.

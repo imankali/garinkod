@@ -26,6 +26,7 @@ import {
   Reply,
   Send,
   Trash2,
+  UserRound,
   X
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -39,6 +40,7 @@ import type { FarmLand } from '@/types/farming';
 import { formatPrice } from '../../utils/formatPrice';
 import { cn } from '../../utils/cn';
 import { copyText } from '../../utils/copyText';
+import CustomerProfileCard from './CustomerProfileCard';
 import { listingHref } from '../../utils/listingHref';
 import { CHANNEL_TONE, conversationIdentity } from '../../utils/conversation';
 import MessageAttachment from './MessageAttachment';
@@ -144,6 +146,8 @@ export default function DirectThread({
   const [menuFor, setMenuFor] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<StorefrontMessage | null>(null);
   const [highlighted, setHighlighted] = useState<number | null>(null);
+  // «زنیم روی پروفایلش تو چت» — the counterpart dossier modal.
+  const [profileOpen, setProfileOpen] = useState(false);
   /**
    * Presence, duty window and canned lines for the desk behind this thread.
    * Fetched with the thread and refreshed by the same poll, because «آنلاین
@@ -558,60 +562,77 @@ export default function DirectThread({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {/* Thread header */}
-      <header className="flex shrink-0 items-center gap-2 border-b border-emerald-100 bg-white px-3 py-2.5 dark:border-emerald-800 dark:bg-emerald-950 sm:px-4 sm:py-3">
-        {onBack && (
+      {/* Thread header — two decks: identity on top, the desk actions on a
+          quiet strip below. One crowded row squeezed the name/status to a
+          sliver and wrapped the status text into a vertical word stack; giving
+          the actions their own hairline row keeps both readable. */}
+      <header className="shrink-0 border-b border-emerald-100/80 bg-gradient-to-l from-white via-white to-emerald-50/70 shadow-[0_1px_2px_rgba(6,78,59,0.05)] dark:border-emerald-800/70 dark:from-emerald-950 dark:via-emerald-950 dark:to-emerald-900/60">
+        <div className="flex items-center gap-1.5 px-2.5 py-2.5 sm:px-4 sm:py-3">
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="-ms-1.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-slate-500 transition hover:bg-emerald-50 dark:text-emerald-200 dark:hover:bg-emerald-900"
+              aria-label={t('common.back')}
+            >
+              <ArrowRight size={17} />
+            </button>
+          )}
+          {identity && isDeskThread && conversation ? (
+            /*
+              A service desk is staffed by people, so the header names the person
+              who is actually answering: the published photo, name and title of the
+              operator, with a presence dot from their real activity. When a
+              colleague takes the thread over, this changes with them — which is
+              the point, since the alternative is a name that stops matching the
+              answers halfway through a conversation.
+            */
+            <DeskIdentity
+              agent={conversation.last_agent || conversation.agent}
+              desk={desk}
+              channelLabel={conversation.channel_label}
+              handover={Boolean(conversation.last_agent)}
+            />
+          ) : identity ? (
+            <>
+              {/* Counterpart avatar, or a channel-tinted initial when the
+                  source has no picture (support, consulting, replies). */}
+              <span
+                className={cn(
+                  'flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full text-fluid-xs font-extrabold',
+                  CHANNEL_TONE[identity.channel],
+                )}
+              >
+                {identity.avatarUrl ? (
+                  <img src={identity.avatarUrl} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  identity.title.slice(0, 2)
+                )}
+              </span>
+
+              <HeaderTitle identity={identity} />
+            </>
+          ) : (
+            <span className="min-w-0 flex-1 truncate text-sm font-extrabold text-slate-800 dark:text-white">
+              {t('direct.title')}
+            </span>
+          )}
+
+          {/* A small × so the drawer can be dismissed from the thread itself —
+              the back arrow only returns to the inbox list, and the overlay tap
+              is not discoverable once a conversation is on screen. */}
           <button
             type="button"
-            onClick={onBack}
-            className="-ms-1.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-slate-500 hover:bg-emerald-50 dark:text-emerald-200 dark:hover:bg-emerald-900"
-            aria-label={t('common.back')}
+            onClick={closeDirect}
+            aria-label={t('common.close')}
+            className="-me-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-slate-400 transition hover:bg-emerald-50 hover:text-slate-600 dark:hover:bg-emerald-900 dark:hover:text-emerald-100"
           >
-            <ArrowRight size={17} />
+            <X size={16} />
           </button>
-        )}
-        {identity && isDeskThread && conversation ? (
-          /*
-            A service desk is staffed by people, so the header names the person
-            who is actually answering: the published photo, name and title of the
-            operator, with a presence dot from their real activity. When a
-            colleague takes the thread over, this changes with them — which is
-            the point, since the alternative is a name that stops matching the
-            answers halfway through a conversation.
-          */
-          <DeskIdentity
-            agent={conversation.last_agent || conversation.agent}
-            desk={desk}
-            channelLabel={conversation.channel_label}
-            handover={Boolean(conversation.last_agent)}
-          />
-        ) : identity ? (
-          <>
-            {/* Counterpart avatar, or a channel-tinted initial when the
-                source has no picture (support, consulting, replies). */}
-            <span
-              className={cn(
-                'flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full text-fluid-xs font-extrabold',
-                CHANNEL_TONE[identity.channel],
-              )}
-            >
-              {identity.avatarUrl ? (
-                <img src={identity.avatarUrl} alt="" className="h-full w-full object-cover" />
-              ) : (
-                identity.title.slice(0, 2)
-              )}
-            </span>
-
-            <HeaderTitle identity={identity} />
-          </>
-        ) : (
-          <span className="flex-1 min-w-0 truncate text-sm font-extrabold text-slate-800 dark:text-white">
-            {t('direct.title')}
-          </span>
-        )}
+        </div>
 
         {isDeskThread && conversation && (
-          <span className="flex shrink-0 items-center gap-0.5">
+          <div className="flex items-center gap-1 border-t border-emerald-100/70 px-2 py-1.5 dark:border-emerald-800/60">
             {desk?.viewer_is_staff && (
               <HandoffButton
                 conversation={conversation}
@@ -620,21 +641,21 @@ export default function DirectThread({
                 onDone={() => void load(true)}
               />
             )}
+            {/* The counterpart's dossier, one tap away: contact details, level,
+                their مزرعه من lands and the service requests they filed. The
+                server picks the right view for the caller — staff see the
+                customer, a customer sees their own profile. */}
+            <button
+              type="button"
+              onClick={() => setProfileOpen(true)}
+              className="flex min-h-9 items-center gap-1.5 rounded-xl px-3 text-fluid-2xs font-bold text-emerald-700 transition hover:bg-emerald-50 dark:text-lime-300 dark:hover:bg-emerald-900"
+            >
+              <UserRound size={13} />
+              پروفایل
+            </button>
             <CloseThreadButton conversation={conversation} onChanged={() => void load(true)} />
-          </span>
+          </div>
         )}
-
-        {/* A small × so the drawer can be dismissed from the thread itself —
-            the back arrow only returns to the inbox list, and the overlay tap
-            is not discoverable once a conversation is on screen. */}
-        <button
-          type="button"
-          onClick={closeDirect}
-          aria-label={t('common.close')}
-          className="-me-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-emerald-50 hover:text-slate-600 dark:hover:bg-emerald-900 dark:hover:text-emerald-100"
-        >
-          <X size={15} />
-        </button>
       </header>
 
       {/* Messages */}
@@ -964,6 +985,11 @@ export default function DirectThread({
         >
           <img src={lightbox} alt="" className="max-h-full max-w-full rounded-2xl object-contain" />
         </button>
+      )}
+
+      {/* Counterpart dossier — «پروفایل مشتری» in the thread's action strip. */}
+      {profileOpen && conversation && (
+        <CustomerProfileCard conversationId={conversation.id} onClose={() => setProfileOpen(false)} />
       )}
     </div>
   );

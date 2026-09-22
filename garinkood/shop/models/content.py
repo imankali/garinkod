@@ -13,6 +13,44 @@ from .catalog import Product
 # ========================================
 # Site content: articles, growing guides, services, landing pages, trust pages
 # ========================================
+class HeroSlide(models.Model):
+    """One slide of the home-page hero carousel.
+
+    The home page used to hardcode its three slides; the content-production
+    console now owns them, so a manager can launch a seasonal campaign without
+    a deploy. Empty rows (a manager started typing and abandoned) never reach
+    the public API — only slides with a title are listed.
+    """
+
+    kicker = models.CharField(max_length=80, blank=True, verbose_name="متن بالای عنوان")
+    title = models.CharField(max_length=120, verbose_name="عنوان")
+    body = models.TextField(max_length=300, blank=True, verbose_name="توضیح کوتاه")
+    cta_label = models.CharField(max_length=60, blank=True, verbose_name="متن دکمه")
+    cta_url = models.CharField(max_length=300, blank=True, verbose_name="لینک دکمه (مثل /products)")
+    background_image = models.ImageField(
+        upload_to='hero/%Y/%m/', blank=True, null=True, verbose_name="تصویر پس‌زمینه"
+    )
+    # Gradient classes used when no photo is uploaded — keeps the current look
+    # working without any asset work.
+    gradient = models.CharField(max_length=200, blank=True, verbose_name="کلاس گرادیان (بدون عکس)")
+    order = models.PositiveSmallIntegerField(default=0, verbose_name="ترتیب نمایش")
+    is_active = models.BooleanField(default=True, db_index=True, verbose_name="فعال")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ('order', 'id')
+        verbose_name = "اسلاید هیرو"
+        verbose_name_plural = "اسلایدهای هیرو"
+
+    def __str__(self):
+        return self.title
+
+    @property
+    def background_url(self) -> str:
+        return self.background_image.url if self.background_image else ''
+
+
 class SiteArticle(models.Model):
     """A site-wide editorial article or a per-crop growing guide.
 

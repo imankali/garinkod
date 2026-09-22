@@ -2,7 +2,7 @@
 
 import type { AttachedListing, Storefront } from './storefront';
 import type { LandType } from './farming';
-export type MessageChannel = 'storefront' | 'support' | 'consulting' | 'comment';
+export type MessageChannel = 'storefront' | 'support' | 'consulting' | 'comment' | 'procurement';
 
 export type MessageAttachmentType = 'image' | 'video' | 'audio';
 

@@ -19,7 +19,7 @@
 // live in the shared ساخت غرفه form, which this page opens in a dialog and the
 // studio redirects to.
 
-import { useCallback, useEffect, useId, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import {
@@ -133,6 +133,14 @@ export default function Storefronts() {
   const [storefronts, setStorefronts] = useState<Storefront[]>([]);
   const [featured, setFeatured] = useState<Storefront[]>([]);
   const [posts, setPosts] = useState<StorefrontPost[]>([]);
+  /** Posts revealed behind the initial four, via «مشاهده بیشتر». */
+  const [extraPosts, setExtraPosts] = useState<StorefrontPost[]>([]);
+  /** The shuffle seed and page cursor shared by «مشاهده بیشتر» requests. */
+  const postSeed = useRef(Math.floor(Math.random() * 1_000_000));
+  const postPage = useRef(1);
+  const [postsLoading, setPostsLoading] = useState(false);
+  /** True when the shuffled feed has more rows than the section currently shows. */
+  const [hasMorePosts, setHasMorePosts] = useState(false);
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -173,13 +181,73 @@ export default function Storefronts() {
       .featured(8)
       .then((response) => setFeatured(response.data))
       .catch(() => setFeatured([]));
-    // Top five by likes, server-side: the first page of newest is not the most
-    // liked list, and a client can only rank what it was given.
+    // A shuffled mix, fresh on every page load: the server samples with a new
+    // seed per request and skips the posts already served to this account, so
+    // a refresh shows a new set instead of the same top five. (A fixed ordering
+    // here would make the section a pinned shelf rather than a feed.) The seed
+    // is pinned for the session so «مشاهده بیشتر» pages continue one ordering.
+    postSeed.current = Math.floor(Math.random() * 1_000_000);
+    postPage.current = 1;
     storefrontPostsApi
-      .list({ post_type: 'post', ordering: '-likes_total', page_size: 5 })
-      .then((response) => setPosts(response.data.results))
+      .list({ post_type: 'post', shuffle: true, seed: postSeed.current, page_size: 8 })
+      .then((response) => {
+        const rows = response.data.results;
+        setPosts(rows.slice(0, 4));
+        setExtraPosts(rows.slice(4));
+        setHasMorePosts(rows.length > 4 || Boolean(response.data.next));
+      })
       .catch(() => setPosts([]));
   }, []);
+
+  /** «مشاهده بیشتر»: reveal what the first shuffled request already brought,
+   *  then keep drawing pages from the same seed until the pool is exhausted. */
+  const loadMorePosts = useCallback(async () => {
+    if (extraPosts.length > 0) {
+      setPosts((current) => [...current, ...extraPosts.slice(0, 4)]);
+      setExtraPosts((current) => current.slice(4));
+      return;
+    }
+    if (!hasMorePosts || postsLoading) return;
+    postPage.current += 1;
+    setPostsLoading(true);
+    try {
+      const response = await storefrontPostsApi.list({
+        post_type: 'post',
+        shuffle: true,
+        seed: postSeed.current,
+        page: postPage.current,
+        page_size: 4,
+      });
+      const rows = response.data.results;
+      setPosts((current) => [...current, ...rows]);
+      setHasMorePosts(Boolean(response.data.next));
+    } catch {
+      setHasMorePosts(false);
+    } finally {
+      setPostsLoading(false);
+    }
+  }, [extraPosts, hasMorePosts, postsLoading]);
+
+  // A signed-in reader's served posts are recorded server-side, which is what
+  // makes the NEXT visit show a different set; anonymous visitors get their
+  // freshness from the per-request seed instead (nothing to track, no login).
+  // One bulk call, deferred to idle: marking the feed must not race the
+  // requests that are still painting the page.
+  const [servedPostIds, setServedPostIds] = useState<number[]>([]);
+  useEffect(() => {
+    if (!isAuthenticated || posts.length === 0) return;
+    const newIds = posts.map((post) => post.id);
+    setServedPostIds((current) => [...new Set([...current, ...newIds])]);
+  }, [isAuthenticated, posts]);
+  useEffect(() => {
+    if (!isAuthenticated || servedPostIds.length === 0) return;
+    const timer = window.setTimeout(() => {
+      const batch = servedPostIds;
+      setServedPostIds((current) => current.filter((id) => !batch.includes(id)));
+      void storefrontPostsApi.markManySeen(batch).catch(() => undefined);
+    }, 2500);
+    return () => window.clearTimeout(timer);
+  }, [isAuthenticated, servedPostIds]);
 
   useEffect(() => {
     if (!filters.province) {
@@ -299,9 +367,11 @@ export default function Storefronts() {
               <ArrowLeft size={13} aria-hidden="true" />
             </a>
           </div>
-          <ul className="mt-3 grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Horizontal rail instead of a wrapping grid — same rail pattern
+              as the product panels: one row, snap points, themed scrollbar. */}
+          <ul className="rail-scroll mt-3 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-3 touch-pan-x">
             {featured.map((item) => (
-              <li key={item.id}>
+              <li key={item.id} className="w-64 shrink-0 snap-start sm:w-72">
                 <StorefrontCard storefront={item} />
               </li>
             ))}
@@ -309,7 +379,9 @@ export default function Storefronts() {
         </section>
       )}
 
-      {/* Sellers' posts, ranked by likes, with the Explore page behind them */}
+      {/* Sellers' posts: a fresh shuffle per visit, expandable in place — the
+          Explore page stays linked in the header for readers who want the
+          full-screen feed. */}
       {posts.length > 0 && (
         <section className="mt-8" aria-labelledby="store-posts-heading">
           <div className="flex flex-wrap items-end justify-between gap-2">
@@ -329,6 +401,21 @@ export default function Storefronts() {
               <PostCard key={post.id} post={post} />
             ))}
           </div>
+          {hasMorePosts && (
+            <div className="mt-5 flex justify-center">
+              <motion.button
+                type="button"
+                onClick={() => void loadMorePosts()}
+                disabled={postsLoading}
+                whileHover={reduceMotion || postsLoading ? undefined : { y: -3 }}
+                whileTap={reduceMotion || postsLoading ? undefined : { scale: 0.97 }}
+                className="flex min-h-11 items-center gap-2 rounded-xl border border-emerald-200 bg-white px-5 text-fluid-xs font-extrabold text-emerald-700 transition hover:bg-emerald-50 disabled:opacity-60 dark:border-emerald-800 dark:bg-emerald-950 dark:text-lime-300 dark:hover:bg-emerald-900"
+              >
+                {postsLoading ? 'در حال بارگذاری…' : 'پست‌های بیشتر در همین صفحه'}
+                <ChevronLeft size={15} aria-hidden="true" />
+              </motion.button>
+            </div>
+          )}
         </section>
       )}
 

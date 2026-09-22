@@ -353,11 +353,13 @@ class ConversationRating(models.Model):
 
 
 class CommentVote(models.Model):
-    """One «مفید بود» per visitor per comment.
+    """One vote per visitor per comment, with a direction.
 
     Votes are anonymous-friendly on purpose (many buyers read reviews without
-    logging in), but the row is keyed so a refresh cannot inflate a review, and it
-    can be withdrawn.
+    logging in), but the row is keyed so a refresh cannot inflate a review, and
+    it can be withdrawn or flipped. ``value`` is +1 (helpful) or -1 (not
+    helpful); a review's tally is the sum, so five ups and two downs read as
+    +3 rather than pretending the downs do not exist.
     """
 
     comment = models.ForeignKey(
@@ -368,6 +370,11 @@ class CommentVote(models.Model):
         related_name='comment_votes',
     )
     visitor_key = models.CharField(max_length=64, blank=True, verbose_name="کلید بازدیدکننده")
+    value = models.SmallIntegerField(
+        default=1,
+        choices=[(1, "مفید"), (-1, "غیرمفید")],
+        verbose_name="جهت رأی",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

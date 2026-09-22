@@ -2,6 +2,7 @@ from contextlib import nullcontext
 from decimal import Decimal, InvalidOperation
 import hashlib
 from datetime import timedelta
+import time
 from secrets import token_urlsafe
 from threading import Lock
 from uuid import UUID
@@ -45,6 +46,7 @@ from .models import (
     WalletTransaction, StorefrontPost, AdminAuditLog, Location, AgriInput,
     AgriInputDose, StorefrontFollow, StorefrontHighlight, StorefrontHighlightItem,
     StorefrontPostComment, StorefrontPostLike, StorefrontStoryView,
+    StorefrontPostSeen,
     UserAccount, Shipment, WebPushSubscription, account_level
 )
 from .serializers import (
@@ -436,13 +438,31 @@ class ProductViewSet(viewsets.ReadOnlyModelViewSet):
                 'id', 'product_id', 'listing_id', 'min_quantity', 'discount_percent',
             ).order_by('min_quantity'),
         )
+        # Both list and retrieve render srcset for every image; ``image_variants``
+        # is the JSON column those serializers read, and the prefetch machinery
+        # itself groups rows by ``product_id``. Leaving either out of ``only()``
+        # made it a deferred field, so every image cost one extra row fetch (the
+        # tell-tale ``LIMIT 21`` pattern in the query log).
+        image_columns = ('image', 'caption', 'order', 'image_variants', 'product_id')
+        # TagSerializer renders a per-tag published count; a bare ``'tags'``
+        # prefetch serves Tag rows without that attribute, so the serializer
+        # fell back to one COUNT per (product, tag) pair on the page. Annotate
+        # the prefetched rows once and the serializer reads the attribute.
+        tags_prefetch = Prefetch(
+            'tags',
+            queryset=Tag.objects.annotate(
+                published_product_count=Count(
+                    'products', filter=Q(products__status='published')
+                )
+            ),
+        )
 
         if self.action == 'retrieve':
             # The detail page renders the spec table, the gallery and the package
             # picker; prefetch all three instead of one query per row.
             queryset = queryset.prefetch_related(
-                Prefetch('images', queryset=ProductImage.objects.only('image', 'caption', 'order')),
-                'packages', 'tags', 'attributes', price_tier_prefetch,
+                Prefetch('images', queryset=ProductImage.objects.only(*image_columns)),
+                'packages', tags_prefetch, 'attributes', price_tier_prefetch,
             )
         else:
             # The LIST serializer embeds each card's tags
@@ -463,8 +483,8 @@ class ProductViewSet(viewsets.ReadOnlyModelViewSet):
             # Measured by counting queries grouped by table, which is the only
             # way to see this — the total looks plausible either way.
             queryset = queryset.prefetch_related(
-                'tags', 'packages',
-                Prefetch('images', queryset=ProductImage.objects.only('image', 'caption', 'order')),
+                tags_prefetch, 'packages',
+                Prefetch('images', queryset=ProductImage.objects.only(*image_columns)),
                 price_tier_prefetch,
             )
         return queryset
@@ -675,12 +695,22 @@ class CommentViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], permission_classes=[permissions.AllowAny],
             throttle_classes=[FeedbackRateThrottle])
     def helpful(self, request, pk=None):
-        """Toggle «مفید بود» on a review.
+        """Cast, flip or withdraw the visitor's vote on a review.
 
-        The tally is recomputed from the rows rather than trusted from the
-        request, so a client cannot post a score of its own.
+        ``value`` is ``+1`` (helpful) or ``-1`` (not helpful); omitting it
+        toggles a ``+1`` vote, which keeps the original one-button client
+        behaviour. Repeating the same direction withdraws the vote. The tallies
+        are recomputed from the rows rather than trusted from the request, so a
+        client cannot post a score of its own; ``helpful_count`` keeps the SUM
+        so existing readers and the ordering column stay meaningful, and the
+        response carries the up/down split the new UI renders.
         """
         comment = self.get_object()
+        raw = request.data.get('value', 1)
+        try:
+            direction = 1 if int(raw) >= 0 else -1
+        except (TypeError, ValueError):
+            direction = 1
         user = request.user if request.user.is_authenticated else None
         votes = CommentVote.objects.filter(comment=comment)
         if user:
@@ -688,13 +718,29 @@ class CommentViewSet(viewsets.ModelViewSet):
         else:
             votes = votes.filter(user__isnull=True, visitor_key=self._visitor_key(request))
         existing = votes.first()
-        if existing:
-            existing.delete()
+        if existing and existing.value == direction:
+            existing.delete()  # same button twice = withdraw
+        elif existing:
+            existing.value = direction
+            existing.save(update_fields=['value'])  # flip
         else:
-            CommentVote.objects.create(comment=comment, user=user, visitor_key=self._visitor_key(request))
-        total = CommentVote.objects.filter(comment=comment).count()
-        Comment.objects.filter(pk=comment.pk).update(helpful_count=total)
-        return Response({'voted': existing is None, 'helpful_count': total})
+            CommentVote.objects.create(
+                comment=comment, user=user,
+                visitor_key=self._visitor_key(request), value=direction,
+            )
+        mine = votes.first()
+        my_value = mine.value if mine else (None if existing is None else direction)
+        # Recompute both tallies from the rows.
+        ups = CommentVote.objects.filter(comment=comment, value=1).count()
+        downs = CommentVote.objects.filter(comment=comment, value=-1).count()
+        Comment.objects.filter(pk=comment.pk).update(helpful_count=ups - downs)
+        return Response({
+            'voted': my_value is not None,
+            'my_value': my_value,
+            'helpful_count': ups - downs,
+            'up_count': ups,
+            'down_count': downs,
+        })
 
     @action(detail=True, methods=['post'], permission_classes=[permissions.AllowAny],
             throttle_classes=[FeedbackRateThrottle])
@@ -1434,26 +1480,249 @@ def my_orders(request):
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
 def create_service_request(request):
-    serializer = ServiceRequestSerializer(data=request.data)
+    """File a service request — and walk it into the messenger.
+
+    The flow, for a signed-in caller:
+    * name and phone prefill from the account; a phone the account does not
+      have yet is *captured here* and written back (unverified), so the desk
+      can always reach the person;
+    * «پرونده زمین»: if the caller picked one of their registered lands it
+      rides along; if they gave land facts but have none registered, one is
+      created automatically — every land a consultant should know about ends
+      up in مزرعه من, not only in a free-text field;
+    * the request is mirrored into the consulting thread as a message, so the
+      request and the chat are one conversation seen from two entrances — the
+      same rule shop/consultations.py already enforces for مزرعه من requests.
+
+    A guest skips the first two steps and files with whatever they typed.
+    """
+    serializer = ServiceRequestSerializer(data=request.data, context={'request': request})
     serializer.is_valid(raise_exception=True)
-    service_request = serializer.save(user=request.user if request.user.is_authenticated else None)
-    return Response({
-        'request': ServiceRequestSerializer(service_request).data,
+    data = dict(serializer.validated_data)
+
+    user = request.user if request.user.is_authenticated else None
+    created_land = None
+    land_linked = False
+    if user is not None:
+        account = UserAccount.objects.filter(user=user).first()
+        # Phone capture: the account is the durable contact record, so a number
+        # typed into a request form should end up on it. It is stored unverified
+        # (phone_verified_at stays put) — verification is OTP's job.
+        if account is not None:
+            phone = (data.get('phone') or '').strip()
+            if phone and not (account.phone or '').strip():
+                account.phone = phone[:11]
+                account.save(update_fields=['phone', 'updated'])
+
+        # Land dossier: link the chosen land, or auto-create one from the form's
+        # land facts so the consultant gets a real case file either way.
+        land = data.pop('land', None)
+        if land is not None:
+            land_linked = True
+        else:
+            name = (data.get('customer_name') or user.get_full_name() or user.username).strip()
+            land = _autocreate_land_for(user, name, data)
+            created_land = land
+        if land is not None:
+            data['land'] = land
+            # Province/city on the request should agree with the land's — the
+            # land is the more considered record (it was reviewed in مزرعه من).
+            if land.province and not data.get('province'):
+                data['province'] = land.province
+            if land.city and not data.get('city'):
+                data['city'] = land.city
+            if not data.get('crop') and land.crop_type:
+                data['crop'] = land.crop_type
+            if data.get('farm_area_hectare') is None and land.area is not None:
+                try:
+                    if land.area_unit == 'hectare':
+                        data['farm_area_hectare'] = land.area
+                    elif land.area_unit == 'square_meter':
+                        data['farm_area_hectare'] = (land.area / Decimal('10000')).quantize(Decimal('0.01'))
+                    else:  # jarib
+                        data['farm_area_hectare'] = (land.area / Decimal('10')).quantize(Decimal('0.01'))
+                except Exception:
+                    pass
+
+    service_request = ServiceRequest(**{**data, 'user': user})
+    service_request.save()
+
+    conversation_id = None
+    if user is not None:
+        conversation_id = _mirror_service_request_in_thread(
+            service_request, user=user, land_linked=land_linked, created_land=created_land,
+        )
+
+    response = Response({
+        'request': ServiceRequestSerializer(service_request, context={'request': request}).data,
         'message': 'درخواست شما ثبت شد؛ کارشناس مناسب با شما تماس می‌گیرد.'
     }, status=status.HTTP_201_CREATED)
+    if conversation_id:
+        response.data['conversation_id'] = conversation_id
+    return response
+
+
+def _autocreate_land_for(user, name, data):
+    """Create a FarmLand from the request form's land facts, unless one matches.
+
+    «پرونده زمین» must not be a form the farmer fills twice: when the request
+    describes a field (type, area, crop, location) and the caller has no
+    registered land with that crop, the description is promoted to a real
+    FarmLand — visible afterwards in مزرعه من and reusable for the next request.
+    Only worth doing when there is something to record; a pure service question
+    ("هزینه اجرا چقدر است؟") creates nothing.
+    """
+    from .models import FarmLand
+
+    crop = (data.get('crop') or '').strip()
+    area = data.get('farm_area_hectare')
+    if not crop and area is None:
+        return None
+
+    existing = FarmLand.objects.filter(owner=user, is_active=True)
+    if crop:
+        existing = existing.filter(crop_type__icontains=crop)
+    match = existing.order_by('-updated_at').first()
+    if match is not None:
+        return match
+
+    area_decimal = None
+    if area is not None:
+        try:
+            area_decimal = Decimal(str(area)).quantize(Decimal('0.01'))
+        except (InvalidOperation, TypeError, ValueError):
+            area_decimal = None
+
+    label = (name or 'زمین من').strip() or 'زمین من'
+    base_name = 'زمین از درخواست خدمت'
+    if FarmLand.objects.filter(owner=user, name=base_name).exists():
+        base_name = f'{base_name} {FarmLand.objects.filter(owner=user).count() + 1}'
+    land = FarmLand.objects.create(
+        owner=user,
+        name=base_name,
+        land_type='farmland',
+        area=area_decimal or Decimal('1.00'),
+        area_unit='hectare',
+        crop_type=crop or 'نامشخص',
+        province=(data.get('province') or '')[:80],
+        city=(data.get('city') or '')[:80],
+        notes=f'پرونده به‌طور خودکار از درخواست خدمت «{label}» ساخته شد.',
+    )
+    return land
+
+
+def _mirror_service_request_in_thread(service_request, *, user, land_linked, created_land):
+    """Post the request into the caller's consulting thread. Returns thread id.
+
+    Best-effort like its sibling in shop/consultations.py: a broken inbox must
+    never eat a filed request. The message is stamped with the request row so
+    retries cannot duplicate it.
+    """
+    from .models import StorefrontConversation, StorefrontMessage, StorefrontPost
+    from .notifications import get_or_create_service_thread
+
+    try:
+        conversation = get_or_create_service_thread(
+            user, StorefrontConversation.CHANNEL_CONSULTING,
+            subject=f"درخواست خدمت {service_request.get_service_type_display()} — {service_request.code}",
+        )
+        if StorefrontMessage.objects.filter(service_request=service_request).exists():
+            return conversation.pk
+        lines = [
+            f"درخواست خدمت {service_request.code} — {service_request.get_service_type_display()}",
+            service_request.description,
+        ]
+        extras = []
+        if service_request.crop:
+            extras.append(f'محصول: {service_request.crop}')
+        if service_request.farm_area_hectare is not None:
+            extras.append(f'مساحت: {service_request.farm_area_hectare} هکتار')
+        if service_request.province or service_request.city:
+            extras.append(f'موقعیت: {service_request.province} {service_request.city}'.strip())
+        if service_request.land:
+            extras.append(f'پرونده زمین: {service_request.land.name}')
+        if created_land is not None:
+            extras.append('پرونده زمین به‌طور خودکار در «مزرعه من» ساخته شد.')
+        body = '\n'.join([line for line in lines if line] + (['\n' + ' · '.join(extras)] if extras else []))
+        StorefrontMessage.objects.create(
+            conversation=conversation,
+            sender=user,
+            body=body[:2000],
+            land=service_request.land,
+            service_request=service_request,
+        )
+        conversation.save(update_fields=['updated_at'])
+        return conversation.pk
+    except Exception:  # pragma: no cover - mirror must not eat the request
+        return None
 
 
 @documented_api
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
 def create_procurement_request(request):
-    serializer = ProcurementRequestSerializer(data=request.data)
+    """File a «فروش محصول به تیم خرید» request — and mirror it into the messenger.
+
+    The procurement offer gets its own desk channel (``procurement``) rather
+    than riding along with consulting, so the buying team works a separate
+    queue. For a signed-in farmer the request is posted into their procurement
+    thread — one conversation, two entrances, the same rule the other desks
+    follow. Guests still file; their offer is evaluated from the form data.
+    """
+    serializer = ProcurementRequestSerializer(data=request.data, context={'request': request})
     serializer.is_valid(raise_exception=True)
     procurement_request = serializer.save(user=request.user if request.user.is_authenticated else None)
-    return Response({
+
+    conversation_id = None
+    user = request.user if request.user.is_authenticated else None
+    if user is not None:
+        conversation_id = _mirror_procurement_request_in_thread(procurement_request, user=user)
+
+    response = Response({
         'request': ProcurementRequestSerializer(procurement_request).data,
         'message': 'درخواست فروش محصول ثبت شد و پس از ارزیابی با شما تماس می‌گیریم.'
     }, status=status.HTTP_201_CREATED)
+    if conversation_id:
+        response.data['conversation_id'] = conversation_id
+    return response
+
+
+def _mirror_procurement_request_in_thread(procurement_request, *, user):
+    """Post the offer into the farmer's procurement thread. Best-effort."""
+    from .models import StorefrontConversation, StorefrontMessage
+    from .notifications import get_or_create_service_thread
+
+    try:
+        conversation = get_or_create_service_thread(
+            user, StorefrontConversation.CHANNEL_PROCUREMENT,
+            subject=f"عرضه {procurement_request.crop_name} — {procurement_request.code}",
+        )
+        if StorefrontMessage.objects.filter(service_request__isnull=True, land__isnull=True).filter(
+            conversation=conversation, body__contains=procurement_request.code
+        ).exists():
+            return conversation.pk
+        summary_parts = [
+            f"{procurement_request.crop_name}"
+            + (f" ({procurement_request.variety})" if procurement_request.variety else ""),
+            f"مقدار: {procurement_request.quantity} {procurement_request.unit}",
+        ]
+        if procurement_request.requested_price:
+            summary_parts.append(f"قیمت پیشنهادی: {procurement_request.requested_price} تومان")
+        summary_parts.append(f"موقعیت: {procurement_request.province} {procurement_request.city}".strip())
+        body = '\n'.join([
+            f"درخواست فروش محصول {procurement_request.code}",
+            ' · '.join(summary_parts),
+            procurement_request.description or '',
+        ])
+        StorefrontMessage.objects.create(
+            conversation=conversation,
+            sender=user,
+            body=body[:2000],
+        )
+        conversation.save(update_fields=['updated_at'])
+        return conversation.pk
+    except Exception:  # pragma: no cover - mirror must not eat the request
+        return None
 
 
 # ========================================
@@ -2251,7 +2520,29 @@ class StorefrontPostViewSet(viewsets.ModelViewSet):
                 public = live.filter(
                     Q(pk__in=public.values('pk')) | Q(storefront__user=self.request.user)
                 )
-            return self._annotate(self._apply_feed_filters(public))
+            feed = self._apply_feed_filters(public)
+            # «هر بار صفحه رفرش شد مجموعه جدیدی نمایش بده»: with ?shuffle=1 the
+            # feed is sampled with a per-request random seed, and a signed-in
+            # reader is additionally shielded from the posts already served to
+            # them (StorefrontPostSeen marks) — until the pool runs dry, then
+            # the seen marks are ignored so the section never goes empty.
+            shuffle_params = self.request.query_params
+            if shuffle_params.get('shuffle') in {'1', 'true'}:
+                if self.request.user.is_authenticated:
+                    seen = StorefrontPostSeen.objects.filter(user=self.request.user).values('post_id')
+                    fresh = feed.exclude(pk__in=seen)
+                    if fresh.exists() or feed.count() == 0:
+                        feed = fresh
+                seed = int(shuffle_params.get('seed') or (time.time() * 1000) % 1_000_000)
+                from .models.social import _seeded_random_order
+
+                feed = _seeded_random_order(feed, seed)
+                # OrderingFilter would otherwise re-apply the model default
+                # (-created_at) over the shuffle and silently undo it — DRF
+                # appends the view's fallback ordering to whatever the
+                # queryset already carries.
+                self.ordering = None
+            return self._annotate(feed)
         if self.request.user.is_authenticated:
             return self._annotate(base.filter(storefront__user=self.request.user))
         return base.none()
@@ -2293,11 +2584,43 @@ class StorefrontPostViewSet(viewsets.ModelViewSet):
 
     def perform_destroy(self, instance):
         self._assert_owner(instance)
-        instance.delete()
+        if instance.post_type == 'story':
+            # استوری حذف‌شده سخت پاک نمی‌شود؛ به آرشیو غرفه می‌رود تا صاحبش
+            # بتواند بعداً آن را در یک هایلایت نگه دارد. پست‌ها همچنان
+            # سخت حذف می‌شوند چون نسخه‌ی ماندگار محتوا هستند.
+            instance.status = 'archived'
+            instance.save(update_fields=['status', 'updated_at'])
+        else:
+            instance.delete()
 
     @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated])
     def mine(self, request):
         return Response(self.get_serializer(self.get_queryset(), many=True).data)
+
+    @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated])
+    def story_archive(self, request):
+        """آرشیو استوری‌های غرفه‌دار — منقضی‌شده‌ها و حذف‌شده‌های نرم.
+
+        The archive is what keeps highlights everlasting: a story that left the
+        24-hour stage — by the clock or by the seller's own delete — still lives
+        here so it can join a highlight later. Each row carries the highlight ids
+        it already belongs to, so the UI can badge «در هایلایت» without guessing.
+        """
+        storefront = get_object_or_404(Storefront, user=request.user)
+        now = timezone.now()
+        stories = (
+            StorefrontPost.objects
+            .filter(storefront=storefront, post_type='story')
+            .filter(Q(status='archived') | Q(expires_at__lte=now))
+            .order_by('-updated_at')
+        )
+        membership: dict[int, list[int]] = {}
+        for item in StorefrontHighlightItem.objects.filter(post__in=stories):
+            membership.setdefault(item.post_id, []).append(item.highlight_id)
+        data = self.get_serializer(stories, many=True).data
+        for row in data:
+            row['highlight_ids'] = membership.get(row['id'], [])
+        return Response(data)
 
     @action(detail=True, methods=['post', 'delete'], permission_classes=[permissions.IsAuthenticated])
     def like(self, request, pk=None):
@@ -2314,10 +2637,49 @@ class StorefrontPostViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
     def seen(self, request, pk=None):
-        """Mark a story as viewed, which greys out its ring for this user."""
+        """Mark a story as viewed, which greys out its ring for this user.
+
+        For a plain post this instead records a feed mark (StorefrontPostSeen),
+        which the shuffled feed uses to serve the reader fresh posts on every
+        page load; same endpoint, so the client has one call to make.
+        """
         post = self.get_object()
-        StorefrontStoryView.objects.get_or_create(post=post, user=request.user)
+        if post.post_type == 'story':
+            StorefrontStoryView.objects.get_or_create(post=post, user=request.user)
+        else:
+            StorefrontPostSeen.objects.get_or_create(post=post, user=request.user)
         return Response({'is_seen': True})
+
+    @action(detail=False, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def mark_seen(self, request):
+        """Mark many posts seen in one round trip.
+
+        The storefronts page serves a feed and then records everything it just
+        showed; a POST per card fired eight requests in the same instant the
+        page was still loading, competing with the very calls that paint it.
+        One bulk call does the same bookkeeping with a single bulk_create.
+        """
+        raw = request.data.get('ids') or request.data.get('post_ids')
+        if not isinstance(raw, (list, tuple)):
+            return Response(
+                {'error': 'آرایه‌ی شناسه پست‌ها الزامی است.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            ids = [int(value) for value in raw][:200]
+        except (TypeError, ValueError):
+            return Response(
+                {'error': 'شناسه‌ها باید عدد باشند.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not ids:
+            return Response({'marked': 0})
+        rows = [
+            StorefrontPostSeen(post_id=post_id, user=request.user)
+            for post_id in set(ids)
+        ]
+        StorefrontPostSeen.objects.bulk_create(rows, ignore_conflicts=True)
+        return Response({'marked': len(rows)})
 
     @action(
         detail=True, methods=['get', 'post'],

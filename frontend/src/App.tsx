@@ -214,6 +214,33 @@ export default function App() {
     initializeSession();
   }, [initializeSession]);
 
+  // ========================================
+  // Prefetch the heavy lazy routes during idle time after first paint.
+  // ========================================
+  // First navigation to /storefronts used to download the whole page chunk
+  // *after* the click, so the first visit stalled on the network while later
+  // visits were instant (the chunk was already cached). Prefetching at idle
+  // keeps the small entry chunk that code-splitting buys and still makes the
+  // first click feel like the second.
+  useEffect(() => {
+    const prefetch = () => {
+      void import("./pages/Storefronts");
+      void import("./pages/StorefrontPage");
+      void import("./pages/Shop");
+    };
+    const idleWindow = window as Window & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    };
+    const id: number = idleWindow.requestIdleCallback
+      ? idleWindow.requestIdleCallback(prefetch, { timeout: 4000 })
+      : window.setTimeout(prefetch, 2500);
+    return () => {
+      if (idleWindow.cancelIdleCallback) idleWindow.cancelIdleCallback(id);
+      else window.clearTimeout(id);
+    };
+  }, []);
+
   useEffect(() => {
     if (isSessionChecked && previousAuthenticated.current && !isAuthenticated) {
       resetCart();
@@ -720,13 +747,13 @@ export default function App() {
           />
         </Suspense>
 
-        {/* Global return-to-top control. */}
-        <BackToTopButton />
+        {/* Global return-to-top control; it must yield to the cart sheet. */}
+        <BackToTopButton cartDrawerOpen={cartOpen} />
 
         {/* ======================================== */}
         {/* Consultation Button */}
         {/* ======================================== */}
-        <GlobalMessengerButton />
+        <GlobalMessengerButton cartDrawerOpen={cartOpen} />
 
         {/* ======================================== */}
         {/* Sign-in dialog used by every gated action (reviews, consult) */}

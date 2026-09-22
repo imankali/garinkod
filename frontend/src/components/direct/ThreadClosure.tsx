@@ -61,14 +61,14 @@ export function CloseThreadButton({
         type="button"
         onClick={() => setSheet(closed ? 'reopen' : 'closing')}
         className={cn(
-          'flex min-h-9 items-center justify-center gap-1.5 rounded-xl px-2.5 text-fluid-2xs font-extrabold transition',
+          'flex min-h-8 items-center justify-center gap-1.5 rounded-lg border border-transparent px-2.5 text-fluid-2xs font-extrabold transition',
           closed
-            ? 'text-emerald-700 hover:bg-emerald-50 dark:text-lime-300 dark:hover:bg-emerald-900'
-            : 'text-slate-500 hover:bg-slate-100 hover:text-rose-600 dark:text-emerald-200 dark:hover:bg-emerald-900',
+            ? 'text-emerald-700 hover:border-emerald-200 hover:bg-emerald-50 dark:text-lime-300 dark:hover:border-emerald-700 dark:hover:bg-emerald-900/60'
+            : 'text-slate-500 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 dark:text-emerald-200/90 dark:hover:border-rose-500/30 dark:hover:bg-rose-950/40 dark:hover:text-rose-300',
           className,
         )}
       >
-        {closed ? <RotateCcw size={14} aria-hidden="true" /> : <PhoneOff size={14} aria-hidden="true" />}
+        {closed ? <RotateCcw size={13} aria-hidden="true" /> : <PhoneOff size={13} aria-hidden="true" />}
         {closed ? 'بازکردن گفتگو' : 'اتمام مکالمه'}
       </button>
 
@@ -208,12 +208,12 @@ export function HandoffButton({
           setOpen(true);
         }}
         className={cn(
-          'flex min-h-9 items-center justify-center gap-1.5 rounded-xl px-2.5 text-fluid-2xs font-extrabold text-slate-500',
-          'transition hover:bg-sky-50 hover:text-sky-700 dark:text-emerald-200 dark:hover:bg-sky-950/40 dark:hover:text-sky-200',
+          'flex min-h-8 items-center justify-center gap-1.5 rounded-lg border border-transparent px-2.5 text-fluid-2xs font-extrabold text-slate-500',
+          'transition hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700 dark:text-emerald-200/90 dark:hover:border-sky-500/30 dark:hover:bg-sky-950/40 dark:hover:text-sky-200',
           className,
         )}
       >
-        <ArrowLeftRight size={14} aria-hidden="true" />
+        <ArrowLeftRight size={13} aria-hidden="true" />
         ارجاع به {targetLabel}
       </button>
 

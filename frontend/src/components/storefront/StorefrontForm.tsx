@@ -343,6 +343,7 @@ export default function StorefrontForm({
             <option value="cooperative">تعاونی</option>
             <option value="merchant">تاجر</option>
             <option value="company">شرکت</option>
+            <option value="agro_shop">نهاده‌های کشاورزی</option>
           </select>
         </label>
 

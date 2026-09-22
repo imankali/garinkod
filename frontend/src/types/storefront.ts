@@ -2,7 +2,7 @@
 
 import type { ImageSrcset } from './shop';
 import type { ProductAttribute } from './shop';
-export type SellerType = 'farmer' | 'cooperative' | 'merchant' | 'company';
+export type SellerType = 'farmer' | 'cooperative' | 'merchant' | 'company' | 'agro_shop';
 
 export interface Storefront {
   id: number;
@@ -96,6 +96,8 @@ export interface MarketplaceListing {
   min_order_quantity: string;
   minimum_order: number;
   harvest_date: string | null;
+  production_date: string | null;
+  expiry_date: string | null;
   image: string | null;
   image_url: string;
   image_srcset?: ImageSrcset | null;

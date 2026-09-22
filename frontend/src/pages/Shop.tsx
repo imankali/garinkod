@@ -189,6 +189,7 @@ function readFilters(params: URLSearchParams, source: 'products' | 'marketplace'
     maxPrice: params.get('max_price') || '',
     minRating: params.get('min_rating') || '',
     features: FEATURES[source].map((item) => item.key).filter((key) => params.get(key) === '1'),
+    sellerType: source === 'marketplace' ? params.get('seller_type') || '' : '',
   };
 }
 
@@ -236,6 +237,7 @@ export default function Shop({ compareItems, onToggleCompare }: ShopProps) {
     if (filters.minPrice) base.min_price = filters.minPrice;
     if (filters.maxPrice) base.max_price = filters.maxPrice;
     if (filters.minRating && source === 'products') base.min_rating = filters.minRating;
+    if (source === 'marketplace' && filters.sellerType) base.seller_type = filters.sellerType;
     if (featured) base.is_featured = true;
     filters.features.forEach((key) => {
       base[key] = source === 'products' ? true : '1';
@@ -344,6 +346,7 @@ export default function Shop({ compareItems, onToggleCompare }: ShopProps) {
       category: undefined, subcategory: undefined, brand: undefined,
       package_weight: undefined, package_size: undefined, ordering: undefined,
       search: undefined, min_price: undefined, max_price: undefined, min_rating: undefined,
+      seller_type: undefined,
       page_size: undefined, collection: undefined, featured: undefined, page: undefined,
       ...Object.fromEntries([...FEATURES.products, ...FEATURES.marketplace].map((item) => [item.key, undefined])),
     });
@@ -365,7 +368,7 @@ export default function Shop({ compareItems, onToggleCompare }: ShopProps) {
     readCsv(filters.brand).length + readCsv(filters.pack).length +
     readCsv(filters.ordering).length + filters.features.length +
     (filters.search ? 1 : 0) + (filters.minPrice || filters.maxPrice ? 1 : 0) +
-    (filters.minRating ? 1 : 0);
+    (filters.minRating ? 1 : 0) + readCsv(filters.sellerType).length;
   const filtersActive = activeCount > 0;
 
   const selectedCategories = readCsv(filters.category);

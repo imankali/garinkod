@@ -24,12 +24,13 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import toast from 'react-hot-toast';
 import {
   ArrowRight, ChevronLeft, ChevronRight, FolderTree, Layers, Link2,
-  ListPlus, Pencil, Plus, Save, Send, Tags, Trash2, X,
+  ListPlus, Pencil, Plus, Save, Send, Tags, Trash2, X, Image as ImageIcon,
 } from 'lucide-react';
 
 import {
   contentStudioApi,
   type ArticleWork,
+  type HeroSlideWork,
   type PackageRow,
   type ProductWork,
   type SpecRow,
@@ -43,7 +44,7 @@ import { parseApiError } from '../../api/errors';
 import { cn } from '../../utils/cn';
 import { formatPrice } from '../../utils/formatPrice';
 
-type Sub = 'products' | 'articles' | 'taxonomy';
+type Sub = 'products' | 'articles' | 'taxonomy' | 'hero';
 
 const PAGE_SIZE = 25;
 
@@ -62,6 +63,7 @@ export default function ContentStudio() {
     { id: 'products', label: 'محصول‌ها', icon: Layers },
     { id: 'articles', label: 'مقاله‌ها و راهنما', icon: Send },
     { id: 'taxonomy', label: 'دسته‌ها و برچسب‌ها', icon: FolderTree },
+    { id: 'hero', label: 'اسلایدر هیرو', icon: ImageIcon },
   ];
 
   return (
@@ -98,16 +100,18 @@ export default function ContentStudio() {
       </nav>
 
       {/* The forms need the taxonomy before they can render their dropdowns. */}
-      {!options ? (
+      {!options && sub !== 'hero' ? (
         <p role="status" className="rounded-3xl bg-white p-8 text-center text-sm text-slate-500 dark:bg-emerald-950">
           در حال دریافت فهرست دسته‌ها…
         </p>
+      ) : sub === 'hero' ? (
+        <HeroSlidesPanel />
       ) : sub === 'products' ? (
-        <ProductsPanel options={options} />
+        <ProductsPanel options={options!} />
       ) : sub === 'articles' ? (
-        <ArticlesPanel options={options} />
+        <ArticlesPanel options={options!} />
       ) : (
-        <TaxonomyPanel options={options} />
+        <TaxonomyPanel options={options!} />
       )}
     </section>
   );
@@ -1026,6 +1030,363 @@ function blankArticle(): ArticleWork {
 }
 
 // =============================================================================
+// Hero slider (اسلایدر هیرو)
+// =============================================================================
+
+const HERO_GRADIENTS = [
+  { value: 'bg-gradient-to-bl from-emerald-800 via-emerald-700 to-lime-600', label: 'زمردی → لیمویی' },
+  { value: 'bg-gradient-to-bl from-teal-800 via-teal-700 to-emerald-500', label: 'سبزآبی → زمردی' },
+  { value: 'bg-gradient-to-bl from-lime-700 via-lime-600 to-amber-400', label: 'لیمویی → کهربایی' },
+  { value: 'bg-gradient-to-bl from-slate-900 via-emerald-900 to-emerald-600', label: 'شب → زمردی' },
+];
+
+function HeroSlidesPanel() {
+  const [rows, setRows] = useState<HeroSlideWork[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState<HeroSlideWork | 'new' | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await contentStudioApi.heroSlides.list();
+      setRows(response.data);
+    } catch (error) {
+      toastError(error);
+      setRows([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function remove(row: HeroSlideWork) {
+    if (!window.confirm(`اسلاید «${row.title}» حذف شود؟ این اقدام بازگشت ندارد.`)) return;
+    try {
+      await contentStudioApi.heroSlides.remove(row.id);
+      toast.success('اسلاید حذف شد.');
+      await load();
+    } catch (error) {
+      toastError(error);
+    }
+  }
+
+  async function toggleActive(row: HeroSlideWork) {
+    const form = new FormData();
+    form.append('is_active', row.is_active ? 'false' : 'true');
+    try {
+      await contentStudioApi.heroSlides.update(row.id, form);
+      await load();
+    } catch (error) {
+      toastError(error);
+    }
+  }
+
+  function move(row: HeroSlideWork, direction: -1 | 1) {
+    // Optimistic local swap, then persist both orders.
+    const index = rows.findIndex((item) => item.id === row.id);
+    const target = index + direction;
+    if (index < 0 || target < 0 || target >= rows.length) return;
+    const first = rows[index]!;
+    const second = rows[target]!;
+    const next = [...rows];
+    next[index] = second;
+    next[target] = first;
+    setRows(next);
+    void (async () => {
+      try {
+        await Promise.all([
+          contentStudioApi.heroSlides.update(first.id, formData({ order: String(second.order) })),
+          contentStudioApi.heroSlides.update(second.id, formData({ order: String(first.order) })),
+        ]);
+      } catch (error) {
+        toastError(error);
+        await load();
+      }
+    })();
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-3xl border border-slate-200 bg-white p-3 shadow-sm dark:border-emerald-900 dark:bg-emerald-950">
+        <p className="text-fluid-xs font-bold text-slate-500 dark:text-emerald-200">
+          اسلایدهای صفحه اصلی — ترتیب نمایش از راست به چپ؛ اسلاید غیرفعال هرگز نمایش داده نمی‌شود.
+          {loading ? ' — در حال بارگذاری…' : ` (${rows.length.toLocaleString('fa-IR')} اسلاید)`}
+        </p>
+        <button
+          type="button"
+          onClick={() => setEditing('new')}
+          className="flex min-h-11 items-center gap-1.5 rounded-xl bg-emerald-600 px-4 text-fluid-sm font-bold text-white transition hover:bg-emerald-700"
+        >
+          <Plus size={15} aria-hidden="true" />
+          افزودن اسلاید
+        </button>
+      </div>
+
+      {rows.length === 0 && !loading ? (
+        <p className="rounded-3xl border border-dashed border-slate-200 py-12 text-center text-sm text-slate-400 dark:border-emerald-800">
+          اسلایدی نیست — صفحه اصلی به اسلایدهای پیش‌فرض برمی‌گردد. اولین اسلاید را بسازید.
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {rows.map((row, index) => (
+            <li
+              key={row.id}
+              className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-100 bg-white p-3 dark:border-emerald-900 dark:bg-emerald-950"
+            >
+              {row.background_url ? (
+                <img
+                  src={row.background_url}
+                  alt=""
+                  loading="lazy"
+                  className="h-12 w-20 shrink-0 rounded-xl bg-slate-100 object-cover dark:bg-emerald-900"
+                />
+              ) : (
+                <span
+                  aria-hidden="true"
+                  className={`h-12 w-20 shrink-0 rounded-xl ${row.gradient || 'bg-gradient-to-bl from-emerald-800 via-emerald-700 to-lime-600'}`}
+                />
+              )}
+              <div className="min-w-0 flex-1">
+                <strong className="block min-w-0 truncate text-sm text-slate-800 dark:text-white">{row.title}</strong>
+                <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-fluid-2xs text-slate-500 dark:text-emerald-200">
+                  {row.kicker && <span>{row.kicker}</span>}
+                  {row.cta_label && <span>· دکمه: {row.cta_label}</span>}
+                  {row.cta_url && <span dir="ltr">· {row.cta_url}</span>}
+                  <span>· ترتیب {row.order.toLocaleString('fa-IR')}</span>
+                </p>
+              </div>
+              <div className="flex items-center gap-1">
+                <IconButton label="جابه‌جایی به عقب" onClick={() => move(row, -1)} disabled={index === 0}>
+                  <ArrowRight size={15} />
+                </IconButton>
+                <IconButton
+                  label="جابه‌جایی به جلو"
+                  onClick={() => move(row, 1)}
+                  disabled={index === rows.length - 1}
+                >
+                  <ChevronLeft size={15} />
+                </IconButton>
+                <IconButton
+                  label={row.is_active ? 'غیرفعال کردن' : 'فعال کردن'}
+                  onClick={() => void toggleActive(row)}
+                  className={row.is_active ? 'text-emerald-600' : 'text-slate-400'}
+                >
+                  <Send size={15} />
+                </IconButton>
+                <IconButton label={`ویرایش ${row.title}`} onClick={() => setEditing(row)}>
+                  <Pencil size={15} />
+                </IconButton>
+                <IconButton label={`حذف ${row.title}`} danger onClick={() => void remove(row)}>
+                  <Trash2 size={15} />
+                </IconButton>
+              </div>
+              {!row.is_active && (
+                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-fluid-2xs font-bold text-slate-500 dark:bg-emerald-900 dark:text-emerald-200">
+                  غیرفعال
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {editing && (
+        <HeroSlideEditor
+          slide={editing === 'new' ? null : editing}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
+            void load();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/** FormData helper — the slide endpoint is multipart because of the photo. */
+function formData(fields: Record<string, string>): FormData {
+  const form = new FormData();
+  Object.entries(fields).forEach(([key, value]) => form.append(key, value));
+  return form;
+}
+
+function HeroSlideEditor({
+  slide,
+  onClose,
+  onSaved,
+}: {
+  slide: HeroSlideWork | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [draft, setDraft] = useState(() => slide ?? {
+    id: 0,
+    kicker: '',
+    title: '',
+    body: '',
+    cta_label: '',
+    cta_url: '',
+    background_image: null,
+    background_url: '',
+    gradient: HERO_GRADIENTS[0]!.value,
+    order: 0,
+    is_active: true,
+  });
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [removePhoto, setRemovePhoto] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  function set<K extends keyof HeroSlideWork>(key: K, value: HeroSlideWork[K]) {
+    setDraft((current) => ({ ...current, [key]: value }));
+  }
+
+  async function save() {
+    if (!draft.title.trim()) {
+      setFieldErrors({ title: 'عنوان لازم است.' });
+      return;
+    }
+    setSaving(true);
+    setFieldErrors({});
+    try {
+      const form = new FormData();
+      form.append('kicker', draft.kicker);
+      form.append('title', draft.title.trim());
+      form.append('body', draft.body);
+      form.append('cta_label', draft.cta_label);
+      form.append('cta_url', draft.cta_url);
+      form.append('gradient', draft.gradient);
+      form.append('order', String(draft.order));
+      form.append('is_active', draft.is_active ? 'true' : 'false');
+      if (photo) form.append('background_image', photo);
+      if (removePhoto) form.append('background_image', '');
+      if (slide) await contentStudioApi.heroSlides.update(slide.id, form);
+      else await contentStudioApi.heroSlides.create(form);
+      toast.success(slide ? 'اسلاید به‌روزرسانی شد.' : 'اسلاید ساخته شد.');
+      onSaved();
+    } catch (error) {
+      setFieldErrors(parseApiError(error).fields || {});
+      toastError(error);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const previewStyle = draft.background_url && !removePhoto
+    ? { backgroundImage: `url(${draft.background_url})` }
+    : undefined;
+
+  return (
+    <Modal title={slide ? `ویرایش اسلاید: ${slide.title}` : 'اسلاید جدید'} onClose={onClose}>
+      <div className="space-y-5">
+        {/* Live preview — the manager sees the slide the way the home page draws it. */}
+        <div
+          className={`relative flex h-44 flex-col justify-center gap-1.5 overflow-hidden rounded-2xl p-5 text-white ${draft.gradient}`}
+          style={previewStyle}
+        >
+          {previewStyle && <div className="absolute inset-0 bg-gradient-to-l from-black/55 via-black/35 to-black/20" aria-hidden="true" />}
+          <div className="relative">
+            {draft.kicker && <p className="text-fluid-2xs font-bold text-lime-200">{draft.kicker}</p>}
+            <p className="text-fluid-lg font-extrabold leading-snug">{draft.title || 'عنوان اسلاید'}</p>
+            {draft.body && <p className="mt-1 max-w-md text-fluid-2xs leading-6 text-emerald-50">{draft.body}</p>}
+            {draft.cta_label && (
+              <span className="mt-2 inline-flex rounded-lg bg-white px-3 py-1.5 text-fluid-2xs font-extrabold text-emerald-800">
+                {draft.cta_label}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <TextInput
+            label="عنوان *"
+            value={draft.title}
+            onChange={(value) => set('title', value)}
+            error={fieldErrors.title}
+          />
+          <TextInput label="متن بالای عنوان" value={draft.kicker} onChange={(value) => set('kicker', value)} />
+        </div>
+        <TextArea label="توضیح کوتاه" value={draft.body} onChange={(value) => set('body', value)} rows={2} />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <TextInput label="متن دکمه" value={draft.cta_label} onChange={(value) => set('cta_label', value)} />
+          <TextInput
+            label="لینک دکمه (مثل /products یا https://…)"
+            value={draft.cta_url}
+            onChange={(value) => set('cta_url', value)}
+            dir="ltr"
+            error={fieldErrors.cta_url}
+          />
+        </div>
+
+        <Fieldset legend="پس‌زمینه">
+          <div className="space-y-3">
+            <SelectInput
+              label="گرادیان (وقتی عکسی نیست)"
+              value={draft.gradient}
+              onChange={(value) => set('gradient', value)}
+              options={HERO_GRADIENTS}
+            />
+            <label className="block text-fluid-xs font-bold text-slate-600 dark:text-emerald-100">
+              عکس پس‌زمینه (آپلود مستقیم)
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(event) => {
+                  const file = event.target.files?.[0] || null;
+                  setPhoto(file);
+                  setRemovePhoto(false);
+                }}
+                className={`${FIELD_CLASS} file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-600 file:px-3 file:py-1.5 file:text-fluid-2xs file:font-bold file:text-white`}
+              />
+            </label>
+            {(draft.background_url || photo) && !removePhoto && (
+              <div className="flex items-center gap-3">
+                <img
+                  src={photo ? URL.createObjectURL(photo) : draft.background_url}
+                  alt=""
+                  className="h-14 w-24 rounded-lg border border-slate-200 object-cover dark:border-emerald-800"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPhoto(null);
+                    setRemovePhoto(true);
+                  }}
+                  className="min-h-9 rounded-lg border border-rose-200 px-3 text-fluid-2xs font-bold text-rose-600 dark:border-rose-900"
+                >
+                  حذف عکس
+                </button>
+              </div>
+            )}
+          </div>
+        </Fieldset>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <NumberInput
+            label="ترتیب نمایش"
+            value={draft.order}
+            onChange={(value) => set('order', Number(value) || 0)}
+          />
+          <div className="flex items-end pb-2">
+            <Checkbox
+              label="فعال (در صفحه اصلی نمایش داده شود)"
+              checked={draft.is_active}
+              onChange={(value) => set('is_active', value)}
+            />
+          </div>
+        </div>
+      </div>
+
+      <ModalFooter saving={saving} onClose={onClose} onSave={() => void save()} />
+    </Modal>
+  );
+}
+
+// =============================================================================
 // Taxonomy
 // =============================================================================
 
@@ -1552,11 +1913,15 @@ function IconButton({
   label,
   onClick,
   danger = false,
+  disabled = false,
+  className,
   children,
 }: {
   label: string;
   onClick: () => void;
   danger?: boolean;
+  disabled?: boolean;
+  className?: string;
   children: ReactNode;
 }) {
   return (
@@ -1565,8 +1930,10 @@ function IconButton({
       onClick={onClick}
       aria-label={label}
       title={label}
+      disabled={disabled}
       className={cn(
-        'flex min-h-11 min-w-11 items-center justify-center rounded-xl text-slate-500 transition',
+        'flex min-h-11 min-w-11 items-center justify-center rounded-xl text-slate-500 transition disabled:cursor-not-allowed disabled:opacity-35',
+        className,
         danger
           ? 'hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40'
           : 'hover:bg-emerald-50 hover:text-emerald-700 dark:hover:bg-emerald-900 dark:hover:text-lime-300',

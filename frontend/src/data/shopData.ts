@@ -454,5 +454,5 @@ export const navLinks = [
   { label: "محصولات", href: "/products" },
   { label: "خدمات کشاورزی", href: "/services" },
   { label: "غرفه‌داران", href: "/storefronts" },
-  { label: "تخفیف‌ها", href: "/products?featured=true" },
+  { label: "تخفیف‌ها", href: "/products?collection=discounted" },
 ];

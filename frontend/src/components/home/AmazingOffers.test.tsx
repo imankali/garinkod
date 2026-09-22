@@ -71,14 +71,14 @@ describe('the flash-deal panel', () => {
   it('scrolls the rail with the round arrow buttons', async () => {
     await renderAppSettled(<AmazingOffers />, { route: '/' });
     await screen.findByText('کود نیتروژن');
-    const rail = screen.getByRole('region', { name: 'کارت‌های قابل پیمایش افقی' });
-    const scrollBy = vi.fn();
-    rail.scrollBy = scrollBy;
+    // The regression this guards: a rail move must never drag the page's
+    // vertical scroll with it (scrollIntoView used to do exactly that).
+    const windowScrollSpy = vi.spyOn(window, 'scrollTo').mockName('window.scrollTo');
+    const documentScrollSpy = vi.spyOn(document.documentElement, 'scrollTop', 'set');
     fireEvent.click(screen.getByRole('button', { name: 'محصولات بعدی' }));
     fireEvent.click(screen.getByRole('button', { name: 'محصولات قبلی' }));
-    expect(scrollBy).toHaveBeenCalledTimes(2);
-    expect(scrollBy).toHaveBeenNthCalledWith(1, { left: 280, behavior: 'smooth' });
-    expect(scrollBy).toHaveBeenNthCalledWith(2, { left: -280, behavior: 'smooth' });
+    expect(windowScrollSpy).not.toHaveBeenCalled();
+    expect(documentScrollSpy).not.toHaveBeenCalled();
   });
 
   it('removes itself when nothing is discounted', async () => {

@@ -358,10 +358,15 @@ def catalog_index(request):
                 'slug': row.slug,
                 'image_url': '',
                 'description': (row.description or '')[:300],
-                'count': row.products.filter(status='published').count(),
+                # One grouped COUNT for every tag instead of one query per tag.
+                'count': getattr(row, 'published_product_count', None) or 0,
                 'url': f'/tag/{row.slug}',
             }
-            for row in Tag.objects.all()[:60]
+            for row in Tag.objects.annotate(
+                published_product_count=Count(
+                    'products', filter=Q(products__status='published')
+                )
+            ).order_by('name')[:60]
         ],
         'brands': [
             {

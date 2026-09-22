@@ -23,6 +23,7 @@ import { parseApiError } from '../../api/errors';
 import { useCartStore } from '../../store/cartStore';
 import { useDirectStore } from '../../store/directStore';
 import { useTranslation } from '../../i18n';
+import { formatShamsi } from '../../utils/shamsiDate';
 import type { MarketplaceListing } from '@/types/storefront';
 import { formatPrice } from '../../utils/formatPrice';
 import { cn } from '../../utils/cn';
@@ -243,10 +244,21 @@ export default function ListingDetailModal({
               {listing.harvest_date && (
                 <Fact
                   label="برداشت"
-                  value={new Date(listing.harvest_date).toLocaleDateString('fa-IR', {
-                    month: 'long',
-                    day: 'numeric',
-                  })}
+                  value={formatShamsi(listing.harvest_date, 'medium')}
+                  icon={CalendarDays}
+                />
+              )}
+              {listing.production_date && (
+                <Fact
+                  label="تولید"
+                  value={formatShamsi(listing.production_date)}
+                  icon={CalendarDays}
+                />
+              )}
+              {listing.expiry_date && (
+                <Fact
+                  label="انقضا"
+                  value={formatShamsi(listing.expiry_date)}
                   icon={CalendarDays}
                 />
               )}

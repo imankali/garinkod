@@ -1,7 +1,11 @@
 // frontend/src/components/home/BannerGrid.tsx
 
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { BookOpen, GraduationCap, Store, TrendingUp } from 'lucide-react';
+
+import { agricultureApi } from '../../api/services';
+import { useAuthStore } from '../../store/authStore';
 
 /**
  * The four-column promo grid + wide campaign banner Digikala places between
@@ -45,6 +49,26 @@ const TILES = [
 ] as const;
 
 export default function BannerGrid() {
+  // A stallholder clicking «شروع غرفه‌داری» lands on a signup form they have
+  // already completed — insulting, and a dead end away from their own shop.
+  // The auth store carries `has_storefront`, so for them the banner becomes a
+  // shortcut into their own stall instead of a second acquisition pitch. The
+  // actual stall address comes from the same source پروفایل uses: the account
+  // requests its own storefront and we keep the slug here once it arrives
+  // (anonymous visitors never fire the request, so the banner stays CTA).
+  const hasStorefront = useAuthStore((state) => Boolean(state.account?.has_storefront));
+  const [myStallSlug, setMyStallSlug] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!hasStorefront) return;
+    agricultureApi
+      .getStorefront()
+      .then((response) => setMyStallSlug(response.data?.slug ?? null))
+      .catch(() => setMyStallSlug(null));
+  }, [hasStorefront]);
+
+  const bannerTo = hasStorefront && myStallSlug ? `/storefronts/${myStallSlug}` : hasStorefront ? '/profile' : '/farmer-sell';
+
   return (
     <section className="page-shell py-6 sm:py-8" aria-label="میان‌برهای گرین کود">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -67,19 +91,24 @@ export default function BannerGrid() {
       </div>
 
       <Link
-        to="/farmer-sell"
+        to={bannerTo}
+        aria-label={hasStorefront ? 'رفتن به غرفه من' : 'شروع ثبت‌نام غرفه‌داری'}
         className="mt-4 flex min-h-24 flex-wrap items-center justify-between gap-3 rounded-2xl bg-gradient-to-l from-emerald-900 via-emerald-800 to-lime-700 px-6 py-5 text-white shadow-md transition duration-300 hover:shadow-xl focus-visible:outline-2 focus-visible:outline-emerald-600"
       >
         <span>
           <span className="block text-fluid-lg font-extrabold">
-            محصولت رو مستقیم بفروش — همین امروز غرفه بزن
+            {hasStorefront
+              ? 'غرفه شما منتظر شماست — پیشخوان فروشنده'
+              : 'محصولت رو مستقیم بفروش — همین امروز غرفه بزن'}
           </span>
           <span className="mt-1 block text-fluid-xs text-emerald-50">
-            ثبت‌نام غرفه‌داری با تأیید مدارک، دفتر مالی شفاف و تسویه به کارت بانکی
+            {hasStorefront
+              ? 'آگهی‌ها، سفارش‌ها و درآمد شما یک‌جا در پیشخوان غرفه'
+              : 'ثبت‌نام غرفه‌داری با تأیید مدارک، دفتر مالی شفاف و تسویه به کارت بانکی'}
           </span>
         </span>
         <span className="rounded-xl bg-white px-5 py-2.5 text-fluid-sm font-extrabold text-emerald-800 transition group-hover:bg-emerald-50">
-          شروع غرفه‌داری
+          {hasStorefront ? 'رفتن به غرفه من' : 'شروع غرفه‌داری'}
         </span>
       </Link>
     </section>

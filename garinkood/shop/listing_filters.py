@@ -29,6 +29,13 @@ from django.db.models import Count, Q
 
 MAX_SELECTED_VALUES = 24
 
+# The marketplace's core aisles. These departments are always offered in the
+# category facet — even with zero matching ads under the current filters — so
+# the aisle map of the site stays complete (کود/سم/بذر/ادوات) instead of
+# shrinking to whichever departments happen to have stock right now. Slugs
+# match the seeded Category rows; unknown slugs are silently ignored.
+CORE_CATEGORY_SLUGS = ('fertilizer', 'pesticide', 'seed', 'equipment', 'irrigation', 'tools')
+
 # Parameters understood by the ad list. Anything else in the query string is
 # someone else's business (page, ordering, a deep link).
 LIST_FILTER_KEYS = (
@@ -178,6 +185,12 @@ def category_facet_rows(queryset, *, limit: int = 24):
     Grouping on ``category`` alone would split the ads that a seller filed under
     a subcategory of that department, which is exactly the case the parent chip
     has to cover — so the count is the union of both.
+
+    The site's core departments (کود، سم، بذر، ادوات…) are always listed even
+    when a seller-type or price filter leaves them empty — with an honest 0 —
+    so the buyer sees the full aisle map of the marketplace and learns which
+    departments exist before any seller has filled them. Non-core departments
+    still only surface once they actually have ads.
     """
     from .models import Category
 
@@ -199,6 +212,16 @@ def category_facet_rows(queryset, *, limit: int = 24):
         slug = row['subcategory__category__slug']
         if slug:
             totals[slug] = totals.get(slug, 0) + row['total']
+
+    # Core aisles of the marketplace: keep them visible at zero. (A buyer
+    # filtering by «نهاده‌های کشاورزی» still expects بذر and ادوات listed,
+    # just not yet stocked by that seller type.)
+    for slug, _name in (
+        Category.objects.filter(slug__in=CORE_CATEGORY_SLUGS)
+        .order_by('id')
+        .values_list('slug', 'name')
+    ):
+        totals.setdefault(slug, 0)
 
     ordered = sorted(totals.items(), key=lambda item: (-item[1], item[0]))[:limit]
     names = dict(

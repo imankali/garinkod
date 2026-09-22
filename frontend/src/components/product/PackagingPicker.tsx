@@ -66,7 +66,7 @@ export default function PackagingPicker({
                 >
                   <span className="text-fluid-xs font-bold">{item.label}</span>
                   <span className={cn('text-fluid-2xs', active ? 'text-emerald-50' : 'text-slate-500 dark:text-emerald-300')}>
-                    {item.is_in_stock ? `${formatPrice(item.discounted_price)} تومان` : 'ناموجود'}
+                    {item.is_in_stock ? formatPrice(item.discounted_price) : 'ناموجود'}
                   </span>
                 </button>
               );
@@ -79,7 +79,7 @@ export default function PackagingPicker({
         {selected?.price_per_kg ? (
           <li className="inline-flex items-center gap-1">
             <Scale size={13} aria-hidden="true" />
-            هر واحد: <span className="text-slate-800 dark:text-white">{formatPrice(selected.price_per_kg)} تومان</span>
+            هر واحد: <span className="text-slate-800 dark:text-white">{formatPrice(selected.price_per_kg)}</span>
           </li>
         ) : null}
         <li className="inline-flex items-center gap-1">

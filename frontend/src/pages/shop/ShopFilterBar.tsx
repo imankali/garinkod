@@ -44,6 +44,8 @@ export interface ShopFilters {
   maxPrice: string;
   minRating: string;
   features: string[];
+  /** Marketplace only: the kind of stall behind the ads (کشاورز، تعاونی…). */
+  sellerType: string;
 }
 
 export const EMPTY_FILTERS: ShopFilters = {
@@ -57,6 +59,7 @@ export const EMPTY_FILTERS: ShopFilters = {
   maxPrice: '',
   minRating: '',
   features: [],
+  sellerType: '',
 };
 
 export interface ShopFacets {
@@ -103,6 +106,21 @@ export const PACK_PARAM: Record<'products' | 'marketplace', string> = {
 const RATING_FLOORS = [
   { value: '4', label: '۴ ستاره و بالاتر' },
   { value: '3', label: '۳ ستاره و بالاتر' },
+];
+
+/**
+ * The kinds of stall a buyer can insist on, in the marketplace tab only.
+ *
+ * Mirrors ``Storefront.SELLER_TYPE_CHOICES`` on the server — «نهاده‌های
+ * کشاورزی» is what supply-shop owners register as, so their ads travel under
+ * their own filter instead of masquerading as farmers.
+ */
+export const SELLER_TYPE_OPTIONS: FacetOption[] = [
+  { value: 'farmer', label: 'کشاورز' },
+  { value: 'cooperative', label: 'تعاونی' },
+  { value: 'merchant', label: 'تاجر' },
+  { value: 'company', label: 'شرکت' },
+  { value: 'agro_shop', label: 'نهاده‌های کشاورزی' },
 ];
 
 export interface ShopFilterBarProps {
@@ -156,6 +174,7 @@ export default function ShopFilterBar({
   const brands = useMemo(() => readCsv(filters.brand), [filters.brand]);
   const packs = useMemo(() => readCsv(filters.pack), [filters.pack]);
   const orderings = useMemo(() => readCsv(filters.ordering), [filters.ordering]);
+  const sellerTypes = useMemo(() => readCsv(filters.sellerType), [filters.sellerType]);
 
   const setCategory = (value: string) =>
     onChange({ category: writeCsv(toggleInList(categories, value)) || undefined, page: undefined });
@@ -165,6 +184,8 @@ export default function ShopFilterBar({
     onChange({ brand: writeCsv(toggleInList(brands, value)) || undefined, page: undefined });
   const setPack = (value: string) =>
     onChange({ [PACK_PARAM[source]]: writeCsv(toggleInList(packs, value)) || undefined, page: undefined });
+  const setSellerType = (value: string) =>
+    onChange({ seller_type: writeCsv(toggleInList(sellerTypes, value)) || undefined, page: undefined });
   const setOrdering = (value: string) => {
     const conflicts = sorts.find((sort) => sort.value === value)?.conflictsWith;
     onChange({
@@ -200,6 +221,11 @@ export default function ShopFilterBar({
     })),
     ...brands.map((value) => ({ key: `brand:${value}`, label: value, onRemove: () => setBrand(value) })),
     ...packs.map((value) => ({ key: `pack:${value}`, label: value, onRemove: () => setPack(value) })),
+    ...sellerTypes.map((value) => ({
+      key: `seller_type:${value}`,
+      label: labelOf(SELLER_TYPE_OPTIONS, value),
+      onRemove: () => setSellerType(value),
+    })),
     ...orderings.map((value) => ({
       key: `ordering:${value}`,
       label: sorts.find((sort) => sort.value === value)?.label || value,
@@ -289,6 +315,16 @@ export default function ShopFilterBar({
             selected={packs}
             onToggle={setPack}
             onClear={() => onChange({ [PACK_PARAM[source]]: undefined, page: undefined })}
+          />
+        )}
+
+        {source === 'marketplace' && (
+          <MultiSelectFacet
+            label="نوع غرفه‌دار"
+            options={SELLER_TYPE_OPTIONS}
+            selected={sellerTypes}
+            onToggle={setSellerType}
+            onClear={() => onChange({ seller_type: undefined, page: undefined })}
           />
         )}
 

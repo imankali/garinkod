@@ -124,7 +124,9 @@ export const SHOP_ITEMS: NavItem[] = [
     id: 'offers',
     label: 'تخفیف‌ها',
     description: 'محصولات ویژه و شگفت‌انگیز',
-    to: '/products?featured=true',
+    // Every discounted product, biggest discount first — not just the few
+    // items hand-picked as featured (that filter used to hide ۳۰٪ off stock).
+    to: '/products?collection=discounted',
     icon: BadgePercent,
   },
 ];

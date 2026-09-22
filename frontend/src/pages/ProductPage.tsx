@@ -6,6 +6,8 @@ import { motion, useReducedMotion } from "framer-motion";
 import {
   ArrowRight,
   BadgeCheck,
+  ChevronLeft,
+  ThumbsDown,
   Beaker,
   ImagePlus,
   MessageCircle,
@@ -82,6 +84,19 @@ export default function ProductPage() {
   const [sticker, setSticker] = useState("");
   const [commentImage, setCommentImage] = useState<File | null>(null);
   const [replyTo, setReplyTo] = useState<Comment | null>(null);
+  const commentFormRef = useRef<HTMLFormElement>(null);
+  const commentBodyRef = useRef<HTMLTextAreaElement>(null);
+
+  /** «پاسخ دادن» from any comment, nested or not, brings the form to the
+   *  user — scrolls it into view and focuses the textarea — instead of
+   *  silently updating a form that may sit far above the fold. */
+  const handleReply = (comment: Comment) => {
+    setReplyTo(comment);
+    requestAnimationFrame(() => {
+      commentFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      commentBodyRef.current?.focus({ preventScroll: true });
+    });
+  };
   const [starFilter, setStarFilter] = useState<number | null>(null);
   const [tab, setTab] = useState<Tab>(() => (linkedComment ? "reviews" : "description"));
   const imageRef = useRef<HTMLInputElement>(null);
@@ -440,10 +455,17 @@ export default function ProductPage() {
 
           <div className="mt-auto border-t border-slate-100 pt-6 dark:border-emerald-900">
             <div className="flex flex-wrap items-end justify-between gap-3">
+              {/* The big number is the price the buyer actually pays — the
+                  discounted one — with the original struck through beside it
+                  only when a discount really changes the amount. Showing the
+                  full price big and struck used to read as the same number
+                  twice, while the payable one hid in a footnote below. */}
               <p className="text-2xl font-extrabold text-slate-800 dark:text-white">
-                {priceOnRequest ? 'تماس بگیرید' : formatPrice(displayPrice)}
-                {!priceOnRequest && product.discount_percent > 0 && (
-                  <span className="ms-2 text-sm font-bold text-slate-400 line-through">{formatPrice(product.price)}</span>
+                {priceOnRequest
+                  ? 'تماس بگیرید'
+                  : formatPrice(displayDiscounted ?? displayPrice)}
+                {!priceOnRequest && displayDiscounted != null && displayDiscounted !== displayPrice && (
+                  <span className="ms-2 text-sm font-bold text-slate-400 line-through">{formatPrice(displayPrice)}</span>
                 )}
               </p>
               {product.discount_percent > 0 && !priceOnRequest && (
@@ -453,9 +475,6 @@ export default function ProductPage() {
                 </span>
               )}
             </div>
-            {!priceOnRequest && product.discount_percent > 0 && (
-              <p className="mt-1.5 text-fluid-sm font-extrabold text-emerald-700 dark:text-lime-300">{formatPrice(displayDiscounted)} تومان</p>
-            )}
 
             {/*
               The ladder sits directly under the price, not in a tab or a
@@ -599,7 +618,7 @@ export default function ProductPage() {
                 )}
               </div>
 
-              <form className="space-y-3 rounded-3xl border border-slate-100 bg-white p-5 shadow-sm dark:border-emerald-900 dark:bg-emerald-950" onSubmit={submitComment}>
+              <form ref={commentFormRef} className="space-y-3 rounded-3xl border border-slate-100 bg-white p-5 shadow-sm dark:border-emerald-900 dark:bg-emerald-950" onSubmit={submitComment}>
                 <h3 className="text-fluid-sm font-extrabold text-slate-800 dark:text-white">{replyTo ? 'پاسخ به دیدگاه' : 'ثبت دیدگاه'}</h3>
                 {replyTo && (
                   <div className="flex items-center justify-between rounded-xl bg-emerald-50 p-2.5 text-fluid-2xs text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-100">
@@ -613,7 +632,7 @@ export default function ProductPage() {
                     <StarPicker value={rating} onChange={setRating} disabled={!isAuthenticated} />
                   </div>
                 )}
-                <textarea value={commentBody} onChange={(event) => setCommentBody(event.target.value)} rows={4} aria-label="متن دیدگاه شما" placeholder={isAuthenticated ? "تجربه خرید، نحوه بسته‌بندی و نتیجه در مزرعه را بنویسید..." : "برای ثبت نظر یا پاسخ ابتدا وارد حساب کاربری شوید"} className="w-full rounded-xl border border-slate-200 bg-white p-3 text-sm outline-none focus:border-emerald-500 dark:border-emerald-700 dark:bg-emerald-900" />
+                <textarea ref={commentBodyRef} value={commentBody} onChange={(event) => setCommentBody(event.target.value)} rows={4} aria-label="متن دیدگاه شما" placeholder={isAuthenticated ? "تجربه خرید، نحوه بسته‌بندی و نتیجه در مزرعه را بنویسید..." : "برای ثبت نظر یا پاسخ ابتدا وارد حساب کاربری شوید"} className="w-full rounded-xl border border-slate-200 bg-white p-3 text-sm outline-none focus:border-emerald-500 dark:border-emerald-700 dark:bg-emerald-900" />
                 <div className="flex flex-wrap items-center gap-2">{STICKERS.map((item) => <button key={item} type="button" onClick={() => setSticker(sticker === item ? "" : item)} className={cn("rounded-lg px-2 py-1 text-lg", sticker === item ? "bg-emerald-100 ring-1 ring-emerald-400 dark:bg-emerald-900" : "bg-slate-50 dark:bg-emerald-900/40")}>{item}</button>)}
                   <input ref={imageRef} type="file" aria-label="افزودن تصویر به دیدگاه" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => setCommentImage(event.target.files?.[0] || null)} />
                   <button type="button" onClick={() => imageRef.current?.click()} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 dark:border-emerald-700 dark:text-emerald-100"><ImagePlus size={15} />{commentImage ? commentImage.name : "افزودن عکس"}</button>
@@ -636,7 +655,7 @@ export default function ProductPage() {
                   <CommentCard
                     key={comment.id}
                     comment={comment}
-                    onReply={setReplyTo}
+                    onReply={handleReply}
                     highlighted={flashedComment === comment.id}
                   />
                 ))}
@@ -653,7 +672,7 @@ export default function ProductPage() {
                       <CommentCard
                         key={comment.id}
                         comment={comment}
-                        onReply={setReplyTo}
+                        onReply={handleReply}
                         highlighted={flashedComment === comment.id}
                       />
                     ))}
@@ -665,7 +684,7 @@ export default function ProductPage() {
                   <CommentCard
                     key={comment.id}
                     comment={comment}
-                    onReply={setReplyTo}
+                    onReply={handleReply}
                     highlighted={flashedComment === comment.id}
                   />
                 ))
@@ -683,8 +702,19 @@ export default function ProductPage() {
               {guides.length > 0 && (
                 <section>
                   <h3 className="text-fluid-lg font-extrabold text-slate-800 dark:text-white">راهنمای کشت مرتبط با این کالا</h3>
-                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                    {guides.map((article) => <ArticleCard key={article.id} article={article} />)}
+                  {/* Horizontal rail (same pattern as the home rails) instead of
+                      a wrapping grid: reading order stays one line, and the
+                      row scrolls rather than reflowing the whole page. */}
+                  <div
+                    className="rail-scroll mt-3 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-3 touch-pan-x"
+                    role="region"
+                    aria-label="راهنماهای کشت مرتبط، قابل پیمایش افقی"
+                  >
+                    {guides.map((article) => (
+                      <div key={article.id} className="w-64 shrink-0 snap-start">
+                        <ArticleCard article={article} />
+                      </div>
+                    ))}
                   </div>
                 </section>
               )}
@@ -728,7 +758,26 @@ export default function ProductPage() {
       </div>
     </div>
 
-    <div ref={similarRef} className="min-h-1">{similar.length > 0 && <section className="mt-10"><h2 className="text-2xl font-extrabold text-slate-800 dark:text-white">محصولات مشابه</h2><div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{similar.map((item) => <SimilarCard key={item.id} product={item} />)}</div></section>}</div>
+    <div ref={similarRef} className="min-h-1">{similar.length > 0 && (
+      <section className="mt-10">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <h2 className="text-2xl font-extrabold text-slate-800 dark:text-white">محصولات مشابه</h2>
+          {/* The rail only previews; the category shelf holds the whole list. */}
+          <Link
+            to={`/products?category=${encodeURIComponent(typeof product?.category === 'string' ? product.category : product?.category?.slug || '')}`}
+            className="ms-auto inline-flex min-h-11 items-center gap-1 text-fluid-sm font-bold text-emerald-700 transition hover:text-emerald-900 dark:text-lime-300"
+          >
+            مشاهده بیشتر
+            <ChevronLeft size={16} aria-hidden="true" />
+          </Link>
+        </div>
+        {/* Horizontal rail instead of a wrapping grid — one row, snap points,
+            thin scrollbar. */}
+        <div className="rail-scroll mt-4 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-3 touch-pan-x" role="region" aria-label="محصولات مشابه، قابل پیمایش افقی">
+          {similar.map((item) => <div key={item.id} className="w-44 shrink-0 snap-start sm:w-52"><SimilarCard product={item} /></div>)}
+        </div>
+      </section>
+    )}</div>
   </main></>;
 }
 
@@ -770,29 +819,49 @@ function CommentCard({ comment, onReply, nested = false, highlighted = false }: 
   // «مفید بود» is writable by a guest, so the row keeps its own tally taken from
   // the server response: the API returns the authoritative count after the
   // toggle, so nothing is shown that the database has not recorded.
-  const [votes, setVotes] = useState({ count: comment.helpful_count ?? 0, voted: false, busy: false });
-  const [reported, setReported] = useState(Boolean(comment.is_reported));
+  const initialTally = comment.helpful_count ?? 0;
+  const [votes, setVotes] = useState({
+    up: Math.max(initialTally, 0),
+    down: Math.max(-initialTally, 0),
+    mine: null as 1 | -1 | null,
+    busy: false,
+  });
 
-  async function toggleHelpful() {
+  async function vote(direction: 1 | -1) {
     if (votes.busy) return;
     setVotes((current) => ({ ...current, busy: true }));
     try {
-      const response = await commentsApi.toggleHelpful(comment.id);
-      setVotes({ count: response.data.helpful_count, voted: response.data.voted, busy: false });
+      const response = await commentsApi.toggleHelpful(comment.id, direction);
+      const data = response.data;
+      setVotes({
+        up: data.up_count ?? 0,
+        down: data.down_count ?? 0,
+        mine: (data.my_value as 1 | -1 | null) ?? null,
+        busy: false,
+      });
     } catch (error) {
       setVotes((current) => ({ ...current, busy: false }));
       toast.error(parseApiError(error).message);
     }
   }
+  const [reported, setReported] = useState(Boolean(comment.is_reported));
 
-  async function reportReview() {
-    const reason = window.prompt('چه چیزی در این دیدگاه مشکل دارد؟ (اختیاری)') ?? '';
+  const [showReportBox, setShowReportBox] = useState(false);
+  const [reportReason, setReportReason] = useState('');
+  const [reportBusy, setReportBusy] = useState(false);
+
+  async function submitReport() {
+    if (reportBusy) return;
+    setReportBusy(true);
     try {
-      await commentsApi.report(comment.id, reason);
+      await commentsApi.report(comment.id, reportReason);
       setReported(true);
+      setShowReportBox(false);
       toast('گزارش برای بررسی به میز پشتیبانی رسید؛ دیدگاه پنهان نمی‌شود.');
     } catch (error) {
       toast.error(parseApiError(error).message);
+    } finally {
+      setReportBusy(false);
     }
   }
 
@@ -816,36 +885,127 @@ function CommentCard({ comment, onReply, nested = false, highlighted = false }: 
   {comment.image && <img src={comment.image} alt="تصویر ارسالی کاربر" className="mt-3 max-h-72 rounded-xl object-cover" />}
   <div className="mt-2 flex flex-wrap items-center gap-2">
     {!nested && (
-      <button
-        type="button"
-        onClick={() => void toggleHelpful()}
-        disabled={votes.busy}
-        aria-pressed={votes.voted}
-        className={cn(
-          "inline-flex min-h-11 items-center gap-1 rounded-lg border px-2.5 text-fluid-2xs font-bold transition",
-          votes.voted
-            ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/60 dark:text-lime-300"
-            : "border-slate-200 text-slate-500 hover:border-emerald-300 hover:text-emerald-700 dark:border-emerald-800 dark:text-emerald-200",
-        )}
-      >
-        <ThumbsUp size={13} aria-hidden="true" />
-        مفید بود{votes.count ? ` (${votes.count.toLocaleString('fa-IR')})` : ''}
-      </button>
+      <span className="inline-flex items-center gap-1">
+        <button
+          type="button"
+          onClick={() => void vote(1)}
+          disabled={votes.busy}
+          aria-pressed={votes.mine === 1}
+          aria-label="این دیدگاه مفید بود"
+          className={cn(
+            "inline-flex min-h-9 items-center gap-1 rounded-full border px-2.5 text-fluid-2xs font-bold transition",
+            votes.mine === 1
+              ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/60 dark:text-lime-300"
+              : "border-slate-200 text-slate-500 hover:border-emerald-300 hover:text-emerald-700 dark:border-emerald-800 dark:text-emerald-200",
+          )}
+        >
+          <ThumbsUp size={13} aria-hidden="true" />
+          {votes.up.toLocaleString('fa-IR')}
+        </button>
+        <button
+          type="button"
+          onClick={() => void vote(-1)}
+          disabled={votes.busy}
+          aria-pressed={votes.mine === -1}
+          aria-label="این دیدگاه مفید نبود"
+          className={cn(
+            "inline-flex min-h-9 items-center gap-1 rounded-full border px-2.5 text-fluid-2xs font-bold transition",
+            votes.mine === -1
+              ? "border-rose-400 bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-300"
+              : "border-slate-200 text-slate-500 hover:border-rose-300 hover:text-rose-600 dark:border-emerald-800 dark:text-emerald-200",
+          )}
+        >
+          <ThumbsDown size={13} aria-hidden="true" />
+          {votes.down.toLocaleString('fa-IR')}
+        </button>
+      </span>
     )}
-    {!nested && (
+    {!nested && !reported && (
       <button
         type="button"
-        onClick={() => void reportReview()}
-        disabled={reported}
-        className={cn("inline-flex min-h-11 items-center gap-1 px-2 text-fluid-2xs font-bold transition", reported ? "text-slate-400" : "text-slate-400 hover:text-rose-600 dark:hover:text-rose-300")}
+        onClick={() => setShowReportBox((open) => !open)}
+        aria-expanded={showReportBox}
+        className="inline-flex min-h-11 items-center gap-1 px-2 text-fluid-2xs font-bold text-slate-400 transition hover:text-rose-600 dark:hover:text-rose-300"
       >
         <Flag size={13} aria-hidden="true" />
-        {reported ? 'گزارش‌شده' : 'گزارش'}
+        گزارش
       </button>
+    )}
+    {!nested && reported && (
+      <span className="inline-flex min-h-11 items-center gap-1 px-2 text-fluid-2xs font-bold text-slate-400">
+        <Flag size={13} aria-hidden="true" />
+        گزارش‌شده
+      </span>
     )}
     <button onClick={() => onReply(comment)} className="ms-auto text-fluid-2xs font-bold text-emerald-700 hover:underline dark:text-lime-300">پاسخ دادن</button>
   </div>
+  {!nested && showReportBox && (
+    <form
+      onSubmit={(event) => { event.preventDefault(); void submitReport(); }}
+      className="mt-2 space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/40"
+    >
+      <label className="block text-fluid-2xs font-bold text-amber-900 dark:text-amber-100">
+        چه مشکلی در این دیدگاه است؟ (اختیاری)
+        <input
+          type="text"
+          value={reportReason}
+          onChange={(event) => setReportReason(event.target.value)}
+          maxLength={300}
+          autoFocus
+          placeholder="مثلاً تبلیغ است، بی‌ربط است، قیمت اشتباه دارد…"
+          className="mt-1.5 w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-fluid-2xs outline-none focus:border-amber-500 dark:border-amber-700 dark:bg-emerald-950 dark:text-white"
+        />
+      </label>
+      <div className="flex items-center justify-end gap-2">
+        <button type="button" onClick={() => setShowReportBox(false)} className="inline-flex min-h-9 items-center rounded-lg px-3 text-fluid-2xs font-bold text-amber-800 dark:text-amber-200">انصراف</button>
+        <button type="submit" disabled={reportBusy} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-rose-600 px-3 text-fluid-2xs font-extrabold text-white transition hover:bg-rose-700 disabled:opacity-60">
+          {reportBusy ? 'در حال ارسال…' : <><Flag size={12} aria-hidden="true" /> ارسال گزارش</>}
+        </button>
+      </div>
+    </form>
+  )}
   {comment.replies?.map((reply) => <CommentCard key={reply.id} comment={reply} onReply={onReply} nested />)}
 </article>; }
 
-function SimilarCard({ product }: { product: ProductList }) { return <Link to={`/products/${product.slug}`} className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-md dark:border-emerald-900 dark:bg-emerald-950"><img src={product.image_url || FALLBACK_IMAGE} alt={product.title} className="h-36 w-full object-cover" /><div className="p-3"><p className="line-clamp-2 text-fluid-sm font-bold text-slate-800 dark:text-white">{product.title}</p>{typeof product.avg_rating === 'number' && product.avg_rating > 0 && <StarRow value={product.avg_rating} size={12} className="mt-1.5" count={product.reviews_count || 0} />}<p className="mt-2 text-fluid-sm font-extrabold text-emerald-700 dark:text-lime-300">{product.price_on_request ? 'تماس بگیرید' : formatPrice(product.price)}</p></div></Link>; }
+function SimilarCard({ product }: { product: ProductList }) {
+  const addToCart = useCartStore((state) => state.addToCart);
+  const [adding, setAdding] = useState(false);
+
+  async function quickAdd() {
+    if (adding) return;
+    setAdding(true);
+    try {
+      await addToCart(product.id, 1);
+      toast.success(`«${product.title}» به سبد خرید اضافه شد`);
+    } catch {
+      toast.error('افزودن به سبد ناموفق بود');
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  return (
+    <div className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-md dark:border-emerald-900 dark:bg-emerald-950">
+      <Link to={`/products/${product.slug}`} className="flex flex-1 flex-col">
+        <img src={product.image_url || FALLBACK_IMAGE} alt={product.title} className="h-36 w-full object-cover" />
+        <div className="p-3">
+          <p className="line-clamp-2 text-fluid-sm font-bold text-slate-800 dark:text-white">{product.title}</p>
+          {typeof product.avg_rating === 'number' && product.avg_rating > 0 && <StarRow value={product.avg_rating} size={12} className="mt-1.5" count={product.reviews_count || 0} />}
+          <p className="mt-2 text-fluid-sm font-extrabold text-emerald-700 dark:text-lime-300">{product.price_on_request ? 'تماس بگیرید' : formatPrice(product.price)}</p>
+        </div>
+      </Link>
+      {!product.price_on_request && (
+        <button
+          type="button"
+          onClick={() => void quickAdd()}
+          disabled={adding}
+          aria-label={`افزودن ${product.title} به سبد خرید`}
+          className="mx-3 mb-3 mt-auto flex h-9 w-[calc(100%-1.5rem)] shrink-0 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 text-fluid-2xs font-extrabold text-white transition hover:bg-emerald-700 active:scale-[0.97] disabled:opacity-60"
+        >
+          <ShoppingCart size={14} aria-hidden="true" />
+          {adding ? 'در حال افزودن…' : 'افزودن به سبد'}
+        </button>
+      )}
+    </div>
+  );
+}

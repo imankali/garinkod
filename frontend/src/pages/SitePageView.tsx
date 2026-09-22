@@ -243,7 +243,7 @@ function LandingProduct({
       </div>
       <div className="text-start sm:text-end">
         <p className="text-fluid-lg font-extrabold text-slate-800 dark:text-white">
-          {product.price_on_request ? 'تماس بگیرید' : `${formatPrice(price)} تومان`}
+          {product.price_on_request ? 'تماس بگیرید' : formatPrice(price)}
         </p>
         {!product.price_on_request && (
           <button

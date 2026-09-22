@@ -134,6 +134,13 @@ class TagSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'slug', 'description', 'product_count']
 
     def get_product_count(self, obj) -> int:
+        # The list endpoint embeds tags on every product card; reaching the
+        # related manager here costs one COUNT per (product, tag) pair on the
+        # page. When the view supplies the published count (one grouped query
+        # for all tags), use it; fall back to the real count elsewhere.
+        published = getattr(obj, 'published_product_count', None)
+        if published is not None:
+            return published
         return obj.products.filter(status='published').count()
 
 
@@ -830,15 +837,36 @@ class CheckoutSerializer(serializers.Serializer):
 class ServiceRequestSerializer(serializers.ModelSerializer):
     status_label = serializers.CharField(source='get_status_display', read_only=True)
     service_label = serializers.CharField(source='get_service_type_display', read_only=True)
+    # The filed-against land's identity card, so the operator sees *which*
+    # field this is about without opening the dossier — and the farmer's
+    # receipt repeats it back to them.
+    land_label = serializers.SerializerMethodField()
+    land = serializers.PrimaryKeyRelatedField(
+        queryset=FarmLand.objects.all(), required=False, allow_null=True
+    )
 
     class Meta:
         model = ServiceRequest
         fields = [
             'id', 'code', 'service_type', 'service_label', 'customer_name', 'phone',
             'province', 'city', 'crop', 'farm_area_hectare', 'description',
+            'land', 'land_label',
             'status', 'status_label', 'created_at'
         ]
         read_only_fields = ['id', 'code', 'status', 'status_label', 'created_at']
+
+    def get_land_label(self, obj):
+        land = obj.land
+        if land is None:
+            return ''
+        return f'{land.name} — {land.get_land_type_display()} · {land.area_label}'
+
+    def validate_land(self, value):
+        """A request may only ride on one of the *caller's* lands."""
+        request = self.context.get('request')
+        if value is not None and request and request.user.is_authenticated and value.owner_id != request.user.id:
+            raise serializers.ValidationError('این پرونده زمین متعلق به شما نیست.')
+        return value
 
 
 class ProcurementRequestSerializer(serializers.ModelSerializer):
@@ -1210,7 +1238,8 @@ class MarketplaceListingSerializer(serializers.ModelSerializer):
             'category', 'category_name', 'subcategory', 'subcategory_name', 'category_label',
             'brand', 'brand_slug', 'package_size', 'is_stock', 'views',
             'price', 'unit', 'quantity_available', 'min_order_quantity', 'minimum_order',
-            'harvest_date', 'image', 'image_url', 'image_srcset', 'status', 'status_label',
+            'harvest_date', 'production_date', 'expiry_date',
+            'image', 'image_url', 'image_srcset', 'status', 'status_label',
             'is_purchasable', 'discount_percent', 'sales_count', 'discounted_price',
             'rejection_reason', 'reviewed_at', 'attributes',
             'created_at', 'updated_at'
@@ -1679,6 +1708,7 @@ class StorefrontMessageSerializer(serializers.ModelSerializer):
     listing = serializers.SerializerMethodField()
     land = serializers.SerializerMethodField()
     post = serializers.SerializerMethodField()
+    service_request = serializers.SerializerMethodField()
     link = serializers.SerializerMethodField()
     is_system = serializers.BooleanField(read_only=True)
     attachment_url = serializers.SerializerMethodField()
@@ -1693,7 +1723,7 @@ class StorefrontMessageSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'conversation', 'sender', 'sender_name', 'sender_avatar_url', 'sender_role_label',
             'sender_verified', 'is_mine', 'is_system', 'body',
-            'listing', 'land', 'post', 'link',
+            'listing', 'land', 'post', 'service_request', 'link',
             'attachment', 'attachment_url', 'attachment_type', 'attachment_duration',
             'reply_to', 'is_edited', 'edited_at', 'is_deleted', 'deleted_at',
             'can_edit', 'can_delete', 'is_read', 'created_at',
@@ -1702,7 +1732,7 @@ class StorefrontMessageSerializer(serializers.ModelSerializer):
             'id', 'conversation', 'sender', 'sender_name', 'sender_avatar_url', 'sender_role_label',
             'sender_verified', 'is_system', 'attachment_url', 'reply_to', 'is_edited', 'edited_at', 'is_deleted',
             'deleted_at', 'can_edit', 'can_delete', 'is_read', 'created_at',
-            'link', 'land', 'post',
+            'link', 'land', 'post', 'service_request',
         ]
 
     def get_reply_to(self, obj):
@@ -1851,6 +1881,34 @@ class StorefrontMessageSerializer(serializers.ModelSerializer):
             'image_url': obj.listing.image_url,
             'storefront_name': obj.listing.storefront.name,
             'storefront_slug': obj.listing.storefront.slug,
+        }
+
+    def get_service_request(self, obj):
+        """The service request this message mirrors, as a compact card.
+
+        The request row is the queue record; showing its code and summary inside
+        the bubble lets the operator see *which* request they are answering
+        without leaving the thread, and gives the farmer a persistent receipt
+        of what they asked for.
+        """
+        if obj.service_request_id is None:
+            return None
+        request_row = obj.service_request
+        return {
+            'id': request_row.id,
+            'code': request_row.code,
+            'service_type': request_row.service_type,
+            'service_label': request_row.get_service_type_display(),
+            'customer_name': request_row.customer_name,
+            'phone': request_row.phone,
+            'province': request_row.province,
+            'city': request_row.city,
+            'crop': request_row.crop,
+            'farm_area_hectare': request_row.farm_area_hectare,
+            'land_id': request_row.land_id,
+            'status': request_row.status,
+            'status_label': request_row.get_status_display(),
+            'summary': (request_row.description or '')[:280],
         }
 
     def get_post(self, obj):

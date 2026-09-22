@@ -3,10 +3,34 @@
 from datetime import time, timedelta
 
 from django.db import models
+from django.db.models import F, Value
 from django.conf import settings
 from django.utils import timezone
 from django.db.models import Q
 from .marketplace import MarketplaceListing, Storefront
+
+
+def _seeded_random_order(queryset, seed: int):
+    """Deterministic pseudo-shuffle of a post queryset by an integer seed.
+
+    The shuffle has to (a) differ per page load, so a refresh really brings a
+    new set, and (b) stay stable across the pages one browsing session draws,
+    so «مشاهده بیشتر» never repeats or skips a row. SQLite and PostgreSQL both
+    expose a Random()/random() function but no seedable one from SQL — so a
+    quadratic mix of (seed, pk) is annotated as the sort key: deterministic
+    per (seed, pk) pair, well spread, and within INTEGER range on both
+    engines (the modulus keeps it there).
+    """
+    pk = F('pk')
+    # (seed*GOLDEN + (pk*STEP1 + pk^2*STEP2) + seed*pk*CROSS) mod PRIME — a
+    # full avalanche for small tables; cheap enough to compute per row.
+    mixed = (
+        Value(seed) * 2654435761
+        + pk * 40503
+        + pk * pk * 2246822519 % Value(1_000_000_007)
+        + Value(seed) * pk * 668265263 % Value(1_000_000_007)
+    ) % Value(1_000_000_007)
+    return queryset.annotate(_shuffle=mixed).order_by('_shuffle', 'pk')
 
 
 
@@ -37,6 +61,10 @@ class StorefrontPost(models.Model):
         ordering = ('-created_at',)
         verbose_name = 'پست غرفه'
         verbose_name_plural = 'پست‌ها و استوری‌های غرفه'
+
+    def random_order(self, seed: int):
+        """This model's rows in a deterministic pseudo-random order."""
+        return _seeded_random_order(self, seed)
 
     def __str__(self):
         return f'{self.storefront.name} — {self.get_post_type_display()}'
@@ -142,6 +170,34 @@ class StorefrontStoryView(models.Model):
         return f'{self.user} 👁 {self.post_id}'
 
 
+class StorefrontPostSeen(models.Model):
+    """One «this reader has already been shown this post» mark.
+
+    The storefronts page keeps a fresh mix on every visit: the feed endpoint
+    excludes the rows recorded here for the requesting user, so a refresh
+    surfaces different posts until the pool of published posts is exhausted
+    (then it starts over rather than showing an empty section). Anonymous
+    visitors get the same freshness from a rotating random seed instead — no
+    account to track.
+    """
+
+    post = models.ForeignKey(StorefrontPost, on_delete=models.CASCADE, related_name='seen_marks')
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='seen_feed_posts'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'پست دیده‌شده'
+        verbose_name_plural = 'پست‌های دیده‌شده'
+        constraints = [
+            models.UniqueConstraint(fields=['post', 'user'], name='unique_post_seen'),
+        ]
+
+    def __str__(self):
+        return f'{self.user} ✓ {self.post_id}'
+
+
 class StorefrontConversation(models.Model):
     """One thread in the unified inbox.
 
@@ -159,12 +215,17 @@ class StorefrontConversation(models.Model):
     CHANNEL_SUPPORT = 'support'
     CHANNEL_CONSULTING = 'consulting'
     CHANNEL_COMMENT = 'comment'
+    # «خرید محصولات کشاورزان» — the procurement team's own desk. Farmer-sell
+    # requests land here rather than inside consulting, so the buyers' queue is
+    # a separate column of work with its own operators.
+    CHANNEL_PROCUREMENT = 'procurement'
 
     CHANNEL_CHOICES = (
         (CHANNEL_STOREFRONT, 'غرفه'),
         (CHANNEL_SUPPORT, 'پشتیبانی'),
         (CHANNEL_CONSULTING, 'پشتیبانی کشاورزان'),
         (CHANNEL_COMMENT, 'پاسخ به دیدگاه'),
+        (CHANNEL_PROCUREMENT, 'خرید محصولات کشاورزان'),
     )
 
     channel = models.CharField(
@@ -219,7 +280,7 @@ class StorefrontConversation(models.Model):
             ),
             models.UniqueConstraint(
                 fields=['customer', 'channel'],
-                condition=Q(channel__in=['support', 'consulting']),
+                condition=Q(channel__in=['support', 'consulting', 'procurement']),
                 name='unique_customer_service_conversation',
             ),
             models.CheckConstraint(
@@ -254,6 +315,10 @@ class StorefrontConversation(models.Model):
             return bool(user.is_superuser or user.has_perm('shop.view_platformfeedback'))
         if self.channel == self.CHANNEL_CONSULTING:
             return bool(user.is_superuser or user.has_perm('shop.view_farmconsultationrequest'))
+        if self.channel == self.CHANNEL_PROCUREMENT:
+            # The procurement queue belongs to whoever may already read the
+            # request rows — the buyer/management side of the platform.
+            return bool(user.is_superuser or user.has_perm('shop.view_procurementrequest'))
         return False
 
     def unread_count_for(self, user) -> int:
@@ -388,6 +453,14 @@ class StorefrontMessage(models.Model):
     land = models.ForeignKey(
         'FarmLand', null=True, blank=True, on_delete=models.SET_NULL,
         related_name='shared_in_messages', verbose_name='پرونده زمین',
+    )
+    # A service request («مشاوره زراعی»، «طراحی آبیاری»، …) mirrored into the
+    # messenger: the request row stays the queue record, the message is where
+    # the operator actually reads and answers it. SET_NULL so deleting the
+    # message never deletes the request.
+    service_request = models.ForeignKey(
+        'ServiceRequest', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='messages', verbose_name='درخواست خدمت',
     )
     # A deep link rendered as a button inside the bubble — «مشاهده پست» after a
     # comment reply, or «گفتگو با مشاور» when support hands a question over.

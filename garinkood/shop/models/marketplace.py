@@ -16,6 +16,7 @@ class Storefront(models.Model):
         ('cooperative', 'تعاونی'),
         ('merchant', 'تاجر'),
         ('company', 'شرکت'),
+        ('agro_shop', 'نهاده‌های کشاورزی'),
     )
 
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='storefront')
@@ -196,6 +197,12 @@ class MarketplaceListing(ImageVariantsMixin):
     quantity_available = models.DecimalField(max_digits=14, decimal_places=2)
     min_order_quantity = models.DecimalField(max_digits=14, decimal_places=2, default=1)
     harvest_date = models.DateField(null=True, blank=True)
+    # Inputs of a manufactured/supplied good (کود، سم، بذر، ادوات) rather than a
+    # grown crop: the seller of fertiliser has a production run and a shelf
+    # life, not a harvest. Kept alongside harvest_date so each kind of seller
+    # fills only the dates that mean something for their own product.
+    production_date = models.DateField(null=True, blank=True, verbose_name='تاریخ تولید')
+    expiry_date = models.DateField(null=True, blank=True, verbose_name='تاریخ انقضا')
     image = models.ImageField(upload_to='marketplace/', blank=True, null=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft', db_index=True)
     discount_percent = models.PositiveSmallIntegerField(default=0, verbose_name='درصد تخفیف')
