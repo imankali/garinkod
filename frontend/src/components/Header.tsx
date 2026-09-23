@@ -22,6 +22,14 @@ import { useTranslation } from "../i18n";
 // ========================================
 // Constants
 // ========================================
+/**
+ * One curve for every part of the header's collapse, so the rows that slide and
+ * the space they give up move together instead of overtaking each other. Long
+ * enough to read as motion, short enough not to sit between the reader and the
+ * page: 0.34s of deceleration, no overshoot.
+ */
+const HEADER_SLIDE = { duration: 0.34, ease: [0.32, 0.72, 0, 1] } as const;
+
 /** The header collapses only once the reader is past this offset. */
 const COLLAPSE_ABOVE = 140;
 /** How long the page must be still before the header comes back at the top. */
@@ -229,6 +237,20 @@ export default function Header({
   const collapsedRef = useRef(false);
   const settleTimerRef = useRef<number | null>(null);
   const topHoldRef = useRef<number | null>(null);
+  // Natural heights of the rows that collapse, measured from their wrappers'
+  // scrollHeight — which is the content height even while the wrapper is
+  // squashed to zero, so the numbers stay valid in both states.
+  const topAuxRef = useRef<HTMLDivElement>(null);
+  const mobileAuxRef = useRef<HTMLDivElement>(null);
+  const navAuxRef = useRef<HTMLDivElement>(null);
+  const mainRowRef = useRef<HTMLDivElement>(null);
+  const [auxHeights, setAuxHeights] = useState({ top: 0, mobile: 0, nav: 0, main: 0 });
+  // Set once the rows have finished sliding away, so they leave the tab order
+  // and stop answering `:visible` while they are off-screen.
+  const [auxHidden, setAuxHidden] = useState(false);
+  // Expanded header height minus the sum of its rows: borders and rounding,
+  // measured once while everything is settled and reused afterwards.
+  const borderSlackRef = useRef(0);
   // A downward gesture made while there is nothing to collapse yet — a single
   // PageDown from the top of the page arrives before the offset it produces.
   const pendingCollapseRef = useRef(false);
@@ -252,26 +274,91 @@ export default function Header({
   //    هدر sticky است و ارتفاعش با اسکرول و اندازه صفحه تغییر می‌کند؛ بدون این
   //    مقدار، نوارهای sticky داخل صفحه و پرش به لنگرها زیر هدر پنهان می‌شدند.
   // ========================================
+  const measureRows = useCallback(() => {
+    const top = topAuxRef.current?.scrollHeight ?? 0;
+    const mobile = mobileAuxRef.current?.scrollHeight ?? 0;
+    const nav = navAuxRef.current?.scrollHeight ?? 0;
+    const main = mainRowRef.current?.offsetHeight ?? 0;
+    setAuxHeights((current) =>
+      current.top === top && current.mobile === mobile && current.nav === nav && current.main === main
+        ? current
+        : { top, mobile, nav, main },
+    );
+    return { top, mobile, nav, main };
+  }, []);
+
+  /**
+   * The space the page must leave at the top for a header that is no longer in
+   * the flow.
+   *
+   * Two variables, two jobs:
+   *
+   *   `--header-space`  how much room the page reserves. It is the *expanded*
+   *                     height and it never changes while the header collapses —
+   *                     which is the whole point. Reserving a constant amount is
+   *                     what makes the collapse incapable of moving the content:
+   *                     with the header out of the flow and the space it needs
+   *                     already accounted for, no row can appear or disappear
+   *                     without disturbing anything below it. No reflow, no
+   *                     scroll anchoring, no jump.
+   *   `--header-height` where the header currently ends, for the pages whose own
+   *                     sticky bars hang underneath it (`Profile`, `Storefronts`)
+   *                     and for `scroll-padding-top`. This one does follow the
+   *                     collapse, so anchor jumps land below the visible header.
+   */
   useEffect(() => {
     const element = headerRef.current;
     if (!element) return undefined;
 
-    const publish = () => {
-      document.documentElement.style.setProperty(
-        "--header-height",
-        `${Math.round(element.getBoundingClientRect().height)}px`,
-      );
+    const parts = () => {
+      const { top, mobile, nav, main } = measureRows();
+      return top + mobile + nav + main;
     };
-    publish();
 
-    const observer = new ResizeObserver(publish);
+    const publishSpace = () => {
+      const root = document.documentElement;
+      // Measured once, while the header is whole: the difference between its
+      // real height and the sum of its rows is the borders.
+      if (!collapsedRef.current && borderSlackRef.current === 0 && element.offsetHeight > 0) {
+        borderSlackRef.current = Math.max(0, element.offsetHeight - parts());
+      }
+      const expanded = parts() + borderSlackRef.current;
+      if (!collapsedRef.current && expanded > 0) {
+        root.style.setProperty("--header-space", `${Math.round(expanded)}px`);
+      }
+    };
+
+    publishSpace();
+    const observer = new ResizeObserver(publishSpace);
     observer.observe(element);
-    window.addEventListener("resize", publish);
+    window.addEventListener("resize", publishSpace);
     return () => {
       observer.disconnect();
-      window.removeEventListener("resize", publish);
+      window.removeEventListener("resize", publishSpace);
     };
-  }, []);
+  }, [measureRows]);
+
+  useEffect(() => {
+    measureRows();
+    const remeasure = () => measureRows();
+    window.addEventListener("resize", remeasure);
+    return () => window.removeEventListener("resize", remeasure);
+  }, [measureRows, headerCollapsed]);
+
+  useEffect(() => {
+    const { top, mobile, nav, main } = auxHeights;
+    const expanded = top + mobile + nav + main + borderSlackRef.current;
+    if (expanded <= 0) return;
+    document.documentElement.style.setProperty(
+      "--header-height",
+      `${Math.round(headerCollapsed ? main + borderSlackRef.current : expanded)}px`,
+    );
+  }, [auxHeights, headerCollapsed]);
+
+  // Rows that have finished sliding away must stop being reachable.
+  useEffect(() => {
+    if (!headerCollapsed) setAuxHidden(false);
+  }, [headerCollapsed]);
 
   // ✨ نوار پیشرفت اسکرول
   const { scrollYProgress } = useScroll();
@@ -504,29 +591,55 @@ export default function Header({
 
   return (
     <>
-      <header ref={headerRef} className="sticky top-0 z-50">
+      {/*
+       * The header is `fixed`, not `sticky`.
+       *
+       * Sticky keeps the header in the document's flow, which makes its height
+       * part of the page's layout: every row that opens or closes changes where
+       * the content starts, and the browser answers that reflow by shifting the
+       * scroll offset to hold the content still. The result was a header and a
+       * page that moved each other — the twitch this file used to document at
+       * length, plus a 12px hop every time the row padding changed.
+       *
+       * Out of the flow, the same collapse cannot move anything: the page
+       * reserves a constant `--header-space`, and the rows animate their height
+       * and slide away inside a box the page cannot see. What is left to measure
+       * is the animation itself, which is why the slide, the fade and the
+       * height all run on one curve.
+       */}
+      <header
+        ref={headerRef}
+        id="site-header"
+        className="pointer-events-none fixed inset-x-0 top-0 z-50"
+      >
         {/* Second rows collapse on scroll-down and return on the first
             scroll-up — the compact row (logo/search/cart) is the only thing
-            that stays pinned. AnimatePresence keeps the exit smooth instead
-            of a hard jump, and --header-height self-corrects via the
-            ResizeObserver above. */}
-        <AnimatePresence initial={false}>
-          {!headerCollapsed && (
-            <motion.div
-              key="aux"
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.25, ease: "easeInOut" }}
-              className="overflow-hidden"
-            >
-              <TopBar isDark={isDark} onToggleDark={onToggleDark} />
-            </motion.div>
-          )}
-        </AnimatePresence>
+            that stays pinned. The rows stay mounted so their natural heights are
+            knowable in both states; when the slide finishes they go `invisible`,
+            which takes them out of the tab order and off the accessibility tree
+            while leaving `scrollHeight` readable for the next measurement. */}
+        <motion.div
+          ref={topAuxRef}
+          initial={false}
+          animate={{
+            height: headerCollapsed ? 0 : auxHeights.top,
+            y: headerCollapsed ? -auxHeights.top : 0,
+            opacity: headerCollapsed ? 0 : 1,
+          }}
+          transition={HEADER_SLIDE}
+          onAnimationComplete={() => {
+            if (collapsedRef.current) setAuxHidden(true);
+          }}
+          className={`overflow-hidden ${
+            headerCollapsed ? `pointer-events-none ${auxHidden ? "invisible" : ""}` : "pointer-events-auto"
+          }`}
+          aria-hidden={headerCollapsed || undefined}
+        >
+          <TopBar isDark={isDark} onToggleDark={onToggleDark} />
+        </motion.div>
 
         <div
-          className={`relative border-b border-emerald-100/70 bg-white/90 backdrop-blur-xl transition-shadow duration-300 dark:border-emerald-900/50 dark:bg-[#052e22]/90 ${
+          className={`pointer-events-auto relative border-b border-emerald-100/70 bg-white/90 backdrop-blur-xl transition-shadow duration-300 dark:border-emerald-900/50 dark:bg-[#052e22]/90 ${
             scrolled ? "shadow-lg shadow-emerald-900/8" : ""
           }`}
         >
@@ -546,10 +659,14 @@ export default function Header({
           {/* ======================================== */}
           {/* Main Row: منو (راست) | لوگو (وسط) | سبد (چپ) */}
           {/* ======================================== */}
+          {/* The row keeps one height. It used to shed 12px of padding once the
+              page was scrolled, which — with the header in the flow — was a second
+              layout change at a second threshold, i.e. a second hop while
+              scrolling. The compact feel now comes from the logo and the shadow,
+              neither of which moves anything. */}
           <div
-            className={`relative mx-auto flex max-w-7xl items-center gap-2 px-[var(--page-gutter)] transition-[padding] duration-300 sm:gap-3 md:gap-4 ${
-              scrolled ? "py-2 sm:py-2.5" : "py-2.5 sm:py-3 md:py-3.5"
-            }`}
+            ref={mainRowRef}
+            className="relative mx-auto flex max-w-7xl items-center gap-2 px-[var(--page-gutter)] py-2.5 sm:gap-3 sm:py-3 md:gap-4 md:py-3.5"
           >
             {/* ✅ Menu Toggle - آیکون morph بین Menu و X */}
             <motion.button
@@ -659,38 +776,40 @@ export default function Header({
 
           {/* ✅ Mobile Search — collapses with the header on scroll-down; while
               collapsed the field above (inside the pinned row) takes its place. */}
-          <AnimatePresence initial={false}>
-            {!headerCollapsed && (
-              <motion.div
-                key="mobile-search"
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.25, ease: "easeInOut" }}
-                className="relative z-40 overflow-hidden border-t border-emerald-50 px-[var(--page-gutter)] dark:border-emerald-900/50 md:hidden"
-              >
-                <div className="py-2 sm:py-2.5">
-                  <SearchBar variant="mobile" />
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          <motion.div
+            ref={mobileAuxRef}
+            initial={false}
+            animate={{
+              height: headerCollapsed ? 0 : auxHeights.mobile,
+              y: headerCollapsed ? auxHeights.mobile : 0,
+              opacity: headerCollapsed ? 0 : 1,
+            }}
+            transition={HEADER_SLIDE}
+            className={`relative z-40 overflow-hidden border-t border-emerald-50 dark:border-emerald-900/50 md:!hidden ${
+              headerCollapsed ? "pointer-events-none invisible" : "pointer-events-auto"
+            }`}
+            aria-hidden={headerCollapsed || undefined}
+          >
+            <div className="px-[var(--page-gutter)] py-2 sm:py-2.5">
+              <SearchBar variant="mobile" />
+            </div>
+          </motion.div>
 
           {/* Desktop Navigation — same collapse contract as the rows above. */}
-          <AnimatePresence initial={false}>
-            {!headerCollapsed && (
-              <motion.div
-                key="desktop-nav"
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.25, ease: "easeInOut" }}
-                className="overflow-hidden"
-              >
-                <DesktopNav />
-              </motion.div>
-            )}
-          </AnimatePresence>
+          <motion.div
+            ref={navAuxRef}
+            initial={false}
+            animate={{
+              height: headerCollapsed ? 0 : auxHeights.nav,
+              y: headerCollapsed ? auxHeights.nav : 0,
+              opacity: headerCollapsed ? 0 : 1,
+            }}
+            transition={HEADER_SLIDE}
+            className={`overflow-hidden ${headerCollapsed ? "pointer-events-none invisible" : "pointer-events-auto"}`}
+            aria-hidden={headerCollapsed || undefined}
+          >
+            <DesktopNav />
+          </motion.div>
 
           {/* ✨ نوار پیشرفت اسکرول */}
           <motion.div

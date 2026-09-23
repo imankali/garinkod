@@ -378,7 +378,26 @@ export default function App() {
           id="main-content"
           tabIndex={-1}
           className="outline-none"
-          style={{ paddingBottom: 'var(--mobile-nav-clearance)' }}
+          /*
+            The header is fixed (see Header.tsx), so the page leaves room for it
+            here instead. `--header-space` is the *expanded* height and does not
+            change while the header collapses — which is what makes the collapse
+            incapable of moving this content.
+          */
+          style={{
+            paddingTop: 'var(--header-space, var(--header-height))',
+            paddingBottom: 'var(--mobile-nav-clearance)',
+            /*
+              Where the skip link lands. `scroll-padding-top` on the document
+              covers anchor jumps, but a target that is focused — which is what
+              the skip link does, so that the keyboard continues from there —
+              is brought into view with `scroll-margin`, not `scroll-padding`.
+              Without this the reader arrives with the first screenful of content
+              tucked under the header, which is the one thing the skip link
+              exists to prevent.
+            */
+            scrollMarginTop: 'var(--header-space, var(--header-height))',
+          }}
         >
           <div className="mx-auto w-full max-w-7xl px-[var(--page-gutter)] pt-3">
             <BackButton />

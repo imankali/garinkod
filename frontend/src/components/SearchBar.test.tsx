@@ -1,14 +1,15 @@
 // frontend/src/components/SearchBar.test.tsx
 //
-// The scope selector inside the search box — «در کدام دسته دنبالش بگردم؟» — and
-// the Enter key that finally does something with it.
+// The search box, after the scope selector and the funnel button were removed:
+// a field, a microphone, and one button that runs the search.
 //
-// The field used to have no scope at all, and its submit button only opened the
-// suggestions dropdown: you pressed a control labelled «جستجو» and no search
-// happened. Both are pinned here, because both are the kind of thing that works
-// by accident until someone changes the handler.
+// The field used to carry a scope («همه» / a category) and a button that opened a
+// panel of filter chips. Both are gone by request, so what has to hold now is
+// simpler and stricter: whatever is in the box is what gets searched, the submit
+// button really submits, and the popular categories are ordinary links into the
+// shop's own filter rather than internal state that only this component could see.
 
-import { screen, within } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { useLocation } from 'react-router';
@@ -37,59 +38,76 @@ function renderSearchBar(variant?: 'desktop' | 'mobile' | 'compact') {
   );
 }
 
-describe('SearchBar scope', () => {
-  it('offers every category, and starts on all of them', () => {
+describe('SearchBar', () => {
+  it('no longer offers a scope to choose from, and no filter panel to open', () => {
     renderSearchBar();
 
-    const scope = screen.getByLabelText('محدوده جستجو');
-    expect(scope).toHaveValue('all');
-
-    // The label the reader sees is short («همه»), so the full meaning has to
-    // survive somewhere: the accessible name is the control's own aria-label and
-    // every category is present and unclipped in the list itself.
-    const labels = [...scope.querySelectorAll('option')].map((option) => option.textContent);
-    expect(labels[0]).toBe('همه');
-    expect(labels.slice(1)).toEqual(categories.map((category) => category.label));
+    expect(screen.queryByLabelText('محدوده جستجو')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('فیلترهای پیشرفته')).not.toBeInTheDocument();
+    // The chips that panel held are gone with it.
+    expect(screen.queryByText('فقط کالای موجود')).not.toBeInTheDocument();
   });
 
-  it('searches inside the chosen category, not just on the site', async () => {
+  it('searches for exactly what was typed', async () => {
     const user = userEvent.setup();
     renderSearchBar();
 
-    await user.selectOptions(screen.getByLabelText('محدوده جستجو'), 'fertilizer');
     await user.type(screen.getByLabelText('جستجوی محصولات'), 'اوره');
-    await user.keyboard('{Enter}');
+    await user.click(screen.getByLabelText('جستجو'));
     await flush();
 
     const location = screen.getByTestId('location').textContent ?? '';
     const params = new URLSearchParams(location.split('?')[1] ?? '');
     expect(location.startsWith('/products')).toBe(true);
     expect(params.get('search')).toBe('اوره');
-    expect(params.get('category')).toBe('fertilizer');
+    // …and nothing else: with no scope in the box there is no category to carry.
+    expect(params.get('category')).toBeNull();
   });
 
-  it('omits the scope when the reader has not narrowed it', async () => {
+  it('runs the same search when the reader just presses Enter', async () => {
     const user = userEvent.setup();
     renderSearchBar();
 
-    await user.type(screen.getByLabelText('جستجوی محصولات'), 'بذر');
-    await user.keyboard('{Enter}');
+    await user.type(screen.getByLabelText('جستجوی محصولات'), 'بذر{Enter}');
     await flush();
 
-    const location = screen.getByTestId('location').textContent ?? '';
-    expect(location).toBe('/products?search=%D8%A8%D8%B0%D8%B1');
+    expect(screen.getByTestId('location').textContent).toBe(
+      `/products?search=${encodeURIComponent('بذر')}`,
+    );
   });
 
-  it('carries the scope selector in every variant', () => {
+  it('sends an empty box to the whole catalogue instead of nowhere', async () => {
+    const user = userEvent.setup();
+    renderSearchBar();
+
+    await user.click(screen.getByLabelText('جستجو'));
+    await flush();
+
+    expect(screen.getByTestId('location').textContent).toBe('/products');
+  });
+
+  it('offers the popular categories as links into the shop filter', async () => {
+    const user = userEvent.setup();
+    renderSearchBar();
+
+    // Focusing the field is what opens the suggestions.
+    await user.click(screen.getByLabelText('جستجوی محصولات'));
+
+    for (const category of categories) {
+      const link = screen.getByRole('link', { name: new RegExp(category.label) });
+      expect(link).toHaveAttribute('href', `/products?category=${category.id}`);
+    }
+  });
+
+  it('renders the field and the submit button in every variant', () => {
     // What each variant *hides* is a layout fact — `hidden sm:flex` is a class
     // name in jsdom, not a layout — so the browser sweep in navigation.spec.ts
-    // checks what is visible at each width. This checks the field is wired the
-    // same way wherever it is rendered, which is what a component test can say
-    // truthfully.
+    // checks what is visible at each width. This checks the parts that must
+    // exist wherever the field is rendered.
     for (const variant of ['desktop', 'mobile', 'compact'] as const) {
       const { unmount } = renderSearchBar(variant);
-      expect(within(document.body).getAllByLabelText('محدوده جستجو')).toHaveLength(1);
       expect(screen.getByLabelText('جستجوی محصولات')).toBeInTheDocument();
+      expect(screen.getByLabelText('جستجو')).toBeInTheDocument();
       unmount();
     }
   });

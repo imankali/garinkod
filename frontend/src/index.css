@@ -57,6 +57,18 @@
 
   /* Spacing */
   --header-height: 72px;
+  /*
+   * The header is fixed, so the page reserves its space with this. The fallback
+   * covers the first paint before the header has measured itself; the header
+   * then writes the real number. It deliberately does not shrink when the header
+   * collapses — see the comment in Header.tsx.
+   */
+  --header-space: 129px;
+
+  /* The desktop header carries the nav row as well, so it reserves more. */
+  @media (min-width: 768px) {
+    --header-space: 205px;
+  }
   --mobile-nav-height: 72px;
   /* Reserve room for the fixed mobile bar plus the iOS home indicator, so
      page content is never hidden underneath it. */

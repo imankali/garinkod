@@ -155,7 +155,7 @@ test.describe('the sticky header', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    const header = page.locator('header.sticky').first();
+    const header = page.locator('#site-header').first();
     await page.mouse.move(640, 500);
     await page.mouse.wheel(0, 260);
     await page.waitForTimeout(1200);
@@ -184,7 +184,7 @@ test.describe('the sticky header', () => {
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    const header = page.locator('header.sticky').first();
+    const header = page.locator('#site-header').first();
     const height = () => header.evaluate((element) => Math.round(element.getBoundingClientRect().height));
 
     const expanded = await height();
@@ -231,7 +231,7 @@ test.describe('the sticky header', () => {
 /** Height of a sticky header, whichever one the page happens to render. */
 async function header_height(page: import('@playwright/test').Page): Promise<number> {
   return page.evaluate(() =>
-    Math.round(document.querySelector('header.sticky')?.getBoundingClientRect().height ?? 0),
+    Math.round(document.getElementById('site-header')?.getBoundingClientRect().height ?? 0),
   );
 }
 
@@ -241,19 +241,16 @@ test.describe('the search box', () => {
    *
    * On a phone the field used to live in a row *under* the pinned one, so
    * collapsing the header took the search with it and left logo, cart and menu —
-   * the three things a reader who is already shopping does not need. On desktop
-   * the field survived the collapse but shared the row with the logo and the
-   * wishlist, and the scope selector did not exist at all.
+   * the three things a reader who is already shopping does not need. It now sits
+   * in the pinned row at every breakpoint, next to a submit button that runs it.
    *
    * Two fields are always in the DOM because the header chooses between them
    * with `md:` classes rather than by unmounting, so every assertion here is
-   * about the *visible* one — which is the only kind of assertion that means
-   * anything about what a reader sees.
+   * about the *visible* one — the only kind that says anything about what a
+   * reader sees.
    */
   const visibleField = (page: import('@playwright/test').Page) =>
-    page.locator('header.sticky input[aria-label="جستجوی محصولات"]:visible');
-  const visibleScope = (page: import('@playwright/test').Page) =>
-    page.locator('header.sticky select[aria-label="محدوده جستجو"]:visible');
+    page.locator('#site-header input[aria-label="جستجوی محصولات"]:visible');
 
   for (const [name, viewport] of [
     ['desktop', { width: 1280, height: 900 }],
@@ -273,11 +270,9 @@ test.describe('the search box', () => {
       }
       await page.waitForTimeout(1200);
 
-      // Still exactly one field in front of the reader, still usable, and still
-      // carrying its scope selector.
+      // Still exactly one field in front of the reader, still usable.
       await expect(visibleField(page)).toHaveCount(1);
       await expect(visibleField(page)).toBeVisible();
-      await expect(visibleScope(page)).toBeVisible();
       const width = await visibleField(page).evaluate((el) => el.getBoundingClientRect().width);
       expect(width, 'the pinned field is too narrow to search in').toBeGreaterThan(60);
 
@@ -289,18 +284,35 @@ test.describe('the search box', () => {
     });
   }
 
-  test('the scope selector narrows the search it submits', async ({ page }) => {
+  test('the box is a field, a microphone and a search button — nothing else', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    await visibleScope(page).selectOption('fertilizer');
+    // Both were removed by request: the scope selector («همه») and the funnel
+    // button that opened a panel of filter chips.
+    await expect(page.getByLabel('محدوده جستجو')).toHaveCount(0);
+    await expect(page.getByLabel('فیلترهای پیشرفته')).toHaveCount(0);
+
+    // The submit button took the funnel button's place in the row.
+    const submit = page.locator('#site-header button[type="submit"]:visible');
+    await expect(submit).toHaveCount(1);
+    await expect(submit).toHaveAccessibleName('جستجو');
+  });
+
+  test('searching navigates to the results, and the filter lives there', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
     await visibleField(page).fill('اوره');
     await page.keyboard.press('Enter');
 
     await expect(page).toHaveURL(/\/products\?.*search=/);
-    const url = new URL(page.url());
-    expect(url.searchParams.get('search')).toBe('اوره');
-    expect(url.searchParams.get('category')).toBe('fertilizer');
+    expect(new URL(page.url()).searchParams.get('search')).toBe('اوره');
+    // No category in the URL: the box has no scope to contribute one.
+    expect(new URL(page.url()).searchParams.get('category')).toBeNull();
+
+    // Filtering still exists — on the results page, where it belongs.
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   });
 });
 
