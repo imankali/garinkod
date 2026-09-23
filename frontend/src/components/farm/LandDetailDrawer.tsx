@@ -15,6 +15,7 @@ import type { FarmCalendarEvent, FarmLand } from '@/types/farming';
 import { formatFaDate } from './farmOptions';
 import LandCalendar from './LandCalendar';
 import { useTabKeyboard } from '../../hooks/useTabKeyboard';
+import { LandTypeIcon } from '../ui/CategoryIcon';
 
 type TabKey = 'id' | 'calendar';
 
@@ -82,7 +83,7 @@ export default function LandDetailDrawer({
             <div className="flex items-center justify-between gap-2">
               <div className="flex min-w-0 items-center gap-2">
                 <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-600 text-xl text-white">
-                  {land.land_type === 'orchard' ? '🌳' : land.land_type === 'greenhouse' ? '🏡' : '🌾'}
+                  <LandTypeIcon type={land.land_type} size={16} />
                 </span>
                 <div className="min-w-0">
                   <h2 className="min-w-0 truncate text-sm font-extrabold text-slate-800 dark:text-white">{land.name}</h2>

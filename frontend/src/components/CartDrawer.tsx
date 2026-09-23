@@ -3,19 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate } from 'react-router';
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import {
-  AlertTriangle,
-  CheckCircle2,
-  Gift,
-  Minus,
-  Plus,
-  ShieldCheck,
-  ShoppingBag,
-  Sparkles,
-  Trash2,
-  Truck,
-  X,
-} from "lucide-react";
+import { AlertTriangle, CheckCircle2, Gift, Minus, Plus, ShieldCheck, ShoppingBag, ShoppingCart, Sparkles, Trash2, Truck, X } from "lucide-react";
 import { useFocusTrap } from "../hooks/useFocusTrap";
 import { useCartStore } from "../store/cartStore";
 import PurchaseSteps from "./PurchaseSteps";
@@ -364,7 +352,7 @@ function productOrderCeiling(item: CartItem): number {
                   animate={{ opacity: 1, scale: 1 }}
                   className="flex h-full flex-col items-center justify-center gap-4 text-center"
                 >
-                  <span className="text-7xl">🛒</span>
+                  <ShoppingCart size={64} strokeWidth={1.25} className="text-slate-300 dark:text-emerald-800" aria-hidden="true" />
                   <div>
                     <p className="text-lg font-bold text-slate-700 dark:text-white">سبد خرید شما خالی است</p>
                     <p className="mt-1 text-sm text-slate-400">محصولات مورد علاقه خود را اضافه کنید</p>

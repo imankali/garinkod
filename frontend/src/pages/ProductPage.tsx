@@ -49,7 +49,20 @@ import { cn } from "../utils/cn";
 import { useTabKeyboard } from "../hooks/useTabKeyboard";
 
 const FALLBACK_IMAGE = "/images/hero-farm.jpg";
-const STICKERS = ["🌱", "🌾", "👍", "⭐", "💚", "👏"];
+/**
+ * Reaction stickers. The emoji here is user content, not iconography — it is
+ * what gets submitted with the review and rendered back beside it — so unlike
+ * the rest of the UI it stays an emoji. Each one still needs a name a screen
+ * reader (and a Persian reader) can use, which is what the label is for.
+ */
+const STICKERS = [
+  { emoji: "🌱", label: "تازه و سرحال" },
+  { emoji: "🌾", label: "برداشت خوب" },
+  { emoji: "👍", label: "رضایت‌بخش" },
+  { emoji: "⭐", label: "کیفیت بالا" },
+  { emoji: "💚", label: "ارزش خرید" },
+  { emoji: "👏", label: "پیشنهاد می‌کنم" },
+];
 
 type Tab = "description" | "specs" | "reviews";
 
@@ -658,7 +671,25 @@ export default function ProductPage() {
                   </div>
                 )}
                 <textarea ref={commentBodyRef} value={commentBody} onChange={(event) => setCommentBody(event.target.value)} rows={4} aria-label="متن دیدگاه شما" placeholder={isAuthenticated ? "تجربه خرید، نحوه بسته‌بندی و نتیجه در مزرعه را بنویسید..." : "برای ثبت نظر یا پاسخ ابتدا وارد حساب کاربری شوید"} className="w-full rounded-xl border border-slate-200 bg-white p-3 text-sm outline-none focus:border-emerald-500 dark:border-emerald-700 dark:bg-emerald-900" />
-                <div className="flex flex-wrap items-center gap-2">{STICKERS.map((item) => <button key={item} type="button" onClick={() => setSticker(sticker === item ? "" : item)} className={cn("rounded-lg px-2 py-1 text-lg", sticker === item ? "bg-emerald-100 ring-1 ring-emerald-400 dark:bg-emerald-900" : "bg-slate-50 dark:bg-emerald-900/40")}>{item}</button>)}
+                <div className="flex flex-wrap items-center gap-2">
+                  {STICKERS.map((item) => (
+                    <button
+                      key={item.emoji}
+                      type="button"
+                      aria-pressed={sticker === item.emoji}
+                      aria-label={`برچسب واکنش: ${item.label}`}
+                      title={item.label}
+                      onClick={() => setSticker(sticker === item.emoji ? "" : item.emoji)}
+                      className={cn(
+                        "tap-target rounded-lg px-2 py-1 text-lg",
+                        sticker === item.emoji
+                          ? "bg-emerald-100 ring-1 ring-emerald-400 dark:bg-emerald-900"
+                          : "bg-slate-50 dark:bg-emerald-900/40",
+                      )}
+                    >
+                      <span aria-hidden="true">{item.emoji}</span>
+                    </button>
+                  ))}
                   <input ref={imageRef} type="file" aria-label="افزودن تصویر به دیدگاه" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => setCommentImage(event.target.files?.[0] || null)} />
                   <button type="button" onClick={() => imageRef.current?.click()} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 dark:border-emerald-700 dark:text-emerald-100"><ImagePlus size={15} />{commentImage ? commentImage.name : "افزودن عکس"}</button>
                   <button disabled={reviewSubmit.isPending} className="ms-auto inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"><Send size={16} />{reviewSubmit.isPending ? "در حال ثبت..." : "ثبت نظر"}</button>
@@ -906,7 +937,11 @@ function CommentCard({ comment, onReply, nested = false, highlighted = false }: 
     </div>
     <time className="shrink-0 text-fluid-2xs text-slate-400">{new Date(comment.created).toLocaleDateString("fa-IR")}</time>
   </div>
-  <p className="mt-3 whitespace-pre-line text-fluid-sm leading-7 text-slate-600 dark:text-emerald-100">{comment.sticker && <span className="me-1 text-lg">{comment.sticker}</span>}{comment.body}</p>
+  <p className="mt-3 whitespace-pre-line text-fluid-sm leading-7 text-slate-600 dark:text-emerald-100">{comment.sticker && (
+    <span className="me-1 text-lg" aria-hidden="true">
+      {comment.sticker}
+    </span>
+  )}{comment.body}</p>
   {comment.image && <img src={comment.image} alt="تصویر ارسالی کاربر" width={800} height={600} loading="lazy" decoding="async" className="mt-3 max-h-72 rounded-xl object-cover" />}
   <div className="mt-2 flex flex-wrap items-center gap-2">
     {!nested && (

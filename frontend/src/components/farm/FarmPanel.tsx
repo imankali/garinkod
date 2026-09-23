@@ -14,6 +14,7 @@ import type { FarmLand } from '@/types/farming';
 import ConsultationsPanel from './ConsultationsPanel';
 import LandDetailDrawer from './LandDetailDrawer';
 import LandFormModal from './LandFormModal';
+import { LandTypeIcon } from '../ui/CategoryIcon';
 
 export default function FarmPanel() {
   const { t } = useTranslation();
@@ -81,7 +82,7 @@ export default function FarmPanel() {
             onClick={openNew}
             className="mt-4 flex w-full flex-col items-center gap-2 rounded-3xl border-2 border-dashed border-emerald-200 py-10 text-center transition hover:border-emerald-400 dark:border-emerald-800"
           >
-            <span className="text-3xl">🌱</span>
+            <Sprout size={32} className="text-emerald-500" aria-hidden="true" />
             <span className="text-sm font-bold text-slate-600 dark:text-emerald-100">
               هنوز زمینی ثبت نکرده‌اید
             </span>
@@ -98,7 +99,7 @@ export default function FarmPanel() {
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-2xl shadow-sm dark:bg-emerald-900">
-                      {land.land_type === 'orchard' ? '🌳' : land.land_type === 'greenhouse' ? '🏡' : '🌾'}
+                      <LandTypeIcon type={land.land_type} size={16} />
                     </span>
                     <span className="rounded-full bg-emerald-600/10 px-2.5 py-1 text-fluid-2xs font-bold text-emerald-700 dark:bg-emerald-900 dark:text-lime-300">
                       {land.land_type_label}

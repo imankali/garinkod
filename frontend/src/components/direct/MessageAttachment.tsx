@@ -158,7 +158,7 @@ function VoiceNote({
   return (
     <div
       className={cn(
-        'mt-2 flex min-w-56 max-w-xs flex-col rounded-2xl p-2.5 shadow-sm transition-all sm:min-w-64',
+        'mt-2 flex min-w-56 max-w-xs flex-col rounded-2xl p-2.5 shadow-sm transition-colors sm:min-w-64',
         isMine
           ? 'bg-emerald-700/80 text-white'
           : 'bg-slate-50 text-slate-800 dark:bg-emerald-950/80 dark:text-emerald-100',
@@ -201,7 +201,7 @@ function VoiceNote({
                 key={idx}
                 style={{ height: `${heightPercent}%` }}
                 className={cn(
-                  'w-1 rounded-full transition-all duration-150',
+                  'w-1 rounded-full transition-colors duration-150',
                   isMine
                     ? isFilled
                       ? 'bg-white'

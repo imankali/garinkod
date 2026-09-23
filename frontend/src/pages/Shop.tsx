@@ -28,6 +28,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Flame,
+  SearchX,
   Sparkles,
   TrendingUp,
   type LucideIcon,
@@ -568,7 +569,7 @@ export default function Shop({ compareItems, onToggleCompare }: ShopProps) {
             </div>
           ) : (source === 'products' ? products.length === 0 : listings.length === 0) ? (
             <div className="flex flex-col items-center justify-center py-14 text-center">
-              <div className="text-5xl">🔍</div>
+              <SearchX size={48} strokeWidth={1.25} className="text-slate-300 dark:text-emerald-800" aria-hidden="true" />
               <p className="mt-4 text-fluid-lg font-bold text-slate-700 dark:text-white">
                 {t('shop.noProducts')}
               </p>

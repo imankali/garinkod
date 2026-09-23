@@ -12,7 +12,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Check, Pencil, Plus, X } from 'lucide-react';
+import { Archive, Check, Pencil, Plus, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 import { storefrontsApi } from '../../api/services';
@@ -153,7 +153,7 @@ export default function HighlightManager({
                 aria-expanded={archiveOpen}
               >
                 <span className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-slate-200 bg-slate-50 text-fluid-2xs font-bold text-slate-500 transition hover:border-emerald-400 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
-                  {archive.length > 0 ? archive.length.toLocaleString('fa-IR') : '🗂'}
+                  {archive.length > 0 ? archive.length.toLocaleString('fa-IR') : <Archive size={20} aria-hidden="true" />}
                 </span>
                 <span className="text-fluid-2xs text-slate-400">آرشیو</span>
               </button>

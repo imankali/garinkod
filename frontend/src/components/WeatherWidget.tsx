@@ -1,7 +1,7 @@
 // frontend/src/components/WeatherWidget.tsx
 
 import { useCallback, useState } from "react";
-import { AlertTriangle, CloudRain, Droplets, Sun, Wind } from "lucide-react";
+import { AlertTriangle, Check, CloudRain, Droplets, Sun, Wind } from "lucide-react";
 import ClimateSelector, { type ClimateSelection } from "./ClimateSelector";
 
 // ========================================
@@ -126,7 +126,17 @@ export default function WeatherWidget() {
                       : "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300"
                   }`}
                 >
-                  {data.canSpray ? "✔ شرایط مساعد سمپاشی" : "⚠ نامساعد برای سمپاشی"}
+                  {data.canSpray ? (
+                    <>
+                      <Check size={12} aria-hidden="true" />
+                      شرایط مساعد سمپاشی
+                    </>
+                  ) : (
+                    <>
+                      <AlertTriangle size={12} aria-hidden="true" />
+                      نامساعد برای سمپاشی
+                    </>
+                  )}
                 </span>
               </div>
               <h3 className="text-sm font-bold text-slate-800 dark:text-white md:text-base">

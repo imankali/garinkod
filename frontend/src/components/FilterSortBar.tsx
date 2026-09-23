@@ -129,7 +129,7 @@ export default function FilterSortBar({
         <motion.button
           whileTap={{ scale: 0.95 }}
           onClick={() => onCategoryChange("all")}
-          className={`flex min-h-11 shrink-0 items-center rounded-full px-4 text-xs font-semibold transition-all ${
+          className={`flex min-h-11 shrink-0 items-center rounded-full px-4 text-xs font-semibold transition-colors ${
             activeCategory === "all"
               ? "bg-brand-gradient-accent text-white shadow-md"
               : "bg-white text-slate-500 ring-1 ring-slate-200 hover:ring-emerald-300"
@@ -149,7 +149,7 @@ export default function FilterSortBar({
               key={cat.slug}
               whileTap={{ scale: 0.95 }}
               onClick={() => onCategoryChange(cat.slug)}
-              className={`flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-4 text-xs font-semibold transition-all ${
+              className={`flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-4 text-xs font-semibold transition-colors ${
                 activeCategory === cat.slug
                   ? "bg-brand-gradient-accent text-white shadow-md"
                   : "bg-white text-slate-500 ring-1 ring-slate-200 hover:ring-emerald-300"

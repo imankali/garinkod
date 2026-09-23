@@ -283,14 +283,26 @@ export default function HeroSlider() {
               if (event.key === 'Home') { event.preventDefault(); goAndFocusDot(0); }
               if (event.key === 'End') { event.preventDefault(); goAndFocusDot(slides.length - 1); }
             }}
-            className={cn(
-              // `transition-all` used to animate every property on every dot on
-              // every slider tick; the pill only ever changes its width and its
-              // colour, so that is what it transitions.
-              'tap-target h-2 rounded-full transition-[width,background-color] duration-300',
-              dotIndex === index ? 'w-8 bg-white' : 'w-2 bg-white/50 hover:bg-white/80',
-            )}
-          />
+            className="tap-target group/dot flex h-2 w-8 items-center justify-center rounded-full"
+          >
+            {/*
+              The pill grows by transform, not by width.
+              The skill's animation rules name animating width/height as an
+              anti-pattern for a reason: a width transition re-lays out the row
+              on every frame, while a scale is done on the compositor. Same
+              picture — a dot that stretches when it becomes current — without
+              touching layout. The track stays a fixed w-8 so the dots beside it
+              do not move as the pill grows.
+            */}
+            <span
+              className={cn(
+                'h-2 w-8 origin-center rounded-full transition-[transform,background-color] duration-300',
+                dotIndex === index
+                  ? 'scale-x-100 bg-white'
+                  : 'scale-x-[0.25] bg-white/50 group-hover/dot:bg-white/80',
+              )}
+            />
+          </button>
         ))}
       </div>
     </section>

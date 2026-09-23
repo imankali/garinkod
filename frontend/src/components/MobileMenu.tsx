@@ -357,7 +357,7 @@ export default function MobileMenu({
                 >
                   <span
                     className={cn(
-                      'absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all',
+                      'absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform',
                       dark ? 'start-[18px]' : 'start-0.5',
                     )}
                   />

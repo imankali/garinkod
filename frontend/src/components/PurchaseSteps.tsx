@@ -124,7 +124,7 @@ export default function PurchaseSteps({
                 >
                   <span
                     className={cn(
-                      "flex items-center justify-center rounded-xl border transition-all duration-300 motion-reduce:transition-none",
+                      "flex items-center justify-center rounded-xl border transition-colors duration-300 motion-reduce:transition-none",
                       compact ? "h-8 w-8" : "h-10 w-10 sm:h-12 sm:w-12",
                       isCurrent &&
                         "border-emerald-600 bg-gradient-to-br from-emerald-600 to-emerald-500 text-white shadow-lg shadow-emerald-200 ring-4 ring-emerald-50 dark:shadow-none dark:ring-emerald-900",

@@ -186,7 +186,7 @@ export default function MarketplaceListingCard({
           type="button"
           onClick={() => setQuickView(true)}
           tabIndex={-1}
-          className="pointer-events-none absolute inset-x-3 bottom-3 z-[2] hidden translate-y-2 items-center justify-center gap-1.5 rounded-xl bg-white/95 py-2.5 text-xs font-bold text-slate-700 opacity-0 shadow-lg backdrop-blur transition-all duration-300 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:translate-y-0 group-focus-within:opacity-100 [@media(hover:hover)]:flex"
+          className="pointer-events-none absolute inset-x-3 bottom-3 z-[2] hidden translate-y-2 items-center justify-center gap-1.5 rounded-xl bg-white/95 py-2.5 text-xs font-bold text-slate-700 opacity-0 shadow-lg backdrop-blur transition-[transform,opacity] duration-300 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:translate-y-0 group-focus-within:opacity-100 [@media(hover:hover)]:flex"
           aria-label={`نمای سریع ${listing.title}`}
         >
           <Eye size={14} aria-hidden="true" /> نمای سریع

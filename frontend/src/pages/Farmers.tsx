@@ -9,8 +9,17 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import {
-  ArrowRight, CalendarPlus, Inbox, MapPin, MessageCircle, MessageCircleQuestion, MessagesSquare,
-  Search, Send, Sprout, Users,
+  ArrowRight,
+  CalendarPlus,
+  Inbox,
+  MapPin,
+  MessageCircle,
+  MessageCircleQuestion,
+  MessagesSquare,
+  Search,
+  Send,
+  Sprout,
+  Users,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -21,6 +30,7 @@ import { cn } from '../utils/cn';
 import { useDirectStore } from '../store/directStore';
 import type { ConsultantFarmerDossier, ConsultantFarmerSummary, FarmCalendarEvent, FarmConsultationRequest, FarmEventKind, FarmLand } from '@/types/farming';
 import { EVENT_KINDS, formatFaDate } from '../components/farm/farmOptions';
+import { LandTypeIcon } from '../components/ui/CategoryIcon';
 
 type View = 'requests' | 'farmers';
 
@@ -579,7 +589,7 @@ function LandDossierCard({ land }: { land: FarmLand & { events: FarmCalendarEven
     <section className="mt-3 rounded-2xl border border-emerald-100 bg-white p-3.5 dark:border-emerald-900 dark:bg-emerald-950">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h4 className="flex items-center gap-2 text-xs font-extrabold text-slate-800 dark:text-white">
-          <span>{land.land_type === 'orchard' ? '🌳' : land.land_type === 'greenhouse' ? '🏡' : '🌾'}</span>
+          <LandTypeIcon type={land.land_type} />
           {land.name}
           <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-fluid-2xs font-bold text-emerald-700 dark:bg-emerald-900 dark:text-lime-300">
             {land.land_type_label}

@@ -6,7 +6,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import toast from "react-hot-toast";
 import { useQuery } from "@tanstack/react-query";
 
-import { Search, X, Clock, Mic, Sparkles, Tag, Flame } from "lucide-react";
+import { Clock, Flame, Mic, Search, SearchX, Sparkles, Tag, X } from "lucide-react";
 import { categories } from "../data/shopData";
 import { productsApi } from "../api/services";
 import { useTranslation } from "../i18n";
@@ -406,7 +406,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
                   <ul className="space-y-1 text-fluid-xs text-slate-600 dark:text-emerald-200">
                     <li>• برای جستجوی دقیق، نام کامل محصول را وارد کنید</li>
                     <li>• برای محدود کردن نتایج، در صفحه محصولات فیلتر بگذارید</li>
-                    <li>• با کلیک روی 🎤 جستجوی صوتی انجام دهید</li>
+                    <li className="flex items-center gap-1.5">• <Mic size={13} aria-hidden="true" /> برای شروع جستجوی صوتی روی میکروفن بزنید</li>
                   </ul>
                 </div>
               </div>
@@ -461,8 +461,8 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
               </div>
             ) : (
               <div className="flex flex-col items-center gap-2 py-8 text-center">
-                <span className="text-3xl">🔍</span>
-                <p className="text-sm text-slate-500">نتیجه‌ای یافت نشد.</p>
+                <SearchX size={32} className="text-slate-300 dark:text-emerald-800" aria-hidden="true" />
+                <p className="text-sm text-slate-500">نتیجهای یافت نشد.</p>
                 <p className="text-xs text-slate-400">عبارت دیگری را امتحان کنید یا از دسته‌بندی‌ها شروع کنید</p>
               </div>
             )}

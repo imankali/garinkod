@@ -1,6 +1,6 @@
 // frontend/src/components/TopBar.tsx
 
-import { Phone, Truck } from "lucide-react";
+import { LucideIcon, PackageCheck, Phone, Sprout, Store, Truck } from 'lucide-react';
 
 import { useAutoRotate } from "../hooks/useAutoRotate";
 
@@ -8,11 +8,25 @@ import { useAutoRotate } from "../hooks/useAutoRotate";
 // Messages Configuration
 // ✅ پیام‌های چرخشی در TopBar
 // ========================================
-const messages = [
-  "🚚 ارسال رایگان برای خرید بالای ۳ میلیون تومان، مطابق شرایط سفارش",
-  "🌱 ثبت سفارش، مشاوره و خدمات مزرعه از یک حساب کاربری",
-  "🌾 بازار کشاورزان با بررسی آگهی‌ها پیش از انتشار",
-  "📦 پیش از پرداخت، موجودی و هزینه ارسال سفارش بررسی می‌شود",
+/*
+ * The ticker's four messages, each with the icon that used to be an emoji.
+ *
+ * The emoji were doing two jobs — marking the message and setting its width —
+ * and only one of them was intended: a marquee whose items are emoji is a strip
+ * whose layout changes with the reader's platform font. An SVG from the same set
+ * the header uses keeps the strip's rhythm identical everywhere, and the icon
+ * inherits the bar's colour instead of bringing its own.
+ */
+const FIRST_MESSAGE: { text: string; icon: LucideIcon } = {
+  text: "ارسال رایگان برای خرید بالای ۳ میلیون تومان، مطابق شرایط سفارش",
+  icon: Truck,
+};
+
+const messages: { text: string; icon: LucideIcon }[] = [
+  FIRST_MESSAGE,
+  { text: "ثبت سفارش، مشاوره و خدمات مزرعه از یک حساب کاربری", icon: Sprout },
+  { text: "بازار کشاورزان با بررسی آگهی‌ها پیش از انتشار", icon: Store },
+  { text: "پیش از پرداخت، موجودی و هزینه ارسال سفارش بررسی می‌شود", icon: PackageCheck },
 ];
 
 // ========================================
@@ -70,15 +84,19 @@ export default function TopBar(_props: { isDark?: boolean; onToggleDark?: () => 
              */
             <div className="flex w-max animate-marquee whitespace-nowrap">
               {[...messages, ...messages].map((msg, idx) => (
-                <span key={idx} className="shrink-0 pe-16 opacity-90">
-                  {msg}
+                <span key={idx} className="flex shrink-0 items-center gap-1.5 pe-16 opacity-90">
+                  <msg.icon size={13} aria-hidden="true" className="shrink-0" />
+                  {msg.text}
                 </span>
               ))}
             </div>
           ) : (
             /* Motion off: one message, stationary and readable, instead of a
                strip frozen wherever the loop happened to be. */
-            <span className="block truncate opacity-90">{messages[0]}</span>
+            <span className="flex items-center gap-1.5 truncate opacity-90">
+              <FIRST_MESSAGE.icon size={13} aria-hidden="true" className="shrink-0" />
+              {FIRST_MESSAGE.text}
+            </span>
           )}
         </div>
 

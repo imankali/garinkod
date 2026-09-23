@@ -112,7 +112,7 @@ export default function HealthPanel() {
 
         <div className="mt-4 h-2.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-emerald-900/50">
           <div
-            className={`h-full rounded-full transition-all ${pressure >= 90 ? 'bg-rose-500' : pressure >= 70 ? 'bg-amber-500' : 'bg-emerald-600'}`}
+            className={`h-full rounded-full transition-colors ${pressure >= 90 ? 'bg-rose-500' : pressure >= 70 ? 'bg-amber-500' : 'bg-emerald-600'}`}
             style={{ width: `${Math.min(100, Math.max(2, pressure))}%` }}
           />
         </div>

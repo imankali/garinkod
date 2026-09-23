@@ -12,7 +12,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from 'react-router';
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  SearchX,
+} from "lucide-react";
 
 import { categoriesApi, productsApi } from "../../api/services";
 import FilterSortBar, { type SortOption } from "../FilterSortBar";
@@ -342,9 +346,12 @@ function useLazyVisibility<T extends Element>(ref: React.RefObject<T | null>): b
 function EmptyGrid({ compact = false }: { compact?: boolean }) {
   return (
     <div className={`flex flex-col items-center justify-center text-center ${compact ? "py-8" : "py-12"}`}>
-      <div className={`${compact ? "text-4xl" : "text-6xl"} mb-3`} aria-hidden="true">
-        🔍
-      </div>
+      <SearchX
+        size={compact ? 36 : 52}
+        strokeWidth={1.25}
+        className="mb-3 text-slate-300 dark:text-emerald-800"
+        aria-hidden="true"
+      />
       <p className="text-fluid-sm font-bold text-slate-700 dark:text-white">محصولی یافت نشد</p>
       <p className="mt-1 text-fluid-xs text-slate-500 dark:text-emerald-300">
         فیلترها را تغییر دهید یا عبارت دیگری جستجو کنید

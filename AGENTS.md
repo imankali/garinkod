@@ -59,7 +59,7 @@ change, review the code and then run the full matrix in detail.
 | Backend unit + integration | `cd garinkood && source /tmp/env.sh && ../.venv/bin/python manage.py test` | **624 tests, OK** |
 | Backend, parallel | `... manage.py test --parallel 4` (needs `tblib`, now in requirements-dev) | **636 tests, OK in ~264s** |
 | Backend, tier module only | `... manage.py test shop.tests_price_tiers` | 41 tests, OK |
-| Frontend unit + integration | `cd frontend && CI=true npx vitest run` | **255 tests / 35 files** |
+| Frontend unit + integration | `cd frontend && CI=true npx vitest run` | **257 tests / 36 files** |
 | Type check | `cd frontend && npx tsc --noEmit` | clean |
 | Build | `cd frontend && npm run build` | ✓ (was failing: see §8, `exclude_seen`) |
 | Design linter | `.agents-tmp/node_modules/.bin/impeccable detect frontend/src` | 125 (see §6) |
@@ -219,6 +219,10 @@ referenced but never loaded), `gradient-text` ×2 (one was on a **price**),
       locale: 'fa-IR',
       timezoneId: 'Asia/Tehran',
       reducedMotion: 'reduce',
+      // The sandbox has no ffmpeg binary (the CDN is blocked), so a failure
+      // video cannot be rendered — `retain-on-failure` fails at `newPage`.
+      video: 'off',
+      trace: 'on',
       launchOptions: {
         executablePath: '/tmp/chromium',
         args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
@@ -226,6 +230,15 @@ referenced but never loaded), `gradient-text` ×2 (one was on a **price**),
     },
     projects: [{ name: 'desktop-chromium', use: { ...devices['Desktop Chrome'] } }],
   });
+  ```
+
+  Two limits come from having exactly one browser binary: `video` must be off,
+  and the WebKit/Firefox projects cannot launch — `executablePath` is applied to
+  every project, so they fail in ~4ms. Run the chromium projects only:
+
+  ```bash
+  npx playwright test --config=pw.local.config.mjs \
+    --project=desktop-chromium --project=mobile-chromium navigation.spec.ts
   ```
 
   Pointing `baseURL` at another port runs the same specs against a second

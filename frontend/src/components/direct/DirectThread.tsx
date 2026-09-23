@@ -63,10 +63,10 @@ const POLL_MS = 4000;
 function quoteSummary(quote: QuotedMessage, t: (key: string) => string): string {
   if (quote.is_deleted) return t('direct.deleted');
   if (quote.body) return quote.body;
-  if (quote.attachment_type === 'image') return '🖼 تصویر';
-  if (quote.attachment_type === 'video') return '🎬 ویدیو';
-  if (quote.attachment_type === 'audio') return '🎤 پیام صوتی';
-  if (quote.listing_title) return `📦 ${quote.listing_title}`;
+  if (quote.attachment_type === 'image') return 'تصویر';
+  if (quote.attachment_type === 'video') return 'ویدیو';
+  if (quote.attachment_type === 'audio') return 'پیام صوتی';
+  if (quote.listing_title) return quote.listing_title;
   return '';
 }
 

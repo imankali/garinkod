@@ -1,4 +1,5 @@
 // frontend/src/components/CropSelector.tsx
+import { CropIcon } from './ui/CategoryIcon';
 
 import { motion } from "framer-motion";
 
@@ -8,7 +9,6 @@ import { motion } from "framer-motion";
 interface Crop {
   id: string;
   label: string;
-  emoji: string;
 }
 
 interface CropSelectorProps {
@@ -20,12 +20,12 @@ interface CropSelectorProps {
 // Constants
 // ========================================
 const CROPS: Crop[] = [
-  { id: "wheat", label: "گندم", emoji: "🌾" },
-  { id: "pistachio", label: "پسته", emoji: " " },
-  { id: "rice", label: "برنج", emoji: "🍚" },
-  { id: "tomato", label: "گوجه‌فرنگی", emoji: "🍅" },
-  { id: "cucumber", label: "خیار گلخانه‌ای", emoji: "🥒" },
-  { id: "citrus", label: "باغ مرکبات", emoji: "🍊" },
+  { id: "wheat", label: "گندم" },
+  { id: "pistachio", label: "پسته" },
+  { id: "rice", label: "برنج" },
+  { id: "tomato", label: "گوجه‌فرنگی" },
+  { id: "cucumber", label: "خیار گلخانه‌ای" },
+  { id: "citrus", label: "باغ مرکبات" },
 ];
 
 // ========================================
@@ -98,7 +98,7 @@ export default function CropSelector({ activeCrop, onSelectCrop }: CropSelectorP
             aria-pressed={activeCrop === crop.id}
             aria-label={`فیلتر محصولات ${crop.label}`}
           >
-            <span className="text-lg">{crop.emoji}</span>
+            <CropIcon id={crop.id} size={18} />
             {crop.label}
           </motion.button>
         ))}

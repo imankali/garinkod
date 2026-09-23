@@ -32,7 +32,7 @@ const matchMedia = (reduce: boolean) => {
   );
 };
 
-const message = '🚚 ارسال رایگان برای خرید بالای ۳ میلیون تومان، مطابق شرایط سفارش';
+const message = 'ارسال رایگان برای خرید بالای ۳ میلیون تومان، مطابق شرایط سفارش';
 
 describe('TopBar ticker', () => {
   beforeEach(() => {
