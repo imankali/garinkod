@@ -2,6 +2,8 @@
 
 import { Phone, Truck } from "lucide-react";
 
+import { useAutoRotate } from "../hooks/useAutoRotate";
+
 // ========================================
 // Messages Configuration
 // ✅ پیام‌های چرخشی در TopBar
@@ -18,6 +20,10 @@ const messages = [
 // ========================================
 export default function TopBar(_props: { isDark?: boolean; onToggleDark?: () => void }) {
   const phoneNumber = import.meta.env.VITE_PHONE_NUMBER?.trim();
+  // The ticker is auto-moving text in a bar that is always on screen, so it
+  // obeys the same switch as the hero and the rails (WCAG 2.2.2). Its CSS
+  // animation also stops under `prefers-reduced-motion` — see index.css.
+  const { playing } = useAutoRotate();
 
   return (
     <div className="hidden overflow-hidden bg-brand-gradient text-emerald-50 sm:block">
@@ -40,13 +46,40 @@ export default function TopBar(_props: { isDark?: boolean; onToggleDark?: () => 
         {/* min-w-0 lets the flex child actually shrink, so the w-max marquee
             inside is clipped instead of stretching the whole bar. */}
         <div className="no-scrollbar relative min-w-0 flex-1 overflow-hidden" aria-hidden="true">
-          <div className="flex w-max animate-marquee gap-16 whitespace-nowrap">
-            {[...messages, ...messages].map((msg, idx) => (
-              <span key={idx} className="opacity-90">
-                {msg}
-              </span>
-            ))}
-          </div>
+          {playing ? (
+            /*
+             * Seamless ticker.
+             *
+             * It used to travel `translateX(100%) → -100%` on a `w-max` strip
+             * while the window showing it is a quarter of its width, so the
+             * strip spent most of the cycle entirely outside the bar: measured
+             * across the 22s loop, this box was empty for 8 of those seconds
+             * (36%) and every message had to be caught on the way past.
+             *
+             * Two changes make it continuous. The strip holds the list twice and
+             * travels exactly one copy (`0 → -50%`), so the moment the second
+             * copy reaches the window the first copy is where it started. And
+             * the gap moved from `gap-16` into each item's padding: a flex `gap`
+             * between items is not part of the element's measured width, so
+             * `-50%` would have been half a gap short every loop and the seam
+             * would tick. Padding counts toward the width, so the two halves are
+             * exactly equal and the loop is pixel-exact.
+             *
+             * 15s per copy is ~110 px/s at this type size — slow enough to read
+             * a message on the way past, which the old 290 px/s was not.
+             */
+            <div className="flex w-max animate-marquee whitespace-nowrap">
+              {[...messages, ...messages].map((msg, idx) => (
+                <span key={idx} className="shrink-0 pe-16 opacity-90">
+                  {msg}
+                </span>
+              ))}
+            </div>
+          ) : (
+            /* Motion off: one message, stationary and readable, instead of a
+               strip frozen wherever the loop happened to be. */
+            <span className="block truncate opacity-90">{messages[0]}</span>
+          )}
         </div>
 
         {/* ======================================== */}

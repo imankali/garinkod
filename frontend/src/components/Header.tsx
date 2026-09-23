@@ -1,6 +1,6 @@
 // frontend/src/components/Header.tsx
 
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import {
   AnimatePresence,
   motion,
@@ -22,8 +22,16 @@ import { useTranslation } from "../i18n";
 // ========================================
 // Constants
 // ========================================
+/** The header collapses only once the reader is past this offset. */
+const COLLAPSE_ABOVE = 140;
+/** How long the page must be still before the header comes back at the top. */
+const TOP_SETTLE_MS = 160;
+/** Settling this close to the top counts as having arrived at the top. */
+const NEAR_THE_TOP = 12;
+
 const SPRING = { type: "spring", damping: 28, stiffness: 320, mass: 0.6 } as const;
 const SPRING_SOFT = { type: "spring", damping: 22, stiffness: 260 } as const;
+
 
 // ========================================
 // ✅ Animated Number - انیمیشن flip برای تغییر عدد
@@ -215,6 +223,21 @@ export default function Header({
 }: HeaderProps) {
   const [scrolled, setScrolled] = useState(false);
   const [headerCollapsed, setHeaderCollapsed] = useState(false);
+  // Mirrors `headerCollapsed` so the gesture handlers below can read the current
+  // value without being re-created on every state change, plus the timer that
+  // expands the header once the reader has come to rest at the top.
+  const collapsedRef = useRef(false);
+  const settleTimerRef = useRef<number | null>(null);
+  const topHoldRef = useRef<number | null>(null);
+  // A downward gesture made while there is nothing to collapse yet — a single
+  // PageDown from the top of the page arrives before the offset it produces.
+  const pendingCollapseRef = useRef(false);
+  // A direction asked for with the keyboard. Those scrolls are animated (the
+  // stylesheet sets `scroll-behavior: smooth`), and changing the header's height
+  // in the middle of one cancels it — the reader presses PageUp and the page
+  // stops moving. So the key is recorded and applied once the page has come to
+  // rest, exactly like the rule for the top of the page.
+  const keyIntentRef = useRef<"down" | "up" | null>(null);
   const [bump, setBump] = useState(false);
   const prefersReducedMotion = useReducedMotion();
   const prevCountRef = useRef<number>(0);
@@ -263,13 +286,206 @@ export default function Header({
   //    اسکرول به پایین → فقط ردیف اصلی (لوگو/جستجو/سبد) چسبان می‌ماند و
   //    نوار اعلان، جستجوی موبایل و ناوبری دسکتاپ جمع می‌شوند؛
   //    اولین اسکرول رو به بالا همه برمی‌گردند. بالای صفحه همیشه هدر کامل است.
+  //
+  //    Collapsing removes three rows (~130px) from a sticky header that sits in
+  //    the normal flow, so the document reflows — and Chrome answers a reflow by
+  //    moving `scrollTop` to hold the content below visually still. That answer
+  //    arrives here as an ordinary scroll event running the *other* way, so a
+  //    header that reads its direction from `scrollY` reads its own echo as the
+  //    reader changing their mind. It flips back, reflows, is answered again,
+  //    and the two of them argue several times a second.
+  //
+  //    Measured on the home page, four seconds in which nothing was touched:
+  //    37 distinct header heights and 35 distinct scroll positions, at every
+  //    breakpoint and in both motion modes. `html { overflow-anchor: none }`
+  //    took both to 1, which is what named the mechanism — but that is not the
+  //    fix. Scroll anchoring is the feature that keeps the page still while
+  //    images load above it, and trading it away site-wide to protect a header
+  //    is a bad bargain.
+  //
+  //    Nor is it fixed by ignoring events for a moment after a change (a race
+  //    against the browser, decided by a stopwatch) or by comparing the visual
+  //    position of the content instead of the offset (correct in principle, but
+  //    the browser's compensation and the layout that caused it do not always
+  //    land in the same frame — traced at 129–485ms into a scroll, the header
+  //    still flipped there). Both leave the outcome to timing.
+  //
+  //    So the direction is not read from the document at all: it is read from
+  //    the reader. A wheel, a touch drag and a page-scrolling key each state
+  //    their direction unambiguously, and no amount of reflow can impersonate
+  //    one. State therefore changes only when a person acts, which also means no
+  //    reflow ever interrupts a scroll that is already in flight — the reason
+  //    «بازگشت به بالا» used to stop a hundred pixels short of the top.
+  //
+  //    The one position rule that stays is the top of the page, where the full
+  //    header belongs; it waits for the scrolling to stop before it fires, for
+  //    the same reason. Scrolling the page by dragging the scrollbar therefore
+  //    leaves the header as it is: the trade for a header that cannot twitch.
   // ========================================
+  const expandHeader = useCallback(() => {
+    pendingCollapseRef.current = false;
+    collapsedRef.current = false;
+    setHeaderCollapsed(false);
+  }, []);
+
+  /**
+   * Apply a direction the reader has just asked for.
+   *
+   * Upwards is unconditional — the full header is never wrong. Downwards only
+   * applies once there is a header worth collapsing into the page, so a gesture
+   * made at the very top is remembered and applied by the first scroll event
+   * that gets there (a PageDown moves the page in one jump and emits nothing
+   * afterwards).
+   */
+  const requestDirection = useCallback(
+    (direction: "down" | "up") => {
+      pendingCollapseRef.current = false;
+      if (direction === "up") {
+        expandHeader();
+        return;
+      }
+      if (scrollY.get() > COLLAPSE_ABOVE) {
+        pendingCollapseRef.current = false;
+        collapsedRef.current = true;
+        setHeaderCollapsed(true);
+      } else {
+        pendingCollapseRef.current = true;
+      }
+    },
+    [expandHeader, scrollY],
+  );
+
+  /**
+   * Run once the page has stopped moving: bring the rows back at the top, or
+   * carry out a direction asked for with the keyboard.
+   */
+  const scheduleSettle = useCallback(() => {
+    if (settleTimerRef.current !== null) window.clearTimeout(settleTimerRef.current);
+    settleTimerRef.current = window.setTimeout(() => {
+      settleTimerRef.current = null;
+      const intent = keyIntentRef.current;
+      keyIntentRef.current = null;
+
+      if (window.scrollY <= NEAR_THE_TOP) {
+        // Park exactly at the top before the rows come back. The reflow that
+        // follows has nowhere to push the page from 0, while from eight pixels
+        // down the browser answers it by moving the page further down to keep
+        // the content still — which is how «بازگشت به بالا» used to stop short
+        // of the top with the header only half returned.
+        if (window.scrollY !== 0) window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+        expandHeader();
+        // The rows and the top strip arrive over the next few frames, and each
+        // of those reflows is answered by the browser moving the page a few
+        // pixels to keep the content still. At the top there is no content to
+        // keep still, so hold it there until they have finished — unless the
+        // reader has started moving again, in which case the gesture handlers
+        // cancel this.
+        topHoldRef.current = window.setTimeout(() => {
+          topHoldRef.current = null;
+          if (window.scrollY !== 0 && window.scrollY <= NEAR_THE_TOP) {
+            window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+          }
+        }, TOP_SETTLE_MS * 3);
+        return;
+      }
+
+      if (intent === "up") expandHeader();
+      else if (intent === "down") requestDirection("down");
+    }, TOP_SETTLE_MS);
+  }, [expandHeader, requestDirection]);
+
+  useEffect(() => {
+    /** Ignore keys that belong to a field the reader is typing in. */
+    const isTyping = (target: EventTarget | null) =>
+      target instanceof HTMLElement &&
+      (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
+
+    const cancelTopHold = () => {
+      if (topHoldRef.current !== null) {
+        window.clearTimeout(topHoldRef.current);
+        topHoldRef.current = null;
+      }
+    };
+
+    const onWheel = (event: WheelEvent) => {
+      if (Math.abs(event.deltaY) < 2) return;
+      cancelTopHold();
+      requestDirection(event.deltaY > 0 ? "down" : "up");
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
+      if (isTyping(event.target)) return;
+      cancelTopHold();
+      if (event.key === "ArrowDown" || event.key === "PageDown" || event.key === "End") {
+        keyIntentRef.current = "down";
+      } else if (event.key === "ArrowUp" || event.key === "PageUp" || event.key === "Home") {
+        keyIntentRef.current = "up";
+      } else if (event.key === " ") {
+        keyIntentRef.current = event.shiftKey ? "up" : "down";
+      } else {
+        return;
+      }
+      scheduleSettle();
+    };
+
+    let lastTouchY = 0;
+    const onTouchStart = (event: TouchEvent) => {
+      cancelTopHold();
+      lastTouchY = event.touches[0]?.clientY ?? 0;
+    };
+    const onTouchMove = (event: TouchEvent) => {
+      const y = event.touches[0]?.clientY ?? lastTouchY;
+      // A finger travelling up the glass scrolls the content down.
+      const travelled = lastTouchY - y;
+      if (Math.abs(travelled) < 6) return;
+      cancelTopHold();
+      requestDirection(travelled > 0 ? "down" : "up");
+      lastTouchY = y;
+    };
+
+    window.addEventListener("wheel", onWheel, { passive: true });
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("touchstart", onTouchStart, { passive: true });
+    window.addEventListener("touchmove", onTouchMove, { passive: true });
+    return () => {
+      window.removeEventListener("wheel", onWheel);
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("touchstart", onTouchStart);
+      window.removeEventListener("touchmove", onTouchMove);
+    };
+  }, [requestDirection, scheduleSettle]);
+
   useMotionValueEvent(scrollY, "change", (latest) => {
     setScrolled(latest > 60);
-    const previous = scrollY.getPrevious() ?? 0;
-    if (latest > previous + 4 && latest > 140) setHeaderCollapsed(true);
-    else if (latest < previous - 4 || latest <= 140) setHeaderCollapsed(false);
+
+    if (pendingCollapseRef.current && latest > COLLAPSE_ABOVE) {
+      pendingCollapseRef.current = false;
+      collapsedRef.current = true;
+      setHeaderCollapsed(true);
+    }
+
+    // At the very top, the full header comes back — once the scrolling has
+    // stopped. The offset has to be 0 rather than merely small: bringing the
+    // rows back reflows the document, and at an offset of 0 that cannot move
+    // anyone (the browser will not scroll above the top), while at an offset of
+    // 96 it answers by pushing the page down to keep the content still — which
+    // is how «بازگشت به بالا» ended up sitting a hundred pixels short of it.
+    if (latest <= NEAR_THE_TOP || keyIntentRef.current !== null) {
+      scheduleSettle();
+    } else if (settleTimerRef.current !== null) {
+      window.clearTimeout(settleTimerRef.current);
+      settleTimerRef.current = null;
+    }
   });
+
+  useEffect(
+    () => () => {
+      if (settleTimerRef.current !== null) window.clearTimeout(settleTimerRef.current);
+      if (topHoldRef.current !== null) window.clearTimeout(topHoldRef.current);
+    },
+    [],
+  );
 
   // ========================================
   // ✅ Bump فقط هنگام «افزایش» تعداد (نه حذف آیتم)

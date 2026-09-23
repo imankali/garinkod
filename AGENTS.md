@@ -59,11 +59,11 @@ change, review the code and then run the full matrix in detail.
 | Backend unit + integration | `cd garinkood && source /tmp/env.sh && ../.venv/bin/python manage.py test` | **624 tests, OK** |
 | Backend, parallel | `... manage.py test --parallel 4` (needs `tblib`, now in requirements-dev) | **636 tests, OK in ~264s** |
 | Backend, tier module only | `... manage.py test shop.tests_price_tiers` | 41 tests, OK |
-| Frontend unit + integration | `cd frontend && CI=true npx vitest run` | **246 tests / 33 files** |
+| Frontend unit + integration | `cd frontend && CI=true npx vitest run` | **249 tests / 34 files** |
 | Type check | `cd frontend && npx tsc --noEmit` | clean |
 | Build | `cd frontend && npm run build` | ✓ (was failing: see §8, `exclude_seen`) |
 | Design linter | `.agents-tmp/node_modules/.bin/impeccable detect frontend/src` | 125 (see §6) |
-| E2E | `cd frontend && npx playwright test` | **never run locally — see §7** |
+| E2E | `cd frontend && npx playwright test` | **236 tests / 8 files**, run here with the browser from §7: `navigation.spec.ts` 11 passed / 3 failed, `public-routes.spec.ts` 10 passed / 1 skipped / 2 failed — all five failures are seed gaps that reproduce on the pre-change commit too |
 
 `manage.py test` (all apps) and `manage.py test shop` are different scopes and
 give different counts. Say which one you ran.
@@ -145,7 +145,7 @@ Rules:
    component.
 
 **ScrollSmoother is deliberately not wired up.** It reparents the DOM and
-would break the `position:fixed` header, cart drawer and modals, plus the 227
+would break the `position:fixed` header, cart drawer and modals, plus the 236
 e2e layout assertions. Do not enable it without rewriting that chrome.
 
 Read `.agents/skills/sheleg-design/MOTION_DOCTRINE.md` before adding animation
@@ -187,15 +187,59 @@ referenced but never loaded), `gradient-text` ×2 (one was on a **price**),
 
 ## 7. Known gaps — stated plainly, not hidden
 
-- **Playwright has never run in this sandbox.** There is no browser. `npx
-  playwright install chromium` fails. The 227 specs are verified only by
-  `--list` and CI. Any claim that e2e passes locally is false.
+- **Playwright runs in this sandbox, with a browser that is not Playwright's.**
+  `npx playwright install chromium` still fails (no route to
+  `cdn.playwright.dev`), but `@sparticuz/chromium` unpacks a usable binary and
+  the AL2023 tarball inside it carries the `libnspr4`/`libnss3` the base image
+  lacks. What works, from a throwaway config that lives outside the repo:
+
+  ```bash
+  cd /tmp && mkdir -p chromiumprobe && cd chromiumprobe && npm i @sparticuz/chromium
+  node -e "require('@sparticuz/chromium').executablePath().then(p => console.log(p))"
+  bx=node_modules/@sparticuz/chromium/bin/al2023.tar.br
+  node -e "const fs=require('fs'),z=require('zlib');fs.writeFileSync('/tmp/al2023.tar',z.brotliDecompressSync(fs.readFileSync('$bx')))"
+  mkdir -p /tmp/chromiumlibs && tar -xf /tmp/al2023.tar -C /tmp/chromiumlibs
+
+  cd frontend
+  LD_LIBRARY_PATH=/tmp/chromiumlibs/lib:/tmp/lib npx playwright test \
+    --config=pw.local.config.mjs navigation.spec.ts
+  ```
+
+  That config is `playwright.config.ts` with the browser swapped in, and it is
+  deliberately not committed — it names paths that only exist here:
+
+  ```js
+  // frontend/pw.local.config.mjs
+  export default defineConfig({
+    testDir: './e2e',
+    retries: 0,
+    workers: 1,
+    use: {
+      baseURL: 'http://127.0.0.1:5173',
+      locale: 'fa-IR',
+      timezoneId: 'Asia/Tehran',
+      reducedMotion: 'reduce',
+      launchOptions: {
+        executablePath: '/tmp/chromium',
+        args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
+      },
+    },
+    projects: [{ name: 'desktop-chromium', use: { ...devices['Desktop Chrome'] } }],
+  });
+  ```
+
+  Pointing `baseURL` at another port runs the same specs against a second
+  checkout — a `git worktree` of an older commit on its own vite port is how
+  "fixed" and "before" were compared. Aside from this route, the 236 specs are
+  still covered by `--list` and by CI.
 - **`ci/workflows/django.yml` still has `continue-on-error: true`**, so a red
   backend suite does not fail CI. Retained deliberately; it should be removed
   once the suite is trusted.
-- **No visual verification is possible here.** No screenshot has ever been
-  taken of any change in this repository by an agent. Layout and motion claims
-  are reasoned, not observed.
+- **Visual verification is possible, and was used.** With the browser above,
+  screenshots (`page.screenshot`) and DOM measurements are available; the first
+  ones taken of this repository are recorded in
+  `docs/ui-ux-pro-max-review-fa.md` §۹. Claims that predate that section are
+  reasoned rather than observed — check the section before trusting one.
 - The `image-pipeline-demo` product and the `e2e-moderator` user do not exist
   in the local SQLite database.
 

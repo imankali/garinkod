@@ -690,14 +690,31 @@ input[type="range"]::-moz-range-thumb {
   animation: shimmer 2.2s ease-in-out infinite;
 }
 
-/* Marquee (TopBar ticker) */
+/* Marquee (TopBar ticker)
+ *
+ * One copy of the message list per cycle: the strip contains the list twice, so
+ * travelling 50% of its own width lands the second copy exactly where the first
+ * started. `100% → -100%` (what this used to be) moved the strip two full
+ * widths through a window a quarter of its size and left the bar empty for a
+ * third of every cycle.
+ *
+ * The reduced-motion rule is not incidental: an OS-level request to stop moving
+ * things is a stronger statement than anything the page can infer, and a ticker
+ * that keeps sliding across a sticky header is exactly the motion it is asking
+ * about. The same switch is honoured in JS so the message stays readable. */
 @keyframes marquee {
-  0% { transform: translateX(100%); }
-  100% { transform: translateX(-100%); }
+  from { transform: translateX(50%); }
+  to { transform: translateX(0); }
 }
 
 .animate-marquee {
-  animation: marquee 22s linear infinite;
+  animation: marquee 15s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-marquee {
+    animation: none;
+  }
 }
 
 /* Ping Soft */

@@ -83,11 +83,15 @@ export default function CategoryGrid() {
         desktop everything still fits. Scroll-snap keeps each circle aligned
         to the gutter when it does overflow.
       */}
-      <ul
-        className="mt-5 grid grid-flow-col auto-cols-fr gap-1.5 overflow-x-auto pb-2 sm:flex sm:justify-between sm:gap-3 [scrollbar-width:none]"
-        role="region"
-        aria-label="دسته‌بندی‌های محصولات"
-      >
+      {/*
+        No `role="region"` here. A `role` on a list replaces its implicit `list`
+        role, which leaves every <li> without a list parent — four serious axe
+        violations ("listitem: <li> elements must be contained in a <ul> or
+        <ol>") for the sake of a label nobody needs twice: the enclosing
+        <section> already carries one via `aria-labelledby`, so this row is
+        inside a named region either way.
+      */}
+      <ul className="mt-5 grid grid-flow-col auto-cols-fr gap-1.5 overflow-x-auto pb-2 sm:flex sm:justify-between sm:gap-3 [scrollbar-width:none]">
         {tiles.map((tile) => (
           <li key={tile.slug} className="w-full min-w-0 shrink-0 snap-start text-center sm:w-24">
             <Link

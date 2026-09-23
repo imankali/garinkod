@@ -42,11 +42,15 @@ export default function AutoRotateToggle({
       <button
         type="button"
         onClick={toggle}
-        // `.tap-target` grows the hit area to 44×44 without enlarging the visible
-        // control — the same contract the round rail arrows use.
+        // 44×44 in the box itself, not a pseudo-element hit area around a smaller
+        // one. `.tap-target` is the right tool for a control that has to stay
+        // visually small; this one does not, and the e2e touch-target audit
+        // measures boxes, so a 32px control is a finding there even when its
+        // finger target is comfortable. It is also the size the header's own
+        // icon buttons use, so the corners of the page agree.
         className={cn(
-          'tap-target inline-flex min-h-8 items-center justify-center gap-1.5 rounded-full transition',
-          withLabel ? 'px-2.5 sm:px-3 text-fluid-2xs font-bold' : 'w-8',
+          'inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-full transition',
+          withLabel ? 'px-2.5 sm:px-3 text-fluid-2xs font-bold' : 'w-11',
           tone === 'overlay'
             ? 'bg-white/20 text-white backdrop-blur hover:bg-white/35 focus-visible:outline-2 focus-visible:outline-white'
             : 'bg-white/95 text-slate-700 ring-1 ring-slate-200 hover:text-emerald-700 dark:bg-emerald-950 dark:text-white dark:ring-emerald-700',
