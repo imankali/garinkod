@@ -475,6 +475,29 @@ button, a, input, select, textarea {
  * changing its visual size: the pseudo-element expands the touch region
  * outward while the icon stays small.
  */
+/*
+ * The horizontal rails (products, storefronts, listings) get a positioning
+ * context of their own.
+ *
+ * Without one, a rail's scrollable overflow leaks into the page: measured on
+ * /storefronts at a 414px viewport, the document reported a scrollWidth of
+ * 1170px — the reader could drag the whole page sideways by 756px, past a rail
+ * that is supposed to scroll inside its own box. The overflow is the *left* half
+ * of an RTL scroll area, and neither `overflow-x: hidden` on the body nor on the
+ * html element contains it; `position: relative` on the scroll container does,
+ * because the container then clips its own scrollable overflow against its own
+ * box instead of the page's.
+ *
+ * Every card that sits in a rail already establishes its own positioning context
+ * (`ProductCard` is `relative`, the storefront card wraps its icon in a
+ * `relative` div), so nothing inside a rail changes which box it is measured
+ * against — verified by diffing the geometry of every descendant before and
+ * after this rule.
+ */
+.rail-scroll {
+  position: relative;
+}
+
 .tap-target {
   position: relative;
 }

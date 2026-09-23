@@ -68,7 +68,7 @@ export default function Faq() {
         )}
       </Helmet>
 
-      <div className="mx-auto max-w-4xl px-[var(--page-gutter)] py-8 md:py-12">
+      <div className="mx-auto max-w-3xl px-[var(--page-gutter)] py-8 md:py-12">
         <header>
           <p className="text-fluid-2xs font-bold text-emerald-700 dark:text-lime-300">{data?.badge || 'راهنما'}</p>
           <h1 className="mt-1.5 text-2xl font-extrabold leading-10 text-slate-800 md:text-3xl dark:text-white">

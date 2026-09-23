@@ -484,7 +484,37 @@ export default function Shop({ compareItems, onToggleCompare }: ShopProps) {
       */}
       {!activeCollection && !filtersActive && !featured && (
         <div className="mx-auto max-w-7xl space-y-8 px-[var(--page-gutter)] pt-8">
-          {source === 'products'
+          {/*
+            The rows below each fetch their own products and drop themselves when
+            their collection turns out to be empty ("a heading over nothing reads
+            as a broken page" — see CuratedRow). That is the right call per row
+            and the wrong one for the page: the first paint showed four rows of
+            skeleton cards, and a moment later three of them vanished and the
+            whole catalogue jumped up by a screen and a half. Measured on this
+            page that was a CLS of 0.53, almost all of it from rows disappearing
+            above the fold.
+
+            The loading state now has the shape the loaded page is meant to have
+            — one skeleton row per configured collection, in the same grid — so
+            the common case (a collection with stock) swaps skeleton for cards of
+            the same height and moves nothing. The grid below keeps its own
+            geometry-exact skeleton, as before.
+          */}
+          {loading && source === 'products' && (
+            <div className="space-y-8" aria-hidden="true">
+              {CURATED_SECTIONS.map((section) => (
+                <section key={`pending-${section.id}`}>
+                  <div className="mb-3 h-9 w-48 animate-pulse rounded-xl bg-slate-100 dark:bg-emerald-900/40" />
+                  <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-5">
+                    {Array.from({ length: SECTION_SIZE }).map((_, index) => (
+                      <SkeletonCard key={index} variant="product" />
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
+          )}
+          {!loading && (source === 'products'
             ? CURATED_SECTIONS.map((section) => (
               <CuratedRow
                 key={section.id}
@@ -499,7 +529,7 @@ export default function Shop({ compareItems, onToggleCompare }: ShopProps) {
             ))
             : AD_SECTIONS.map((section) => (
               <AdRow key={section.id} section={section} />
-            ))}
+            )))}
         </div>
       )}
 

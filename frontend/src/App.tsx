@@ -388,6 +388,21 @@ export default function App() {
             paddingTop: 'var(--header-space, var(--header-height))',
             paddingBottom: 'var(--mobile-nav-clearance)',
             /*
+              The tallest thing the first paint can move, and the reason the
+              site's CLS was as high as 0.61 on a page like /storefronts.
+              The footer renders with the shell, so before any data arrives the
+              document is nearly empty, the footer sits just under the header —
+              inside the viewport — and the moment the content mounts it is
+              thrown thousands of pixels down. Every pixel of that journey is a
+              layout shift, and the header and footer of a shop are exactly the
+              two things that should never appear to move.
+              Reserving one screenless viewport for the content keeps the footer
+              below the fold from the first frame, so the same shift happens
+              where nobody can see it. `dvh` so a phone's collapsing toolbar
+              cannot reintroduce it.
+            */
+            minHeight: 'calc(100dvh - var(--header-space, var(--header-height)))',
+            /*
               Where the skip link lands. `scroll-padding-top` on the document
               covers anchor jumps, but a target that is focused — which is what
               the skip link does, so that the keyboard continues from there —
