@@ -6,6 +6,8 @@ import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useTranslation } from '../../i18n';
 import { cn } from '../../utils/cn';
+import { useAutoRotate } from '../../hooks/useAutoRotate';
+import AutoRotateToggle from '../ui/AutoRotateToggle';
 import { heroSlidesApi, type HeroSlideData } from '../../api/services';
 
 /**
@@ -20,11 +22,20 @@ import { heroSlidesApi, type HeroSlideData } from '../../api/services';
  * Behaviours, each one deliberate:
  *  - Autoplay every 6s; PAUSED while the pointer is over the slider or the
  *    tab focus sits inside it, because a moving target you are reading is
- *    hostile. `prefers-reduced-motion` disables autoplay entirely.
+ *    hostile. Just as importantly it is PAUSEABLE BY THE USER: the round
+ *    control in the corner stops every auto-rotating region of the site (see
+ *    `useAutoRotate`), which is the mechanism WCAG 2.2.2 requires of content
+ *    that starts moving on its own and runs for more than five seconds. Hover
+ *    was never that mechanism — a touch user has no hover, and the other five
+ *    moving regions on this page were not listening to this one anyway.
  *  - Touch swipe (RTL-aware: swiping right goes to the previous slide).
- *  - Keyboard: ArrowRight/ArrowLeft move between slides.
+ *  - Keyboard: ArrowRight/ArrowLeft move between slides; the slide picker
+ *    takes ArrowLeft/ArrowRight/Home/End of its own once focus is inside it.
  *  - The heading keeps id="hero-heading" — e2e assertions target it — and the
  *    slide text stays in the DOM as real elements.
+ *  - The slides are announced while motion is stopped and silent while it is
+ *    running (`aria-live` flips), so a screen reader describes a slide once the
+ *    user can actually hold it still — the pattern in the ARIA APG carousel.
  */
 
 interface Slide {
@@ -87,12 +98,16 @@ function useHeroSlides(): Slide[] {
 
 export default function HeroSlider() {
   const [index, setIndex] = useState(0);
-  const [paused, setPaused] = useState(false);
+  // Transient: the pointer is over the slider, or focus is inside it. Kept
+  // separate from the user's explicit choice so that leaving the slider
+  // resumes motion only for someone who never asked it to stop.
+  const [interactionPaused, setInteractionPaused] = useState(false);
   const touchStartX = useRef<number | null>(null);
+  const dotsRef = useRef<HTMLDivElement>(null);
 
-  const reduceMotion =
-    typeof window !== 'undefined' &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // Shared with every rail on the page: one control stops all of them, and the
+  // OS reduced-motion preference is folded in here rather than read again.
+  const { playing } = useAutoRotate();
 
   const slides = useHeroSlides();
 
@@ -100,11 +115,26 @@ export default function HeroSlider() {
     setIndex(((next % slides.length) + slides.length) % slides.length);
   }, [slides.length]);
 
+  /** Move to a slide index and put focus on its dot (slide-picker keyboard model). */
+  const goAndFocusDot = useCallback((next: number) => {
+    const target = ((next % slides.length) + slides.length) % slides.length;
+    go(target);
+    const dot = dotsRef.current?.querySelectorAll<HTMLButtonElement>('button')[target];
+    dot?.focus();
+  }, [go, slides.length]);
+
   useEffect(() => {
-    if (paused || reduceMotion) return;
+    if (!playing || interactionPaused) return;
     const timer = window.setTimeout(() => go(index + 1), SLIDE_DWELL_MS);
     return () => window.clearTimeout(timer);
-  }, [index, paused, reduceMotion, go]);
+  }, [index, playing, interactionPaused, go]);
+
+  // `aria-live` follows the same switch as the timer: describing slides while
+  // they are still moving would talk over the user, and describing them only
+  // when rotation has stopped means the announcement lands on a slide that is
+  // going to stay put. The dot group is exempted below so that its own arrow
+  // keys are not also read as "next slide".
+  const autoRotating = playing && !interactionPaused;
 
   const onTouchStart = (event: React.TouchEvent) => {
     touchStartX.current = event.touches[0]?.clientX ?? null;
@@ -126,17 +156,24 @@ export default function HeroSlider() {
       aria-roledescription="carousel"
       aria-label="معرفی گرین کود"
       dir="rtl"
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
-      onFocus={() => setPaused(true)}
-      onBlur={() => setPaused(false)}
+      onMouseEnter={() => setInteractionPaused(true)}
+      onMouseLeave={() => setInteractionPaused(false)}
+      onFocus={() => setInteractionPaused(true)}
+      onBlur={() => setInteractionPaused(false)}
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
       onKeyDown={(event) => {
+        // The slide picker owns the arrow keys while focus is inside it;
+        // without this the section would advance the slide *and* move the dot.
+        if ((event.target as HTMLElement | null)?.closest('[data-slide-picker]')) return;
         if (event.key === 'ArrowRight') go(index - 1);
         if (event.key === 'ArrowLeft') go(index + 1);
       }}
-    >      <div className="relative h-[320px] sm:h-[380px] lg:h-[420px]">
+    >      <div
+        className="relative h-[320px] sm:h-[380px] lg:h-[420px]"
+        aria-live={autoRotating ? 'off' : 'polite'}
+        aria-atomic="false"
+      >
         {slides.map((slide, slideIndex) => (
           <div
             key={slide.title}
@@ -190,16 +227,19 @@ export default function HeroSlider() {
         ))}
       </div>
 
-      {/* Arrows — a small pair sitting together at the bottom-right corner,
-          DESKTOP ONLY: touch widths swipe the slider natively and the arrows
-          only crowded the small screen. In RTL the right-hand button is
-          "previous", matching the ArrowRight keyboard behaviour. */}
-      <div className="absolute bottom-3 right-4 z-10 hidden items-center gap-1.5 md:flex">
+      {/* Arrows — a small cluster at the bottom-right corner. The arrows are
+          DESKTOP ONLY (touch widths swipe the slider natively and the arrows
+          only crowded the small screen), but the pause control is NOT: it is
+          the site-wide mechanism for stopping motion, so it renders on every
+          width. In RTL the right-hand button is "previous", matching the
+          ArrowRight keyboard behaviour. `.tap-target` gives each 32px visual
+          button the 44px hit area WCAG 2.5.5 asks for. */}
+      <div className="absolute bottom-3 right-4 z-10 flex items-center gap-1.5">
         <button
           type="button"
           aria-label="اسلاید قبلی"
           onClick={() => go(index - 1)}
-          className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-white backdrop-blur transition hover:bg-white/35 focus-visible:outline-2 focus-visible:outline-white"
+          className="tap-target hidden h-8 w-8 items-center justify-center rounded-full bg-white/20 text-white backdrop-blur transition hover:bg-white/35 focus-visible:outline-2 focus-visible:outline-white md:flex"
         >
           <ChevronRight size={16} aria-hidden="true" />
         </button>
@@ -207,24 +247,47 @@ export default function HeroSlider() {
           type="button"
           aria-label="اسلاید بعدی"
           onClick={() => go(index + 1)}
-          className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-white backdrop-blur transition hover:bg-white/35 focus-visible:outline-2 focus-visible:outline-white"
+          className="tap-target hidden h-8 w-8 items-center justify-center rounded-full bg-white/20 text-white backdrop-blur transition hover:bg-white/35 focus-visible:outline-2 focus-visible:outline-white md:flex"
         >
           <ChevronLeft size={16} aria-hidden="true" />
         </button>
+        <AutoRotateToggle />
       </div>
 
-      {/* Dots: the active dot is a progress pill. */}
-      <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-2" role="tablist" aria-label="انتخاب اسلاید">
+      {/* Slide picker.
+          These are buttons in a labelled group, not a tablist: there are no
+          tabpanels behind them and no roving tabindex, so `role="tab"` promised
+          a keyboard model (arrow keys moving between tabs, arrow keys moving
+          selection) that was never there — a screen reader said "tab, 1 of 3"
+          and the arrow keys did nothing. `aria-current` states the same thing
+          without the broken promise, and the group now implements the arrow /
+          Home / End navigation the role used to imply. */}
+      <div
+        ref={dotsRef}
+        data-slide-picker
+        className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-2"
+        role="group"
+        aria-label="انتخاب اسلاید"
+      >
         {slides.map((slide, dotIndex) => (
           <button
             key={slide.title}
             type="button"
-            role="tab"
-            aria-selected={dotIndex === index}
-            aria-label={`اسلاید ${dotIndex + 1}`}
+            aria-current={dotIndex === index}
+            aria-label={`اسلاید ${dotIndex + 1} از ${slides.length}`}
+            tabIndex={dotIndex === index ? 0 : -1}
             onClick={() => go(dotIndex)}
+            onKeyDown={(event) => {
+              if (event.key === 'ArrowLeft') { event.preventDefault(); goAndFocusDot(index + 1); }
+              if (event.key === 'ArrowRight') { event.preventDefault(); goAndFocusDot(index - 1); }
+              if (event.key === 'Home') { event.preventDefault(); goAndFocusDot(0); }
+              if (event.key === 'End') { event.preventDefault(); goAndFocusDot(slides.length - 1); }
+            }}
             className={cn(
-              'h-2 rounded-full transition-all duration-300',
+              // `transition-all` used to animate every property on every dot on
+              // every slider tick; the pill only ever changes its width and its
+              // colour, so that is what it transitions.
+              'tap-target h-2 rounded-full transition-[width,background-color] duration-300',
               dotIndex === index ? 'w-8 bg-white' : 'w-2 bg-white/50 hover:bg-white/80',
             )}
           />

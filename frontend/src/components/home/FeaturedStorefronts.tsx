@@ -9,11 +9,13 @@
 // other rails, so the scroll personality (rAF tween, snap on touch, autoplay
 // that pauses on hover) is shared everywhere.
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { ArrowLeft, BadgeCheck, PlusCircle, Sprout } from 'lucide-react';
 
 import { storefrontsApi } from '../../api/services';
+import { useAutoRotate } from '../../hooks/useAutoRotate';
+import AutoRotateToggle from '../ui/AutoRotateToggle';
 import type { Storefront } from '@/types/storefront';
 
 const AUTOPLAY_MS = 4000;
@@ -23,6 +25,8 @@ export default function FeaturedStorefronts() {
   const [loading, setLoading] = useState(true);
 
   const railRef = useRef<HTMLDivElement>(null);
+  // Shared site-wide switch; it also carries the reduced-motion default.
+  const { playing } = useAutoRotate();
   const hoverPause = useRef(false);
   const touchPause = useRef(false);
   const cancelTween = useRef<(() => void) | null>(null);
@@ -46,7 +50,7 @@ export default function FeaturedStorefronts() {
   }, []);
 
   /** rAF tween of the rail's own scrollLeft — identical to the other rails. */
-  const animateTo = (targetLeft: number) => {
+  const animateTo = useCallback((targetLeft: number) => {
     const rail = railRef.current;
     if (!rail) return;
     cancelTween.current?.();
@@ -73,8 +77,7 @@ export default function FeaturedStorefronts() {
       window.cancelAnimationFrame(raf);
       done();
     };
-  };
-
+  }, []);
   /** One column = the scroll step (mydigipay pairs two stalls per column). */
   const columnStep = (rail: HTMLDivElement): number => {
     const first = rail.children[0] as HTMLElement | undefined;
@@ -82,7 +85,7 @@ export default function FeaturedStorefronts() {
     return width > 0 ? width + 16 : Math.max(rail.clientWidth * 0.4, 160);
   };
 
-  const scrollToColumn = (index: number) => {
+  const scrollToColumn = useCallback((index: number) => {
     const rail = railRef.current;
     if (!rail) return;
     const unit = Math.max(columnStep(rail), 1);
@@ -92,8 +95,7 @@ export default function FeaturedStorefronts() {
       : at > 0 ? 1
       : getComputedStyle(rail).direction === 'rtl' ? -1 : 1;
     animateTo(sign * index * unit);
-  };
-
+  }, [animateTo]);
   const move = (direction: -1 | 1) => {
     const rail = railRef.current;
     if (!rail) return;
@@ -124,15 +126,11 @@ export default function FeaturedStorefronts() {
     return () => observer.disconnect();
   }, []);
 
-  // Gentle autoplay, consistent with the home rails; pauses on hover/touch
-  // and respects reduced-motion.
+  // Gentle autoplay, consistent with the home rails; pauses on hover/touch,
+  // stops for good when the visitor turns auto-rotation off, and respects
+  // reduced-motion.
   useEffect(() => {
-    if (loading || storefronts.length < 4) return;
-    const reduceMotion =
-      typeof window !== 'undefined' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (reduceMotion) return;
-
+    if (loading || storefronts.length < 4 || !playing) return;
     const timer = window.setInterval(() => {
       const rail = railRef.current;
       if (!rail || !inViewRef.current || hoverPause.current || touchPause.current) return;
@@ -148,7 +146,7 @@ export default function FeaturedStorefronts() {
       else scrollToColumn(Math.min(currentIndex + 1, rail.children.length - 1));
     }, AUTOPLAY_MS);
     return () => window.clearInterval(timer);
-  }, [loading, storefronts.length]);
+  }, [loading, storefronts.length, playing, scrollToColumn]);
 
   useEffect(() => () => cancelTween.current?.(), []);
 
@@ -177,13 +175,18 @@ export default function FeaturedStorefronts() {
             مستقیم از غرفه کشاورزان — بدون واسطه، با قیمت درب مزرعه
           </p>
         </div>
-        <Link
-          to="/storefronts"
-          className="inline-flex min-h-11 items-center gap-1 rounded-xl px-3 text-fluid-xs font-bold text-emerald-700 transition hover:bg-emerald-50 dark:text-lime-300 dark:hover:bg-emerald-900"
-        >
-          همه
-          <ArrowLeft size={14} aria-hidden="true" />
-        </Link>
+        <div className="flex items-center gap-1">
+          {/* Only offered while the rail can actually move on its own; a pause
+              button over a static row would be a control that does nothing. */}
+          {storefronts.length > 1 && <AutoRotateToggle tone="surface" />}
+          <Link
+            to="/storefronts"
+            className="inline-flex min-h-11 items-center gap-1 rounded-xl px-3 text-fluid-xs font-bold text-emerald-700 transition hover:bg-emerald-50 dark:text-lime-300 dark:hover:bg-emerald-900"
+          >
+            همه
+            <ArrowLeft size={14} aria-hidden="true" />
+          </Link>
+        </div>
       </div>
 
       <div className="relative mt-5">

@@ -26,6 +26,7 @@ import HighlightManager from './storefront/HighlightManager';
 import { OwnerEditor } from './storefront/OwnerEditor';
 import { OwnerComposer } from './storefront/OwnerComposer';
 import { PostEditor } from './storefront/OwnerActions';
+import { useTabKeyboard } from '../hooks/useTabKeyboard';
 
 /**
  * The viewer only ever renders an image and a caption, so it takes this
@@ -93,6 +94,12 @@ export default function StorefrontPage() {
   const [tab, setTab] = useState<TabKey>(() =>
     new URLSearchParams(window.location.search).get('tab') === 'posts' ? 'posts' : 'listings',
   );
+  // role="tab" promises arrow-key navigation between the tabs; this supplies it.
+  const tabKeyboard = useTabKeyboard({
+    values: TABS.map((item) => item.key),
+    current: tab,
+    onSelect: setTab,
+  });
   const [followBusy, setFollowBusy] = useState(false);
   const [viewer, setViewer] = useState<{ posts: ViewableStory[]; index: number } | null>(null);
   const [unread, setUnread] = useState(0);
@@ -672,7 +679,12 @@ export default function StorefrontPage() {
       {isOwner && <OwnerComposer onPublished={load} />}
 
       {/* Tabs */}
-      <div role="tablist" aria-label="محتوای غرفه" className="mt-6 flex border-b border-slate-200 dark:border-emerald-900">
+      <div
+        role="tablist"
+        aria-label="محتوای غرفه"
+        className="mt-6 flex border-b border-slate-200 dark:border-emerald-900"
+        {...tabKeyboard.tabListProps}
+      >
         {TABS.map(({ key, labelKey, icon: Icon }) => (
           <motion.button
             key={key}
@@ -682,6 +694,7 @@ export default function StorefrontPage() {
             aria-selected={tab === key}
             aria-controls={`panel-${key}`}
             onClick={() => setTab(key)}
+            {...tabKeyboard.tabProps(key)}
             className={`flex flex-1 items-center justify-center gap-1.5 border-b-2 px-3 py-3 text-sm font-bold transition ${
               tab === key
                 ? 'border-emerald-600 text-emerald-700 dark:border-lime-400 dark:text-lime-300'

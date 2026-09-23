@@ -59,9 +59,9 @@ change, review the code and then run the full matrix in detail.
 | Backend unit + integration | `cd garinkood && source /tmp/env.sh && ../.venv/bin/python manage.py test` | **624 tests, OK** |
 | Backend, parallel | `... manage.py test --parallel 4` (needs `tblib`, now in requirements-dev) | **636 tests, OK in ~264s** |
 | Backend, tier module only | `... manage.py test shop.tests_price_tiers` | 41 tests, OK |
-| Frontend unit + integration | `cd frontend && CI=true npx vitest run` | **190 tests / 24 files** |
+| Frontend unit + integration | `cd frontend && CI=true npx vitest run` | **246 tests / 33 files** |
 | Type check | `cd frontend && npx tsc --noEmit` | clean |
-| Build | `cd frontend && npm run build` | ✓ |
+| Build | `cd frontend && npm run build` | ✓ (was failing: see §8, `exclude_seen`) |
 | Design linter | `.agents-tmp/node_modules/.bin/impeccable detect frontend/src` | 125 (see §6) |
 | E2E | `cd frontend && npx playwright test` | **never run locally — see §7** |
 
@@ -218,7 +218,30 @@ referenced but never loaded), `gradient-text` ×2 (one was on a **price**),
   as its own 44 kB chunk and never enters the main bundle.
 - **Three skills installed** under `.agents/skills/`: UI/UX Pro Max, Impeccable,
   SHELEG Design (272 files).
+  `ui-ux-pro-max/SKILL.md` was refreshed to the current `npx ui-ux-pro-max-cli
+  init --ai codex` render (425 → 739 lines: priority table + the full 119-rule
+  quick reference). Everything else in that skill tree already matched the
+  published install byte for byte, so only the one file changed. The npm package
+  ships no `references/` — do not add one, and do not sync `core.py`/`search.py`
+  from GitHub main, where they differ from the released assets.
 - **Competitor audit** — `docs/competitor-audit.md`.
+- **UI/UX Pro Max review pass** — `docs/ui-ux-pro-max-review-fa.md`. Three
+  findings worth keeping in mind:
+  - **Auto-rotating content had no user control** (WCAG 2.2.2 A): hero + four
+    rails + the flash-deal countdown all moved on their own, and hover/focus was
+    the only brake. `hooks/useAutoRotate.ts` is now the single shared switch
+    (persisted, honours a *live* reduced-motion query), with
+    `components/ui/AutoRotateToggle.tsx` as its control. Any new auto-rotating
+    region must subscribe to it.
+  - **`role="tab"` without a keyboard model** in 13 places. `hooks/useTabKeyboard.ts`
+    supplies arrow/Home/End + roving tabindex for real tab lists; the ones that
+    were filters or links were given honest roles (`aria-pressed` in a group,
+    `<nav>` + `aria-current`). axe cannot detect this class of bug — writing the
+    DOM test is the only thing that catches it.
+  - **The production build was broken**: `StorefrontExplore.tsx` sent
+    `exclude_seen`, `shop/api_views.py` supported it, and the client type did
+    not, so `tsc` — and therefore `npm run build` — failed. Types are the API's
+    contract; a parameter the server reads belongs in them.
 
 ### Done — latency, first pass
 

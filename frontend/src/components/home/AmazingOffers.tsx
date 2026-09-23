@@ -6,7 +6,9 @@ import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft, Timer, Zap } from 'lucide-react';
 
 import { productsApi } from '../../api/services';
+import { useAutoRotate } from '../../hooks/useAutoRotate';
 import { toPersianDigits } from '../../utils/normalizeDigits';
+import AutoRotateToggle from '../ui/AutoRotateToggle';
 import type { ProductList } from '@/types/shop';
 import OfferRail from './OfferRail';
 
@@ -29,16 +31,18 @@ function secondsUntilMidnight(now: Date): number {
 
 export default function AmazingOffers() {
   const [remaining, setRemaining] = useState(() => secondsUntilMidnight(new Date()));
+  // The countdown is auto-updating text, so it is part of the same WCAG 2.2.2
+  // bargain as the rail: one control stops the ticking and the scrolling.
+  const { playing } = useAutoRotate();
 
   useEffect(() => {
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (reduceMotion) return;
+    if (!playing) return;
     const timer = window.setInterval(
       () => setRemaining(secondsUntilMidnight(new Date())),
       1000,
     );
     return () => window.clearInterval(timer);
-  }, []);
+  }, [playing]);
 
   const hours = Math.floor(remaining / 3600);
   const minutes = Math.floor((remaining % 3600) / 60);
@@ -82,9 +86,10 @@ export default function AmazingOffers() {
               {toPersianDigits(String(seconds).padStart(2, '0'))}
             </span>
           </span>
+          {products.length > 1 && <AutoRotateToggle className="ms-auto" />}
           <Link
             to="/products?collection=discounted"
-            className="ms-auto inline-flex items-center gap-1 text-fluid-sm font-bold text-lime-200 transition hover:text-white"
+            className="inline-flex shrink-0 items-center gap-1 text-fluid-sm font-bold text-lime-200 transition hover:text-white"
           >
             همه تخفیف‌ها
             <ChevronLeft size={16} aria-hidden="true" />

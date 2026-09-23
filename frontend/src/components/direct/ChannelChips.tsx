@@ -78,7 +78,7 @@ export default function ChannelChips({
     <div className={cn('relative shrink-0', className)}>
       <div
         ref={scrollerRef}
-        role="tablist"
+        role="group"
         aria-label="فیلتر منبع پیام"
         onWheel={onWheel}
         className="no-scrollbar flex snap-x snap-proximity gap-1 overflow-x-auto scroll-px-3 px-3 py-2 [-webkit-overflow-scrolling:touch] [overscroll-behavior-x:contain]"
@@ -128,8 +128,10 @@ function Chip({
   return (
     <button
       type="button"
-      role="tab"
-      aria-selected={active}
+      // `aria-pressed` alone: the chip carries a filter, and the previous
+      // `role="tab"` both mis-described it and made `aria-pressed` invalid on
+      // that role (a tab cannot be a toggle button). The row already scrolls the
+      // pressed chip into view, so nothing else had to change.
       aria-pressed={active}
       onClick={onClick}
       className={cn(

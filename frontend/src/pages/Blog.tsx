@@ -83,14 +83,20 @@ export default function Blog({ fixedKind }: { fixedKind?: 'guide' | 'article' })
 
       {/* Controls */}
       <div className="mt-7 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        {/* These are Links that navigate to a different URL, so they are
+            navigation — not tabs. `role="tab"` on an anchor told a screen
+            reader to expect arrow keys and a panel that never existed; a nav
+            landmark with `aria-current="page"` describes it exactly. */}
         {!fixedKind && (
-          <div className="flex gap-1 rounded-2xl bg-slate-100 p-1 dark:bg-emerald-900/60" role="tablist" aria-label="نوع مطلب">
+          <nav
+            className="flex gap-1 rounded-2xl bg-slate-100 p-1 dark:bg-emerald-900/60"
+            aria-label="نوع مطلب"
+          >
             {TABS.map((tab) => (
               <Link
                 key={tab.id}
                 to={tab.id === 'all' ? '/blog' : tab.id === 'guide' ? '/guides' : '/blog?kind=article'}
-                role="tab"
-                aria-selected={tab.id === (kind || 'all')}
+                aria-current={tab.id === (kind || 'all') ? 'page' : undefined}
                 className={cn(
                   'flex min-h-11 items-center gap-1.5 rounded-xl px-3.5 text-fluid-xs font-bold transition',
                   tab.id === (kind || 'all')
@@ -102,7 +108,7 @@ export default function Blog({ fixedKind }: { fixedKind?: 'guide' | 'article' })
                 {tab.label}
               </Link>
             ))}
-          </div>
+          </nav>
         )}
 
         <label className="relative flex-1 lg:max-w-sm">

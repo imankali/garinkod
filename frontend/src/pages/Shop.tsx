@@ -395,11 +395,18 @@ export default function Shop({ compareItems, onToggleCompare }: ShopProps) {
               </p>
             </div>
 
-            <div className="inline-flex rounded-2xl bg-emerald-50 p-1 dark:bg-emerald-900/50" role="tablist" aria-label="منبع کاتالوگ">
+            {/* A segmented filter, not tabs: both options render the same grid
+                with a different source, there is no panel per option, and the
+                choice lives in the URL. `aria-pressed` says exactly that, where
+                `role="tab"` promised panels and arrow keys that never existed. */}
+            <div
+              className="inline-flex rounded-2xl bg-emerald-50 p-1 dark:bg-emerald-900/50"
+              role="group"
+              aria-label="منبع کاتالوگ"
+            >
               <button
                 type="button"
-                role="tab"
-                aria-selected={source === 'products'}
+                aria-pressed={source === 'products'}
                 onClick={() => updateParams({ source: undefined, page: undefined })}
                 className={cn(
                   'min-h-11 rounded-xl px-4 text-sm font-bold transition',
@@ -412,8 +419,7 @@ export default function Shop({ compareItems, onToggleCompare }: ShopProps) {
               </button>
               <button
                 type="button"
-                role="tab"
-                aria-selected={source === 'marketplace'}
+                aria-pressed={source === 'marketplace'}
                 onClick={() => updateParams({ source: 'marketplace', page: undefined })}
                 className={cn(
                   'min-h-11 rounded-xl px-4 text-sm font-bold transition',

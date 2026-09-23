@@ -26,6 +26,7 @@ import { parseApiError } from '../api/errors';
 import { useAuthStore } from '../store/authStore';
 import type { OtpRequestResponse } from '@/types/user';
 import { normalizePhoneNumber, toEnglishDigits } from '../utils/normalizeDigits';
+import { useTabKeyboard } from '../hooks/useTabKeyboard';
 
 type AuthMethod = 'otp' | 'password';
 
@@ -51,6 +52,12 @@ const EMPTY_PASSWORD_FORM: PasswordFormData = {
 
 export default function Login() {
   const [authMethod, setAuthMethod] = useState<AuthMethod>('otp');
+  // role="tab" promises arrow-key navigation; this is where it comes from.
+  const methodKeyboard = useTabKeyboard({
+    values: ['otp', 'password'] as const,
+    current: authMethod,
+    onSelect: setAuthMethod,
+  });
   const [isRegister, setIsRegister] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showPassword2, setShowPassword2] = useState(false);
@@ -213,12 +220,19 @@ export default function Login() {
             </p>
           </header>
 
-          <div className="mb-6 grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1 dark:bg-emerald-950" role="tablist" aria-label="روش ورود">
+          <div
+            className="mb-6 grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1 dark:bg-emerald-950"
+            role="tablist"
+            aria-label="روش ورود"
+            {...methodKeyboard.tabListProps}
+          >
             <button
               type="button"
               role="tab"
+              id="tab-otp"
               aria-selected={authMethod === 'otp'}
               onClick={() => selectMethod('otp')}
+              {...methodKeyboard.tabProps('otp')}
               className={`flex min-h-11 items-center justify-center gap-2 rounded-xl px-3 text-sm font-bold transition ${
                 authMethod === 'otp'
                   ? 'bg-white text-emerald-700 shadow-sm dark:bg-emerald-800 dark:text-lime-300'
@@ -230,8 +244,10 @@ export default function Login() {
             <button
               type="button"
               role="tab"
+              id="tab-password"
               aria-selected={authMethod === 'password'}
               onClick={() => selectMethod('password')}
+              {...methodKeyboard.tabProps('password')}
               className={`flex min-h-11 items-center justify-center gap-2 rounded-xl px-3 text-sm font-bold transition ${
                 authMethod === 'password'
                   ? 'bg-white text-emerald-700 shadow-sm dark:bg-emerald-800 dark:text-lime-300'

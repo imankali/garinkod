@@ -1,12 +1,13 @@
 // frontend/src/components/home/OfferRail.tsx
 
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Link } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, ShoppingCart, Star } from 'lucide-react';
 
 import { formatPrice } from '../../utils/formatPrice';
 import { toPersianDigits } from '../../utils/normalizeDigits';
+import { useAutoRotate } from '../../hooks/useAutoRotate';
 import { useCartStore } from '../../store/cartStore';
 import { productsApi } from '../../api/services';
 import toast from 'react-hot-toast';
@@ -24,7 +25,9 @@ import type { ProductList } from '@/types/shop';
  *  - Native CSS scroll-snap: momentum scrolling, keyboard friendly, RTL-safe.
  *  - Autoplay every 2s, one column per tick, toward the reading direction; it
  *    loops back to the start at the end. Pointer hover or an active touch
- *    pauses it; reduced-motion users never see the rail move by itself.
+ *    pauses it, the visitor can stop it for the whole site from the section
+ *    heading (see `useAutoRotate` — this is the WCAG 2.2.2 mechanism), and
+ *    reduced-motion users never see the rail move by itself.
  *  - Movement is a rAF tween of the rail's own scrollLeft: it can never
  *    scroll the surrounding page vertically (scrollIntoView did), and it
  *    lands exactly on a snap point in every engine.
@@ -43,6 +46,8 @@ export default function OfferRail({ products }: { products: ProductList[] }) {
   const busyId = useRef<number | null>(null);
   const cancelTween = useRef<(() => void) | null>(null);
   const addToCart = useCartStore((state) => state.addToCart);
+  // User-controlled and site-wide: covers the reduced-motion default too.
+  const { playing } = useAutoRotate();
 
   // Pair the products into two-row columns: [0,1], [2,3], … The leftover
   // product of an odd list fills the top row of the last column alone.
@@ -62,7 +67,7 @@ export default function OfferRail({ products }: { products: ProductList[] }) {
    *  collapses this tween into a single-frame jump (measured: intermediate
    *  values never land). So the tween suspends snap for its 450 ms and hands
    *  it back afterwards; manual swipes still snap. */
-  const animateTo = (targetLeft: number) => {
+  const animateTo = useCallback((targetLeft: number) => {
     const rail = railRef.current;
     if (!rail) return;
     cancelTween.current?.();
@@ -89,8 +94,7 @@ export default function OfferRail({ products }: { products: ProductList[] }) {
       window.cancelAnimationFrame(raf);
       done();
     };
-  };
-
+  }, []);
   /** Pixel advance of one column (column + gap). Without layout (jsdom,
    *  hidden node) it falls back to the ~80%-viewport page step. */
   const cardStep = (rail: HTMLDivElement): number => {
@@ -102,7 +106,7 @@ export default function OfferRail({ products }: { products: ProductList[] }) {
   /** Bring column `index` flush to the start edge. The RTL sign comes from the
    *  live scroll position (negative while scrolled in Chromium RTL), falling
    *  back to the computed direction when the rail sits at 0. */
-  const scrollToCard = (index: number) => {
+  const scrollToCard = useCallback((index: number) => {
     const rail = railRef.current;
     if (!rail) return;
     const unit = Math.max(cardStep(rail), 1);
@@ -112,8 +116,7 @@ export default function OfferRail({ products }: { products: ProductList[] }) {
       : at > 0 ? 1
       : getComputedStyle(rail).direction === 'rtl' ? -1 : 1;
     animateTo(sign * index * unit);
-  };
-
+  }, [animateTo]);
   const move = (direction: -1 | 1) => {
     const rail = railRef.current;
     if (!rail) return;
@@ -148,14 +151,10 @@ export default function OfferRail({ products }: { products: ProductList[] }) {
   }, []);
 
   // Autoplay: one column per 2s. Pointer hover or an active touch pauses it —
-  // the standard carousel contract; moving the pointer away resumes.
+  // the standard carousel contract; moving the pointer away resumes, unless the
+  // visitor turned auto-rotation off, which is sticky.
   useEffect(() => {
-    if (products.length < 2) return;
-    const reduceMotion =
-      typeof window !== 'undefined' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (reduceMotion) return;
-
+    if (products.length < 2 || !playing) return;
     const timer = window.setInterval(() => {
       const rail = railRef.current;
       if (!rail || !inViewRef.current || hoverPause.current || touchPause.current) return;
@@ -174,7 +173,7 @@ export default function OfferRail({ products }: { products: ProductList[] }) {
       }
     }, AUTOPLAY_MS);
     return () => window.clearInterval(timer);
-  }, [products.length]);
+  }, [products.length, playing, scrollToCard]);
 
   async function quickAdd(product: ProductList) {
     if (busyId.current === product.id) return;

@@ -46,6 +46,7 @@ import type { Comment } from '@/types/content';
 import { formatPrice } from "../utils/formatPrice";
 import PriceLadder from "../components/shop/PriceLadder";
 import { cn } from "../utils/cn";
+import { useTabKeyboard } from "../hooks/useTabKeyboard";
 
 const FALLBACK_IMAGE = "/images/hero-farm.jpg";
 const STICKERS = ["🌱", "🌾", "👍", "⭐", "💚", "👏"];
@@ -99,6 +100,14 @@ export default function ProductPage() {
   };
   const [starFilter, setStarFilter] = useState<number | null>(null);
   const [tab, setTab] = useState<Tab>(() => (linkedComment ? "reviews" : "description"));
+  // The tab strip claimed role="tab" with no keyboard model behind it: the
+  // arrow keys a screen reader announces as available did nothing. One shared
+  // hook supplies them (and keeps a single tab in the tab order).
+  const tabKeyboard = useTabKeyboard({
+    values: TABS.map((item) => item.id),
+    current: tab,
+    onSelect: setTab,
+  });
   const imageRef = useRef<HTMLInputElement>(null);
   const guidesRef = useRef<HTMLDivElement>(null);
   const similarRef = useRef<HTMLDivElement>(null);
@@ -547,7 +556,12 @@ export default function ProductPage() {
 
     {/* Tabs: توضیحات / ویژگی‌ها / دیدگاه‌ها */}
     <div id="product-tabs" className="mt-9 scroll-mt-24">
-      <div className="flex gap-1 overflow-x-auto rounded-2xl bg-slate-100 p-1 dark:bg-emerald-900/60" role="tablist" aria-label="بخش‌های محصول">
+      <div
+        className="flex gap-1 overflow-x-auto rounded-2xl bg-slate-100 p-1 dark:bg-emerald-900/60"
+        role="tablist"
+        aria-label="بخش‌های محصول"
+        {...tabKeyboard.tabListProps}
+      >
         {TABS.map((item) => {
           const count = item.id === 'reviews' ? comments.length : item.id === 'specs' ? specRows.length : 0;
           return (
@@ -555,8 +569,13 @@ export default function ProductPage() {
               key={item.id}
               type="button"
               role="tab"
+              id={`tab-${item.id}`}
               aria-selected={tab === item.id}
+              // One region holds whichever panel is open, so every tab points at
+              // it; the panel names itself after the tab that is showing.
+              aria-controls="product-tab-panel"
               onClick={() => setTab(item.id)}
+              {...tabKeyboard.tabProps(item.id)}
               className={cn(
                 'flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl px-4 text-fluid-xs font-bold transition',
                 tab === item.id
@@ -572,7 +591,13 @@ export default function ProductPage() {
         })}
       </div>
 
-      <div className="mt-4">
+      <div
+        className="mt-4"
+        role="tabpanel"
+        id="product-tab-panel"
+        aria-labelledby={`tab-${tab}`}
+        tabIndex={-1}
+      >
         {tab === 'specs' && (
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
             {specRows.length ? (
