@@ -659,14 +659,17 @@ export default function Header({
           {/* ======================================== */}
           {/* Main Row: منو (راست) | لوگو (وسط) | سبد (چپ) */}
           {/* ======================================== */}
-          {/* The row keeps one height. It used to shed 12px of padding once the
-              page was scrolled, which — with the header in the flow — was a second
-              layout change at a second threshold, i.e. a second hop while
-              scrolling. The compact feel now comes from the logo and the shadow,
-              neither of which moves anything. */}
+          {/* One height, always.
+              Two things used to change it, and each was a hop of its own:
+              the padding shed 12px once the page was scrolled, and the logo
+              drops its tagline at the same threshold, which takes 9–12px off the
+              row on every screen wide enough to show the tagline. `md:min-h-24`
+              holds the row at the height it has when the tagline is present, so
+              neither the bar nor the nav row under it moves when the threshold
+              is crossed — and the compact logo simply centres inside it. */}
           <div
             ref={mainRowRef}
-            className="relative mx-auto flex max-w-7xl items-center gap-2 px-[var(--page-gutter)] py-2.5 sm:gap-3 sm:py-3 md:gap-4 md:py-3.5"
+            className="relative mx-auto flex max-w-7xl items-center gap-2 px-[var(--page-gutter)] py-2.5 sm:gap-3 sm:py-3 md:min-h-24 md:gap-4 md:py-3.5"
           >
             {/* ✅ Menu Toggle - آیکون morph بین Menu و X */}
             <motion.button
