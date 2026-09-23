@@ -7,7 +7,7 @@ import toast from "react-hot-toast";
 import { useQuery } from "@tanstack/react-query";
 
 import {
-  Search, X, Clock, SlidersHorizontal,
+  Search, X, Clock, SlidersHorizontal, ChevronDown,
   PackageCheck, Mic, Sparkles, Tag, Flame
 } from "lucide-react";
 import { categories } from "../data/shopData";
@@ -19,7 +19,14 @@ import type { ProductList, MockProduct } from '@/types/shop';
 // Types
 // ========================================
 interface SearchBarProps {
-  variant?: "desktop" | "mobile";
+  /**
+   * `desktop` — the wide field in the header's main row.
+   * `mobile`  — the field in its own row under the header, on compact screens.
+   * `compact` — the field inside the pinned row while the header is collapsed,
+   *             where it shares ~190px with a menu button, a cart button and the
+   *             scope selector, so it sheds what it can do without.
+   */
+  variant?: "desktop" | "mobile" | "compact";
   onSelectProduct?: (product: MockProduct) => void;
 }
 
@@ -203,12 +210,26 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
   // ========================================
   // Handlers
   // ========================================
+  /**
+   * Enter (or the «جستجو» button) goes to the results page, carrying the scope.
+   *
+   * It used to only open the suggestions dropdown, which left the field's own
+   * promise unkept: you press a button that says «جستجو» and no search happens.
+   * The scope selector would also have had nothing to act on, since it exists to
+   * say *where* the search should run.
+   */
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (query.trim() && !recent.includes(query.trim())) {
-      setRecent((prev) => [query.trim(), ...prev].slice(0, 8));
+    const trimmed = query.trim();
+    if (trimmed && !recent.includes(trimmed)) {
+      setRecent((prev) => [trimmed, ...prev].slice(0, 8));
     }
-    openSuggestions();
+
+    const params = new URLSearchParams();
+    if (trimmed) params.set("search", trimmed);
+    if (activeCategory !== "all") params.set("category", activeCategory);
+    setPanel("none");
+    navigate(`/products${params.size ? `?${params.toString()}` : ""}`);
   }
 
   /**
@@ -282,12 +303,46 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
     >
       <motion.form
         onSubmit={handleSubmit}
-        className={`group flex items-stretch rounded-2xl border-2 bg-white shadow-sm transition-colors duration-300 dark:bg-emerald-950 ${
+        className={`group flex items-stretch overflow-hidden rounded-2xl border-2 bg-white shadow-sm transition-colors duration-300 dark:bg-emerald-950 ${
           isFocused
             ? "border-[#0F8A5F] shadow-lg shadow-emerald-100 ring-4 ring-emerald-100/50 dark:shadow-none dark:ring-emerald-900/50"
             : "border-emerald-100 hover:border-emerald-300 dark:border-emerald-900/60"
         }`}
       >
+        {/* Search Scope — «در کدام دسته دنبالش بگردم؟»
+            A native <select> on purpose: it is a listbox that already works with
+            a keyboard, with a screen reader and with a phone's own picker, and a
+            custom popup would have to reimplement all three. It drives the same
+            `activeCategory` the filter panel's chips do, so the live results, the
+            chips and this selector can never disagree. */}
+        <div className="relative flex shrink-0 items-stretch">
+          <select
+            value={activeCategory}
+            onChange={(event) => setActiveCategory(event.target.value)}
+            aria-label="محدوده جستجو"
+            className="min-h-11 w-[4.25rem] shrink-0 cursor-pointer appearance-none rounded-s-2xl border-e border-emerald-100 bg-emerald-50/70 py-2 ps-2 pe-5 text-fluid-2xs font-bold text-[#0F8A5F] focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 sm:ps-3 dark:border-emerald-900 dark:bg-emerald-900/40 dark:text-lime-300"
+          >
+            {/* Short label for the default scope. On a phone the control is
+                72px wide, and "همه دسته‌ها" at the 16px floor that touch
+                screens get would arrive clipped to "همه دس" — the whole word
+                cannot be read, which is worse than a shorter word that can.
+                The full label is the aria-label's job, and the open list shows
+                every category in full. Desktop has room and spells it out via
+                the option text below. */}
+            <option value="all">همه</option>
+            {categories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.label}
+              </option>
+            ))}
+          </select>
+          <ChevronDown
+            size={14}
+            aria-hidden="true"
+            className="pointer-events-none absolute end-1.5 top-1/2 -translate-y-1/2 text-[#0F8A5F] dark:text-lime-300"
+          />
+        </div>
+
         {/* Search Input */}
         <input
           type="text"
@@ -304,7 +359,9 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
           type="button"
           onClick={toggleVoiceSearch}
           title="جستجوی صوتی به زبان فارسی"
-          className={`relative flex min-h-11 min-w-11 items-center justify-center transition-colors ${
+          className={`relative min-h-11 min-w-11 items-center justify-center transition-colors ${
+            variant === "compact" ? "hidden sm:flex" : "flex"
+          } ${
             isListening
               ? "text-rose-500"
               : "text-slate-400 hover:text-[#0F8A5F] dark:text-emerald-400 dark:hover:text-lime-300"

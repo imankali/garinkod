@@ -235,6 +235,75 @@ async function header_height(page: import('@playwright/test').Page): Promise<num
   );
 }
 
+test.describe('the search box', () => {
+  /**
+   * The header's own promise: scroll down and the field stays with you.
+   *
+   * On a phone the field used to live in a row *under* the pinned one, so
+   * collapsing the header took the search with it and left logo, cart and menu —
+   * the three things a reader who is already shopping does not need. On desktop
+   * the field survived the collapse but shared the row with the logo and the
+   * wishlist, and the scope selector did not exist at all.
+   *
+   * Two fields are always in the DOM because the header chooses between them
+   * with `md:` classes rather than by unmounting, so every assertion here is
+   * about the *visible* one — which is the only kind of assertion that means
+   * anything about what a reader sees.
+   */
+  const visibleField = (page: import('@playwright/test').Page) =>
+    page.locator('header.sticky input[aria-label="جستجوی محصولات"]:visible');
+  const visibleScope = (page: import('@playwright/test').Page) =>
+    page.locator('header.sticky select[aria-label="محدوده جستجو"]:visible');
+
+  for (const [name, viewport] of [
+    ['desktop', { width: 1280, height: 900 }],
+    ['phone', { width: 390, height: 844 }],
+  ] as const) {
+    test(`stays pinned while scrolling on ${name}`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await page.goto('/');
+      await page.waitForLoadState('networkidle');
+
+      await expect(visibleField(page)).toHaveCount(1);
+
+      await page.mouse.move(viewport.width / 2, viewport.height / 2);
+      for (let notch = 0; notch < 4; notch += 1) {
+        await page.mouse.wheel(0, 240);
+        await page.waitForTimeout(120);
+      }
+      await page.waitForTimeout(1200);
+
+      // Still exactly one field in front of the reader, still usable, and still
+      // carrying its scope selector.
+      await expect(visibleField(page)).toHaveCount(1);
+      await expect(visibleField(page)).toBeVisible();
+      await expect(visibleScope(page)).toBeVisible();
+      const width = await visibleField(page).evaluate((el) => el.getBoundingClientRect().width);
+      expect(width, 'the pinned field is too narrow to search in').toBeGreaterThan(60);
+
+      // …and on the way back up, when the rest of the header returns.
+      await page.mouse.wheel(0, -260);
+      await page.waitForTimeout(1200);
+      await expect(visibleField(page)).toHaveCount(1);
+      await expect(visibleField(page)).toBeVisible();
+    });
+  }
+
+  test('the scope selector narrows the search it submits', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    await visibleScope(page).selectOption('fertilizer');
+    await visibleField(page).fill('اوره');
+    await page.keyboard.press('Enter');
+
+    await expect(page).toHaveURL(/\/products\?.*search=/);
+    const url = new URL(page.url());
+    expect(url.searchParams.get('search')).toBe('اوره');
+    expect(url.searchParams.get('category')).toBe('fertilizer');
+  });
+});
+
 test.describe('touch targets', () => {
   test.use({ viewport: { width: 375, height: 812 } });
 

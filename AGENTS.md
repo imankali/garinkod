@@ -59,11 +59,11 @@ change, review the code and then run the full matrix in detail.
 | Backend unit + integration | `cd garinkood && source /tmp/env.sh && ../.venv/bin/python manage.py test` | **624 tests, OK** |
 | Backend, parallel | `... manage.py test --parallel 4` (needs `tblib`, now in requirements-dev) | **636 tests, OK in ~264s** |
 | Backend, tier module only | `... manage.py test shop.tests_price_tiers` | 41 tests, OK |
-| Frontend unit + integration | `cd frontend && CI=true npx vitest run` | **249 tests / 34 files** |
+| Frontend unit + integration | `cd frontend && CI=true npx vitest run` | **253 tests / 35 files** |
 | Type check | `cd frontend && npx tsc --noEmit` | clean |
 | Build | `cd frontend && npm run build` | ✓ (was failing: see §8, `exclude_seen`) |
 | Design linter | `.agents-tmp/node_modules/.bin/impeccable detect frontend/src` | 125 (see §6) |
-| E2E | `cd frontend && npx playwright test` | **236 tests / 8 files**, run here with the browser from §7: `navigation.spec.ts` 11 passed / 3 failed, `public-routes.spec.ts` 10 passed / 1 skipped / 2 failed — all five failures are seed gaps that reproduce on the pre-change commit too |
+| E2E | `cd frontend && npx playwright test` | **245 tests / 8 files**, run here with the browser from §7: `navigation.spec.ts` 14 passed / 3 failed, `accessibility.spec.ts` 12/12, `public-routes.spec.ts` 10 passed / 1 skipped / 2 failed — all five failures are seed gaps that reproduce on the pre-change commit too |
 
 `manage.py test` (all apps) and `manage.py test shop` are different scopes and
 give different counts. Say which one you ran.

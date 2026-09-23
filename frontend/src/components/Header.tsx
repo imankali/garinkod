@@ -576,8 +576,18 @@ export default function Header({
               </AnimatePresence>
             </motion.button>
 
-            {/* Logo — never shrinks the search field on desktop. */}
-            <div className="flex flex-1 justify-center sm:justify-start md:flex-none">
+            {/* Logo — never shrinks the search field on desktop.
+                On compact screens it steps aside for the search once the header
+                is collapsed: there is only room for four things in that row, and
+                the search is the one the reader asked to keep. The logo is the
+                brand you have already found; the field is how you find anything
+                else. It returns, animated, with the rest of the header on the
+                first scroll back up. */}
+            <div
+              className={`flex-1 justify-center sm:justify-start md:flex-none ${
+                headerCollapsed ? "hidden lg:flex" : "flex"
+              }`}
+            >
               <Logo compact={scrolled} />
             </div>
 
@@ -586,6 +596,16 @@ export default function Header({
             <div className="relative z-40 hidden min-w-0 flex-1 md:block">
               <SearchBar />
             </div>
+
+            {/* Search (Compact) — the same field, in the row that stays pinned.
+                The two are never on screen together: this one is `md:hidden`, the
+                desktop one is `md:block`, and this one only exists while the
+                header is collapsed. */}
+            {headerCollapsed && (
+              <div className="relative z-40 min-w-0 flex-1 md:hidden">
+                <SearchBar variant="compact" />
+              </div>
+            )}
 
             {/* Desktop Actions: علاقه‌مندی و سبد خرید؛ بقیهٔ امکانات (حالت شب،
                 پیام‌ها، حساب کاربری و…) در منوی اصلی (همه‌ی اندازه‌ها) هستند. */}
@@ -637,7 +657,8 @@ export default function Header({
             </div>
           </div>
 
-          {/* ✅ Mobile Search — collapses with the header on scroll-down. */}
+          {/* ✅ Mobile Search — collapses with the header on scroll-down; while
+              collapsed the field above (inside the pinned row) takes its place. */}
           <AnimatePresence initial={false}>
             {!headerCollapsed && (
               <motion.div
