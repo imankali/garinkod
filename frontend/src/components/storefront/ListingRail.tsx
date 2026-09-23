@@ -9,12 +9,13 @@
 // snap on touch, tweened on the arrow buttons, pause on hover.
 
 import { useEffect, useRef } from 'react';
-import { ChevronLeft, ChevronRight, ShoppingCart } from 'lucide-react';
+import { ChevronLeft, ShoppingCart } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 import { useCartStore } from '../../store/cartStore';
 import { formatPrice } from '../../utils/formatPrice';
 import { cn } from '../../utils/cn';
+import { isLowStock } from '../listing/StockBadge';
 import type { MarketplaceListing } from '@/types/storefront';
 
 type Listing = MarketplaceListing;
@@ -99,22 +100,57 @@ export default function ListingRail({
     animateTo(sign * index * unit);
   };
 
-  const move = (direction: -1 | 1) => {
+  const inViewRef = useRef(false);
+  /** Mouse drag-to-scroll state — touch already pans natively, so only the
+   *  mouse path is hijacked. `moved` suppresses the click that follows a drag
+   *  so grabbing the rail never opens the listing under the cursor. */
+  const drag = useRef<{ pointerId: number; lastX: number; moved: boolean; active: boolean } | null>(null);
+
+  const endDrag = () => {
+    const d = drag.current;
     const rail = railRef.current;
-    if (!rail) return;
-    const unit = Math.max(cardStep(rail), 1);
-    const travelled = Math.abs(rail.scrollLeft);
-    const currentIndex = Number.isFinite(travelled / unit)
-      ? Math.round(travelled / unit)
-      : 0;
-    const nextIndex = Math.min(
-      Math.max(currentIndex + direction, 0),
-      rail.children.length - 1,
-    );
-    scrollToCard(nextIndex);
+    if (d) d.active = false;
+    if (rail) {
+      rail.style.scrollSnapType = '';
+      rail.style.userSelect = '';
+      rail.style.cursor = '';
+    }
   };
 
-  const inViewRef = useRef(false);
+  const onRailPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType !== 'mouse' || event.button !== 0) return;
+    const rail = railRef.current;
+    if (!rail) return;
+    cancelTween.current?.();
+    drag.current = { pointerId: event.pointerId, lastX: event.clientX, moved: false, active: true };
+    rail.style.scrollSnapType = 'none';
+    rail.style.userSelect = 'none';
+    rail.style.cursor = 'grabbing';
+    try { rail.setPointerCapture(event.pointerId); } catch { /* older browsers */ }
+  };
+
+  const onRailPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const d = drag.current;
+    const rail = railRef.current;
+    if (!d?.active || !rail || event.pointerId !== d.pointerId) return;
+    const dx = event.clientX - d.lastX;
+    d.lastX = event.clientX;
+    if (Math.abs(dx) < 0.5) return;
+    d.moved = true;
+    // Drag the content like a sheet of paper: moving the mouse left brings
+    // the next cards (which live to the left in RTL) into view. scrollBy
+    // handles the browser's scrollLeft sign convention for us.
+    rail.scrollBy({ left: dx, behavior: 'instant' as ScrollBehavior });
+  };
+
+  const onRailClickCapture = (event: React.MouseEvent) => {
+    if (drag.current?.moved) {
+      event.preventDefault();
+      event.stopPropagation();
+      drag.current.moved = false;
+    }
+  };
+
   useEffect(() => {
     const rail = railRef.current;
     if (!rail || typeof IntersectionObserver === 'undefined') {
@@ -169,10 +205,7 @@ export default function ListingRail({
   }
 
   return (
-    <section
-      aria-label={`آگهی‌های دسته ${title}`}
-      className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-emerald-900 dark:bg-emerald-950 sm:p-5"
-    >
+    <section aria-label={`آگهی‌های دسته ${title}`}>
       {/* Heading row: title + count on one side, «همه» on the far side — the
           بانی‌مد/دیجی‌پی شکل. */}
       <div className="flex items-center justify-between gap-2">
@@ -190,7 +223,7 @@ export default function ListingRail({
             onClick={onOpenAll}
             className="ms-auto inline-flex shrink-0 items-center gap-1 text-fluid-xs font-bold text-emerald-700 transition hover:text-emerald-900 dark:text-lime-300"
           >
-            همه
+            مشاهده بیشتر
             <ChevronLeft size={14} aria-hidden="true" />
           </button>
         )}
@@ -200,7 +233,12 @@ export default function ListingRail({
         <div
           ref={railRef}
           onPointerEnter={() => { hoverPause.current = true; }}
-          onPointerLeave={() => { hoverPause.current = false; }}
+          onPointerLeave={() => { hoverPause.current = false; endDrag(); }}
+          onPointerDown={onRailPointerDown}
+          onPointerMove={onRailPointerMove}
+          onPointerUp={endDrag}
+          onPointerCancel={endDrag}
+          onClickCapture={onRailClickCapture}
           onTouchStart={() => {
             cancelTween.current?.();
             touchPause.current = true;
@@ -208,14 +246,14 @@ export default function ListingRail({
           onTouchEnd={() => {
             window.setTimeout(() => { touchPause.current = false; }, 2500);
           }}
-          className="rail-scroll flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-2 touch-pan-x"
+          className="rail-scroll flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-2 touch-pan-x cursor-grab select-none"
           role="region"
           aria-label={`کارت‌های دسته ${title}`}
         >
           {items.map((listing) => (
             <article
               key={listing.id}
-              className="w-[46%] min-w-0 shrink-0 snap-start rounded-2xl border border-slate-100 bg-white shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-md dark:border-emerald-900 dark:bg-emerald-950/60 sm:w-[30%] lg:w-[23%]"
+              className="flex w-[46%] min-w-0 shrink-0 snap-start flex-col rounded-2xl border border-slate-100 bg-white shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-md dark:border-emerald-900 dark:bg-emerald-950/60 sm:w-[30%] lg:w-[23%]"
             >
               <button
                 type="button"
@@ -235,6 +273,11 @@ export default function ListingRail({
                     {listing.discount_percent.toLocaleString('fa-IR')}٪
                   </span>
                 )}
+                {isLowStock(listing.quantity_available) && (
+                  <span className="absolute end-2 top-2 rounded-full bg-amber-400/95 px-2 py-0.5 text-fluid-2xs font-extrabold text-amber-950 shadow-sm">
+                    موجودی محدود
+                  </span>
+                )}
                 {isOwner && listing.status !== 'published' && (
                   <span
                     className={cn(
@@ -248,7 +291,10 @@ export default function ListingRail({
                   </span>
                 )}
               </button>
-              <div className="flex flex-col gap-1 p-2.5">
+              {/* flex-grow keeps every card the same height, so the action row
+                  (cart button / ask link) lines up across the whole shelf —
+                  long titles never push one card's button lower. */}
+              <div className="flex flex-grow flex-col gap-1 p-2.5">
                 <button
                   type="button"
                   onClick={() => onOpen(listing)}
@@ -266,6 +312,7 @@ export default function ListingRail({
                   )}
                   <span className="text-fluid-2xs">/ {listing.unit}</span>
                 </p>
+                <div className="mt-auto" />
                 {isOwner ? (
                   (onEdit || onDelete) && (
                     <div className="mt-1 flex gap-1.5">
@@ -291,12 +338,12 @@ export default function ListingRail({
                     </div>
                   )
                 ) : (
-                  <>
+                  <div className="mt-1 flex flex-col items-stretch gap-1">
                     <button
                       type="button"
                       disabled={!listing.is_purchasable}
                       onClick={() => void quickAdd(listing)}
-                      className="mt-1 flex h-9 w-full shrink-0 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 text-[12px] font-extrabold text-white transition hover:bg-emerald-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:bg-slate-300"
+                      className="flex h-9 w-full shrink-0 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 text-[12px] font-extrabold text-white transition hover:bg-emerald-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:bg-slate-300"
                       aria-label={`افزودن ${listing.title} به سبد خرید`}
                     >
                       <ShoppingCart size={13} aria-hidden="true" />
@@ -312,30 +359,12 @@ export default function ListingRail({
                         پرسش درباره این کالا
                       </button>
                     )}
-                  </>
+                  </div>
                 )}
               </div>
             </article>
           ))}
         </div>
-
-        {/* Round edge arrows — the same controls the home rails use. */}
-        <button
-          type="button"
-          onClick={() => move(1)}
-          aria-label="آگهی‌های بعدی"
-          className="absolute left-1 top-1/2 z-20 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-slate-700 shadow-lg ring-1 ring-slate-200 transition hover:scale-105 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-300 dark:bg-emerald-950 dark:text-white dark:ring-emerald-700"
-        >
-          <ChevronLeft size={18} aria-hidden="true" />
-        </button>
-        <button
-          type="button"
-          onClick={() => move(-1)}
-          aria-label="آگهی‌های قبلی"
-          className="absolute right-1 top-1/2 z-20 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-slate-700 shadow-lg ring-1 ring-slate-200 transition hover:scale-105 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-300 dark:bg-emerald-950 dark:text-white dark:ring-emerald-700"
-        >
-          <ChevronRight size={18} aria-hidden="true" />
-        </button>
       </div>
     </section>
   );

@@ -297,16 +297,17 @@ export default function OfferRail({ products }: { products: ProductList[] }) {
         ))}
       </div>
 
-      {/* Round controls, visible on every width — touch users get buttons and
-          swipe. RTL carousel contract (Digikala-style): the RIGHT button slides
-          the content rightward, bringing the earlier (right-side) products into
-          view; the LEFT button slides content leftward for the later ones. The
-          chevrons point the way the CONTENT moves, not the way new items enter. */}
+      {/* Round controls — DESKTOP ONLY: on touch widths the rail pans with the
+          finger and the arrows only crowded it. Same contract as ProductCarousel
+          (`hidden md:flex`). RTL carousel contract (Digikala-style): the RIGHT
+          button slides the content rightward, bringing the earlier (right-side)
+          products into view; the LEFT button slides content leftward for the
+          later ones. The chevrons point the way the CONTENT moves. */}
       <button
         type="button"
         onClick={() => move(1)}
         aria-label="محصولات بعدی"
-        className="absolute left-1 top-1/2 z-20 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-slate-700 shadow-lg ring-1 ring-slate-200 transition hover:scale-105 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-300 dark:bg-emerald-950 dark:text-white dark:ring-emerald-700"
+        className="absolute left-1 top-1/2 z-20 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-slate-700 shadow-lg ring-1 ring-slate-200 transition hover:scale-105 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-300 md:flex dark:bg-emerald-950 dark:text-white dark:ring-emerald-700"
       >
         <ChevronLeft size={18} aria-hidden="true" />
       </button>
@@ -314,7 +315,7 @@ export default function OfferRail({ products }: { products: ProductList[] }) {
         type="button"
         onClick={() => move(-1)}
         aria-label="محصولات قبلی"
-        className="absolute right-1 top-1/2 z-20 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-slate-700 shadow-lg ring-1 ring-slate-200 transition hover:scale-105 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-300 dark:bg-emerald-950 dark:text-white dark:ring-emerald-700"
+        className="absolute right-1 top-1/2 z-20 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-slate-700 shadow-lg ring-1 ring-slate-200 transition hover:scale-105 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-300 md:flex dark:bg-emerald-950 dark:text-white dark:ring-emerald-700"
       >
         <ChevronRight size={18} aria-hidden="true" />
       </button>

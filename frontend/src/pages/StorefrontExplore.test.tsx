@@ -48,8 +48,13 @@ describe('the grid', () => {
     expect(storefrontPostsApi.list).toHaveBeenCalledWith(
       expect.objectContaining({ post_type: 'post', ordering: '-likes_total', page: 1 }),
     );
-    const [params] = vi.mocked(storefrontPostsApi.list).mock.calls[0] as [{ storefront?: string }];
+    const [params] = vi.mocked(storefrontPostsApi.list).mock.calls[0] as [
+      { storefront?: string; exclude_seen?: boolean },
+    ];
     expect(params.storefront).toBeUndefined();
+    // Anonymous reader: the seen ledger is per-account, so there is nothing to
+    // exclude until someone signs in.
+    expect(params.exclude_seen).toBe(false);
   });
 
   it('adds the next page underneath what is already on screen', async () => {

@@ -191,10 +191,10 @@ export default function HeroSlider() {
       </div>
 
       {/* Arrows — a small pair sitting together at the bottom-right corner,
-          visible on every screen size (touch users get them too, not only
-          swipe). In RTL the right-hand button is "previous", matching the
-          ArrowRight keyboard behaviour. */}
-      <div className="absolute bottom-3 right-4 z-10 flex items-center gap-1.5">
+          DESKTOP ONLY: touch widths swipe the slider natively and the arrows
+          only crowded the small screen. In RTL the right-hand button is
+          "previous", matching the ArrowRight keyboard behaviour. */}
+      <div className="absolute bottom-3 right-4 z-10 hidden items-center gap-1.5 md:flex">
         <button
           type="button"
           aria-label="اسلاید قبلی"

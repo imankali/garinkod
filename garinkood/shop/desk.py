@@ -200,7 +200,15 @@ OPERATOR_PERMISSIONS = {
 
 def _is_operator(user, channel: str) -> bool:
     permission = OPERATOR_PERMISSIONS.get(channel)
-    return bool(permission and user.has_perm(permission))
+    if permission and user.has_perm(permission):
+        return True
+    # The procurement desk shares the support roster (DESK_CHANNELS maps it to
+    # ROLE_SUPPORT): anyone working the support queue can work the buying queue
+    # too. Without this, a support agent — the exact team the mapping announces
+    # — would be locked out of the very queue the mapping gives them.
+    if channel == StorefrontConversation.CHANNEL_PROCUREMENT:
+        return user.has_perm(OPERATOR_PERMISSIONS[StorefrontConversation.CHANNEL_SUPPORT])
+    return False
 
 
 def is_operator_for(user, channel: str) -> bool:

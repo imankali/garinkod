@@ -1,9 +1,13 @@
 // frontend/src/pages/storefront/Overlays.tsx — split from StorefrontPage.tsx
 
-import {useEffect} from 'react';
+import {useCallback, useEffect, useRef, useState} from 'react';
 import {motion, useReducedMotion} from 'framer-motion';
 import {X} from 'lucide-react';
 import {useTranslation} from '../../i18n';
+
+/** Instagram parity: every story lasts exactly 15 seconds site-wide —
+ *  the same constant the social StoryViewer runs on. */
+const STORY_DURATION_MS = 15_000;
 
 /**
  * The viewer only ever renders an image and a caption, so it takes this
@@ -49,6 +53,47 @@ export function StoryViewer({
   const { dir } = useTranslation();
   const current = posts[index];
 
+  // The 15-second clock, driven by rAF so the fill moves like Instagram's:
+  // previous bars sit full, the active bar grows frame by frame, later bars
+  // wait empty. Pauses while the pointer/touch is down and resumes on release.
+  const [progress, setProgress] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+  const elapsedRef = useRef(0);
+  const previousFrameRef = useRef<number | null>(null);
+
+  const advance = useCallback(() => {
+    if (index < posts.length - 1) onIndexChange(index + 1);
+    else onClose();
+  }, [index, posts.length, onIndexChange, onClose]);
+
+  useEffect(() => {
+    elapsedRef.current = 0;
+    previousFrameRef.current = null;
+    setProgress(0);
+  }, [current?.id]);
+
+  useEffect(() => {
+    if (!current) return undefined;
+    let frameId = 0;
+    const tick = (timestamp: number) => {
+      if (previousFrameRef.current === null) previousFrameRef.current = timestamp;
+      const delta = timestamp - previousFrameRef.current;
+      previousFrameRef.current = timestamp;
+      if (!isPaused) {
+        elapsedRef.current = Math.min(elapsedRef.current + delta, STORY_DURATION_MS);
+        const next = elapsedRef.current / STORY_DURATION_MS;
+        setProgress(next);
+        if (next >= 1) {
+          advance();
+          return;
+        }
+      }
+      frameId = window.requestAnimationFrame(tick);
+    };
+    frameId = window.requestAnimationFrame(tick);
+    return () => window.cancelAnimationFrame(frameId);
+  }, [advance, current?.id, current, isPaused]);
+
   useEffect(() => {
     function handleKey(event: KeyboardEvent) {
       if (event.key === 'Escape') onClose();
@@ -65,6 +110,8 @@ export function StoryViewer({
   }, [index, posts.length, onIndexChange, onClose, dir]);
 
   if (!current) return null;
+  const pause = () => setIsPaused(true);
+  const resume = () => setIsPaused(false);
 
   return (
     <motion.div
@@ -74,16 +121,28 @@ export function StoryViewer({
       role="dialog"
       aria-modal="true"
       aria-label={`استوری‌های ${storefrontName}`}
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4"
+      onMouseDown={pause}
+      onMouseUp={resume}
+      onMouseLeave={resume}
+      onTouchStart={pause}
+      onTouchEnd={resume}
+      onTouchCancel={resume}
+      className="fixed inset-0 z-[100] flex select-none items-center justify-center bg-black/90 p-4"
     >
-      {/* Progress bars */}
-      <div className="absolute inset-x-4 top-4 flex gap-1">
-        {posts.map((post, position) => (
-          <span
-            key={post.id}
-            className={`h-1 flex-1 rounded-full ${position <= index ? 'bg-white' : 'bg-white/30'}`}
-          />
-        ))}
+      {/* Progress bars — the animated Instagram strip: done bars full,
+          the active bar filling in real time, future bars empty. */}
+      <div className="absolute inset-x-4 top-4 flex gap-1" role="group" aria-label="پیشرفت استوری‌ها">
+        {posts.map((post, position) => {
+          const width = position < index ? 100 : position === index ? progress * 100 : 0;
+          return (
+            <span key={post.id} className="h-1 flex-1 overflow-hidden rounded-full bg-white/30">
+              <span
+                className="block h-full rounded-full bg-white"
+                style={{ width: `${width}%` }}
+              />
+            </span>
+          );
+        })}
       </div>
 
       <button

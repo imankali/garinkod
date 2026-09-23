@@ -1,14 +1,15 @@
 // frontend/src/pages/StorefrontPage.tsx
 
-import {useCallback, useEffect, useState} from 'react';
+import {useCallback, useEffect, useRef, useState} from 'react';
 import {Link, useParams, useSearchParams} from 'react-router';
 import {AnimatePresence, motion, useReducedMotion} from 'framer-motion';
-import {BadgeCheck, Grid3x3, Heart, MapPin, MessageCircle, Plus, Search, ShoppingBasket, Star, UserPlus, X} from 'lucide-react';
+import {BadgeCheck, ChevronRight, Grid3x3, Heart, MapPin, MessageCircle, Plus, Search, ShoppingBasket, ShoppingCart, Star, UserPlus, X} from 'lucide-react';
 import toast from 'react-hot-toast';
 import {Helmet} from 'react-helmet-async';
 import {agricultureApi, messagesApi, storefrontPostsApi, storefrontsApi} from '../api/services';
 import {parseApiError} from '../api/errors';
 import {useAuthStore} from '../store/authStore';
+import {useCartStore} from '../store/cartStore';
 import {useDirectStore} from '../store/directStore';
 import {useDebouncedValue} from '../hooks/useDebouncedValue';
 import {useTranslation} from '../i18n';
@@ -16,6 +17,7 @@ import {formatPrice} from '../utils/formatPrice';
 import ListingComposer from '../components/storefront/ListingComposer';
 import ListingDetailModal from '../components/storefront/ListingDetailModal';
 import ListingRail from '../components/storefront/ListingRail';
+import { isLowStock } from '../components/listing/StockBadge';
 import PostCard from '../components/social/PostCard';
 import type { MarketplaceListing, StorefrontPost, StorefrontProfile } from '@/types/storefront';
 
@@ -109,6 +111,7 @@ export default function StorefrontPage() {
   const [contentError, setContentError] = useState('');
 
   const { isAuthenticated } = useAuthStore();
+  const addToCart = useCartStore((state) => state.addToCart);
   const openDirect = useDirectStore((state) => state.openDirect);
 
   const load = useCallback(async () => {
@@ -205,6 +208,21 @@ export default function StorefrontPage() {
     }
   }
 
+  /** Quick add-to-cart from the «مشاهده بیشتر» grid — same flow as the rails. */
+  const quickAddGridBusy = useRef<number | null>(null);
+  async function quickAddGrid(listing: StorefrontProfile['listings'][number]) {
+    if (quickAddGridBusy.current === listing.id) return;
+    quickAddGridBusy.current = listing.id;
+    try {
+      await addToCart(listing.id, 1);
+      toast.success(`«${listing.title}» به سبد خرید اضافه شد`);
+    } catch {
+      toast.error('افزودن به سبد ناموفق بود');
+    } finally {
+      quickAddGridBusy.current = null;
+    }
+  }
+
   function sendListingToDirect(listing: StorefrontProfile['listings'][number]) {
     openDirect({
       storefrontSlug: listing.storefront.slug,
@@ -278,7 +296,8 @@ export default function StorefrontPage() {
 
   // آگهی‌های غرفه بر اساس دسته‌بندی گروه می‌شوند تا غرفه‌ای که هم سم می‌فروشد و
   // هم ابزار، هر کدام را زیر برچسب خودش نشان دهد؛ غرفه تک‌دسته‌ای هم هدر دسته
-  // و شمارنده را می‌بیند تا زبان صفحه یکسان بماند. ترتیب دسته‌ها: پرمایه‌ترین اول.
+  // و شمارنده را می‌بیند تا زبان صفحه یکسان بماند. ترتیب دسته‌ها: پرفروش‌ترین
+  // اول (مجموع sales_count دسته)، و برای شکستن تساوی‌ها تعداد آگهی.
   const listingGroups: Array<[string, typeof listings]> = (() => {
     const groups = new Map<string, typeof listings>();
     listings.forEach((listing) => {
@@ -287,7 +306,16 @@ export default function StorefrontPage() {
       if (bucket) bucket.push(listing);
       else groups.set(key, [listing]);
     });
-    return [...groups.entries()].sort((a, b) => b[1].length - a[1].length);
+    const salesOf = (items: typeof listings) =>
+      items.reduce((sum, item) => sum + (item.sales_count || 0), 0);
+    return [...groups.entries()]
+      .sort(
+        (a, b) => salesOf(b[1]) - salesOf(a[1]) || b[1].length - a[1].length,
+      )
+      .map(([name, items]) => [
+        name,
+        [...items].sort((a, b) => (b.sales_count || 0) - (a.sales_count || 0)),
+      ]);
   })();
 
   const isOwner = storefront.is_owner;
@@ -709,16 +737,12 @@ export default function StorefrontPage() {
                   onEdit={isOwner ? (listing) => setListingEditor({ open: true, listing }) : undefined}
                   onDelete={isOwner ? (listing) => void deleteListing(listing) : undefined}
                   onSendToDirect={isOwner ? undefined : (listing) => sendListingToDirect(listing)}
-                  onOpenAll={
-                    listings.length > groupItems.length
-                      ? () => {
-                          const next = new URLSearchParams(searchParams);
-                          next.set('tab', 'listings-all');
-                          next.set('category', groupName);
-                          setSearchParams(next, { replace: true });
-                        }
-                      : undefined
-                  }
+                  onOpenAll={() => {
+                    const next = new URLSearchParams(searchParams);
+                    next.set('tab', 'listings-all');
+                    next.set('category', groupName);
+                    setSearchParams(next, { replace: true });
+                  }}
                 />
               ))}
             </div>
@@ -726,14 +750,35 @@ export default function StorefrontPage() {
         </div>
       )}
 
-      {/* «همه» view: the full grid of ONE category, reached from a rail's
-          «همه» button. `?tab=listings-all&category=…` — with its own «بازگشت»
-          that returns to the rails. */}
+      {/* «مشاهده بیشتر» view: a dedicated page-like grid of ONE category,
+          reached from a rail's «مشاهده بیشتر» button — the mydigipay promotion
+          page shape: header band with the category name + count, a back link,
+          and the same full card the rails use (image, price, cart, ask).
+          `?tab=listings-all&category=…`. */}
       {tab === 'listings' && searchParams.get('tab') === 'listings-all' && contentResults === null && (() => {
         const categoryName = searchParams.get('category') || '';
         const groupItems = listingGroups.find(([name]) => name === categoryName)?.[1] ?? [];
         return (
           <div role="tabpanel" aria-label={`همه آگهی‌های دسته ${categoryName}`} className="mt-4">
+            {/* Header band — the digipay promotion-page header. */}
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-gradient-to-l from-emerald-800 to-emerald-700 p-4 text-white shadow-sm dark:from-emerald-950 dark:to-emerald-900">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <img
+                  src={profile.storefront.avatar_url || '/images/hero-farm.jpg'}
+                  alt=""
+                  width={44}
+                  height={44}
+                  className="h-11 w-11 rounded-xl object-cover ring-2 ring-white/40"
+                />
+                <div className="min-w-0">
+                  <p className="truncate text-fluid-xs text-emerald-100/80">{profile.storefront.name}</p>
+                  <h2 className="truncate text-fluid-lg font-extrabold">{categoryName}</h2>
+                </div>
+              </div>
+              <span className="rounded-full bg-white/15 px-3 py-1 text-fluid-xs font-bold text-white">
+                {groupItems.length.toLocaleString('fa-IR')} آگهی
+              </span>
+            </div>
             <button
               type="button"
               onClick={() => {
@@ -742,24 +787,19 @@ export default function StorefrontPage() {
                 next.delete('category');
                 setSearchParams(next, { replace: true });
               }}
-              className="mb-4 inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-emerald-200 px-3 text-xs font-bold text-emerald-700 transition hover:bg-emerald-50 dark:border-emerald-800 dark:text-lime-300 dark:hover:bg-emerald-900"
+              className="mt-3 inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-emerald-200 px-3 text-xs font-bold text-emerald-700 transition hover:bg-emerald-50 dark:border-emerald-800 dark:text-lime-300 dark:hover:bg-emerald-900"
             >
+              <ChevronRight size={14} aria-hidden="true" />
               بازگشت به دسته‌بندی‌ها
             </button>
-            <h2 className="text-fluid-lg font-extrabold text-slate-800 dark:text-white">
-              {categoryName}
-              <span className="ms-2 rounded-full bg-emerald-50 px-2 py-0.5 align-middle text-fluid-2xs font-bold text-emerald-700 dark:bg-emerald-900/60 dark:text-lime-300">
-                {groupItems.length.toLocaleString('fa-IR')} آگهی
-              </span>
-            </h2>
             {groupItems.length === 0 ? (
               <EmptyState text="آگهی‌ای در این دسته نیست." />
             ) : (
-              <ul className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                 {groupItems.map((listing) => (
                   <li
                     key={listing.id}
-                    className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm dark:border-emerald-900 dark:bg-emerald-950/40"
+                    className="flex flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-md dark:border-emerald-900 dark:bg-emerald-950/40"
                   >
                     <button
                       type="button"
@@ -767,22 +807,28 @@ export default function StorefrontPage() {
                       className="relative block w-full text-start"
                       aria-label={`مشاهده جزئیات ${listing.title}`}
                     >
-                      <img src={listing.image_url} alt="" className="h-36 w-full object-cover" loading="lazy" />
+                      <img src={listing.image_url} alt="" className="h-32 w-full object-cover sm:h-40" loading="lazy" decoding="async" />
                       {listing.discount_percent > 0 && (
                         <span className="absolute start-2 top-2 rounded-full bg-brand-orange px-2 py-0.5 text-fluid-2xs font-bold text-white">
                           {listing.discount_percent.toLocaleString('fa-IR')}٪ تخفیف
                         </span>
                       )}
+                      {isLowStock(listing.quantity_available) && (
+                        <span className="absolute end-2 top-2 rounded-full bg-amber-400/95 px-2 py-0.5 text-fluid-2xs font-extrabold text-amber-950 shadow-sm">
+                          موجودی محدود
+                        </span>
+                      )}
                     </button>
-                    <div className="p-3">
+                    <div className="flex flex-grow flex-col gap-1 p-3">
                       <button
                         type="button"
                         onClick={() => openListing(listing.slug)}
                         className="min-w-0 truncate text-start text-sm font-bold text-slate-800 hover:text-emerald-700 hover:underline dark:text-white dark:hover:text-lime-300"
+                        title={listing.title}
                       >
                         {listing.title}
                       </button>
-                      <p className="mt-1 flex items-baseline gap-1.5 text-xs text-slate-500 dark:text-emerald-200">
+                      <p className="flex items-baseline gap-1.5 text-xs text-slate-500 dark:text-emerald-200">
                         <strong className="text-emerald-700 dark:text-lime-300">
                           {formatPrice(listing.discounted_price)}
                         </strong>
@@ -791,6 +837,31 @@ export default function StorefrontPage() {
                         )}
                         / {listing.unit}
                       </p>
+                      <div className="mt-auto" />
+                      {!isOwner && (
+                        <div className="mt-1 flex flex-col items-stretch gap-1">
+                          <button
+                            type="button"
+                            disabled={!listing.is_purchasable}
+                            onClick={() => void quickAddGrid(listing)}
+                            className="flex h-9 w-full shrink-0 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 text-[12px] font-extrabold text-white transition hover:bg-emerald-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:bg-slate-300"
+                            aria-label={`افزودن ${listing.title} به سبد خرید`}
+                          >
+                            <ShoppingCart size={13} aria-hidden="true" />
+                            {listing.is_purchasable ? 'افزودن به سبد' : 'ناموجود'}
+                          </button>
+                          {!isOwner && listing.storefront?.slug && (
+                            <button
+                              type="button"
+                              onClick={() => sendListingToDirect(listing)}
+                              className="text-center text-fluid-2xs font-bold text-sky-600 transition hover:text-sky-800 dark:text-sky-300"
+                              title="پرسیدن این آگهی در گفتگو با غرفه‌دار"
+                            >
+                              پرسش درباره این کالا
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </li>
                 ))}

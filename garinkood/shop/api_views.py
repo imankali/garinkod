@@ -2526,14 +2526,19 @@ class StorefrontPostViewSet(viewsets.ModelViewSet):
             # reader is additionally shielded from the posts already served to
             # them (StorefrontPostSeen marks) — until the pool runs dry, then
             # the seen marks are ignored so the section never goes empty.
-            shuffle_params = self.request.query_params
-            if shuffle_params.get('shuffle') in {'1', 'true'}:
-                if self.request.user.is_authenticated:
-                    seen = StorefrontPostSeen.objects.filter(user=self.request.user).values('post_id')
-                    fresh = feed.exclude(pk__in=seen)
-                    if fresh.exists() or feed.count() == 0:
-                        feed = fresh
-                seed = int(shuffle_params.get('seed') or (time.time() * 1000) % 1_000_000)
+            params = self.request.query_params
+            wants_shuffle = params.get('shuffle') in {'1', 'true'}
+            # کاوش (ranked feed) also skips what this reader has already been
+            # served — a repeat there is just as stale as one on the home feed —
+            # so the seen-exclusion is its own flag, independent of shuffling.
+            wants_fresh = wants_shuffle or params.get('exclude_seen') in {'1', 'true'}
+            if wants_fresh and self.request.user.is_authenticated:
+                seen = StorefrontPostSeen.objects.filter(user=self.request.user).values('post_id')
+                fresh = feed.exclude(pk__in=seen)
+                if fresh.exists() or feed.count() == 0:
+                    feed = fresh
+            if wants_shuffle:
+                seed = int(params.get('seed') or (time.time() * 1000) % 1_000_000)
                 from .models.social import _seeded_random_order
 
                 feed = _seeded_random_order(feed, seed)

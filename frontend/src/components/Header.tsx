@@ -214,6 +214,7 @@ export default function Header({
   onOpenWishlist,
 }: HeaderProps) {
   const [scrolled, setScrolled] = useState(false);
+  const [headerCollapsed, setHeaderCollapsed] = useState(false);
   const [bump, setBump] = useState(false);
   const prefersReducedMotion = useReducedMotion();
   const prevCountRef = useRef<number>(0);
@@ -258,12 +259,16 @@ export default function Header({
   });
 
   // ========================================
-  // ✅ هدر همیشه در دسترس است و هرگز مخفی نمی‌شود —
-  //    سرچ‌باکس در همه حالت‌ها (حتی حین اسکرول) بالا می‌ماند.
-  //    فقط فاصله‌های داخلی هنگام اسکرول جمع می‌شوند.
+  // ✅ هدر هوشمند — جهت اسکرول:
+  //    اسکرول به پایین → فقط ردیف اصلی (لوگو/جستجو/سبد) چسبان می‌ماند و
+  //    نوار اعلان، جستجوی موبایل و ناوبری دسکتاپ جمع می‌شوند؛
+  //    اولین اسکرول رو به بالا همه برمی‌گردند. بالای صفحه همیشه هدر کامل است.
   // ========================================
   useMotionValueEvent(scrollY, "change", (latest) => {
     setScrolled(latest > 60);
+    const previous = scrollY.getPrevious() ?? 0;
+    if (latest > previous + 4 && latest > 140) setHeaderCollapsed(true);
+    else if (latest < previous - 4 || latest <= 140) setHeaderCollapsed(false);
   });
 
   // ========================================
@@ -284,7 +289,25 @@ export default function Header({
   return (
     <>
       <header ref={headerRef} className="sticky top-0 z-50">
-        <TopBar isDark={isDark} onToggleDark={onToggleDark} />
+        {/* Second rows collapse on scroll-down and return on the first
+            scroll-up — the compact row (logo/search/cart) is the only thing
+            that stays pinned. AnimatePresence keeps the exit smooth instead
+            of a hard jump, and --header-height self-corrects via the
+            ResizeObserver above. */}
+        <AnimatePresence initial={false}>
+          {!headerCollapsed && (
+            <motion.div
+              key="aux"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.25, ease: "easeInOut" }}
+              className="overflow-hidden"
+            >
+              <TopBar isDark={isDark} onToggleDark={onToggleDark} />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <div
           className={`relative border-b border-emerald-100/70 bg-white/90 backdrop-blur-xl transition-shadow duration-300 dark:border-emerald-900/50 dark:bg-[#052e22]/90 ${
@@ -398,13 +421,39 @@ export default function Header({
             </div>
           </div>
 
-          {/* ✅ Mobile Search - همیشه در دسترس، حتی هنگام اسکرول */}
-          <div className="relative z-40 border-t border-emerald-50 px-[var(--page-gutter)] py-2 dark:border-emerald-900/50 sm:py-2.5 md:hidden">
-            <SearchBar variant="mobile" />
-          </div>
+          {/* ✅ Mobile Search — collapses with the header on scroll-down. */}
+          <AnimatePresence initial={false}>
+            {!headerCollapsed && (
+              <motion.div
+                key="mobile-search"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.25, ease: "easeInOut" }}
+                className="relative z-40 overflow-hidden border-t border-emerald-50 px-[var(--page-gutter)] dark:border-emerald-900/50 md:hidden"
+              >
+                <div className="py-2 sm:py-2.5">
+                  <SearchBar variant="mobile" />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-          {/* Desktop Navigation */}
-          <DesktopNav />
+          {/* Desktop Navigation — same collapse contract as the rows above. */}
+          <AnimatePresence initial={false}>
+            {!headerCollapsed && (
+              <motion.div
+                key="desktop-nav"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.25, ease: "easeInOut" }}
+                className="overflow-hidden"
+              >
+                <DesktopNav />
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* ✨ نوار پیشرفت اسکرول */}
           <motion.div

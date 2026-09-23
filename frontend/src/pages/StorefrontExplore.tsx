@@ -14,6 +14,7 @@ import { Compass, Heart, MessageCircle, X } from 'lucide-react';
 
 import { storefrontPostsApi } from '../api/services';
 import PostCard from '../components/social/PostCard';
+import { useAuthStore } from '../store/authStore';
 import { cn } from '../utils/cn';
 import type { StorefrontPost } from '@/types/storefront';
 
@@ -21,6 +22,7 @@ const PAGE_SIZE = 24;
 
 export default function StorefrontExplore() {
   const reduceMotion = useReducedMotion();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const [posts, setPosts] = useState<StorefrontPost[]>([]);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -29,28 +31,36 @@ export default function StorefrontExplore() {
   const [openPost, setOpenPost] = useState<StorefrontPost | null>(null);
   const sentinel = useRef<HTMLDivElement | null>(null);
 
-  const load = useCallback(async (nextPage: number, append: boolean) => {
-    if (append) setLoadingMore(true);
-    else setLoading(true);
-    try {
-      const response = await storefrontPostsApi.list({
-        post_type: 'post',
-        ordering: '-likes_total',
-        page: nextPage,
-        page_size: PAGE_SIZE,
-      });
-      setTotal(response.data.count);
-      setPosts((previous) => (append ? [...previous, ...response.data.results] : response.data.results));
-      setPage(nextPage);
-    } catch {
-      // A failed page must not clear what is already on screen — the reader
-      // loses their place for a network blip they cannot see.
-      if (!append) setPosts([]);
-    } finally {
-      if (append) setLoadingMore(false);
-      else setLoading(false);
-    }
-  }, []);
+  const load = useCallback(
+    async (nextPage: number, append: boolean) => {
+      if (append) setLoadingMore(true);
+      else setLoading(true);
+      try {
+        const response = await storefrontPostsApi.list({
+          post_type: 'post',
+          ordering: '-likes_total',
+          // Ranked feed that skips what this reader has already been served —
+          // the same seen-marks the home feed keeps, so a post shown once is
+          // not shown again here either. (The server falls back to the full
+          // pool once it runs dry, so the grid never goes empty.)
+          exclude_seen: isAuthenticated,
+          page: nextPage,
+          page_size: PAGE_SIZE,
+        });
+        setTotal(response.data.count);
+        setPosts((previous) => (append ? [...previous, ...response.data.results] : response.data.results));
+        setPage(nextPage);
+      } catch {
+        // A failed page must not clear what is already on screen — the reader
+        // loses their place for a network blip they cannot see.
+        if (!append) setPosts([]);
+      } finally {
+        if (append) setLoadingMore(false);
+        else setLoading(false);
+      }
+    },
+    [isAuthenticated],
+  );
 
   useEffect(() => {
     void load(1, false);
@@ -74,6 +84,28 @@ export default function StorefrontExplore() {
     observer.observe(node);
     return () => observer.disconnect();
   }, [hasMore, loading, loadingMore, page, load]);
+
+  // Served posts are recorded with the same bulk mark the home feed uses, so
+  // کاوش and the storefronts page share one «seen» ledger: a post shown here
+  // does not resurface on the home feed (and vice versa). The mark is deferred
+  // a beat so it never competes with the requests still painting the grid.
+  const servedIds = useRef<Set<number>>(new Set());
+  useEffect(() => {
+    if (!isAuthenticated || posts.length === 0) return;
+    let added = false;
+    for (const post of posts) {
+      if (!servedIds.current.has(post.id)) {
+        servedIds.current.add(post.id);
+        added = true;
+      }
+    }
+    if (!added) return;
+    const batch = [...servedIds.current];
+    const timer = window.setTimeout(() => {
+      void storefrontPostsApi.markManySeen(batch).catch(() => undefined);
+    }, 2500);
+    return () => window.clearTimeout(timer);
+  }, [isAuthenticated, posts]);
 
   return (
     <div className="mx-auto max-w-6xl px-[var(--page-gutter)] py-6">

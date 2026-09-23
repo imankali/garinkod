@@ -529,6 +529,13 @@ def _participant_conversations(user):
         ])
     if user.is_superuser or user.has_perm('shop.view_farmconsultationrequest'):
         visible |= Q(channel=StorefrontConversation.CHANNEL_CONSULTING)
+    # The buying queue is worked by the procurement/support team: same gate as
+    # the desk (desk.is_operator_for), so «خرید محصولات کشاورزان» shows up in
+    # the inbox of exactly who can answer it — not for every staff member.
+    if user.is_superuser or desk.is_operator_for(
+        user, StorefrontConversation.CHANNEL_PROCUREMENT
+    ):
+        visible |= Q(channel=StorefrontConversation.CHANNEL_PROCUREMENT)
 
     return (
         StorefrontConversation.objects

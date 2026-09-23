@@ -18,6 +18,7 @@ import { formatPrice } from '../utils/formatPrice';
 import { listingHref } from '../utils/listingHref';
 import SkeletonCard from './ui/SkeletonCard';
 import ListingDetailModal from './storefront/ListingDetailModal';
+import StockBadge from './listing/StockBadge';
 
 // Shared press physics with ProductCard: crisp 0.2s, soft in-out, and only
 // ever on controls that are actually enabled.
@@ -153,6 +154,7 @@ export default function MarketplaceListingCard({
                 استوک
               </span>
             )}
+            <StockBadge quantityAvailable={listing.quantity_available} />
           </div>
         ) : discount > 0 ? (
           <span

@@ -35,7 +35,7 @@ beforeEach(() => {
 describe('the home storefronts block', () => {
   it('shows the cards, not a story ring', async () => {
     await renderAppSettled(<FeaturedStorefronts />, { route: '/' });
-    expect(await screen.findByRole('link', { name: 'باغ سبز' })).toHaveAttribute(
+    expect(await screen.findByRole('link', { name: 'غرفه باغ سبز' })).toHaveAttribute(
       'href',
       '/storefronts/bagh-sabz',
     );

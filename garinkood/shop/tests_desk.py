@@ -91,10 +91,15 @@ class DeskHoursTests(TestCase):
         # A window that only covers the next hour in Tehran must be open even if
         # the server's UTC clock says otherwise.
         now = timezone.localtime()
-        self.settings_row.support_start = now.time()
-        self.settings_row.support_end = (now + timedelta(hours=1)).time()
-        if now.hour == 23 and now.minute > 30:  # keep the window on one calendar day
+        if now.hour == 23:  # keep the window on one calendar day — and covering
+            # now: bumping only the start (the old guard) left the end at the
+            # next midnight, so a 23:5x run produced 00:00–00:5x, which does
+            # not contain 23:5x and the desk reported closed.
             self.settings_row.support_start = time(0, 0)
+            self.settings_row.support_end = time(23, 59)
+        else:
+            self.settings_row.support_start = now.time()
+            self.settings_row.support_end = (now + timedelta(hours=1)).time()
         self.settings_row.save()
 
         state = api(self.farmer).get('/api/desk/state/?channel=support').data
