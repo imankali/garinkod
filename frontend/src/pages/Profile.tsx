@@ -151,7 +151,7 @@ export default function Profile() {
   }
 
   if (!isSessionChecked || !isAuthenticated || isLoading) {
-    return <main className="flex min-h-[55dvh] items-center justify-center"><div className="text-center"><div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" /><p className="mt-4 text-sm text-slate-500">{t("common.loading")}</p></div></main>;
+    return <div className="flex min-h-[55dvh] items-center justify-center"><div className="text-center"><div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" /><p className="mt-4 text-sm text-slate-500">{t("common.loading")}</p></div></div>;
   }
 
   const fullName = [user?.first_name, user?.last_name].filter(Boolean).join(" ") || user?.username || "—";
@@ -166,7 +166,7 @@ export default function Profile() {
   ];
 
   return (
-    <main className="min-h-dvh bg-gradient-to-b from-emerald-50 via-[#f8faf6] to-white px-[var(--page-gutter)] py-6 dark:from-emerald-950 dark:via-[#062d21] dark:to-emerald-950 md:py-8">
+    <div className="min-h-dvh bg-gradient-to-b from-emerald-50 via-[#f8faf6] to-white px-[var(--page-gutter)] py-6 dark:from-emerald-950 dark:via-[#062d21] dark:to-emerald-950 md:py-8">
       <div className="mx-auto max-w-7xl">
         <section className="overflow-hidden rounded-3xl bg-gradient-to-l from-emerald-800 via-emerald-700 to-lime-600 p-5 text-white shadow-xl shadow-emerald-900/15 sm:p-6 md:p-8">
           <div className="flex flex-col justify-between gap-5 md:flex-row md:items-center">
@@ -245,7 +245,7 @@ export default function Profile() {
           </section>
         </div>
       </div>
-    </main>
+    </div>
   );
 }
 

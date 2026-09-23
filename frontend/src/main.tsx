@@ -112,7 +112,7 @@ class ErrorBoundary extends (await import("react")).Component<
               با شمارهٔ پشتیبانی تماس بگیرید — ما همین خطا را در لاگ سیستم می‌بینیم.
             </p>
             {detail ? (
-              <p dir="ltr" className="mb-5 rounded-2xl bg-slate-50 p-3 text-left text-[11px] leading-5 text-slate-400">
+              <p dir="ltr" className="mb-5 rounded-2xl bg-slate-50 p-3 text-left text-[12px] leading-5 text-slate-400">
                 {detail}
               </p>
             ) : null}
@@ -130,7 +130,7 @@ class ErrorBoundary extends (await import("react")).Component<
                 رفتن به خانه
               </a>
             </div>
-            <p className="mt-5 text-[11px] text-slate-400">
+            <p className="mt-5 text-[12px] text-slate-400">
               {this.state.reported ? 'گزارش این خطا به تیم فنی ارسال شد.' : 'اگر اینترنت ندارید، پس از اتصال دوباره همین پیام را می‌فرستیم.'}
             </p>
           </div>

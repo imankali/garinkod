@@ -18,6 +18,7 @@ import { useAuthModalStore } from '../store/authModalStore';
 import { useAuthStore } from '../store/authStore';
 import type { OtpRequestResponse } from '@/types/user';
 import { normalizePhoneNumber, toEnglishDigits } from '../utils/normalizeDigits';
+import { useTabKeyboard } from '../hooks/useTabKeyboard';
 
 const INPUT =
   'w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm outline-none transition focus:border-emerald-500 dark:border-emerald-800 dark:bg-emerald-950 dark:text-white';
@@ -35,6 +36,16 @@ export default function LoginModal() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [method, setMethod] = useState<'otp' | 'password'>('otp');
+  // The same keyboard model as the login page: the two methods are one
+  // two-tab list, and arrow keys must move between them.
+  const methodKeyboard = useTabKeyboard({
+    values: ['otp', 'password'] as const,
+    current: method,
+    onSelect: (next) => {
+      setMethod(next);
+      setError('');
+    },
+  });
 
   // A fresh dialog every time it opens, and nothing to do once signed in.
   useEffect(() => {
@@ -124,7 +135,12 @@ export default function LoginModal() {
       size="sm"
     >
       <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1 dark:bg-emerald-900/60" role="tablist" aria-label="روش ورود">
+        <div
+          className="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1 dark:bg-emerald-900/60"
+          role="tablist"
+          aria-label="روش ورود"
+          {...methodKeyboard.tabListProps}
+        >
           {(
             [
               { id: 'otp', label: 'کد یک‌بارمصرف', icon: Phone },
@@ -135,11 +151,13 @@ export default function LoginModal() {
               key={option.id}
               type="button"
               role="tab"
+              id={`login-modal-tab-${option.id}`}
               aria-selected={method === option.id}
               onClick={() => {
                 setMethod(option.id);
                 setError('');
               }}
+              {...methodKeyboard.tabProps(option.id)}
               className={`flex min-h-10 items-center justify-center gap-1.5 rounded-lg text-fluid-xs font-bold transition ${
                 method === option.id
                   ? 'bg-white text-emerald-700 shadow-sm dark:bg-emerald-950 dark:text-lime-300'

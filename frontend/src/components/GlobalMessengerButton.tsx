@@ -221,7 +221,7 @@ export default function GlobalMessengerButton({ cartDrawerOpen = false }: { cart
                         className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3.5 transition-colors hover:bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-900/50 dark:hover:bg-emerald-900"
                         aria-label={`تماس تلفنی با شماره ${PHONE_NUMBER}`}
                       >
-                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-[#0F8A5F] shadow-sm dark:bg-emerald-950 dark:text-lime-300">
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-brand-green shadow-sm dark:bg-emerald-950 dark:text-lime-300">
                           <Phone size={18} />
                         </span>
                         <span className="min-w-0">
@@ -238,7 +238,7 @@ export default function GlobalMessengerButton({ cartDrawerOpen = false }: { cart
                         className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3.5 transition-colors hover:bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-900/50 dark:hover:bg-emerald-900"
                         aria-label="گفتگو در واتس‌اپ"
                       >
-                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-[#0F8A5F] shadow-sm dark:bg-emerald-950 dark:text-lime-300">
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-brand-green shadow-sm dark:bg-emerald-950 dark:text-lime-300">
                           <MessageCircle size={18} />
                         </span>
                         <span className="min-w-0">
@@ -281,7 +281,7 @@ function MessengerAction({
         'hover:bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-900/50 dark:hover:bg-emerald-900',
       )}
     >
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-[#0F8A5F] shadow-sm dark:bg-emerald-950 dark:text-lime-300">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-brand-green shadow-sm dark:bg-emerald-950 dark:text-lime-300">
         {icon}
       </span>
       <span className="min-w-0 flex-1">

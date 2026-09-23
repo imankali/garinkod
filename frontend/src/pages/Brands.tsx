@@ -40,7 +40,7 @@ export default function Brands() {
         />
       </Helmet>
 
-      <main className="mx-auto max-w-6xl px-[var(--page-gutter)] py-8 md:py-12">
+      <div className="mx-auto max-w-6xl px-[var(--page-gutter)] py-8 md:py-12">
         <header>
           <p className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-fluid-2xs font-bold text-emerald-700 dark:bg-emerald-900/60 dark:text-lime-300">
             <Building2 size={13} aria-hidden="true" />
@@ -134,7 +134,7 @@ export default function Brands() {
             </ul>
           </section>
         )}
-      </main>
+      </div>
     </>
   );
 }

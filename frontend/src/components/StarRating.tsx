@@ -127,8 +127,9 @@ export function RatingBars({
             )}
             aria-label={`نمایش دیدگاه‌های ${faNumber(star)} ستاره`}
           >
-            <span className="w-8 shrink-0 text-fluid-2xs font-bold text-slate-500 dark:text-emerald-200">
-              {faNumber(star)} ★
+            <span className="flex w-8 shrink-0 items-center gap-1 text-fluid-2xs font-bold text-slate-500 dark:text-emerald-200">
+              {faNumber(star)}
+              <Star size={11} aria-hidden="true" className="fill-amber-400 text-amber-400" />
             </span>
             <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-emerald-900">
               <span

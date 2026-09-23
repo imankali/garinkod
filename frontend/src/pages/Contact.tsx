@@ -68,7 +68,7 @@ export default function Contact() {
   const whatsapp = contact?.whatsapp_number?.replace(/\D/g, '');
 
   return (
-    <main className="page-shell py-8 md:py-10">
+    <div className="page-shell py-8 md:py-10">
       <RouteSeo />
 
       <header className="max-w-3xl">
@@ -296,7 +296,7 @@ export default function Contact() {
           </div>
         </aside>
       </div>
-    </main>
+    </div>
   );
 }
 

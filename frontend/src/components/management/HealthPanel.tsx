@@ -112,7 +112,7 @@ export default function HealthPanel() {
 
         <div className="mt-4 h-2.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-emerald-900/50">
           <div
-            className={`h-full rounded-full transition-all ${pressure >= 90 ? 'bg-rose-500' : pressure >= 70 ? 'bg-amber-500' : 'bg-emerald-600'}`}
+            className={`h-full rounded-full transition-colors ${pressure >= 90 ? 'bg-rose-500' : pressure >= 70 ? 'bg-amber-500' : 'bg-emerald-600'}`}
             style={{ width: `${Math.min(100, Math.max(2, pressure))}%` }}
           />
         </div>
@@ -545,7 +545,7 @@ function LogRow({ row, onAct }: { row: OpsLogRow; onAct: (row: OpsLogRow, action
       {row.context && Object.keys(row.context as object).length > 0 ? (
         <details className="mt-3">
           <summary className="cursor-pointer text-fluid-2xs font-bold text-slate-500 dark:text-emerald-200">بافت درخواست (پاک‌سازی‌شده)</summary>
-          <pre dir="ltr" className="mt-2 max-h-56 overflow-auto rounded-xl bg-slate-900/90 p-3 text-left text-[10px] leading-5 text-emerald-100">
+          <pre dir="ltr" className="mt-2 max-h-56 overflow-auto rounded-xl bg-slate-900/90 p-3 text-left text-[12px] leading-5 text-emerald-100">
             {typeof row.context === 'string' ? row.context : JSON.stringify(row.context, null, 2)}
           </pre>
         </details>

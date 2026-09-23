@@ -14,6 +14,8 @@ import { useTranslation } from '../../i18n';
 import type { FarmCalendarEvent, FarmLand } from '@/types/farming';
 import { formatFaDate } from './farmOptions';
 import LandCalendar from './LandCalendar';
+import { useTabKeyboard } from '../../hooks/useTabKeyboard';
+import { LandTypeIcon } from '../ui/CategoryIcon';
 
 type TabKey = 'id' | 'calendar';
 
@@ -30,6 +32,11 @@ export default function LandDetailDrawer({
 }) {
   const { t } = useTranslation();
   const [tab, setTab] = useState<TabKey>('id');
+  const detailKeyboard = useTabKeyboard({
+    values: ['id', 'calendar'] as const,
+    current: tab,
+    onSelect: setTab,
+  });
   const [events, setEvents] = useState<FarmCalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -76,7 +83,7 @@ export default function LandDetailDrawer({
             <div className="flex items-center justify-between gap-2">
               <div className="flex min-w-0 items-center gap-2">
                 <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-600 text-xl text-white">
-                  {land.land_type === 'orchard' ? '🌳' : land.land_type === 'greenhouse' ? '🏡' : '🌾'}
+                  <LandTypeIcon type={land.land_type} size={16} />
                 </span>
                 <div className="min-w-0">
                   <h2 className="min-w-0 truncate text-sm font-extrabold text-slate-800 dark:text-white">{land.name}</h2>
@@ -106,7 +113,12 @@ export default function LandDetailDrawer({
               </div>
             </div>
 
-            <div className="mt-3 flex" role="tablist" aria-label="بخش‌های پرونده زمین">
+            <div
+              className="mt-3 flex"
+              role="tablist"
+              aria-label="بخش‌های پرونده زمین"
+              {...detailKeyboard.tabListProps}
+            >
               {(
                 [
                   { key: 'id', label: 'شناسنامه زمین' },
@@ -116,8 +128,11 @@ export default function LandDetailDrawer({
                 <button
                   key={key}
                   role="tab"
+                  id={`land-detail-tab-${key}`}
                   aria-selected={tab === key}
+                  aria-controls="land-detail-panel"
                   onClick={() => setTab(key)}
+                  {...detailKeyboard.tabProps(key)}
                   className={`flex-1 border-b-2 px-2 py-2 text-xs font-bold transition ${
                     tab === key
                       ? 'border-emerald-600 text-emerald-700 dark:border-lime-400 dark:text-lime-300'
@@ -130,8 +145,17 @@ export default function LandDetailDrawer({
             </div>
           </header>
 
-          {/* Body */}
-          <div className="min-h-0 flex-1 overflow-y-auto p-4">
+          {/* Body. One region swapping its content, so it is one tabpanel
+              labelled by whichever tab is showing — the ARIA APG's one-panel-
+              per-tab shape would mean keeping both panels mounted and hidden,
+              which the drawer's fixed height cannot afford. */}
+          <div
+            className="min-h-0 flex-1 overflow-y-auto p-4"
+            role="tabpanel"
+            id="land-detail-panel"
+            aria-labelledby={`land-detail-tab-${tab}`}
+            tabIndex={-1}
+          >
             {tab === 'id' ? (
               <section className="rounded-3xl border border-emerald-100 bg-white p-4 dark:border-emerald-900 dark:bg-emerald-950">
                 <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">

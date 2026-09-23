@@ -104,7 +104,7 @@ export default function ServiceDetail() {
         </script>
       </Helmet>
 
-      <main className="page-shell py-8 md:py-10">
+      <div className="page-shell py-8 md:py-10">
         <Link
           to="/services"
           className="inline-flex min-h-11 items-center gap-2 text-fluid-sm font-bold text-emerald-700 hover:text-emerald-900 dark:text-lime-300"
@@ -240,7 +240,7 @@ export default function ServiceDetail() {
             </div>
           </aside>
         </div>
-      </main>
+      </div>
     </>
   );
 }

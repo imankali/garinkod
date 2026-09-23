@@ -1,12 +1,13 @@
 // frontend/src/components/home/OfferRail.tsx
 
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Link } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, ShoppingCart, Star } from 'lucide-react';
 
 import { formatPrice } from '../../utils/formatPrice';
 import { toPersianDigits } from '../../utils/normalizeDigits';
+import { useAutoRotate } from '../../hooks/useAutoRotate';
 import { useCartStore } from '../../store/cartStore';
 import { productsApi } from '../../api/services';
 import toast from 'react-hot-toast';
@@ -24,7 +25,9 @@ import type { ProductList } from '@/types/shop';
  *  - Native CSS scroll-snap: momentum scrolling, keyboard friendly, RTL-safe.
  *  - Autoplay every 2s, one column per tick, toward the reading direction; it
  *    loops back to the start at the end. Pointer hover or an active touch
- *    pauses it; reduced-motion users never see the rail move by itself.
+ *    pauses it, the visitor can stop it for the whole site from the section
+ *    heading (see `useAutoRotate` — this is the WCAG 2.2.2 mechanism), and
+ *    reduced-motion users never see the rail move by itself.
  *  - Movement is a rAF tween of the rail's own scrollLeft: it can never
  *    scroll the surrounding page vertically (scrollIntoView did), and it
  *    lands exactly on a snap point in every engine.
@@ -35,7 +38,22 @@ import type { ProductList } from '@/types/shop';
  */
 const AUTOPLAY_MS = 2000;
 
-export default function OfferRail({ products }: { products: ProductList[] }) {
+export default function OfferRail({
+  products,
+  /**
+   * The name of this scroll region.
+   *
+   * `role="region"` makes the rail a landmark, and two landmarks on the same
+   * page must not answer to the same name — the home page carries this rail
+   * twice (the flash deals and the newest arrivals), so a generic label left a
+   * reader with two identical "horizontal carousel" entries in their landmark
+   * list and no way to tell which was which. Callers pass their own title.
+   */
+  label,
+}: {
+  products: ProductList[];
+  label?: string;
+}) {
   const queryClient = useQueryClient();
   const railRef = useRef<HTMLDivElement>(null);
   const hoverPause = useRef(false);
@@ -43,6 +61,8 @@ export default function OfferRail({ products }: { products: ProductList[] }) {
   const busyId = useRef<number | null>(null);
   const cancelTween = useRef<(() => void) | null>(null);
   const addToCart = useCartStore((state) => state.addToCart);
+  // User-controlled and site-wide: covers the reduced-motion default too.
+  const { playing } = useAutoRotate();
 
   // Pair the products into two-row columns: [0,1], [2,3], … The leftover
   // product of an odd list fills the top row of the last column alone.
@@ -62,7 +82,7 @@ export default function OfferRail({ products }: { products: ProductList[] }) {
    *  collapses this tween into a single-frame jump (measured: intermediate
    *  values never land). So the tween suspends snap for its 450 ms and hands
    *  it back afterwards; manual swipes still snap. */
-  const animateTo = (targetLeft: number) => {
+  const animateTo = useCallback((targetLeft: number) => {
     const rail = railRef.current;
     if (!rail) return;
     cancelTween.current?.();
@@ -89,8 +109,7 @@ export default function OfferRail({ products }: { products: ProductList[] }) {
       window.cancelAnimationFrame(raf);
       done();
     };
-  };
-
+  }, []);
   /** Pixel advance of one column (column + gap). Without layout (jsdom,
    *  hidden node) it falls back to the ~80%-viewport page step. */
   const cardStep = (rail: HTMLDivElement): number => {
@@ -102,7 +121,7 @@ export default function OfferRail({ products }: { products: ProductList[] }) {
   /** Bring column `index` flush to the start edge. The RTL sign comes from the
    *  live scroll position (negative while scrolled in Chromium RTL), falling
    *  back to the computed direction when the rail sits at 0. */
-  const scrollToCard = (index: number) => {
+  const scrollToCard = useCallback((index: number) => {
     const rail = railRef.current;
     if (!rail) return;
     const unit = Math.max(cardStep(rail), 1);
@@ -112,8 +131,7 @@ export default function OfferRail({ products }: { products: ProductList[] }) {
       : at > 0 ? 1
       : getComputedStyle(rail).direction === 'rtl' ? -1 : 1;
     animateTo(sign * index * unit);
-  };
-
+  }, [animateTo]);
   const move = (direction: -1 | 1) => {
     const rail = railRef.current;
     if (!rail) return;
@@ -148,14 +166,10 @@ export default function OfferRail({ products }: { products: ProductList[] }) {
   }, []);
 
   // Autoplay: one column per 2s. Pointer hover or an active touch pauses it —
-  // the standard carousel contract; moving the pointer away resumes.
+  // the standard carousel contract; moving the pointer away resumes, unless the
+  // visitor turned auto-rotation off, which is sticky.
   useEffect(() => {
-    if (products.length < 2) return;
-    const reduceMotion =
-      typeof window !== 'undefined' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (reduceMotion) return;
-
+    if (products.length < 2 || !playing) return;
     const timer = window.setInterval(() => {
       const rail = railRef.current;
       if (!rail || !inViewRef.current || hoverPause.current || touchPause.current) return;
@@ -174,7 +188,7 @@ export default function OfferRail({ products }: { products: ProductList[] }) {
       }
     }, AUTOPLAY_MS);
     return () => window.clearInterval(timer);
-  }, [products.length]);
+  }, [products.length, playing, scrollToCard]);
 
   async function quickAdd(product: ProductList) {
     if (busyId.current === product.id) return;
@@ -216,7 +230,7 @@ export default function OfferRail({ products }: { products: ProductList[] }) {
           className="h-32 w-full rounded-lg object-cover sm:h-40"
         />
         {product.discount_percent > 0 && (
-          <span className="absolute right-1.5 top-1.5 rounded-full bg-rose-600 px-1.5 py-0.5 text-[10px] font-extrabold text-white">
+          <span className="absolute right-1.5 top-1.5 rounded-full bg-rose-600 px-1.5 py-0.5 text-[12px] font-extrabold text-white">
             {toPersianDigits(product.discount_percent)}٪
           </span>
         )}
@@ -225,7 +239,7 @@ export default function OfferRail({ products }: { products: ProductList[] }) {
         {product.title}
       </p>
       {typeof product.avg_rating === 'number' && product.avg_rating > 0 && (
-        <p className="mt-0.5 flex items-center gap-1 text-[11px] font-bold text-amber-500">
+        <p className="mt-0.5 flex items-center gap-1 text-[12px] font-bold text-amber-500">
           <Star size={12} aria-hidden="true" className="fill-current" />
           <span className="tabular-nums">{toPersianDigits(product.avg_rating.toFixed(1))}</span>
           {typeof product.reviews_count === 'number' && product.reviews_count > 0 && (
@@ -238,7 +252,7 @@ export default function OfferRail({ products }: { products: ProductList[] }) {
       <div className="mt-1">
         {product.discount_percent > 0 ? (
           <>
-            <p className="text-[11px] text-slate-400 line-through">
+            <p className="text-[12px] text-slate-400 line-through">
               {formatPrice(product.price)}
             </p>
             <p className="text-[13px] font-extrabold text-emerald-800 sm:text-fluid-sm">
@@ -285,7 +299,7 @@ export default function OfferRail({ products }: { products: ProductList[] }) {
         }}
         className="rail-scroll mt-4 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-4 pb-4 touch-pan-x sm:px-6"
         role="region"
-        aria-label="کارت‌های قابل پیمایش افقی"
+        aria-label={label ?? "کارت‌های قابل پیمایش افقی"}
       >
         {columns.map((column, columnIndex) => (
           <div

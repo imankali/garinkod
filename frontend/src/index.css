@@ -35,7 +35,27 @@
  */
 @theme {
   --color-emerald-600: #047857;
-  --color-slate-400: #67778f;
+  /* rose-600 (#ec003f) measures 4.12:1 on the rose-50 panels it marks up
+     ("your request count is too high" and friends). #e0003c is the same red at
+     4.51:1 there and 4.96:1 on white. */
+  --color-rose-600: #e0003c;
+  /*
+   * The two muted steps, corrected with the same measurement as emerald-600.
+   *
+   * #67778f (slate-400) clears AA on white but not on the tinted surfaces it is
+   * actually used on: 4.35:1 on slate-50, 4.40:1 on the emerald wash under
+   * cards and 4.33:1 on the cream panels — a hair under, which is the worst way
+   * to miss a threshold, because nothing looks wrong. Teal-adjusted to #617087
+   * it measures 4.54:1 on the cream, 4.81:1 on
+   * slate-50, 4.85:1 on that wash and 5.03:1 on white, so the muted voice of the
+   * design survives intact.
+   *
+   * slate-500 (#62748e) was never overridden and fails the same way on the
+   * slate-100 chips and the cream panels: 4.35:1 and 4.30:1. #5e6f88 measures
+   * 4.67:1 and 4.61:1 there, and 5.12:1 on white.
+   */
+  --color-slate-400: #617087;
+  --color-slate-500: #5e6f88;
 }
 
 .dark {
@@ -46,7 +66,7 @@
  * 2. CSS Custom Properties (Design Tokens)
  * ======================================== */
 :root {
-  --brand-green: #0f8a5f;
+  --brand-green: #0e7c56;
   --brand-green-dark: #064e3b;
   --brand-green-light: #10b981;
   --brand-lime: #a3e635;
@@ -57,6 +77,18 @@
 
   /* Spacing */
   --header-height: 72px;
+  /*
+   * The header is fixed, so the page reserves its space with this. The fallback
+   * covers the first paint before the header has measured itself; the header
+   * then writes the real number. It deliberately does not shrink when the header
+   * collapses — see the comment in Header.tsx.
+   */
+  --header-space: 129px;
+
+  /* The desktop header carries the nav row as well, so it reserves more. */
+  @media (min-width: 768px) {
+    --header-space: 205px;
+  }
   --mobile-nav-height: 72px;
   /* Reserve room for the fixed mobile bar plus the iOS home indicator, so
      page content is never hidden underneath it. */
@@ -162,8 +194,41 @@ body {
   background: linear-gradient(135deg, var(--brand-green), var(--brand-green-dark));
 }
 
+/*
+ * The brand colour as *text* and as a *surface*, named rather than spelled.
+ *
+ * 44 call sites wrote the hex out by hand (`text-[#0F8A5F]`, `bg-[#0F8A5F]`),
+ * which is why correcting the token to an AA-safe green left those spots
+ * behind at 3.83:1 and 4.35:1 — a hand-written hex cannot follow a token that
+ * moves. These utilities read the token, so the next correction reaches them
+ * too.
+ */
+.text-brand-green {
+  color: var(--brand-green);
+}
+
+.bg-brand-green {
+  background-color: var(--brand-green);
+}
+
+.border-brand-green {
+  border-color: var(--brand-green);
+}
+
+/*
+ * The accent gradient, and the one place where a gradient is not decorative.
+ *
+ * Buttons, chips and the search submit all paint white text on this ramp, and
+ * the lime end of it — #a3e635 — measures 1.51:1 against white. A gradient is
+ * invisible to contrast tooling, which is exactly why it survived every audit so
+ * far: the label is legible at the dark end and disappears at the light one.
+ *
+ * The light stop becomes #4d7c0f, where white measures 4.99:1; the ramp still
+ * reads green-to-lime, but now it reads that way with the label legible along
+ * its whole length.
+ */
 .bg-brand-gradient-accent {
-  background: linear-gradient(90deg, var(--brand-green), var(--brand-lime));
+  background: linear-gradient(90deg, var(--brand-green), #4d7c0f);
 }
 
 /*
@@ -348,8 +413,20 @@ body {
 /* ========================================
  * 9. Interactive Element Transitions
  * ======================================== */
+/*
+ * Explicit properties, not `all`.
+ *
+ * `transition: all` on every control asked the browser to interpolate anything
+ * that changed — including layout properties like width and height, which forces
+ * a style recalculation per frame and a layout pass on any control that resizes
+ * (`box-shadow` and transforms are the only things these controls actually
+ * animate). Naming them keeps the same look and takes layout out of the
+ * transition path.
+ */
 button, a, input, select, textarea {
-  transition: all var(--transition-base);
+  transition-property: color, background-color, border-color, box-shadow, transform, opacity;
+  transition-duration: 300ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* ========================================
@@ -398,6 +475,29 @@ button, a, input, select, textarea {
  * changing its visual size: the pseudo-element expands the touch region
  * outward while the icon stays small.
  */
+/*
+ * The horizontal rails (products, storefronts, listings) get a positioning
+ * context of their own.
+ *
+ * Without one, a rail's scrollable overflow leaks into the page: measured on
+ * /storefronts at a 414px viewport, the document reported a scrollWidth of
+ * 1170px — the reader could drag the whole page sideways by 756px, past a rail
+ * that is supposed to scroll inside its own box. The overflow is the *left* half
+ * of an RTL scroll area, and neither `overflow-x: hidden` on the body nor on the
+ * html element contains it; `position: relative` on the scroll container does,
+ * because the container then clips its own scrollable overflow against its own
+ * box instead of the page's.
+ *
+ * Every card that sits in a rail already establishes its own positioning context
+ * (`ProductCard` is `relative`, the storefront card wraps its icon in a
+ * `relative` div), so nothing inside a rail changes which box it is measured
+ * against — verified by diffing the geometry of every descendant before and
+ * after this rule.
+ */
+.rail-scroll {
+  position: relative;
+}
+
 .tap-target {
   position: relative;
 }
@@ -690,14 +790,31 @@ input[type="range"]::-moz-range-thumb {
   animation: shimmer 2.2s ease-in-out infinite;
 }
 
-/* Marquee (TopBar ticker) */
+/* Marquee (TopBar ticker)
+ *
+ * One copy of the message list per cycle: the strip contains the list twice, so
+ * travelling 50% of its own width lands the second copy exactly where the first
+ * started. `100% → -100%` (what this used to be) moved the strip two full
+ * widths through a window a quarter of its size and left the bar empty for a
+ * third of every cycle.
+ *
+ * The reduced-motion rule is not incidental: an OS-level request to stop moving
+ * things is a stronger statement than anything the page can infer, and a ticker
+ * that keeps sliding across a sticky header is exactly the motion it is asking
+ * about. The same switch is honoured in JS so the message stays readable. */
 @keyframes marquee {
-  0% { transform: translateX(100%); }
-  100% { transform: translateX(-100%); }
+  from { transform: translateX(50%); }
+  to { transform: translateX(0); }
 }
 
 .animate-marquee {
-  animation: marquee 22s linear infinite;
+  animation: marquee 15s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-marquee {
+    animation: none;
+  }
 }
 
 /* Ping Soft */

@@ -28,6 +28,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Flame,
+  SearchX,
   Sparkles,
   TrendingUp,
   type LucideIcon,
@@ -381,7 +382,7 @@ export default function Shop({ compareItems, onToggleCompare }: ShopProps) {
         : t('shop.allProducts');
 
   return (
-    <main className="min-h-dvh bg-gradient-to-b from-emerald-50/60 via-white to-white pb-10 dark:from-emerald-950/40 dark:via-[#052e22] dark:to-emerald-950">
+    <div className="min-h-dvh bg-gradient-to-b from-emerald-50/60 via-white to-white pb-10 dark:from-emerald-950/40 dark:via-[#052e22] dark:to-emerald-950">
       {/* Page header + the one filter bar both tabs share */}
       <section className="border-b border-emerald-100 bg-white/70 py-6 dark:border-emerald-900/50 dark:bg-emerald-950/40 md:py-8">
         <div className="mx-auto max-w-7xl px-[var(--page-gutter)]">
@@ -395,11 +396,18 @@ export default function Shop({ compareItems, onToggleCompare }: ShopProps) {
               </p>
             </div>
 
-            <div className="inline-flex rounded-2xl bg-emerald-50 p-1 dark:bg-emerald-900/50" role="tablist" aria-label="منبع کاتالوگ">
+            {/* A segmented filter, not tabs: both options render the same grid
+                with a different source, there is no panel per option, and the
+                choice lives in the URL. `aria-pressed` says exactly that, where
+                `role="tab"` promised panels and arrow keys that never existed. */}
+            <div
+              className="inline-flex rounded-2xl bg-emerald-50 p-1 dark:bg-emerald-900/50"
+              role="group"
+              aria-label="منبع کاتالوگ"
+            >
               <button
                 type="button"
-                role="tab"
-                aria-selected={source === 'products'}
+                aria-pressed={source === 'products'}
                 onClick={() => updateParams({ source: undefined, page: undefined })}
                 className={cn(
                   'min-h-11 rounded-xl px-4 text-sm font-bold transition',
@@ -412,8 +420,7 @@ export default function Shop({ compareItems, onToggleCompare }: ShopProps) {
               </button>
               <button
                 type="button"
-                role="tab"
-                aria-selected={source === 'marketplace'}
+                aria-pressed={source === 'marketplace'}
                 onClick={() => updateParams({ source: 'marketplace', page: undefined })}
                 className={cn(
                   'min-h-11 rounded-xl px-4 text-sm font-bold transition',
@@ -478,7 +485,37 @@ export default function Shop({ compareItems, onToggleCompare }: ShopProps) {
       */}
       {!activeCollection && !filtersActive && !featured && (
         <div className="mx-auto max-w-7xl space-y-8 px-[var(--page-gutter)] pt-8">
-          {source === 'products'
+          {/*
+            The rows below each fetch their own products and drop themselves when
+            their collection turns out to be empty ("a heading over nothing reads
+            as a broken page" — see CuratedRow). That is the right call per row
+            and the wrong one for the page: the first paint showed four rows of
+            skeleton cards, and a moment later three of them vanished and the
+            whole catalogue jumped up by a screen and a half. Measured on this
+            page that was a CLS of 0.53, almost all of it from rows disappearing
+            above the fold.
+
+            The loading state now has the shape the loaded page is meant to have
+            — one skeleton row per configured collection, in the same grid — so
+            the common case (a collection with stock) swaps skeleton for cards of
+            the same height and moves nothing. The grid below keeps its own
+            geometry-exact skeleton, as before.
+          */}
+          {loading && source === 'products' && (
+            <div className="space-y-8" aria-hidden="true">
+              {CURATED_SECTIONS.map((section) => (
+                <section key={`pending-${section.id}`}>
+                  <div className="mb-3 h-9 w-48 animate-pulse rounded-xl bg-slate-100 dark:bg-emerald-900/40" />
+                  <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-5">
+                    {Array.from({ length: SECTION_SIZE }).map((_, index) => (
+                      <SkeletonCard key={index} variant="product" />
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
+          )}
+          {!loading && (source === 'products'
             ? CURATED_SECTIONS.map((section) => (
               <CuratedRow
                 key={section.id}
@@ -493,7 +530,7 @@ export default function Shop({ compareItems, onToggleCompare }: ShopProps) {
             ))
             : AD_SECTIONS.map((section) => (
               <AdRow key={section.id} section={section} />
-            ))}
+            )))}
         </div>
       )}
 
@@ -532,7 +569,7 @@ export default function Shop({ compareItems, onToggleCompare }: ShopProps) {
             </div>
           ) : (source === 'products' ? products.length === 0 : listings.length === 0) ? (
             <div className="flex flex-col items-center justify-center py-14 text-center">
-              <div className="text-5xl">🔍</div>
+              <SearchX size={48} strokeWidth={1.25} className="text-slate-300 dark:text-emerald-800" aria-hidden="true" />
               <p className="mt-4 text-fluid-lg font-bold text-slate-700 dark:text-white">
                 {t('shop.noProducts')}
               </p>
@@ -635,7 +672,7 @@ export default function Shop({ compareItems, onToggleCompare }: ShopProps) {
         isWishlisted={selectedProduct ? wishlist.some((p) => p.id === selectedProduct.id) : false}
         onToggleWishlist={toggleWishlist}
       />
-    </main>
+    </div>
   );
 }
 

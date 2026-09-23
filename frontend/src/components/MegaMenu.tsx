@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, LayoutGrid } from "lucide-react";
+
+import { CategoryIcon } from "./ui/CategoryIcon";
 import { useQuery } from "@tanstack/react-query";
 import { categoriesApi } from "../api/services";
 import type { Category } from '@/types/shop';
@@ -10,10 +12,6 @@ import type { Category } from '@/types/shop';
 // ========================================
 // Types
 // ========================================
-interface CategoryIcons {
-  [key: string]: string;
-}
-
 interface CategoryColors {
   [key: string]: string;
 }
@@ -22,14 +20,6 @@ interface CategoryColors {
 // Category Icons & Colors Mapping
 // ✅ نگاشت slug به آیکون و رنگ (بر اساس دسته‌بندی‌های UI)
 // ========================================
-const categoryIcons: CategoryIcons = {
-  'pesticide': '',
-  'fertilizer': '',
-  'seed': '🌾',
-  'equipment': '🚜',
-  'irrigation': '💧',
-  'tools': '🔧',
-};
 
 const categoryColors: CategoryColors = {
   'pesticide': 'from-[#0F8A5F] to-[#0c6b49]',
@@ -123,7 +113,7 @@ export default function MegaMenu() {
       {/* ======================================== */}
       <button
         onClick={() => setOpen((v) => !v)}
-        className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-300 ${
+        className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors duration-300 ${
           open
             ? "bg-emerald-600 text-white shadow-lg shadow-emerald-200"
             : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
@@ -166,7 +156,7 @@ export default function MegaMenu() {
                         categoryColors[cat.slug] || 'from-emerald-500 to-lime-500'
                       } text-white`}
                     >
-                      {categoryIcons[cat.slug] || '📦'}
+                      <CategoryIcon slug={cat.slug} size={16} />
                     </span>
                     <span className="flex-1 text-start">{cat.name}</span>
                     {cat.product_count > 0 && (
@@ -197,7 +187,7 @@ export default function MegaMenu() {
                       categoryColors[activeCategory.slug] || 'from-emerald-500 to-lime-500'
                     } text-white shadow-lg`}
                   >
-                    {categoryIcons[activeCategory.slug] || '📦'}
+                    <CategoryIcon slug={activeCategory.slug} size={18} />
                   </span>
                   <div>
                     <p className="font-bold text-slate-800 dark:text-white">{activeCategory.name}</p>
@@ -214,12 +204,12 @@ export default function MegaMenu() {
                       <a
                         key={sub.slug}
                         href={`/products?category=${activeCategory.slug}&subcategory=${sub.slug}`}
-                        className="group flex items-center justify-between rounded-xl bg-slate-50 px-3.5 py-2.5 text-sm text-slate-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200 dark:hover:bg-emerald-900 dark:hover:text-lime-300"
+                        className="group flex items-center justify-between rounded-xl bg-slate-50 px-3.5 py-2.5 text-sm text-slate-600 transition-colors hover:bg-emerald-50 hover:text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200 dark:hover:bg-emerald-900 dark:hover:text-lime-300"
                       >
                         {sub.name}
                         <ArrowLeft
                           size={14}
-                          className="opacity-0 transition-all group-hover:-translate-x-1 group-hover:opacity-100"
+                          className="opacity-0 transition-[transform,opacity] group-hover:-translate-x-1 group-hover:opacity-100"
                         />
                       </a>
                     ))

@@ -927,6 +927,18 @@ export const storefrontPostsApi = {
     shuffle?: boolean;
     /** Pin the shuffle so a paginated scroll keeps one coherent ordering. */
     seed?: number;
+    /**
+     * Drop the posts this reader has already been served (the server's
+     * StorefrontPostSeen marks, and it falls back to the full pool once that
+     * runs dry). Independent of `shuffle`: کاوش asks for a *ranked* feed with no
+     * repeats, which is neither shuffled nor the plain chronological list.
+     *
+     * This was sent by `StorefrontExplore.tsx` and read by
+     * `StorefrontPostViewSet` for a while before the type admitted it existed,
+     * so `tsc` — and therefore `npm run build`, which runs `tsc && vite build` —
+     * failed on a parameter the API has supported all along.
+     */
+    exclude_seen?: boolean;
   }) => apiClient.get<PaginatedResponse<StorefrontPost>>('/marketplace/posts/', { params }),
   mine: () => apiClient.get<StorefrontPost[]>('/marketplace/posts/mine/'),
 

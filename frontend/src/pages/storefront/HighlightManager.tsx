@@ -12,7 +12,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Check, Pencil, Plus, X } from 'lucide-react';
+import { Archive, Check, Pencil, Plus, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 import { storefrontsApi } from '../../api/services';
@@ -153,7 +153,7 @@ export default function HighlightManager({
                 aria-expanded={archiveOpen}
               >
                 <span className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-slate-200 bg-slate-50 text-fluid-2xs font-bold text-slate-500 transition hover:border-emerald-400 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
-                  {archive.length > 0 ? archive.length.toLocaleString('fa-IR') : '🗂'}
+                  {archive.length > 0 ? archive.length.toLocaleString('fa-IR') : <Archive size={20} aria-hidden="true" />}
                 </span>
                 <span className="text-fluid-2xs text-slate-400">آرشیو</span>
               </button>
@@ -192,14 +192,14 @@ export default function HighlightManager({
                     className="aspect-[9/16] w-full rounded-lg object-cover"
                   />
                   {(story.highlight_ids?.length ?? 0) > 0 && (
-                    <span className="absolute start-1 top-1 rounded-full bg-emerald-600/90 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                    <span className="absolute start-1 top-1 rounded-full bg-emerald-600/90 px-1.5 py-0.5 text-[12px] font-bold text-white">
                       در هایلایت
                     </span>
                   )}
                   <button
                     type="button"
                     onClick={() => setPickerStory(story)}
-                    className="mt-1 w-full rounded-lg bg-emerald-600 py-1.5 text-[10px] font-bold text-white transition hover:bg-emerald-700"
+                    className="mt-1 w-full rounded-lg bg-emerald-600 py-1.5 text-[12px] font-bold text-white transition hover:bg-emerald-700"
                   >
                     افزودن به هایلایت
                   </button>
@@ -287,7 +287,7 @@ function StoryPickerGrid({
               >
                 <img src={story.image_url} alt={story.caption.slice(0, 40)} className="aspect-[9/16] w-full object-cover" />
                 {index >= 0 ? (
-                  <span className="absolute end-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-[10px] font-bold text-white">
+                  <span className="absolute end-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-[12px] font-bold text-white">
                     {order?.toLocaleString('fa-IR')}
                   </span>
                 ) : (

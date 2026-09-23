@@ -86,11 +86,21 @@ function OrderTimelineStepper({ status }: { status: string }) {
       <div className="relative flex items-center justify-between">
         {/* Progress bar background */}
         <div className="absolute inset-x-4 top-4 h-1 -translate-y-1/2 bg-slate-200 dark:bg-emerald-800" />
-        {/* Active progress fill */}
+        {/*
+          The fill grows by transform, not by width.
+          Its width used to be written inline and transitioned with
+          `transition-all`, which re-lays out the row on every frame of the
+          animation. The rail is already laid out; stretching it with `scaleX`
+          is a compositor job, and the fill now spans the rail exactly instead of
+          stopping 10% short of the last step.
+        */}
         <div
-          className="absolute start-4 top-4 h-1 -translate-y-1/2 bg-emerald-600 transition-all duration-500 dark:bg-lime-400"
+          className="absolute inset-x-4 top-4 h-1 bg-emerald-600 transition-transform duration-500 dark:bg-lime-400"
           style={{
-            width: currentIndex >= 0 ? `${(currentIndex / (ORDER_STEPS.length - 1)) * 90}%` : '0%',
+            transform: `translateY(-50%) scaleX(${
+              currentIndex >= 0 ? currentIndex / (ORDER_STEPS.length - 1) : 0
+            })`,
+            transformOrigin: '100% 50%',
           }}
         />
 
@@ -102,7 +112,7 @@ function OrderTimelineStepper({ status }: { status: string }) {
           return (
             <div key={step.key} className="relative z-10 flex flex-col items-center">
               <div
-                className={`flex h-8 w-8 items-center justify-center rounded-full border-2 text-xs font-bold transition-all duration-300 ${
+                className={`flex h-8 w-8 items-center justify-center rounded-full border-2 text-xs font-bold transition-[background-color,border-color,color,box-shadow] duration-300 ${
                   isDone
                     ? 'border-emerald-600 bg-emerald-600 text-white shadow-sm'
                     : isCurrent
@@ -239,7 +249,7 @@ export default function Orders() {
   }
 
   return (
-    <main className="page-shell py-8">
+    <div className="page-shell py-8">
       <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
           <p className="text-fluid-sm font-bold text-emerald-700 dark:text-lime-300">
@@ -362,7 +372,7 @@ export default function Orders() {
           )}
         </section>
       )}
-    </main>
+    </div>
   );
 }
 

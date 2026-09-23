@@ -126,6 +126,196 @@ test.describe('keyboard access', () => {
   });
 });
 
+test.describe('the sticky header', () => {
+  /**
+   * The header collapses its aux rows (top strip, nav) on scroll-down and brings
+   * them back on scroll-up. Collapsing removes ~130px from a sticky header that
+   * sits in the normal flow, so the document reflows — and the browser answers a
+   * reflow by moving the scroll offset to hold the content below still. That
+   * answer arrives as an ordinary scroll event running the other way, so a header
+   * that took its direction from the scroll offset took its own echo for the
+   * reader changing their mind: it flipped back, reflowed, was answered again,
+   * and the two argued several times a second.
+   *
+   * Measured over four seconds in which nothing was touched: 37 different header
+   * heights and 35 different scroll positions, at every breakpoint and in both
+   * motion modes — and, because a reflow cancels a scroll in flight, a page that
+   * would not come back to the top when asked. None of that is visible to jsdom,
+   * which has no layout and no scroll anchoring, so it is pinned here.
+   */
+  test.use({ viewport: { width: 1280, height: 900 } });
+  // The suite default is `reducedMotion: 'reduce'`, so that hover and tap
+  // animations stop fighting Playwright for stability. This block opts out per
+  // page: the twitch lives in the 250ms row animation, and with motion reduced
+  // the rows appear and disappear instantly — precisely the case that does not
+  // reproduce it. The default most visitors get is the one tested here.
+
+  test('settles after a scroll instead of oscillating', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    const header = page.locator('#site-header').first();
+    await page.mouse.move(640, 500);
+    await page.mouse.wheel(0, 260);
+    await page.waitForTimeout(1200);
+
+    // An in-page jump — an anchor link, a route change — moves the page without
+    // touching the header, exactly as the browser's own compensation does. Under
+    // the old logic this is what sent the two of them into a loop.
+    await page.evaluate(() => window.scrollTo(0, 340));
+
+    const heights: number[] = [];
+    for (let sample = 0; sample < 12; sample += 1) {
+      heights.push(
+        await header.evaluate((element) => Math.round(element.getBoundingClientRect().height)),
+      );
+      await page.waitForTimeout(100);
+    }
+
+    expect(
+      new Set(heights).size,
+      `the header changed height while the page was still: ${heights.join(' → ')}`,
+    ).toBe(1);
+  });
+
+  test('still collapses on the way down and returns on the way up', async ({ page }) => {
+    // The fix must not have "solved" the twitch by disabling the feature.
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+    const header = page.locator('#site-header').first();
+    const height = () => header.evaluate((element) => Math.round(element.getBoundingClientRect().height));
+
+    const expanded = await height();
+
+    await page.mouse.move(640, 500);
+    await page.mouse.wheel(0, 300);
+    await page.waitForTimeout(1200);
+    const collapsed = await height();
+    expect(collapsed, 'the header did not collapse on scroll-down').toBeLessThan(expanded);
+
+    await page.mouse.wheel(0, -260);
+    await page.waitForTimeout(1200);
+    expect(await height(), 'the header did not come back on scroll-up').toBeGreaterThan(collapsed);
+  });
+
+  test('«بازگشت به بالا» arrives at the top', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    await page.mouse.move(640, 500);
+    for (let notch = 0; notch < 6; notch += 1) {
+      await page.mouse.wheel(0, 220);
+      await page.waitForTimeout(90);
+    }
+    await page.waitForTimeout(1500);
+
+    // Dispatched rather than clicked: the button unmounts the moment the page
+    // passes the 300px visibility threshold on the way up, which is a race
+    // Playwright's actionability checks lose.
+    await page
+      .locator('button[aria-label="بازگشت به بالای صفحه"]')
+      .dispatchEvent('click');
+
+    await expect
+      .poll(async () => page.evaluate(() => Math.round(window.scrollY)), { timeout: 5000 })
+      .toBe(0);
+    await expect
+      .poll(async () => header_height(page), { timeout: 5000 })
+      .toBeGreaterThan(150);
+  });
+});
+
+/** Height of a sticky header, whichever one the page happens to render. */
+async function header_height(page: import('@playwright/test').Page): Promise<number> {
+  return page.evaluate(() =>
+    Math.round(document.getElementById('site-header')?.getBoundingClientRect().height ?? 0),
+  );
+}
+
+test.describe('the search box', () => {
+  /**
+   * The header's own promise: scroll down and the field stays with you.
+   *
+   * On a phone the field used to live in a row *under* the pinned one, so
+   * collapsing the header took the search with it and left logo, cart and menu —
+   * the three things a reader who is already shopping does not need. It now sits
+   * in the pinned row at every breakpoint, next to a submit button that runs it.
+   *
+   * Two fields are always in the DOM because the header chooses between them
+   * with `md:` classes rather than by unmounting, so every assertion here is
+   * about the *visible* one — the only kind that says anything about what a
+   * reader sees.
+   */
+  const visibleField = (page: import('@playwright/test').Page) =>
+    page.locator('#site-header input[aria-label="جستجوی محصولات"]:visible');
+
+  for (const [name, viewport] of [
+    ['desktop', { width: 1280, height: 900 }],
+    ['phone', { width: 390, height: 844 }],
+  ] as const) {
+    test(`stays pinned while scrolling on ${name}`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await page.goto('/');
+      await page.waitForLoadState('networkidle');
+
+      await expect(visibleField(page)).toHaveCount(1);
+
+      await page.mouse.move(viewport.width / 2, viewport.height / 2);
+      for (let notch = 0; notch < 4; notch += 1) {
+        await page.mouse.wheel(0, 240);
+        await page.waitForTimeout(120);
+      }
+      await page.waitForTimeout(1200);
+
+      // Still exactly one field in front of the reader, still usable.
+      await expect(visibleField(page)).toHaveCount(1);
+      await expect(visibleField(page)).toBeVisible();
+      const width = await visibleField(page).evaluate((el) => el.getBoundingClientRect().width);
+      expect(width, 'the pinned field is too narrow to search in').toBeGreaterThan(60);
+
+      // …and on the way back up, when the rest of the header returns.
+      await page.mouse.wheel(0, -260);
+      await page.waitForTimeout(1200);
+      await expect(visibleField(page)).toHaveCount(1);
+      await expect(visibleField(page)).toBeVisible();
+    });
+  }
+
+  test('the box is a field, a microphone and a search button — nothing else', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    // Both were removed by request: the scope selector («همه») and the funnel
+    // button that opened a panel of filter chips.
+    await expect(page.getByLabel('محدوده جستجو')).toHaveCount(0);
+    await expect(page.getByLabel('فیلترهای پیشرفته')).toHaveCount(0);
+
+    // The submit button took the funnel button's place in the row.
+    const submit = page.locator('#site-header button[type="submit"]:visible');
+    await expect(submit).toHaveCount(1);
+    await expect(submit).toHaveAccessibleName('جستجو');
+  });
+
+  test('searching navigates to the results, and the filter lives there', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    await visibleField(page).fill('اوره');
+    await page.keyboard.press('Enter');
+
+    await expect(page).toHaveURL(/\/products\?.*search=/);
+    expect(new URL(page.url()).searchParams.get('search')).toBe('اوره');
+    // No category in the URL: the box has no scope to contribute one.
+    expect(new URL(page.url()).searchParams.get('category')).toBeNull();
+
+    // Filtering still exists — on the results page, where it belongs.
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  });
+});
+
 test.describe('touch targets', () => {
   test.use({ viewport: { width: 375, height: 812 } });
 

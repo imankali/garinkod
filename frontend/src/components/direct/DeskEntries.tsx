@@ -171,12 +171,12 @@ export default function DeskEntries({
                   {desk.title}
                 </span>
                 {unread > 0 && (
-                  <span className="shrink-0 rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] font-extrabold text-white">
+                  <span className="shrink-0 rounded-full bg-rose-500 px-1.5 py-0.5 text-[12px] font-extrabold text-white">
                     {unread.toLocaleString('fa-IR')}
                   </span>
                 )}
                 {closed && (
-                  <span className="shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600 dark:bg-emerald-900 dark:text-emerald-200">
+                  <span className="shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 text-[12px] font-bold text-slate-600 dark:bg-emerald-900 dark:text-emerald-200">
                     بسته شده
                   </span>
                 )}
@@ -191,7 +191,7 @@ export default function DeskEntries({
                 {blocked && !thread ? state!.customer_denied_reason : thread ? thread.last_message?.body || desk.hint : desk.hint}
               </span>
 
-              <span className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-bold">
+              <span className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] font-bold">
                 <span className={cn(presence === 'online' ? 'text-emerald-600 dark:text-lime-300' : 'text-slate-500 dark:text-emerald-300/70')}>
                   {presence === 'closed'
                     ? `خارج از ساعت کاری${state?.opens_at_label ? ` — بازگشایی ${state.opens_at_label}` : ''}`

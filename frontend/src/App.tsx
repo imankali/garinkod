@@ -378,7 +378,41 @@ export default function App() {
           id="main-content"
           tabIndex={-1}
           className="outline-none"
-          style={{ paddingBottom: 'var(--mobile-nav-clearance)' }}
+          /*
+            The header is fixed (see Header.tsx), so the page leaves room for it
+            here instead. `--header-space` is the *expanded* height and does not
+            change while the header collapses — which is what makes the collapse
+            incapable of moving this content.
+          */
+          style={{
+            paddingTop: 'var(--header-space, var(--header-height))',
+            paddingBottom: 'var(--mobile-nav-clearance)',
+            /*
+              The tallest thing the first paint can move, and the reason the
+              site's CLS was as high as 0.61 on a page like /storefronts.
+              The footer renders with the shell, so before any data arrives the
+              document is nearly empty, the footer sits just under the header —
+              inside the viewport — and the moment the content mounts it is
+              thrown thousands of pixels down. Every pixel of that journey is a
+              layout shift, and the header and footer of a shop are exactly the
+              two things that should never appear to move.
+              Reserving one screenless viewport for the content keeps the footer
+              below the fold from the first frame, so the same shift happens
+              where nobody can see it. `dvh` so a phone's collapsing toolbar
+              cannot reintroduce it.
+            */
+            minHeight: 'calc(100dvh - var(--header-space, var(--header-height)))',
+            /*
+              Where the skip link lands. `scroll-padding-top` on the document
+              covers anchor jumps, but a target that is focused — which is what
+              the skip link does, so that the keyboard continues from there —
+              is brought into view with `scroll-margin`, not `scroll-padding`.
+              Without this the reader arrives with the first screenful of content
+              tucked under the header, which is the one thing the skip link
+              exists to prevent.
+            */
+            scrollMarginTop: 'var(--header-space, var(--header-height))',
+          }}
         >
           <div className="mx-auto w-full max-w-7xl px-[var(--page-gutter)] pt-3">
             <BackButton />

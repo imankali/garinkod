@@ -46,9 +46,23 @@ import type { Comment } from '@/types/content';
 import { formatPrice } from "../utils/formatPrice";
 import PriceLadder from "../components/shop/PriceLadder";
 import { cn } from "../utils/cn";
+import { useTabKeyboard } from "../hooks/useTabKeyboard";
 
 const FALLBACK_IMAGE = "/images/hero-farm.jpg";
-const STICKERS = ["🌱", "🌾", "👍", "⭐", "💚", "👏"];
+/**
+ * Reaction stickers. The emoji here is user content, not iconography — it is
+ * what gets submitted with the review and rendered back beside it — so unlike
+ * the rest of the UI it stays an emoji. Each one still needs a name a screen
+ * reader (and a Persian reader) can use, which is what the label is for.
+ */
+const STICKERS = [
+  { emoji: "🌱", label: "تازه و سرحال" },
+  { emoji: "🌾", label: "برداشت خوب" },
+  { emoji: "👍", label: "رضایت‌بخش" },
+  { emoji: "⭐", label: "کیفیت بالا" },
+  { emoji: "💚", label: "ارزش خرید" },
+  { emoji: "👏", label: "پیشنهاد می‌کنم" },
+];
 
 type Tab = "description" | "specs" | "reviews";
 
@@ -99,6 +113,14 @@ export default function ProductPage() {
   };
   const [starFilter, setStarFilter] = useState<number | null>(null);
   const [tab, setTab] = useState<Tab>(() => (linkedComment ? "reviews" : "description"));
+  // The tab strip claimed role="tab" with no keyboard model behind it: the
+  // arrow keys a screen reader announces as available did nothing. One shared
+  // hook supplies them (and keeps a single tab in the tab order).
+  const tabKeyboard = useTabKeyboard({
+    values: TABS.map((item) => item.id),
+    current: tab,
+    onSelect: setTab,
+  });
   const imageRef = useRef<HTMLInputElement>(null);
   const guidesRef = useRef<HTMLDivElement>(null);
   const similarRef = useRef<HTMLDivElement>(null);
@@ -351,7 +373,7 @@ export default function ProductPage() {
     <meta name="twitter:description" content={seoDescription} />
     <meta name="twitter:image" content={imageUrl} />
     <script type="application/ld+json">{JSON.stringify(structuredData)}</script>
-  </Helmet><main className="mx-auto max-w-7xl px-[var(--page-gutter)] py-8 md:py-12 [&_button]:min-h-11 [&_button]:min-w-11">
+  </Helmet><div className="mx-auto max-w-7xl px-[var(--page-gutter)] py-8 md:py-12 [&_button]:min-h-11 [&_button]:min-w-11">
     <Link to="/products" className="mb-7 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-emerald-700 hover:text-emerald-900 dark:text-lime-300" aria-label="بازگشت به محصولات"><ArrowRight size={18} /> بازگشت به محصولات</Link>
 
     <div className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -440,9 +462,9 @@ export default function ProductPage() {
           {/* The promise is worth reading where the decision is made, not only
               in the footer after the money has moved. */}
           <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-fluid-2xs font-bold text-slate-500 dark:text-emerald-200">
-            <Link to="/legal/warranty" className="inline-flex items-center gap-1 hover:text-emerald-700 hover:underline dark:hover:text-lime-300"><ShieldCheck size={13} aria-hidden="true" /> ضمانت اصالت کالا</Link>
+            <Link to="/legal/warranty" className="inline-flex min-h-6 items-center gap-1 py-0.5 hover:text-emerald-700 hover:underline dark:hover:text-lime-300"><ShieldCheck size={13} aria-hidden="true" /> ضمانت اصالت کالا</Link>
             <Link to="/legal/returns" className="hover:text-emerald-700 hover:underline dark:hover:text-lime-300">شرایط بازگشت کالا</Link>
-            <Link to="/legal/shipping" className="hover:text-emerald-700 hover:underline dark:hover:text-lime-300">زمان و هزینه ارسال</Link>
+            <Link to="/legal/shipping" className="inline-flex min-h-6 items-center py-0.5 hover:text-emerald-700 hover:underline dark:hover:text-lime-300">زمان و هزینه ارسال</Link>
           </div>
 
           {product.price_on_request && (
@@ -547,7 +569,12 @@ export default function ProductPage() {
 
     {/* Tabs: توضیحات / ویژگی‌ها / دیدگاه‌ها */}
     <div id="product-tabs" className="mt-9 scroll-mt-24">
-      <div className="flex gap-1 overflow-x-auto rounded-2xl bg-slate-100 p-1 dark:bg-emerald-900/60" role="tablist" aria-label="بخش‌های محصول">
+      <div
+        className="flex gap-1 overflow-x-auto rounded-2xl bg-slate-100 p-1 dark:bg-emerald-900/60"
+        role="tablist"
+        aria-label="بخش‌های محصول"
+        {...tabKeyboard.tabListProps}
+      >
         {TABS.map((item) => {
           const count = item.id === 'reviews' ? comments.length : item.id === 'specs' ? specRows.length : 0;
           return (
@@ -555,8 +582,13 @@ export default function ProductPage() {
               key={item.id}
               type="button"
               role="tab"
+              id={`tab-${item.id}`}
               aria-selected={tab === item.id}
+              // One region holds whichever panel is open, so every tab points at
+              // it; the panel names itself after the tab that is showing.
+              aria-controls="product-tab-panel"
               onClick={() => setTab(item.id)}
+              {...tabKeyboard.tabProps(item.id)}
               className={cn(
                 'flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl px-4 text-fluid-xs font-bold transition',
                 tab === item.id
@@ -572,7 +604,13 @@ export default function ProductPage() {
         })}
       </div>
 
-      <div className="mt-4">
+      <div
+        className="mt-4"
+        role="tabpanel"
+        id="product-tab-panel"
+        aria-labelledby={`tab-${tab}`}
+        tabIndex={-1}
+      >
         {tab === 'specs' && (
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
             {specRows.length ? (
@@ -583,7 +621,7 @@ export default function ProductPage() {
               </p>
             )}
             <div className="rounded-3xl border border-slate-100 bg-white p-5 dark:border-emerald-900 dark:bg-emerald-950">
-              <h3 className="text-fluid-sm font-extrabold text-slate-800 dark:text-white">راهنمای مصرف</h3>
+              <h2 className="text-fluid-sm font-extrabold text-slate-800 dark:text-white">راهنمای مصرف</h2>
               <p className="mt-2 text-fluid-xs leading-7 text-slate-500 dark:text-emerald-200">
                 دوز و روش مصرف را با «ماشین‌حساب دوز» و بر پایه مساحت زمین خودتان حساب کنید؛ اعداد این صفحه جای برچسب رسمی محصول را نمی‌گیرد.
               </p>
@@ -619,7 +657,7 @@ export default function ProductPage() {
               </div>
 
               <form ref={commentFormRef} className="space-y-3 rounded-3xl border border-slate-100 bg-white p-5 shadow-sm dark:border-emerald-900 dark:bg-emerald-950" onSubmit={submitComment}>
-                <h3 className="text-fluid-sm font-extrabold text-slate-800 dark:text-white">{replyTo ? 'پاسخ به دیدگاه' : 'ثبت دیدگاه'}</h3>
+                <h2 className="text-fluid-sm font-extrabold text-slate-800 dark:text-white">{replyTo ? 'پاسخ به دیدگاه' : 'ثبت دیدگاه'}</h2>
                 {replyTo && (
                   <div className="flex items-center justify-between rounded-xl bg-emerald-50 p-2.5 text-fluid-2xs text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-100">
                     <span className="min-w-0 truncate">در پاسخ به {replyTo.name}</span>
@@ -633,7 +671,25 @@ export default function ProductPage() {
                   </div>
                 )}
                 <textarea ref={commentBodyRef} value={commentBody} onChange={(event) => setCommentBody(event.target.value)} rows={4} aria-label="متن دیدگاه شما" placeholder={isAuthenticated ? "تجربه خرید، نحوه بسته‌بندی و نتیجه در مزرعه را بنویسید..." : "برای ثبت نظر یا پاسخ ابتدا وارد حساب کاربری شوید"} className="w-full rounded-xl border border-slate-200 bg-white p-3 text-sm outline-none focus:border-emerald-500 dark:border-emerald-700 dark:bg-emerald-900" />
-                <div className="flex flex-wrap items-center gap-2">{STICKERS.map((item) => <button key={item} type="button" onClick={() => setSticker(sticker === item ? "" : item)} className={cn("rounded-lg px-2 py-1 text-lg", sticker === item ? "bg-emerald-100 ring-1 ring-emerald-400 dark:bg-emerald-900" : "bg-slate-50 dark:bg-emerald-900/40")}>{item}</button>)}
+                <div className="flex flex-wrap items-center gap-2">
+                  {STICKERS.map((item) => (
+                    <button
+                      key={item.emoji}
+                      type="button"
+                      aria-pressed={sticker === item.emoji}
+                      aria-label={`برچسب واکنش: ${item.label}`}
+                      title={item.label}
+                      onClick={() => setSticker(sticker === item.emoji ? "" : item.emoji)}
+                      className={cn(
+                        "tap-target rounded-lg px-2 py-1 text-lg",
+                        sticker === item.emoji
+                          ? "bg-emerald-100 ring-1 ring-emerald-400 dark:bg-emerald-900"
+                          : "bg-slate-50 dark:bg-emerald-900/40",
+                      )}
+                    >
+                      <span aria-hidden="true">{item.emoji}</span>
+                    </button>
+                  ))}
                   <input ref={imageRef} type="file" aria-label="افزودن تصویر به دیدگاه" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => setCommentImage(event.target.files?.[0] || null)} />
                   <button type="button" onClick={() => imageRef.current?.click()} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 dark:border-emerald-700 dark:text-emerald-100"><ImagePlus size={15} />{commentImage ? commentImage.name : "افزودن عکس"}</button>
                   <button disabled={reviewSubmit.isPending} className="ms-auto inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"><Send size={16} />{reviewSubmit.isPending ? "در حال ثبت..." : "ثبت نظر"}</button>
@@ -663,10 +719,10 @@ export default function ProductPage() {
               )}
               {questions.length > 0 && (
                 <section className="rounded-3xl border border-slate-100 bg-white p-5 dark:border-emerald-900 dark:bg-emerald-950">
-                  <h3 className="flex items-center gap-2 text-fluid-sm font-extrabold text-slate-800 dark:text-white">
+                  <h2 className="flex items-center gap-2 text-fluid-sm font-extrabold text-slate-800 dark:text-white">
                     <MessageCircle size={16} className="text-emerald-600 dark:text-lime-300" />
                     پرسش‌های بی‌پاسخ مانده و پاسخ غرفه
-                  </h3>
+                  </h2>
                   <div className="mt-3 space-y-3">
                     {questions.map((comment) => (
                       <CommentCard
@@ -701,7 +757,7 @@ export default function ProductPage() {
               </div>
               {guides.length > 0 && (
                 <section>
-                  <h3 className="text-fluid-lg font-extrabold text-slate-800 dark:text-white">راهنمای کشت مرتبط با این کالا</h3>
+                  <h2 className="text-fluid-lg font-extrabold text-slate-800 dark:text-white">راهنمای کشت مرتبط با این کالا</h2>
                   {/* Horizontal rail (same pattern as the home rails) instead of
                       a wrapping grid: reading order stays one line, and the
                       row scrolls rather than reflowing the whole page. */}
@@ -722,7 +778,7 @@ export default function ProductPage() {
             <div className="space-y-4">
               {specRows.length > 0 && (
                 <div className="rounded-3xl border border-slate-100 bg-white p-5 dark:border-emerald-900 dark:bg-emerald-950">
-                  <h3 className="text-fluid-sm font-extrabold text-slate-800 dark:text-white">خلاصه مشخصات</h3>
+                  <h2 className="text-fluid-sm font-extrabold text-slate-800 dark:text-white">خلاصه مشخصات</h2>
                   <ul className="mt-3 space-y-2">
                     {specRows.slice(0, 6).map((row) => (
                       <li key={row.label} className="flex items-baseline justify-between gap-3 border-b border-dashed border-slate-100 pb-2 text-fluid-xs last:border-0 dark:border-emerald-900">
@@ -778,7 +834,7 @@ export default function ProductPage() {
         </div>
       </section>
     )}</div>
-  </main></>;
+  </div></>;
 }
 
 function useIntersectionOnce(ref: React.RefObject<Element | null>) {
@@ -798,7 +854,7 @@ function useIntersectionOnce(ref: React.RefObject<Element | null>) {
 
 function ProductPageSkeleton() {
   const block = "animate-pulse rounded-xl bg-slate-100 dark:bg-emerald-900/60";
-  return <main className="mx-auto max-w-7xl px-[var(--page-gutter)] py-8 md:py-12" aria-busy="true" aria-label="در حال بارگذاری محصول">
+  return <div role="status" className="mx-auto max-w-7xl px-[var(--page-gutter)] py-8 md:py-12" aria-busy="true" aria-label="در حال بارگذاری محصول">
     <div className={`mb-7 h-11 w-40 ${block}`} />
     <div className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_320px]">
       <article className="grid gap-8 rounded-3xl border border-slate-100 bg-white p-5 md:grid-cols-2 md:p-8 dark:border-emerald-900 dark:bg-emerald-950">
@@ -812,7 +868,7 @@ function ProductPageSkeleton() {
       <aside className="space-y-4"><div className={`h-64 w-full ${block}`} /><div className={`h-24 w-full ${block}`} /></aside>
     </div>
     <div className={`mt-9 h-14 w-full ${block}`} /><div className={`mt-4 h-64 w-full ${block}`} />
-  </main>;
+  </div>;
 }
 
 function CommentCard({ comment, onReply, nested = false, highlighted = false }: { comment: Comment; onReply: (comment: Comment) => void; nested?: boolean; /** The comment an inbox notification was about. */ highlighted?: boolean }) {
@@ -881,8 +937,12 @@ function CommentCard({ comment, onReply, nested = false, highlighted = false }: 
     </div>
     <time className="shrink-0 text-fluid-2xs text-slate-400">{new Date(comment.created).toLocaleDateString("fa-IR")}</time>
   </div>
-  <p className="mt-3 whitespace-pre-line text-fluid-sm leading-7 text-slate-600 dark:text-emerald-100">{comment.sticker && <span className="me-1 text-lg">{comment.sticker}</span>}{comment.body}</p>
-  {comment.image && <img src={comment.image} alt="تصویر ارسالی کاربر" className="mt-3 max-h-72 rounded-xl object-cover" />}
+  <p className="mt-3 whitespace-pre-line text-fluid-sm leading-7 text-slate-600 dark:text-emerald-100">{comment.sticker && (
+    <span className="me-1 text-lg" aria-hidden="true">
+      {comment.sticker}
+    </span>
+  )}{comment.body}</p>
+  {comment.image && <img src={comment.image} alt="تصویر ارسالی کاربر" width={800} height={600} loading="lazy" decoding="async" className="mt-3 max-h-72 rounded-xl object-cover" />}
   <div className="mt-2 flex flex-wrap items-center gap-2">
     {!nested && (
       <span className="inline-flex items-center gap-1">
@@ -987,7 +1047,7 @@ function SimilarCard({ product }: { product: ProductList }) {
   return (
     <div className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-md dark:border-emerald-900 dark:bg-emerald-950">
       <Link to={`/products/${product.slug}`} className="flex flex-1 flex-col">
-        <img src={product.image_url || FALLBACK_IMAGE} alt={product.title} className="h-36 w-full object-cover" />
+        <img src={product.image_url || FALLBACK_IMAGE} alt={product.title} width={640} height={360} loading="lazy" decoding="async" className="h-36 w-full object-cover" />
         <div className="p-3">
           <p className="line-clamp-2 text-fluid-sm font-bold text-slate-800 dark:text-white">{product.title}</p>
           {typeof product.avg_rating === 'number' && product.avg_rating > 0 && <StarRow value={product.avg_rating} size={12} className="mt-1.5" count={product.reviews_count || 0} />}

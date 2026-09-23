@@ -210,7 +210,7 @@ export default function ProductCard({
             onQuickView(product);
           }}
           tabIndex={-1}
-          className="pointer-events-none absolute inset-x-3 bottom-3 z-[2] hidden translate-y-2 items-center justify-center gap-1.5 rounded-xl bg-white/95 py-2.5 text-xs font-bold text-slate-700 opacity-0 shadow-lg backdrop-blur transition-all duration-300 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:translate-y-0 group-focus-within:opacity-100 [@media(hover:hover)]:flex"
+          className="pointer-events-none absolute inset-x-3 bottom-3 z-[2] hidden translate-y-2 items-center justify-center gap-1.5 rounded-xl bg-white/95 py-2.5 text-xs font-bold text-slate-700 opacity-0 shadow-lg backdrop-blur transition-[transform,opacity] duration-300 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:translate-y-0 group-focus-within:opacity-100 [@media(hover:hover)]:flex"
           aria-label="نمای سریع محصول"
         >
           <Eye size={14} /> نمای سریع
@@ -223,7 +223,7 @@ export default function ProductCard({
       <div className="flex flex-1 flex-col p-4">
         {/* Category & Brand */}
         <div className="mb-1 flex items-center justify-between">
-          <p className="text-fluid-xs font-medium text-[#0F8A5F] dark:text-lime-300">{product.category}</p>
+          <p className="text-fluid-xs font-medium text-brand-green dark:text-lime-300">{product.category}</p>
           <p className="text-fluid-2xs text-slate-400">{product.brand}</p>
         </div>
 
@@ -234,7 +234,7 @@ export default function ProductCard({
               href={productUrl}
               // The stretched link makes the whole card tappable, which is the
               // real target on a phone rather than the two-line title itself.
-              className="line-clamp-2 min-h-11 py-1.5 leading-6 transition-colors before:absolute before:inset-0 before:z-[1] before:content-[''] hover:text-[#0F8A5F]"
+              className="line-clamp-2 min-h-11 py-1.5 leading-6 transition-colors before:absolute before:inset-0 before:z-[1] before:content-[''] hover:text-brand-green"
             >
               {product.name}
             </a>
@@ -242,7 +242,7 @@ export default function ProductCard({
             <button
               type="button"
               onClick={() => onQuickView(product)}
-              className="line-clamp-2 min-h-11 py-1.5 text-start leading-6 transition-colors hover:text-[#0F8A5F]"
+              className="line-clamp-2 min-h-11 py-1.5 text-start leading-6 transition-colors hover:text-brand-green"
             >
               {product.name}
             </button>
@@ -324,8 +324,8 @@ export default function ProductCard({
             title={isComparing ? "حذف از مقایسه" : "افزودن به مقایسه"}
             className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-colors disabled:cursor-not-allowed disabled:opacity-30 dark:border-emerald-700 ${
               isComparing
-                ? "border-[#0F8A5F] bg-emerald-50 text-[#0F8A5F] dark:bg-emerald-900 dark:text-lime-300"
-                : "border-slate-200 text-slate-400 hover:text-[#0F8A5F] dark:text-emerald-400"
+                ? "border-brand-green bg-emerald-50 text-brand-green dark:bg-emerald-900 dark:text-lime-300"
+                : "border-slate-200 text-slate-400 hover:text-brand-green dark:text-emerald-400"
             }`}
           >
             <GitCompare size={15} />

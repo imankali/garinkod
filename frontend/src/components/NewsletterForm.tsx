@@ -113,26 +113,45 @@ export default function NewsletterForm({
         </div>
       )}
 
+      {/*
+        A visible label, not only a placeholder.
+        The field used to say «you@example.com» / «09121234567» and nothing else,
+        so the moment someone started typing, the field stopped saying what it
+        wanted — and a reader who arrives at it with a screen reader hears only
+        the aria-label. The skill's own form rule is explicit ("every input needs
+        a visible label; a placeholder is not a label"), and the label here stays
+        put while the value is typed over the hint. `htmlFor` keeps the click
+        target and the accessible name pointing at the same field.
+      */}
+      <label
+        htmlFor={channel === 'email' ? 'newsletter-email' : 'newsletter-mobile'}
+        className={cn(
+          'block text-fluid-2xs font-bold',
+          variant === 'footer' ? 'text-emerald-200' : 'text-slate-500 dark:text-emerald-300',
+        )}
+      >
+        {channel === 'email' ? 'ایمیل برای دریافت خبرنامه' : 'شماره موبایل برای دریافت پیامک'}
+      </label>
       <div className="flex flex-col gap-2 sm:flex-row">
         {channel === 'email' ? (
           <input
+            id="newsletter-email"
             type="email"
             dir="ltr"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             placeholder="you@example.com"
-            aria-label="ایمیل برای خبرنامه"
             className={inputClass}
           />
         ) : (
           <input
+            id="newsletter-mobile"
             type="tel"
             dir="ltr"
             inputMode="numeric"
             value={mobile}
             onChange={(event) => setMobile(toEnglishDigits(event.target.value))}
             placeholder="09121234567"
-            aria-label="شماره موبایل برای خبرنامه"
             className={inputClass}
           />
         )}

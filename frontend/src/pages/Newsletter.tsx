@@ -128,7 +128,7 @@ export default function Newsletter() {
   }
 
   return (
-    <main className="page-shell py-8 md:py-10">
+    <div className="page-shell py-8 md:py-10">
       <RouteSeo />
 
       <header className="overflow-hidden rounded-3xl bg-gradient-to-l from-emerald-900 via-emerald-800 to-emerald-600 p-6 text-white sm:p-9">
@@ -225,27 +225,46 @@ export default function Newsletter() {
                   ))}
                 </div>
 
+                {/* Each field carries a visible label as well as its name.
+                    A placeholder is a hint, not a label: it stops saying what
+                    the field is the moment someone types in it. */}
                 {channel === 'mobile' ? (
-                  <input
-                    type="tel"
-                    dir="ltr"
-                    inputMode="numeric"
-                    value={mobile}
-                    onChange={(event) => setMobile(toEnglishDigits(event.target.value))}
-                    placeholder="09121234567"
-                    aria-label="شماره موبایل"
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-fluid-sm outline-none focus:border-emerald-500 dark:border-emerald-700 dark:bg-emerald-900 dark:text-white"
-                  />
+                  <div>
+                    <label
+                      htmlFor="newsletter-page-mobile"
+                      className="mb-1.5 block text-fluid-2xs font-bold text-slate-500 dark:text-emerald-300"
+                    >
+                      شماره موبایل برای دریافت پیامک
+                    </label>
+                    <input
+                      id="newsletter-page-mobile"
+                      type="tel"
+                      dir="ltr"
+                      inputMode="numeric"
+                      value={mobile}
+                      onChange={(event) => setMobile(toEnglishDigits(event.target.value))}
+                      placeholder="09121234567"
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-fluid-sm outline-none focus:border-emerald-500 dark:border-emerald-700 dark:bg-emerald-900 dark:text-white"
+                    />
+                  </div>
                 ) : (
-                  <input
-                    type="email"
-                    dir="ltr"
-                    value={email}
-                    onChange={(event) => setEmail(event.target.value)}
-                    placeholder="you@example.com"
-                    aria-label="ایمیل"
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-fluid-sm outline-none focus:border-emerald-500 dark:border-emerald-700 dark:bg-emerald-900 dark:text-white"
-                  />
+                  <div>
+                    <label
+                      htmlFor="newsletter-page-email"
+                      className="mb-1.5 block text-fluid-2xs font-bold text-slate-500 dark:text-emerald-300"
+                    >
+                      ایمیل برای دریافت خبرنامه
+                    </label>
+                    <input
+                      id="newsletter-page-email"
+                      type="email"
+                      dir="ltr"
+                      value={email}
+                      onChange={(event) => setEmail(event.target.value)}
+                      placeholder="you@example.com"
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-fluid-sm outline-none focus:border-emerald-500 dark:border-emerald-700 dark:bg-emerald-900 dark:text-white"
+                    />
+                  </div>
                 )}
 
                 <div>
@@ -318,6 +337,6 @@ export default function Newsletter() {
           </div>
         </aside>
       </div>
-    </main>
+    </div>
   );
 }

@@ -103,11 +103,16 @@ export default function LandCalendar({
       </div>
 
       {/* Kind filter */}
-      <div className="no-scrollbar mt-3 flex gap-1.5 overflow-x-auto pb-0.5" role="tablist" aria-label="فیلتر نوع عملیات">
+      {/* Filter chips. They used to be announced as tabs with no panels and no
+          arrow keys; a toggle button in a labelled group is what they are. */}
+      <div
+        className="no-scrollbar mt-3 flex gap-1.5 overflow-x-auto pb-0.5"
+        role="group"
+        aria-label="فیلتر نوع عملیات"
+      >
         <button
           type="button"
-          role="tab"
-          aria-selected={kindFilter === 'all'}
+          aria-pressed={kindFilter === 'all'}
           onClick={() => setKindFilter('all')}
           className={cn(
             'shrink-0 rounded-full px-3 py-1.5 text-fluid-xs font-bold transition',
@@ -122,8 +127,7 @@ export default function LandCalendar({
           <button
             key={value}
             type="button"
-            role="tab"
-            aria-selected={kindFilter === value}
+            aria-pressed={kindFilter === value}
             onClick={() => setKindFilter(value)}
             className={cn(
               'shrink-0 rounded-full px-3 py-1.5 text-fluid-xs font-bold transition',

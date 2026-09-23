@@ -5,6 +5,7 @@ import { ChevronLeft, type LucideIcon } from 'lucide-react';
 import { Link } from 'react-router';
 
 import { productsApi } from '../../api/services';
+import AutoRotateToggle from '../ui/AutoRotateToggle';
 import type { ProductList, ProductQueryParams } from '@/types/shop';
 import OfferRail from './OfferRail';
 
@@ -72,15 +73,18 @@ export default function RankedRail({
             {title}
           </h2>
           <span className="text-fluid-xs text-slate-500 dark:text-emerald-200">{hint}</span>
+          {/* The rail below moves on its own every 2s; this is the control that
+              stops it (and, through the shared preference, every other rail). */}
+          {products.length > 1 && <AutoRotateToggle tone="surface" className="ms-auto" />}
           <Link
             to={moreTo}
-            className="ms-auto inline-flex items-center gap-1 text-fluid-sm font-bold text-emerald-700 transition hover:text-emerald-900 dark:text-lime-300"
+            className="inline-flex items-center gap-1 text-fluid-sm font-bold text-emerald-700 transition hover:text-emerald-900 dark:text-lime-300"
           >
             {moreLabel}
             <ChevronLeft size={16} aria-hidden="true" />
           </Link>
         </div>
-        <OfferRail products={products as ProductList[]} />
+        <OfferRail products={products as ProductList[]} label={`${title}، قابل پیمایش افقی`} />
       </div>
     </section>
   );

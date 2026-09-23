@@ -53,20 +53,20 @@ export default function CatalogLanding({ kind }: { kind: CatalogKind }) {
 
   if (landingQuery.isLoading) {
     return (
-      <main className="mx-auto max-w-7xl px-[var(--page-gutter)] py-10">
+      <div className="mx-auto max-w-7xl px-[var(--page-gutter)] py-10">
         <div className="h-40 animate-pulse rounded-3xl bg-slate-100 dark:bg-emerald-950" />
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[0, 1, 2, 3].map((item) => (
             <div key={item} className="h-72 animate-pulse rounded-3xl bg-slate-100 dark:bg-emerald-950" />
           ))}
         </div>
-      </main>
+      </div>
     );
   }
 
   if (!landing) {
     return (
-      <main className="mx-auto max-w-3xl px-[var(--page-gutter)] py-16 text-center">
+      <div className="mx-auto max-w-3xl px-[var(--page-gutter)] py-16 text-center">
         <PackageSearch size={38} className="mx-auto text-slate-300 dark:text-emerald-800" />
         <h1 className="mt-4 text-xl font-extrabold text-slate-800 dark:text-white">چنین صفحه‌ای در فهرست نداریم</h1>
         <p className="mt-2 text-fluid-sm leading-7 text-slate-500 dark:text-emerald-200">
@@ -76,7 +76,7 @@ export default function CatalogLanding({ kind }: { kind: CatalogKind }) {
           همه محصولات
           <ArrowLeft size={16} />
         </Link>
-      </main>
+      </div>
     );
   }
 
@@ -93,7 +93,7 @@ export default function CatalogLanding({ kind }: { kind: CatalogKind }) {
         <link rel="canonical" href={`${ROUTE_FOR_KIND[kind]}/${slug}`} />
       </Helmet>
 
-      <main className="mx-auto max-w-7xl px-[var(--page-gutter)] py-8 md:py-10">
+      <div className="mx-auto max-w-7xl px-[var(--page-gutter)] py-8 md:py-10">
         <nav aria-label="مسیر دسترسی" className="flex flex-wrap items-center gap-1.5 text-fluid-2xs font-bold text-slate-400">
           {landing.breadcrumb.map((crumb, index) => (
             <span key={`${crumb.url}-${index}`} className="flex items-center gap-1.5">
@@ -253,7 +253,7 @@ export default function CatalogLanding({ kind }: { kind: CatalogKind }) {
             </ul>
           </section>
         )}
-      </main>
+      </div>
     </>
   );
 }

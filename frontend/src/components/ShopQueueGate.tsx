@@ -117,7 +117,7 @@ export default function ShopQueueGate({ children }: { children: React.ReactNode 
           </button>
         </div>
 
-        <p className="mt-5 text-[11px] leading-6 text-slate-500 dark:text-emerald-300/70">
+        <p className="mt-5 text-[12px] leading-6 text-slate-500 dark:text-emerald-300/70">
           رفرش‌های پی‌در‌پی شما را جلو نمی‌اندازد؛ بسته نگه‌داشتن همین صفحه هم جایتان را نگه می‌دارد و هم به سرور
           فرصت می‌دهد تا همان کاری را که برای بقیه انجام می‌داد، برای شما تمام کند.
         </p>
@@ -129,7 +129,7 @@ export default function ShopQueueGate({ children }: { children: React.ReactNode 
 function Cell({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-[128px] rounded-2xl bg-slate-50 px-4 py-3 dark:bg-emerald-900/40">
-      <p className="text-[11px] text-slate-500 dark:text-emerald-200">{label}</p>
+      <p className="text-[12px] text-slate-500 dark:text-emerald-200">{label}</p>
       <p className="mt-1 text-lg font-extrabold text-slate-800 dark:text-white">{value}</p>
     </div>
   );

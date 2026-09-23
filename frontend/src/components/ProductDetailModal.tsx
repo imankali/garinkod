@@ -179,7 +179,7 @@ export default function ProductDetailModal({
               <div className="flex flex-col p-6">
                 {/* Category & Brand */}
                 <div className="mb-1 flex items-center justify-between">
-                  <p className="text-xs font-bold text-[#0F8A5F]">{product.category}</p>
+                  <p className="text-xs font-bold text-brand-green">{product.category}</p>
                   <p className="text-xs text-slate-400">برند: {product.brand}</p>
                 </div>
 
@@ -227,7 +227,7 @@ export default function ProductDetailModal({
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
                       className={`relative flex min-h-11 min-w-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 text-fluid-xs font-bold transition-colors ${
-                        activeTab === tab.id ? "text-white" : "text-slate-500 hover:text-[#0F8A5F]"
+                        activeTab === tab.id ? "text-white" : "text-slate-500 hover:text-brand-green"
                       }`}
                     >
                       {activeTab === tab.id && (
@@ -299,7 +299,7 @@ export default function ProductDetailModal({
                         className="space-y-3 text-xs"
                       >
                         <div className="rounded-xl bg-emerald-50 p-3">
-                          <p className="mb-1 flex items-center gap-1.5 font-bold text-[#0F8A5F]">
+                          <p className="mb-1 flex items-center gap-1.5 font-bold text-brand-green">
                             <Beaker size={13} /> دوز مصرف
                           </p>
                           <p className="text-slate-600">{product.usage.dosage}</p>
@@ -364,7 +364,7 @@ export default function ProductDetailModal({
                         transition={{ duration: 0.2 }}
                       >
                         {product.brochureAvailable ? (
-                          <button className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-emerald-200 bg-emerald-50/50 py-4 text-xs font-bold text-[#0F8A5F] transition-colors hover:bg-emerald-50">
+                          <button className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-emerald-200 bg-emerald-50/50 py-4 text-xs font-bold text-brand-green transition-colors hover:bg-emerald-50">
                             <Download size={15} />
                             دانلود برگه آنالیز و بروشور محصول (PDF)
                           </button>
@@ -394,7 +394,7 @@ export default function ProductDetailModal({
                     <motion.button
                       whileTap={reduceMotion ? undefined : { scale: 0.97 }}
                       onClick={() => setQty((q) => q + 1)}
-                      className="flex h-11 w-11 items-center justify-center text-[#0F8A5F] hover:bg-emerald-50"
+                      className="flex h-11 w-11 items-center justify-center text-brand-green hover:bg-emerald-50"
                       aria-label="افزایش تعداد"
                     >
                       <Plus size={16} />
@@ -427,7 +427,7 @@ export default function ProductDetailModal({
                     <Link
                       to={`/products/${product.slug}`}
                       onClick={onClose}
-                      className="flex h-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 px-3 text-fluid-2xs font-bold text-slate-500 transition-colors hover:border-[#0F8A5F] hover:text-[#0F8A5F]"
+                      className="flex h-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 px-3 text-fluid-2xs font-bold text-slate-500 transition-colors hover:border-brand-green hover:text-brand-green"
                     >
                       صفحه کامل
                     </Link>

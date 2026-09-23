@@ -26,6 +26,7 @@ import HighlightManager from './storefront/HighlightManager';
 import { OwnerEditor } from './storefront/OwnerEditor';
 import { OwnerComposer } from './storefront/OwnerComposer';
 import { PostEditor } from './storefront/OwnerActions';
+import { useTabKeyboard } from '../hooks/useTabKeyboard';
 
 /**
  * The viewer only ever renders an image and a caption, so it takes this
@@ -93,6 +94,12 @@ export default function StorefrontPage() {
   const [tab, setTab] = useState<TabKey>(() =>
     new URLSearchParams(window.location.search).get('tab') === 'posts' ? 'posts' : 'listings',
   );
+  // role="tab" promises arrow-key navigation between the tabs; this supplies it.
+  const tabKeyboard = useTabKeyboard({
+    values: TABS.map((item) => item.key),
+    current: tab,
+    onSelect: setTab,
+  });
   const [followBusy, setFollowBusy] = useState(false);
   const [viewer, setViewer] = useState<{ posts: ViewableStory[]; index: number } | null>(null);
   const [unread, setUnread] = useState(0);
@@ -648,7 +655,7 @@ export default function StorefrontPage() {
                         <span className="line-clamp-1">{post.caption}</span>
                         {/* Counts even in a result tile: the number is the reason
                             a seller reads a post's performance at all. */}
-                        <span className="mt-0.5 flex items-center gap-2 text-[10px] font-bold text-white/85">
+                        <span className="mt-0.5 flex items-center gap-2 text-[12px] font-bold text-white/85">
                           <span className="flex items-center gap-0.5">
                             <Heart size={9} aria-hidden="true" />
                             {post.like_count.toLocaleString('fa-IR')}
@@ -672,7 +679,12 @@ export default function StorefrontPage() {
       {isOwner && <OwnerComposer onPublished={load} />}
 
       {/* Tabs */}
-      <div role="tablist" aria-label="محتوای غرفه" className="mt-6 flex border-b border-slate-200 dark:border-emerald-900">
+      <div
+        role="tablist"
+        aria-label="محتوای غرفه"
+        className="mt-6 flex border-b border-slate-200 dark:border-emerald-900"
+        {...tabKeyboard.tabListProps}
+      >
         {TABS.map(({ key, labelKey, icon: Icon }) => (
           <motion.button
             key={key}
@@ -682,6 +694,7 @@ export default function StorefrontPage() {
             aria-selected={tab === key}
             aria-controls={`panel-${key}`}
             onClick={() => setTab(key)}
+            {...tabKeyboard.tabProps(key)}
             className={`flex flex-1 items-center justify-center gap-1.5 border-b-2 px-3 py-3 text-sm font-bold transition ${
               tab === key
                 ? 'border-emerald-600 text-emerald-700 dark:border-lime-400 dark:text-lime-300'
@@ -944,5 +957,5 @@ export default function StorefrontPage() {
 
 function StorefrontSkeleton() {
   const block = "animate-pulse rounded-2xl bg-slate-100 dark:bg-emerald-900";
-  return <main className="mx-auto max-w-5xl px-[var(--page-gutter)] py-8" role="status" aria-label="در حال بارگذاری غرفه"><div className={`h-52 w-full ${block}`} /><div className="-mt-10 flex items-end gap-4 px-5"><div className={`h-24 w-24 rounded-full ${block}`} /><div className="flex-1 space-y-3 pb-2"><div className={`h-7 w-52 ${block}`} /><div className={`h-4 w-36 ${block}`} /></div></div><div className="mt-5 grid grid-cols-3 gap-2">{Array.from({length:3}).map((_,i)=><div key={i} className={`h-20 min-w-0 ${block}`} />)}</div><div className={`mt-6 h-12 ${block}`} /><div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{Array.from({length:6}).map((_,i)=><div key={i} className={`h-56 ${block}`} />)}</div><span className="sr-only">در حال بارگذاری</span></main>;
+  return <div className="mx-auto max-w-5xl px-[var(--page-gutter)] py-8" role="status" aria-label="در حال بارگذاری غرفه"><div className={`h-52 w-full ${block}`} /><div className="-mt-10 flex items-end gap-4 px-5"><div className={`h-24 w-24 rounded-full ${block}`} /><div className="flex-1 space-y-3 pb-2"><div className={`h-7 w-52 ${block}`} /><div className={`h-4 w-36 ${block}`} /></div></div><div className="mt-5 grid grid-cols-3 gap-2">{Array.from({length:3}).map((_,i)=><div key={i} className={`h-20 min-w-0 ${block}`} />)}</div><div className={`mt-6 h-12 ${block}`} /><div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{Array.from({length:6}).map((_,i)=><div key={i} className={`h-56 ${block}`} />)}</div><span className="sr-only">در حال بارگذاری</span></div>;
 }
