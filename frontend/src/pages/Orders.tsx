@@ -239,7 +239,7 @@ export default function Orders() {
   }
 
   return (
-    <main className="page-shell py-8">
+    <div className="page-shell py-8">
       <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
           <p className="text-fluid-sm font-bold text-emerald-700 dark:text-lime-300">
@@ -362,7 +362,7 @@ export default function Orders() {
           )}
         </section>
       )}
-    </main>
+    </div>
   );
 }
 

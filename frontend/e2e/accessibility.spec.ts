@@ -22,32 +22,38 @@ const PAGES = [
 ];
 
 /**
- * The one rule this app fails everywhere, at a scale that is not a patch.
+ * The contrast ceilings are gone, and this is the change that removed them.
  *
- * White on the brand's emerald-600 measures 3.77:1 and the muted-text token
- * slate-400 on white measures 2.56:1 (AA asks 4.5:1), so a single pair of colours
- * accounts for most of these nodes — 143 buttons and 99 text accents across 72
- * files. Re-inking the palette is a design decision with visual consequences on
- * every page, so it gets its own change and its own review rather than sneaking in
- * behind a test PR.
+ * They existed because a single pair of colours accounted for almost every
+ * violation on the site: the brand emerald-600 measured 3.77:1 against white and
+ * the muted slate-400 measured 2.56:1, which is 143 buttons and 99 text accents
+ * across 72 files. Re-inking a palette is a design decision, so the ceilings
+ * recorded the debt page by page instead of failing every build — with the rule
+ * that a page doing *better* than its ceiling also fails, so the numbers could
+ * only ever go down.
  *
- * What is NOT a permission slip: the numbers below are ceilings, measured on
- * 2026-09-10. A page that reports more contrast nodes than its ceiling fails; a
- * page that does better fails too, until its number is lowered. Every other rule —
- * names, roles, labels, headings — is blocking from the first violation, and a new
- * rule appearing on a page has no ceiling at all and therefore fails.
+ * The palette has now been re-inked for AA, measured rather than eyeballed:
+ *
+ *   emerald-600   #059669 (3.77:1 on white)  → #047857 (5.48:1 both ways)
+ *   brand green   #0f8a5f (4.35:1, and 3.83:1 on the emerald-100 chips)
+ *                                            → #0e7c56 (5.03:1 / 4.58:1)
+ *   slate-400     #67778f (4.35:1 on slate-50, 4.33:1 on the cream)
+ *                                            → #617087 (4.54:1 there)
+ *   slate-500     #62748e (4.35:1 on slate-100) → #5e6f88 (4.61:1)
+ *   rose-600      #ec003f (4.12:1 on rose-50) → #e0003c (4.51:1)
+ *
+ * The last of them are under a tenth of a step: a colour can be legible-looking
+ * and still miss by 0.15, which is exactly the kind of miss that survives review.
+ * Measured after the change, all twenty-five public routes report zero contrast
+ * violations at both 1280px and 390px, so every ceiling here is zero and any
+ * contrast node at all is a regression.
+ *
+ * Two rules stay out of reach of this suite and are worth remembering: axe cannot
+ * measure text painted over a gradient (the accent gradient's lime end was 1.51:1
+ * against white until it was darkened — see `.bg-brand-gradient-accent` in
+ * index.css), and it cannot see a colour that changes per frame.
  */
-// Measured on run 34466905457, after the tagline and amber-CTA fixes.
-const CONTRAST_CEILING: Record<string, number> = {
-  '/': 10,
-  '/products?source=marketplace': 17,
-  '/products': 9,
-  '/products/image-pipeline-demo/': 2,
-  '/storefronts': 16,
-  '/checkout': 6,
-  '/login': 4,
-  '/support': 3,
-};
+const CONTRAST_CEILING: Record<string, number> = {};
 
 for (const target of PAGES) {
   test(`${target.name} has no serious accessibility violations`, async ({ page }, testInfo) => {
@@ -64,8 +70,10 @@ for (const target of PAGES) {
       contentType: 'application/json',
     });
 
+    // Every rule is blocking from the first violation. The map is kept as the
+    // place to record a ceiling if the design ever has to accept one again.
     const ceilingFor = (violation: { id: string }) =>
-      violation.id === 'color-contrast' ? CONTRAST_CEILING[target.path] ?? 0 : 0;
+      violation.id === 'color-contrast' ? (CONTRAST_CEILING[target.path] ?? 0) : 0;
 
     const serious = results.violations.filter(
       (violation) => violation.impact === 'serious' || violation.impact === 'critical',

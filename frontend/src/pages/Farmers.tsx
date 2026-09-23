@@ -28,7 +28,7 @@ export default function Farmers() {
   const [view, setView] = useState<View>('requests');
 
   return (
-    <main className="mx-auto max-w-7xl px-[var(--page-gutter)] py-6 md:py-8">
+    <div className="mx-auto max-w-7xl px-[var(--page-gutter)] py-6 md:py-8">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-xl font-extrabold text-slate-800 dark:text-white md:text-2xl">
@@ -65,7 +65,7 @@ export default function Farmers() {
       </header>
 
       {view === 'requests' ? <RequestsView /> : <FarmersDirectory />}
-    </main>
+    </div>
   );
 }
 

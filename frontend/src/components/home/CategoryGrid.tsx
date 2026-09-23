@@ -101,11 +101,11 @@ export default function CategoryGrid() {
               <span className="flex h-14 w-14 items-center justify-center rounded-full border border-emerald-100 bg-gradient-to-b from-emerald-50 to-white text-2xl shadow-sm transition duration-300 group-hover:-translate-y-1 group-hover:border-emerald-300 group-hover:shadow-md motion-reduce:group-hover:translate-y-0 dark:border-emerald-900 dark:from-emerald-950 dark:to-emerald-900/30 sm:h-20 sm:w-20 sm:text-4xl">
                 <span aria-hidden="true">{tile.emoji}</span>
               </span>
-              <span className="line-clamp-2 min-h-[2lh] text-[10px] font-bold leading-tight text-slate-800 dark:text-white sm:text-fluid-xs">
+              <span className="line-clamp-2 min-h-[2lh] text-[12px] font-bold leading-tight text-slate-800 dark:text-white sm:text-fluid-xs">
                 {tile.name}
               </span>
               {tile.count !== undefined && (
-                <span className="-mt-1 text-[10px] leading-tight text-slate-500 dark:text-emerald-300 sm:text-fluid-2xs">
+                <span className="-mt-1 text-[12px] leading-tight text-slate-500 dark:text-emerald-300 sm:text-fluid-2xs">
                   {tile.count.toLocaleString('fa-IR')} محصول
                 </span>
               )}

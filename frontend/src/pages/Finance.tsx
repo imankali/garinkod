@@ -173,7 +173,7 @@ export default function Finance() {
   const hasFilters = Boolean(statusFilter || typeFilter || dateFrom || dateTo || search);
 
   return (
-    <main className="mx-auto max-w-6xl px-[var(--page-gutter)] py-9">
+    <div className="mx-auto max-w-6xl px-[var(--page-gutter)] py-9">
       <section className="rounded-3xl bg-gradient-to-l from-slate-900 via-emerald-900 to-emerald-600 p-6 text-white md:p-8">
         <p className="text-sm font-bold text-lime-200">دفتر مالی فروشنده</p>
         <h1 className="mt-2 text-2xl font-extrabold md:text-3xl">موجودی، کمیسیون و تسویه شفاف</h1>
@@ -491,7 +491,7 @@ export default function Finance() {
           </section>
         </>
       )}
-    </main>
+    </div>
   );
 }
 

@@ -381,7 +381,7 @@ export default function Shop({ compareItems, onToggleCompare }: ShopProps) {
         : t('shop.allProducts');
 
   return (
-    <main className="min-h-dvh bg-gradient-to-b from-emerald-50/60 via-white to-white pb-10 dark:from-emerald-950/40 dark:via-[#052e22] dark:to-emerald-950">
+    <div className="min-h-dvh bg-gradient-to-b from-emerald-50/60 via-white to-white pb-10 dark:from-emerald-950/40 dark:via-[#052e22] dark:to-emerald-950">
       {/* Page header + the one filter bar both tabs share */}
       <section className="border-b border-emerald-100 bg-white/70 py-6 dark:border-emerald-900/50 dark:bg-emerald-950/40 md:py-8">
         <div className="mx-auto max-w-7xl px-[var(--page-gutter)]">
@@ -641,7 +641,7 @@ export default function Shop({ compareItems, onToggleCompare }: ShopProps) {
         isWishlisted={selectedProduct ? wishlist.some((p) => p.id === selectedProduct.id) : false}
         onToggleWishlist={toggleWishlist}
       />
-    </main>
+    </div>
   );
 }
 

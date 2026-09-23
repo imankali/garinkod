@@ -63,7 +63,7 @@ change, review the code and then run the full matrix in detail.
 | Type check | `cd frontend && npx tsc --noEmit` | clean |
 | Build | `cd frontend && npm run build` | ✓ (was failing: see §8, `exclude_seen`) |
 | Design linter | `.agents-tmp/node_modules/.bin/impeccable detect frontend/src` | 125 (see §6) |
-| E2E | `cd frontend && npx playwright test` | **248 tests / 8 files**, run here with the browser from §7: `navigation.spec.ts` 15 passed / 3 failed, `accessibility.spec.ts` 12/12, `public-routes.spec.ts` 10 passed / 1 skipped / 2 failed — all five failures are seed gaps that reproduce on the pre-change commit too |
+| E2E | `cd frontend && npx playwright test` | **248 tests / 8 files**, run here with the browser from §7: `navigation.spec.ts` 15 passed / 3 failed, `accessibility.spec.ts` 12/12 with no contrast ceiling left to spend, `public-routes.spec.ts` 10 passed / 1 skipped / 2 failed — all five failures are seed gaps that reproduce on the pre-change commit too |
 
 `manage.py test` (all apps) and `manage.py test shop` are different scopes and
 give different counts. Say which one you ran.

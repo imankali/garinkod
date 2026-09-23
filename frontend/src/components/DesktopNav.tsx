@@ -106,8 +106,8 @@ export default function DesktopNav() {
                 className={cn(
                   'relative flex min-h-11 items-center px-3 text-fluid-sm font-medium transition-colors duration-200',
                   isActive
-                    ? 'text-[#0F8A5F] dark:text-lime-300'
-                    : 'text-slate-600 hover:text-[#0F8A5F] dark:text-emerald-100 dark:hover:text-lime-300',
+                    ? 'text-brand-green dark:text-lime-300'
+                    : 'text-slate-600 hover:text-brand-green dark:text-emerald-100 dark:hover:text-lime-300',
                 )}
                 aria-current={isActive ? 'page' : undefined}
               >
@@ -149,7 +149,7 @@ export default function DesktopNav() {
           </li>
         ))}
 
-        <li className="ms-auto hidden items-center gap-1.5 py-1 text-fluid-2xs font-semibold text-[#0F8A5F] dark:text-lime-300 xl:flex">
+        <li className="ms-auto hidden items-center gap-1.5 py-1 text-fluid-2xs font-semibold text-brand-green dark:text-lime-300 xl:flex">
           <span className="relative flex h-2 w-2">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
             <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
@@ -193,8 +193,8 @@ function NavGroup({
         className={cn(
           'flex min-h-11 items-center gap-1 rounded-lg px-3 text-fluid-sm font-medium transition-colors duration-200',
           open || hasActive
-            ? 'text-[#0F8A5F] dark:text-lime-300'
-            : 'text-slate-600 hover:text-[#0F8A5F] dark:text-emerald-100 dark:hover:text-lime-300',
+            ? 'text-brand-green dark:text-lime-300'
+            : 'text-slate-600 hover:text-brand-green dark:text-emerald-100 dark:hover:text-lime-300',
         )}
       >
         {section.title}

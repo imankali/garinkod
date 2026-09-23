@@ -96,7 +96,7 @@ export default function About() {
   ];
 
   return (
-    <main className="page-shell py-8 md:py-10">
+    <div className="page-shell py-8 md:py-10">
       <RouteSeo />
 
       <header className="overflow-hidden rounded-3xl bg-gradient-to-l from-emerald-800 via-emerald-700 to-lime-600 p-6 text-white sm:p-9">
@@ -275,6 +275,6 @@ export default function About() {
         </div>
         <NewsletterForm source="about-page" variant="panel" />
       </section>
-    </main>
+    </div>
   );
 }

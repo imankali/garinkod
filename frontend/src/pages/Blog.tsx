@@ -63,7 +63,7 @@ export default function Blog({ fixedKind }: { fixedKind?: 'guide' | 'article' })
   const hero = featured.find((item) => item.kind !== 'guide') || featured[0];
 
   return (
-    <main className="page-shell py-8 md:py-10">
+    <div className="page-shell py-8 md:py-10">
       <RouteSeo />
 
       <header className="max-w-3xl">
@@ -225,6 +225,6 @@ export default function Blog({ fixedKind }: { fixedKind?: 'guide' | 'article' })
           </div>
         )}
       </section>
-    </main>
+    </div>
   );
 }

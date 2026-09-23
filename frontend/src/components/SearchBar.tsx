@@ -250,7 +250,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
         onSubmit={handleSubmit}
         className={`group flex items-stretch overflow-hidden rounded-2xl border-2 bg-white shadow-sm transition-colors duration-300 dark:bg-emerald-950 ${
           showSuggestions
-            ? "border-[#0F8A5F] shadow-lg shadow-emerald-100 ring-4 ring-emerald-100/50 dark:shadow-none dark:ring-emerald-900/50"
+            ? "border-brand-green shadow-lg shadow-emerald-100 ring-4 ring-emerald-100/50 dark:shadow-none dark:ring-emerald-900/50"
             : "border-emerald-100 hover:border-emerald-300 dark:border-emerald-900/60"
         }`}
       >
@@ -276,7 +276,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
           } ${
             isListening
               ? "text-rose-500"
-              : "text-slate-400 hover:text-[#0F8A5F] dark:text-emerald-400 dark:hover:text-lime-300"
+              : "text-slate-400 hover:text-brand-green dark:text-emerald-400 dark:hover:text-lime-300"
           }`}
           aria-label="جستجوی صوتی"
         >
@@ -424,7 +424,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
                   <button
                     type="button"
                     onClick={() => navigate(`/products?search=${encodeURIComponent(query.trim())}`)}
-                    className="text-fluid-2xs font-bold text-[#0F8A5F] hover:underline dark:text-lime-300"
+                    className="text-fluid-2xs font-bold text-brand-green hover:underline dark:text-lime-300"
                   >
                     دیدن همه نتایج
                   </button>
@@ -451,7 +451,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
                           </p>
                           <p className="text-fluid-2xs text-slate-400">{product.category}</p>
                         </div>
-                        <span className="shrink-0 text-xs font-semibold text-[#0F8A5F] dark:text-lime-300">
+                        <span className="shrink-0 text-xs font-semibold text-brand-green dark:text-lime-300">
                           {product.price.toLocaleString("fa-IR")}
                         </span>
                       </button>

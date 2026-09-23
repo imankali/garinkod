@@ -173,7 +173,7 @@ export default function ExportDashboard() {
   const exportOrders = data ?? [];
 
   return (
-    <main className="page-shell py-8">
+    <div className="page-shell py-8">
       <Helmet>
         <title>پرونده‌های صادراتی | گرین کود</title>
         {/* Account-scoped desk; must never be indexed. */}
@@ -248,6 +248,6 @@ export default function ExportDashboard() {
           </section>
         )}
       </div>
-    </main>
+    </div>
   );
 }

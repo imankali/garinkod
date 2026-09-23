@@ -90,7 +90,7 @@ export default function SitePageView({ kind }: { kind: 'page' | 'landing' }) {
         {page.hero_image_url && <meta property="og:image" content={new URL(page.hero_image_url, `${siteUrl}/`).href} />}
       </Helmet>
 
-      <main className="page-shell py-8 md:py-10">
+      <div className="page-shell py-8 md:py-10">
         <Link
           to="/"
           className="inline-flex min-h-11 items-center gap-2 text-fluid-sm font-bold text-emerald-700 dark:text-lime-300"
@@ -206,7 +206,7 @@ export default function SitePageView({ kind }: { kind: 'page' | 'landing' }) {
             )}
           </aside>
         </div>
-      </main>
+      </div>
     </>
   );
 }

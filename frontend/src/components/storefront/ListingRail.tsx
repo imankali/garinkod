@@ -318,7 +318,7 @@ export default function ListingRail({
                         <button
                           type="button"
                           onClick={() => onEdit(listing)}
-                          className="flex flex-1 items-center justify-center rounded-lg border border-emerald-300 py-1.5 text-[11px] font-bold text-emerald-700 transition hover:bg-emerald-50 dark:border-emerald-700 dark:text-lime-300 dark:hover:bg-emerald-900/50"
+                          className="flex flex-1 items-center justify-center rounded-lg border border-emerald-300 py-1.5 text-[12px] font-bold text-emerald-700 transition hover:bg-emerald-50 dark:border-emerald-700 dark:text-lime-300 dark:hover:bg-emerald-900/50"
                         >
                           ویرایش
                         </button>

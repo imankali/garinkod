@@ -221,7 +221,7 @@ export default function Checkout() {
 
   if (order) {
     return (
-      <main className="mx-auto max-w-3xl px-[var(--page-gutter)] py-8 md:py-12">
+      <div className="mx-auto max-w-3xl px-[var(--page-gutter)] py-8 md:py-12">
         <PurchaseSteps currentStep="complete" completed />
         <section className="mt-5 rounded-3xl border border-emerald-100 bg-white p-7 text-center shadow-xl shadow-emerald-100/60 dark:border-emerald-800 dark:bg-emerald-950 dark:shadow-none">
           <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-900 dark:text-lime-300">
@@ -273,13 +273,13 @@ export default function Checkout() {
             <Link to="/" className="rounded-xl border border-emerald-200 px-5 py-3 text-sm font-bold text-emerald-700 dark:border-emerald-700 dark:text-lime-300">بازگشت به فروشگاه</Link>
           </div>
         </section>
-      </main>
+      </div>
     );
   }
 
   if (!isLoading && !cart?.items.length) {
     return (
-      <main className="mx-auto min-h-[55dvh] max-w-3xl px-[var(--page-gutter)] py-8 md:py-12">
+      <div className="mx-auto min-h-[55dvh] max-w-3xl px-[var(--page-gutter)] py-8 md:py-12">
         <PurchaseSteps currentStep="cart" />
         <section className="flex flex-col items-center justify-center py-12 text-center">
           <ClipboardCheck size={50} className="text-emerald-500" />
@@ -287,12 +287,12 @@ export default function Checkout() {
           <p className="mt-2 text-slate-500 dark:text-emerald-200">ابتدا محصولات مورد نیاز مزرعه یا باغ خود را انتخاب کنید.</p>
           <Link to="/products" className="mt-6 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white">مشاهده محصولات</Link>
         </section>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-[var(--page-gutter)] [&_button]:min-h-11 [&_button]:min-w-11 py-7 md:py-10">
+    <div className="mx-auto max-w-6xl px-[var(--page-gutter)] [&_button]:min-h-11 [&_button]:min-w-11 py-7 md:py-10">
       <Link to="/" className="inline-flex items-center gap-2 text-sm font-bold text-emerald-700 dark:text-lime-300">بازگشت به فروشگاه</Link>
       <PurchaseSteps currentStep="details" className="mt-5" />
       <div className="mt-5 grid gap-6 lg:grid-cols-[1fr_360px]">
@@ -531,7 +531,7 @@ export default function Checkout() {
           <div className="mt-5 flex gap-2 rounded-xl bg-white/70 p-3 text-fluid-xs leading-5 text-slate-500 dark:bg-emerald-950/50 dark:text-emerald-200"><ShieldCheck size={18} className="shrink-0 text-emerald-600" />مبلغ نهایی توسط سرور با قیمت و موجودی لحظه‌ای محاسبه می‌شود.</div>
         </aside>
       </div>
-    </main>
+    </div>
   );
 }
 

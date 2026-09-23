@@ -195,7 +195,7 @@ export default function Login() {
     : isRegister ? 'ثبت‌نام با رمز عبور' : 'ورود با رمز عبور';
 
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-gradient-to-br from-emerald-50 to-lime-50 px-4 py-12 dark:from-emerald-950 dark:to-emerald-900">
+    <div className="flex min-h-dvh items-center justify-center bg-gradient-to-br from-emerald-50 to-lime-50 px-4 py-12 dark:from-emerald-950 dark:to-emerald-900">
       <motion.section
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -509,7 +509,7 @@ className={`${AUTH_INPUT_CLASS} ps-10`}
           )}
         </div>
       </motion.section>
-    </main>
+    </div>
   );
 }
 

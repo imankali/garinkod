@@ -135,7 +135,7 @@ function Chip({
       aria-pressed={active}
       onClick={onClick}
       className={cn(
-        'flex h-8 shrink-0 snap-start items-center gap-1 whitespace-nowrap rounded-full border px-2.5 text-[11px] font-bold leading-none transition',
+        'flex h-8 shrink-0 snap-start items-center gap-1 whitespace-nowrap rounded-full border px-2.5 text-[12px] font-bold leading-none transition',
         active
           ? 'border-emerald-600 bg-emerald-600 text-white shadow-sm'
           : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-300 hover:text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200 dark:hover:border-emerald-600',
@@ -145,7 +145,7 @@ function Chip({
       {count > 0 && (
         <span
           className={cn(
-            'flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-extrabold',
+            'flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[12px] font-extrabold',
             active ? 'bg-white/25 text-white' : 'bg-emerald-600 text-white',
           )}
         >

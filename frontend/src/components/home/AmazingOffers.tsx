@@ -96,7 +96,7 @@ export default function AmazingOffers() {
           </Link>
         </div>
 
-        <OfferRail products={products} />
+        <OfferRail products={products} label="پیشنهادهای شگفت‌انگیز، قابل پیمایش افقی" />
       </div>
     </section>
   );

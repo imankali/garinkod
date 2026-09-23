@@ -192,14 +192,14 @@ export default function HighlightManager({
                     className="aspect-[9/16] w-full rounded-lg object-cover"
                   />
                   {(story.highlight_ids?.length ?? 0) > 0 && (
-                    <span className="absolute start-1 top-1 rounded-full bg-emerald-600/90 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                    <span className="absolute start-1 top-1 rounded-full bg-emerald-600/90 px-1.5 py-0.5 text-[12px] font-bold text-white">
                       در هایلایت
                     </span>
                   )}
                   <button
                     type="button"
                     onClick={() => setPickerStory(story)}
-                    className="mt-1 w-full rounded-lg bg-emerald-600 py-1.5 text-[10px] font-bold text-white transition hover:bg-emerald-700"
+                    className="mt-1 w-full rounded-lg bg-emerald-600 py-1.5 text-[12px] font-bold text-white transition hover:bg-emerald-700"
                   >
                     افزودن به هایلایت
                   </button>
@@ -287,7 +287,7 @@ function StoryPickerGrid({
               >
                 <img src={story.image_url} alt={story.caption.slice(0, 40)} className="aspect-[9/16] w-full object-cover" />
                 {index >= 0 ? (
-                  <span className="absolute end-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-[10px] font-bold text-white">
+                  <span className="absolute end-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-[12px] font-bold text-white">
                     {order?.toLocaleString('fa-IR')}
                   </span>
                 ) : (

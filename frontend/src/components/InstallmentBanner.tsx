@@ -12,7 +12,7 @@ export default function InstallmentBanner() {
       <div className="grid gap-4 md:grid-cols-2">
         <article className="flex flex-col justify-between rounded-3xl border border-emerald-100 bg-gradient-to-br from-white to-emerald-50/50 p-6 shadow-md dark:border-emerald-900/40 dark:from-[#08392a] dark:to-[#052e22]">
           <div>
-            <span className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-[#0F8A5F] dark:bg-emerald-900 dark:text-lime-300">
+            <span className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-brand-green dark:bg-emerald-900 dark:text-lime-300">
               <Calendar size={13} /> پیش‌ثبت‌نام خرید اعتباری
             </span>
             <h2 className="text-lg font-extrabold text-slate-800 dark:text-white md:text-xl">تأمین اعتباری برای فصل کشت</h2>
@@ -21,8 +21,8 @@ export default function InstallmentBanner() {
             </p>
           </div>
           <div className="mt-6 flex items-center justify-between border-t border-slate-100 pt-4 dark:border-emerald-900/40">
-            <span className="flex items-center gap-1.5 text-xs font-bold text-[#0F8A5F] dark:text-lime-300"><Landmark size={14} /> هنوز پیشنهاد مالی قطعی صادر نشده است</span>
-            <a href={phoneNumber ? `tel:${phoneNumber.replace(/[^+\d]/g, '')}` : '/services'} className="inline-flex min-h-11 items-center rounded-xl bg-[#0F8A5F] px-4 text-xs font-bold text-white shadow-md transition-colors hover:bg-[#064E3B]">{phoneNumber ? 'گفت‌وگو با کارشناس' : 'ثبت درخواست'}</a>
+            <span className="flex items-center gap-1.5 text-xs font-bold text-brand-green dark:text-lime-300"><Landmark size={14} /> هنوز پیشنهاد مالی قطعی صادر نشده است</span>
+            <a href={phoneNumber ? `tel:${phoneNumber.replace(/[^+\d]/g, '')}` : '/services'} className="inline-flex min-h-11 items-center rounded-xl bg-brand-green px-4 text-xs font-bold text-white shadow-md transition-colors hover:bg-[#064E3B]">{phoneNumber ? 'گفت‌وگو با کارشناس' : 'ثبت درخواست'}</a>
           </div>
         </article>
 

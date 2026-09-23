@@ -176,7 +176,7 @@ export default function FilterSortBar({
           className={`text-xs text-slate-400 transition-opacity dark:text-emerald-300 ${loading ? "opacity-50" : ""}`}
           aria-live="polite"
         >
-          <span className="font-bold text-[#0F8A5F] dark:text-lime-300">
+          <span className="font-bold text-brand-green dark:text-lime-300">
             {resultsCount.toLocaleString("fa-IR")}
           </span>{" "}
           محصول یافت شد
@@ -189,8 +189,8 @@ export default function FilterSortBar({
             onClick={() => togglePanel("filters")}
             className={`relative flex min-h-11 items-center gap-1.5 rounded-xl px-3.5 text-xs font-semibold transition-colors ${
               showFilters
-                ? "bg-[#0F8A5F] text-white"
-                : "bg-emerald-50 text-[#0F8A5F] hover:bg-emerald-100 dark:bg-emerald-900 dark:text-lime-300"
+                ? "bg-brand-green text-white"
+                : "bg-emerald-50 text-brand-green hover:bg-emerald-100 dark:bg-emerald-900 dark:text-lime-300"
             }`}
             aria-label="فیلترها"
           >
@@ -264,13 +264,13 @@ export default function FilterSortBar({
                           onClick={() => handleSortSelect(opt.id)}
                           className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-start text-sm font-semibold transition-colors ${
                             sort === opt.id
-                              ? "bg-emerald-50 text-[#0F8A5F] dark:bg-emerald-800 dark:text-lime-300"
+                              ? "bg-emerald-50 text-brand-green dark:bg-emerald-800 dark:text-lime-300"
                               : "text-slate-700 hover:bg-slate-50 dark:text-emerald-100 dark:hover:bg-emerald-800"
                           }`}
                         >
                           <span>{opt.label}</span>
                           {sort === opt.id && (
-                            <Check size={16} className="text-[#0F8A5F] dark:text-lime-300" />
+                            <Check size={16} className="text-brand-green dark:text-lime-300" />
                           )}
                         </button>
                       ))}
@@ -323,7 +323,7 @@ export default function FilterSortBar({
               <div>
                 <div className="mb-2 flex items-center justify-between text-xs font-semibold text-slate-600 dark:text-emerald-200">
                   <span>حداکثر قیمت</span>
-                  <span className="text-[#0F8A5F] dark:text-lime-300">
+                  <span className="text-brand-green dark:text-lime-300">
                     {priceLimit.toLocaleString("fa-IR")} تومان
                   </span>
                 </div>
@@ -345,7 +345,7 @@ export default function FilterSortBar({
                 onClick={() => onInStockChange(!inStockOnly)}
                 className={`flex min-h-11 items-center gap-1.5 rounded-full px-3.5 text-xs font-semibold transition-colors ${
                   inStockOnly
-                    ? "bg-[#0F8A5F] text-white"
+                    ? "bg-brand-green text-white"
                     : "bg-white text-slate-600 ring-1 ring-slate-200 dark:bg-emerald-900 dark:text-emerald-300 dark:ring-emerald-700"
                 }`}
                 aria-label="فقط کالای موجود"

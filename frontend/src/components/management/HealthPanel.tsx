@@ -545,7 +545,7 @@ function LogRow({ row, onAct }: { row: OpsLogRow; onAct: (row: OpsLogRow, action
       {row.context && Object.keys(row.context as object).length > 0 ? (
         <details className="mt-3">
           <summary className="cursor-pointer text-fluid-2xs font-bold text-slate-500 dark:text-emerald-200">بافت درخواست (پاک‌سازی‌شده)</summary>
-          <pre dir="ltr" className="mt-2 max-h-56 overflow-auto rounded-xl bg-slate-900/90 p-3 text-left text-[10px] leading-5 text-emerald-100">
+          <pre dir="ltr" className="mt-2 max-h-56 overflow-auto rounded-xl bg-slate-900/90 p-3 text-left text-[12px] leading-5 text-emerald-100">
             {typeof row.context === 'string' ? row.context : JSON.stringify(row.context, null, 2)}
           </pre>
         </details>

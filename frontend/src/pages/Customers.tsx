@@ -55,7 +55,7 @@ export default function Customers() {
         />
       </Helmet>
 
-      <main className="mx-auto max-w-6xl px-[var(--page-gutter)] py-8 md:py-12">
+      <div className="mx-auto max-w-6xl px-[var(--page-gutter)] py-8 md:py-12">
         <header className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm md:p-7 dark:border-emerald-900 dark:bg-emerald-950">
           <p className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-fluid-2xs font-bold text-emerald-700 dark:bg-emerald-900/60 dark:text-lime-300">
             <MessageSquareQuote size={13} aria-hidden="true" />
@@ -144,7 +144,7 @@ export default function Customers() {
           دیدگاه‌ها پیش از نمایش بررسی می‌شوند و هیچ تخفیف یا پاداشی بابت امتیاز بالا داده نمی‌شود. برای
           نوشتن تجربه خود، به صفحه کالایی که خریده‌اید بروید.
         </p>
-      </main>
+      </div>
     </>
   );
 }

@@ -153,7 +153,7 @@ export default function Services() {
 
   const selected = cards.find((card) => card.id === form.service_type) ?? cards[0];
 
-  return <main className="page-shell py-8 md:py-10">
+  return <div className="page-shell py-8 md:py-10">
     <section className="rounded-3xl bg-gradient-to-l from-emerald-700 to-lime-600 p-7 text-white md:p-9">
       <p className="text-sm font-bold text-lime-100">شبکه خدمات مزرعه</p>
       <h1 className="mt-2 text-fluid-2xl font-extrabold leading-12">از مشاوره تا اجرای آبیاری در کنار کشاورز</h1>
@@ -280,7 +280,7 @@ export default function Services() {
         <Link to="/farmer-sell" className="mt-5 inline-flex min-h-11 items-center text-fluid-sm font-bold text-emerald-700 underline dark:text-lime-300">محصول کشاورزی برای فروش دارید؟</Link>
       </aside>
     </section>
-  </main>;
+  </div>;
 }
 
 function Input({ label, value, onChange, type = 'text' }: { label: string; value: string; onChange: (value: string) => void; type?: string }) { return <label className="block text-sm font-bold text-slate-700 dark:text-emerald-50">{label}<input required={!label.includes('اختیاری')} type={type} min={type === 'number' ? 0 : undefined} value={value} onChange={(event) => onChange(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2.5 font-normal outline-none focus:border-emerald-500 dark:border-emerald-700 dark:bg-emerald-900" /></label>; }

@@ -127,15 +127,15 @@ export default function Messages() {
 
   if (!isSessionChecked || loading) {
     return (
-      <main className="flex min-h-[55dvh] items-center justify-center">
+      <div className="flex min-h-[55dvh] items-center justify-center">
         <p className="text-sm text-slate-500 dark:text-emerald-200">{t('common.loading')}</p>
-      </main>
+      </div>
     );
   }
 
   if (!isAuthenticated) {
     return (
-      <main className="mx-auto flex min-h-[55dvh] max-w-md flex-col items-center justify-center px-4 text-center">
+      <div className="mx-auto flex min-h-[55dvh] max-w-md flex-col items-center justify-center px-4 text-center">
         <MessageCircle size={40} className="text-emerald-500" />
         <h1 className="mt-4 text-xl font-extrabold text-slate-800 dark:text-white">{t('direct.title')}</h1>
         <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-emerald-200">
@@ -144,12 +144,12 @@ export default function Messages() {
         <Link to="/login" className="mt-6 rounded-xl bg-emerald-600 px-6 py-3 text-sm font-bold text-white">
           {t('nav.login')}
         </Link>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-[var(--page-gutter)] py-5 md:py-8">
+    <div className="mx-auto max-w-6xl px-[var(--page-gutter)] py-5 md:py-8">
       {/*
         The heading is hidden on a phone once a thread is open: the chat needs
         every available pixel, and the thread already names the storefront.
@@ -242,6 +242,6 @@ export default function Messages() {
           )}
         </section>
       </div>
-    </main>
+    </div>
   );
 }

@@ -84,7 +84,7 @@ export default function RankedRail({
             <ChevronLeft size={16} aria-hidden="true" />
           </Link>
         </div>
-        <OfferRail products={products as ProductList[]} />
+        <OfferRail products={products as ProductList[]} label={`${title}، قابل پیمایش افقی`} />
       </div>
     </section>
   );

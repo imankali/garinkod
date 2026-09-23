@@ -128,7 +128,7 @@ export default function Newsletter() {
   }
 
   return (
-    <main className="page-shell py-8 md:py-10">
+    <div className="page-shell py-8 md:py-10">
       <RouteSeo />
 
       <header className="overflow-hidden rounded-3xl bg-gradient-to-l from-emerald-900 via-emerald-800 to-emerald-600 p-6 text-white sm:p-9">
@@ -318,6 +318,6 @@ export default function Newsletter() {
           </div>
         </aside>
       </div>
-    </main>
+    </div>
   );
 }
