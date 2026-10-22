@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Link } from 'react-router';
 import { useQuery } from "@tanstack/react-query";
 import { useFocusTrap } from "../hooks/useFocusTrap";
+import { useDragToScroll } from "../hooks/useDragToScroll";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   AlertTriangle,
@@ -75,6 +76,12 @@ export default function ProductDetailModal({
   const [qty, setQty] = useState(1);
   const [activeTab, setActiveTab] = useState<Tab>("description");
 
+  // ========================================
+  // Mouse drag-to-scroll for the tab strip — the shared rails hook: a 5px
+  // dead-zone keeps genuine tab clicks working.
+  // ========================================
+  const tabsRail = useDragToScroll<HTMLDivElement>();
+
   // Quick view is opened from a list payload, which has no spec table. The
   // detail request reuses the product page's cache key, so it is free when the
   // visitor has already been on that page.
@@ -131,7 +138,7 @@ export default function ProductDetailModal({
             aria-modal="true"
             aria-label={product?.name ?? "جزئیات محصول"}
             tabIndex={-1}
-            className="fixed inset-x-4 top-1/2 z-[90] [&_button]:min-h-11 [&_button]:min-w-11 mx-auto max-h-[90dvh] max-w-3xl -translate-y-1/2 overflow-y-auto rounded-3xl bg-white shadow-2xl outline-none md:inset-x-auto"
+            className="fixed inset-x-4 top-1/2 z-[90] [&_button]:min-h-11 [&_button]:min-w-11 mx-auto max-h-[90dvh] max-w-3xl -translate-y-1/2 overflow-y-auto overflow-x-hidden rounded-3xl bg-white shadow-2xl outline-none md:inset-x-auto"
           >
             {/* Close Button */}
             <motion.button
@@ -148,7 +155,7 @@ export default function ProductDetailModal({
               {/* ======================================== */}
               {/* Product Image */}
               {/* ======================================== */}
-              <div className="relative h-56 overflow-hidden bg-gradient-to-br from-emerald-50 via-white to-[#F7F3E8] md:h-full">
+              <div className="relative h-56 overflow-hidden bg-gradient-to-br from-emerald-50 via-white to-[#f0fdf4] md:h-full">
                 <img
                   src={product.image}
                   alt={product.name}
@@ -176,10 +183,10 @@ export default function ProductDetailModal({
               {/* ======================================== */}
               {/* Product Info */}
               {/* ======================================== */}
-              <div className="flex flex-col p-6">
+              <div className="flex min-w-0 flex-col p-6">
                 {/* Category & Brand */}
                 <div className="mb-1 flex items-center justify-between">
-                  <p className="text-xs font-bold text-[#0F8A5F]">{product.category}</p>
+                  <p className="text-xs font-bold text-[#15803d]">{product.category}</p>
                   <p className="text-xs text-slate-400">برند: {product.brand}</p>
                 </div>
 
@@ -221,13 +228,17 @@ export default function ProductDetailModal({
                 {/* ======================================== */}
                 {/* Tabs */}
                 {/* ======================================== */}
-                <div className="mb-3 flex gap-1 overflow-x-auto rounded-xl bg-slate-50 p-1 no-scrollbar">
+                <div
+                  ref={tabsRail.ref}
+                  {...tabsRail.handlers}
+                  className="mb-3 flex cursor-grab select-none gap-1 overflow-x-auto rounded-xl bg-slate-50 p-1 no-scrollbar"
+                >
                   {tabs.map((tab) => (
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
                       className={`relative flex min-h-11 min-w-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 text-fluid-xs font-bold transition-colors ${
-                        activeTab === tab.id ? "text-white" : "text-slate-500 hover:text-[#0F8A5F]"
+                        activeTab === tab.id ? "text-white" : "text-slate-500 hover:text-[#15803d]"
                       }`}
                     >
                       {activeTab === tab.id && (
@@ -299,7 +310,7 @@ export default function ProductDetailModal({
                         className="space-y-3 text-xs"
                       >
                         <div className="rounded-xl bg-emerald-50 p-3">
-                          <p className="mb-1 flex items-center gap-1.5 font-bold text-[#0F8A5F]">
+                          <p className="mb-1 flex items-center gap-1.5 font-bold text-[#15803d]">
                             <Beaker size={13} /> دوز مصرف
                           </p>
                           <p className="text-slate-600">{product.usage.dosage}</p>
@@ -364,7 +375,7 @@ export default function ProductDetailModal({
                         transition={{ duration: 0.2 }}
                       >
                         {product.brochureAvailable ? (
-                          <button className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-emerald-200 bg-emerald-50/50 py-4 text-xs font-bold text-[#0F8A5F] transition-colors hover:bg-emerald-50">
+                          <button className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-emerald-200 bg-emerald-50/50 py-4 text-xs font-bold text-[#15803d] transition-colors hover:bg-emerald-50">
                             <Download size={15} />
                             دانلود برگه آنالیز و بروشور محصول (PDF)
                           </button>
@@ -379,11 +390,11 @@ export default function ProductDetailModal({
                 {/* ======================================== */}
                 {/* Actions: Quantity, Add to Cart, Wishlist */}
                 {/* ======================================== */}
-                <div className="mt-auto flex items-center gap-3">
+                <div className="mt-auto flex flex-wrap items-center gap-3">
                   {priceOnRequest && (
                     <a
                       href="/contact"
-                      className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-900 py-3.5 text-sm font-bold text-lime-300"
+                      className="flex min-w-0 flex-1 items-center justify-center gap-2 rounded-xl bg-slate-900 py-3.5 text-sm font-bold text-lime-300"
                     >
                       <MessageCircle size={17} />
                       استعلام قیمت و زمان تحویل
@@ -394,7 +405,7 @@ export default function ProductDetailModal({
                     <motion.button
                       whileTap={reduceMotion ? undefined : { scale: 0.97 }}
                       onClick={() => setQty((q) => q + 1)}
-                      className="flex h-11 w-11 items-center justify-center text-[#0F8A5F] hover:bg-emerald-50"
+                      className="flex h-11 w-11 items-center justify-center text-[#15803d] hover:bg-emerald-50"
                       aria-label="افزایش تعداد"
                     >
                       <Plus size={16} />
@@ -417,7 +428,10 @@ export default function ProductDetailModal({
                     disabled={!product.inStock}
                     whileHover={!reduceMotion && product.inStock ? { y: -4 } : undefined}
                     whileTap={!reduceMotion && product.inStock ? { scale: 0.97 } : undefined}
-                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-brand-gradient-accent py-3.5 text-sm font-bold text-white shadow-lg shadow-emerald-200 disabled:cursor-not-allowed disabled:opacity-40"
+                    /* On phones the four controls cannot share one row (that
+                       was the horizontal «از صفحه بیرون زدن») — the cart CTA
+                       drops to its own full-width row; sm+ keeps the old row. */
+                    className="order-last w-full sm:order-none sm:w-auto sm:min-w-0 sm:flex-1 flex items-center justify-center gap-2 rounded-xl bg-brand-gradient-accent py-3.5 text-sm font-bold text-white shadow-lg shadow-emerald-200 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <ShoppingCart size={17} />
                     {product.inStock ? "افزودن به سبد خرید" : "ناموجود"}
@@ -427,7 +441,7 @@ export default function ProductDetailModal({
                     <Link
                       to={`/products/${product.slug}`}
                       onClick={onClose}
-                      className="flex h-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 px-3 text-fluid-2xs font-bold text-slate-500 transition-colors hover:border-[#0F8A5F] hover:text-[#0F8A5F]"
+                      className="flex h-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 px-3 text-fluid-2xs font-bold text-slate-500 transition-colors hover:border-[#15803d] hover:text-[#15803d]"
                     >
                       صفحه کامل
                     </Link>

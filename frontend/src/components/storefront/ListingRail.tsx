@@ -104,7 +104,7 @@ export default function ListingRail({
   /** Mouse drag-to-scroll state — touch already pans natively, so only the
    *  mouse path is hijacked. `moved` suppresses the click that follows a drag
    *  so grabbing the rail never opens the listing under the cursor. */
-  const drag = useRef<{ pointerId: number; lastX: number; moved: boolean; active: boolean } | null>(null);
+  const drag = useRef<{ pointerId: number; startX: number; lastX: number; moved: boolean; active: boolean } | null>(null);
 
   const endDrag = () => {
     const d = drag.current;
@@ -122,11 +122,10 @@ export default function ListingRail({
     const rail = railRef.current;
     if (!rail) return;
     cancelTween.current?.();
-    drag.current = { pointerId: event.pointerId, lastX: event.clientX, moved: false, active: true };
-    rail.style.scrollSnapType = 'none';
-    rail.style.userSelect = 'none';
-    rail.style.cursor = 'grabbing';
-    try { rail.setPointerCapture(event.pointerId); } catch { /* older browsers */ }
+    // Capture and grab-styling wait for the first real movement: capturing on
+    // pointerdown makes Chromium retarget the following click to the rail and
+    // silently swallow every button inside it (افزودن به سبد / پرسش / links).
+    drag.current = { pointerId: event.pointerId, startX: event.clientX, lastX: event.clientX, moved: false, active: true };
   };
 
   const onRailPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -135,8 +134,15 @@ export default function ListingRail({
     if (!d?.active || !rail || event.pointerId !== d.pointerId) return;
     const dx = event.clientX - d.lastX;
     d.lastX = event.clientX;
-    if (Math.abs(dx) < 0.5) return;
-    d.moved = true;
+    if (!d.moved) {
+      // Dead-zone: under ~5px the gesture is a click, not a drag.
+      if (Math.abs(event.clientX - d.startX) < 5) return;
+      d.moved = true;
+      rail.style.scrollSnapType = 'none';
+      rail.style.userSelect = 'none';
+      rail.style.cursor = 'grabbing';
+      try { rail.setPointerCapture(event.pointerId); } catch { /* older browsers */ }
+    }
     // Drag the content like a sheet of paper: moving the mouse left brings
     // the next cards (which live to the left in RTL) into view. scrollBy
     // handles the browser's scrollLeft sign convention for us.
@@ -210,7 +216,7 @@ export default function ListingRail({
           بانی‌مد/دیجی‌پی شکل. */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
-          <h3 className="min-w-0 truncate text-fluid-base font-extrabold text-slate-900 dark:text-white">
+          <h3 className="min-w-0 truncate text-fluid-lg font-extrabold text-slate-900 dark:text-white">
             {title}
           </h3>
           <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-fluid-2xs font-bold text-emerald-700 dark:bg-emerald-900/60 dark:text-lime-300">
@@ -229,7 +235,7 @@ export default function ListingRail({
         )}
       </div>
 
-      <div className="relative mt-3">
+      <div className="relative mt-4">
         <div
           ref={railRef}
           onPointerEnter={() => { hoverPause.current = true; }}

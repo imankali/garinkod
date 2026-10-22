@@ -128,7 +128,7 @@ const CartButton = memo(function CartButton({
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0, opacity: 0 }}
               transition={{ ...SPRING_SOFT, damping: 15 }}
-              className={`absolute flex items-center justify-center rounded-full bg-white font-bold text-[#0F8A5F] shadow ring-2 ring-emerald-500/20 ${
+              className={`absolute flex items-center justify-center rounded-full bg-white font-bold text-[#15803d] shadow ring-2 ring-emerald-500/20 ${
                 mobile
                   ? "-end-2 -top-2.5 h-4 min-w-4 px-0.5 text-fluid-2xs"
                   : "-end-2 -top-2.5 h-4 min-w-4 px-0.5 text-fluid-2xs sm:-end-2.5 sm:-top-3 sm:h-5 sm:min-w-5 sm:text-fluid-2xs"
@@ -341,7 +341,7 @@ export default function Header({
               whileHover={prefersReducedMotion ? undefined : { scale: 1.05 }}
               whileTap={{ scale: 0.92 }}
               transition={SPRING}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-[#0F8A5F] transition-colors hover:bg-emerald-100 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-[#15803d] transition-colors hover:bg-emerald-100 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300"
               aria-label={mobileOpen ? t("header.closeMenu") : t("header.openMenu")}
               aria-expanded={mobileOpen}
               aria-controls="mobile-menu"
@@ -439,7 +439,12 @@ export default function Header({
             )}
           </AnimatePresence>
 
-          {/* Desktop Navigation — same collapse contract as the rows above. */}
+          {/* Desktop Navigation — same collapse contract as the rows above.
+              No `overflow-hidden` on this wrapper: it would clip the nav's
+              dropdown panels (بلاگ و راهنما opens 440px tall) below the row's
+              own height. The collapse is rare (once per direction change) and
+              the panel slides with the row anyway; clipping broke every
+              dropdown taller than one row. */}
           <AnimatePresence initial={false}>
             {!headerCollapsed && (
               <motion.div
@@ -448,7 +453,6 @@ export default function Header({
                 animate={{ height: "auto", opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
                 transition={{ duration: 0.25, ease: "easeInOut" }}
-                className="overflow-hidden"
               >
                 <DesktopNav />
               </motion.div>

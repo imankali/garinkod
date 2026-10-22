@@ -223,11 +223,15 @@ export default function HeroSlider() {
             aria-selected={dotIndex === index}
             aria-label={`اسلاید ${dotIndex + 1}`}
             onClick={() => go(dotIndex)}
-            className={cn(
-              'h-2 rounded-full transition-all duration-300',
-              dotIndex === index ? 'w-8 bg-white' : 'w-2 bg-white/50 hover:bg-white/80',
-            )}
-          />
+            className="flex h-6 min-w-6 items-center justify-center"
+          >
+            <span
+              className={cn(
+                'block h-2.5 rounded-full transition-all duration-300',
+                dotIndex === index ? 'w-8 bg-white' : 'w-2.5 bg-white/50 hover:bg-white/80',
+              )}
+            />
+          </button>
         ))}
       </div>
     </section>

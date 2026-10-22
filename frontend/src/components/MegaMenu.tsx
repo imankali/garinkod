@@ -32,10 +32,10 @@ const categoryIcons: CategoryIcons = {
 };
 
 const categoryColors: CategoryColors = {
-  'pesticide': 'from-[#0F8A5F] to-[#0c6b49]',
-  'fertilizer': 'from-emerald-500 to-[#0F8A5F]',
+  'pesticide': 'from-[#15803d] to-[#166534]',
+  'fertilizer': 'from-emerald-500 to-[#15803d]',
   'seed': 'from-amber-500 to-orange-500',
-  'equipment': 'from-lime-600 to-[#0F8A5F]',
+  'equipment': 'from-lime-600 to-[#15803d]',
   'irrigation': 'from-sky-500 to-cyan-600',
   'tools': 'from-teal-500 to-emerald-600',
 };

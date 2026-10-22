@@ -81,6 +81,7 @@ const DirectMessagesDrawer = lazy(() => import("./components/direct/DirectMessag
 const Login = lazy(() => import("./pages/Login"));
 const Profile = lazy(() => import("./pages/Profile"));
 const ProductPage = lazy(() => import("./pages/ProductPage"));
+const ListingDetailPage = lazy(() => import("./pages/ListingDetailPage"));
 const Checkout = lazy(() => import("./pages/Checkout"));
 const Orders = lazy(() => import("./pages/Orders"));
 const OrderTrackingPage = lazy(() => import("./pages/OrderTrackingPage"));
@@ -637,6 +638,10 @@ export default function App() {
               {/* Crawlable product detail route */}
               {/* ======================================== */}
               <Route path="/products/:slug" element={<ProductPage />} />
+
+              {/* Full-page آگهی detail: the grid card click lands here, while
+                  «نمای سریع» stays an in-place dialog on the grid. */}
+              <Route path="/listing/:slug" element={<ListingDetailPage />} />
 
               {/* ======================================== */}
               {/* Login Page */}

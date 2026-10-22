@@ -84,14 +84,14 @@ export default function AmazingOffers() {
           </span>
           <Link
             to="/products?collection=discounted"
-            className="ms-auto inline-flex items-center gap-1 text-fluid-sm font-bold text-lime-200 transition hover:text-white"
+            className="ms-auto inline-flex min-h-6 items-center gap-1 py-1 text-fluid-sm font-bold text-lime-200 transition hover:text-white"
           >
             همه تخفیف‌ها
             <ChevronLeft size={16} aria-hidden="true" />
           </Link>
         </div>
 
-        <OfferRail products={products} />
+        <OfferRail products={products} label="کارت‌های پیشنهادهای شگفت‌انگیز" />
       </div>
     </section>
   );

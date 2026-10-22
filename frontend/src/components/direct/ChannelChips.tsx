@@ -4,9 +4,10 @@
 //
 // The chips used to be one oversized row that overflowed the drawer with no
 // hint that more existed. This version is compact (small text, tight padding),
-// swipes horizontally with momentum on touch, shows a fade on the overflowing
-// edge so the cut-off is visible, and — on wide screens — lets the user
-// scroll it with the mouse wheel.
+// swipes horizontally with momentum on touch, drag-scrolls with the mouse on
+// desktop (the same grab pattern as the home product rails), shows a fade on
+// the overflowing edge so the cut-off is visible, and — on wide screens — lets
+// the user scroll it with the mouse wheel.
 
 import { useEffect, useRef, useState } from 'react';
 
@@ -32,6 +33,60 @@ export default function ChannelChips({
 }) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [edges, setEdges] = useState({ start: false, end: false });
+
+  // Mouse drag-to-scroll, the pattern the home rails use: grab with the left
+  // button, the row follows the pointer 1:1, and a dead-zone keeps the chip
+  // click working for small jitters. Touch keeps its native swipe.
+  const drag = useRef<{ pointerId: number; startX: number; lastX: number; moved: boolean; active: boolean } | null>(null);
+
+  const endDrag = () => {
+    const scroller = scrollerRef.current;
+    if (drag.current) drag.current.active = false;
+    if (scroller) {
+      scroller.style.scrollSnapType = '';
+      scroller.style.userSelect = '';
+      scroller.style.cursor = '';
+    }
+  };
+
+  const onDragStart = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType !== 'mouse' || event.button !== 0) return;
+    const scroller = scrollerRef.current;
+    if (!scroller || scroller.scrollWidth <= scroller.clientWidth) return;
+    // Capture and grab-styling wait for the first real movement: capturing on
+    // pointerdown makes Chromium retarget the following click to the scroller
+    // and silently swallow the chip clicks inside it.
+    drag.current = { pointerId: event.pointerId, startX: event.clientX, lastX: event.clientX, moved: false, active: true };
+  };
+
+  const onDragMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const state = drag.current;
+    const scroller = scrollerRef.current;
+    if (!state?.active || !scroller || event.pointerId !== state.pointerId) return;
+    const dx = event.clientX - state.lastX;
+    state.lastX = event.clientX;
+    // Dead-zone: under ~5px this is a click on a chip, not a drag.
+    if (!state.moved && Math.abs(event.clientX - state.startX) < 5) return;
+    if (!state.moved) {
+      state.moved = true;
+      scroller.style.scrollSnapType = 'none';
+      scroller.style.userSelect = 'none';
+      scroller.style.cursor = 'grabbing';
+      try { scroller.setPointerCapture(event.pointerId); } catch { /* older engines */ }
+    }
+    scroller.scrollBy({ left: dx, behavior: 'instant' as ScrollBehavior });
+  };
+
+  const onDragEnd = () => endDrag();
+
+  // A drag that ends over a chip must not activate it.
+  const onClickCapture = (event: React.MouseEvent) => {
+    if (drag.current?.moved) {
+      event.preventDefault();
+      event.stopPropagation();
+      drag.current.moved = false;
+    }
+  };
 
   // Track which edges are cut off so the fades only show when they mean it.
   useEffect(() => {
@@ -81,7 +136,12 @@ export default function ChannelChips({
         role="tablist"
         aria-label="فیلتر منبع پیام"
         onWheel={onWheel}
-        className="no-scrollbar flex snap-x snap-proximity gap-1 overflow-x-auto scroll-px-3 px-3 py-2 [-webkit-overflow-scrolling:touch] [overscroll-behavior-x:contain]"
+        onPointerDown={onDragStart}
+        onPointerMove={onDragMove}
+        onPointerUp={onDragEnd}
+        onPointerCancel={onDragEnd}
+        onClickCapture={onClickCapture}
+        className="no-scrollbar flex cursor-grab snap-x snap-proximity gap-1 overflow-x-auto scroll-px-3 px-3 py-2 [-webkit-overflow-scrolling:touch] [overscroll-behavior-x:contain]"
       >
         <Chip label={allLabel} active={value === 'all'} count={total} onClick={() => onChange('all')} />
         {channels.map((channel) => (

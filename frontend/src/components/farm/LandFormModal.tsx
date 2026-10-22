@@ -293,7 +293,7 @@ const inputClass =
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <label className="block text-sm font-bold text-slate-700 dark:text-emerald-50">
-      {label} {required && <span className="text-rose-500">*</span>}
+      {label} {required && <span className="text-rose-600 dark:text-rose-400">*</span>}
       {children}
     </label>
   );

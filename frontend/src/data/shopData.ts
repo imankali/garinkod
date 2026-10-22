@@ -23,7 +23,7 @@ export const categories: CategoryItem[] = [
     id: "pesticide",
     label: "سموم دفع آفات",
     icon: Bug,
-    color: "from-[#0F8A5F] to-[#0c6b49]",
+    color: "from-[#15803d] to-[#166534]",
     items: [
       { label: "حشره‌کش‌ها", id: "insecticide" },
       { label: "قارچ‌کش‌ها", id: "fungicide" },
@@ -35,7 +35,7 @@ export const categories: CategoryItem[] = [
     id: "fertilizer",
     label: "کود کشاورزی",
     icon: Sprout,
-    color: "from-emerald-500 to-[#0F8A5F]",
+    color: "from-emerald-500 to-[#15803d]",
     items: [
       { label: "کود NPK", id: "npk" },
       { label: "کود اوره", id: "urea" },
@@ -59,7 +59,7 @@ export const categories: CategoryItem[] = [
     id: "equipment",
     label: "ادوات کشاورزی",
     icon: Tractor,
-    color: "from-lime-600 to-[#0F8A5F]",
+    color: "from-lime-600 to-[#15803d]",
     items: [
       { label: "سمپاش", id: "sprayer" },
       { label: "سیستم آبیاری", id: "irrigation-eq" },

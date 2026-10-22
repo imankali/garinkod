@@ -20,7 +20,7 @@
  *
  * emerald-600 is the brand action colour: every primary button, and the text
  * colour of a lot of emphasis. Tailwind's `oklch(59.6% 0.145 163.225)` is
- * #059669, which measures 3.77:1 against white — under AA's 4.5:1 for text and
+ * #15803d, which measures 3.77:1 against white — under AA's 4.5:1 for text and
  * under 3:1 only for large text and UI components. #047857 is 5.48:1 in both
  * directions (white on it, and it on white), still unmistakably the same green,
  * and it fixes the ~143 buttons and ~99 text accents in one line.
@@ -45,12 +45,31 @@
 /* ========================================
  * 2. CSS Custom Properties (Design Tokens)
  * ======================================== */
+/*
+ * Brand palette — applied from the ui-ux-pro-max design-system search
+ * ("agriculture farming marketplace earthy green"), style: Organic
+ * Biophilic. Earth green (#15803d) + harvest gold (#a16207) is the
+ * agriculture reading of the brand, and both swaps pay for themselves
+ * in contrast, not only in mood: the old orange-500 accent carried
+ * white badge text at 2.8:1 (fail) where the gold measures 4.9:1
+ * (AA), and the old brand green measured 4.36:1 as text on white
+ * where the earth green measures 5.01:1. Lime stays as the
+ * new-growth accent; gray and rose are outside the palette swap.
+ *
+ * Font pairing from the same dataset: the organic/natural Latin
+ * pairing it recommends (Lora + Raleway) cannot render Farsi, and the
+ * Persian-capable family its google-fonts index ranks first for a
+ * Farsi/RTL query is Vazirmatn — already the served face. The pairing
+ * is therefore weight-based within Vazirmatn (400/500 body, 700/800
+ * display) rather than a second family; naming an unloaded Latin face
+ * here would reintroduce the bug documented in section 3 below.
+ */
 :root {
-  --brand-green: #0f8a5f;
-  --brand-green-dark: #064e3b;
-  --brand-green-light: #10b981;
+  --brand-green: #15803d;
+  --brand-green-dark: #14532d;
+  --brand-green-light: #22c55e;
   --brand-lime: #a3e635;
-  --brand-cream: #f7f3e8;
+  --brand-cream: #f0fdf4;
   --brand-orange: #f97316;
   --brand-gray: #1f2937;
   --brand-rose: #f43f5e;
@@ -123,7 +142,14 @@ html[dir="ltr"] .rtl-only {
 }
 
 html {
-  scroll-behavior: smooth;
+  /* Global smooth scroll was REMOVED deliberately: CSS smooth animates every
+     programmatic scrollTo — including framer-motion's internal measurement
+     restores (measureAllKeyframes scrolls the window to measure whileInView
+     elements). Each restore then became its own smooth animation, fighting
+     the browser's smooth scroll and swallowing it: the storefronts page
+     sometimes never reached the top on navigation and back-to-top stalled
+     mid-page. Smoothness now lives in JS tweens (rails, back-to-top) where
+     the axis and duration are explicit; anchor jumps stay instant. */
   font-size: 16px;
   -webkit-text-size-adjust: 100%;
   -ms-text-size-adjust: 100%;
@@ -205,7 +231,7 @@ body {
  * depends on a timer.
  */
 .text-gradient-green {
-  background: linear-gradient(90deg, #10b981, #84cc16);
+  background: linear-gradient(90deg, #22c55e, #84cc16);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -232,12 +258,12 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #10b981, #84cc16);
+  background: linear-gradient(180deg, #22c55e, #84cc16);
   border-radius: 999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #059669, #65a30d);
+  background: linear-gradient(180deg, #15803d, #65a30d);
 }
 
 .no-scrollbar::-webkit-scrollbar {
@@ -258,7 +284,7 @@ body {
  */
 .rail-scroll {
   scrollbar-width: thin;
-  scrollbar-color: #10b981 transparent;
+  scrollbar-color: #22c55e transparent;
 }
 
 .rail-scroll::-webkit-scrollbar {
@@ -270,7 +296,7 @@ body {
 }
 
 .rail-scroll::-webkit-scrollbar-thumb {
-  background: linear-gradient(90deg, #10b981, #84cc16);
+  background: linear-gradient(90deg, #22c55e, #84cc16);
   border-radius: 999px;
 }
 
@@ -366,7 +392,7 @@ button, a, input, select, textarea {
 
 .dark *:focus-visible {
   outline-color: #ffffff;
-  box-shadow: 0 0 0 4px #10b981;
+  box-shadow: 0 0 0 4px #22c55e;
 }
 
 /* Skip link: hidden until focused, then pinned to the top of the viewport. */
@@ -377,6 +403,9 @@ button, a, input, select, textarea {
   top: 0.5rem;
   z-index: 200;
   padding: 0.75rem 1.25rem;
+  /* The measured box was 43.9px tall — under the product's own 44px rule by a
+     rounding hair. Anchor it like every other control. */
+  min-height: var(--tap-min);
   border-radius: 0.75rem;
   background: #052e22;
   color: #ffffff;
@@ -452,6 +481,13 @@ html,
 body {
   max-width: 100%;
   overflow-x: clip;
+  /* Chrome's scroll anchoring re-pins the viewport to whatever it anchored
+     before a route swap — content mounting below while the old scroll depth
+     is still held dragged /storefronts back to the old y for seconds after
+     the scroll-reset (the «صفحه بالا نمی‌آید» bug). Anchoring buys nothing
+     here that the layout doesn't already guarantee: every route mounts from
+     the top, so anchoring is disabled document-wide. */
+  overflow-anchor: none;
 }
 
 /* Long identifiers (order codes, emails, chemical names like
@@ -558,7 +594,7 @@ body {
 
 .hover-lift:hover {
   transform: translateY(-4px);
-  box-shadow: 0 12px 24px rgba(16, 185, 129, 0.15);
+  box-shadow: 0 12px 24px rgba(34, 197, 94, 0.15);
 }
 
 .tilt-card {
@@ -608,7 +644,7 @@ body {
   inset: -2px;
   padding: 2px;
   border-radius: 16px;
-  background: linear-gradient(135deg, #10b981, #84cc16, #10b981);
+  background: linear-gradient(135deg, #22c55e, #84cc16, #22c55e);
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
@@ -624,8 +660,8 @@ input[type="range"]::-webkit-slider-thumb {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #10b981, #84cc16);
-  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.5);
+  background: linear-gradient(135deg, #22c55e, #84cc16);
+  box-shadow: 0 2px 6px rgba(34, 197, 94, 0.5);
   cursor: pointer;
 }
 
@@ -633,8 +669,8 @@ input[type="range"]::-moz-range-thumb {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #10b981, #84cc16);
-  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.5);
+  background: linear-gradient(135deg, #22c55e, #84cc16);
+  box-shadow: 0 2px 6px rgba(34, 197, 94, 0.5);
   cursor: pointer;
   border: none;
 }
@@ -733,8 +769,8 @@ input[type="range"]::-moz-range-thumb {
 
 /* Glow Pulse */
 @keyframes glow-pulse {
-  0%, 100% { box-shadow: 0 0 20px rgba(16, 185, 129, 0.3); }
-  50% { box-shadow: 0 0 40px rgba(16, 185, 129, 0.6); }
+  0%, 100% { box-shadow: 0 0 20px rgba(34, 197, 94, 0.3); }
+  50% { box-shadow: 0 0 40px rgba(34, 197, 94, 0.6); }
 }
 
 .animate-glow-pulse {

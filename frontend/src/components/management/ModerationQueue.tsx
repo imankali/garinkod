@@ -408,7 +408,7 @@ export default function ModerationQueue() {
               دلیل رد برای غرفه‌دار نمایش داده می‌شود و در لاگ مدیریتی ثبت می‌گردد.
             </p>
             <label htmlFor="reject-reason" className="mt-3 block text-xs font-bold text-slate-600 dark:text-emerald-100">
-              دلیل رد <span className="text-rose-500">*</span>
+              دلیل رد <span className="text-rose-600 dark:text-rose-400">*</span>
             </label>
             <textarea
               id="reject-reason"

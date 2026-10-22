@@ -63,7 +63,7 @@ change, review the code and then run the full matrix in detail.
 | Type check | `cd frontend && npx tsc --noEmit` | clean |
 | Build | `cd frontend && npm run build` | ✓ |
 | Design linter | `.agents-tmp/node_modules/.bin/impeccable detect frontend/src` | 125 (see §6) |
-| E2E | `cd frontend && npx playwright test` | **never run locally — see §7** |
+| E2E | `cd frontend && PLAYWRIGHT_CHANNEL=chrome PLAYWRIGHT_BASE_URL=http://127.0.0.1:5173 npx playwright test --project=desktop-chromium` | ux-audit 4/4 (see §7 update) |
 
 `manage.py test` (all apps) and `manage.py test shop` are different scopes and
 give different counts. Say which one you ran.
@@ -188,8 +188,13 @@ referenced but never loaded), `gradient-text` ×2 (one was on a **price**),
 ## 7. Known gaps — stated plainly, not hidden
 
 - **Playwright has never run in this sandbox.** There is no browser. `npx
-  playwright install chromium` fails. The 227 specs are verified only by
+  playwright install chromium` fails. The specs are verified only by
   `--list` and CI. Any claim that e2e passes locally is false.
+  **Update 2026-10-07 — partially superseded:** e2e now runs here through the
+  *system* Chrome: `PLAYWRIGHT_CHANNEL=chrome PLAYWRIGHT_BASE_URL=http://127.0.0.1:5173
+  npx playwright test --project=desktop-chromium` (the config grew the
+  `PLAYWRIGHT_CHANNEL` env, and `npx playwright install ffmpeg` was needed for
+  the failure-video binary). Verified with ux-audit: 4/4 passed, twice.
 - **`ci/workflows/django.yml` still has `continue-on-error: true`**, so a red
   backend suite does not fail CI. Retained deliberately; it should be removed
   once the suite is trusted.

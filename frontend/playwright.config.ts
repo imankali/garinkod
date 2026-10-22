@@ -38,6 +38,10 @@ export default defineConfig({
     : [['list']],
   use: {
     baseURL,
+    // A machine that has a system Chrome can run the suite without the
+    // chromium download: PLAYWRIGHT_CHANNEL=chrome npx playwright test.
+    // CI leaves it unset and uses the bundled chromium.
+    channel: process.env.PLAYWRIGHT_CHANNEL || undefined,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',

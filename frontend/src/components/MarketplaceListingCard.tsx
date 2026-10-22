@@ -5,9 +5,8 @@
 // can send the listing straight to the storefront's direct messages so the
 // buyer can ask for advice about that exact product.
 
-import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Link } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { Eye, MessageCircle, ShoppingCart } from 'lucide-react';
 
 import { useCartStore } from '../store/cartStore';
@@ -50,8 +49,23 @@ export default function MarketplaceListingCard({
   const addListingToCart = useCartStore((state) => state.addListingToCart);
   const openDirect = useDirectStore((state) => state.openDirect);
   // Quick view parity with the catalogue card: the آگهی is inspected in place,
-  // without leaving the shelf it was found on.
-  const [quickView, setQuickView] = useState(false);
+  // without leaving the shelf it was found on. The open state lives in the
+  // URL (`?quick=<slug>`) rather than component state, so the browser's Back
+  // button closes the dialog and leaves the visitor on the very card they
+  // were reading — instead of dumping them into the storefront page.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const quickView = searchParams.get('quick') === listing.slug;
+  const setQuickView = (open: boolean) => {
+    setSearchParams(
+      (previous) => {
+        const next = new URLSearchParams(previous);
+        if (open) next.set('quick', listing.slug);
+        else next.delete('quick');
+        return next;
+      },
+      { replace: !open },
+    );
+  };
 
   // Hooks above stay unconditional; the skeleton short-circuit lives after
   // them, keeping the call order identical on every render.
@@ -88,8 +102,8 @@ export default function MarketplaceListingCard({
 
   return (
     <motion.article
-      initial={{ opacity: 0, y: 16 }}
-      whileInView={{ opacity: 1, y: 0 }}
+      initial={{ opacity: 0 }}
+      whileInView={{ opacity: 1 }}
       viewport={{ once: true, margin: '-60px' }}
       transition={{ delay: (index % 4) * 0.05, duration: 0.35 }}
       whileHover={{ y: -4 }}
@@ -240,7 +254,7 @@ export default function MarketplaceListingCard({
             whileTap={{ scale: 0.94 }}
             transition={TACTILE}
             title={t('storefront.sendToDirectHint')}
-            className="flex min-h-10 w-10 items-center justify-center rounded-xl border border-emerald-200 text-emerald-700 transition-colors hover:bg-emerald-50 dark:border-emerald-700 dark:text-lime-300 dark:hover:bg-emerald-900"
+            className="tap-target flex min-h-10 w-10 items-center justify-center rounded-xl border border-emerald-200 text-emerald-700 transition-colors hover:bg-emerald-50 dark:border-emerald-700 dark:text-lime-300 dark:hover:bg-emerald-900"
             aria-label={t('storefront.sendToDirect')}
           >
             <MessageCircle size={15} aria-hidden="true" />

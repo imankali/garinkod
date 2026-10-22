@@ -83,7 +83,7 @@ export default function DesktopNav() {
   return (
     <nav
       ref={navRef}
-      className="relative z-30 hidden border-t border-emerald-50 bg-gradient-to-l from-emerald-50/40 via-white to-[#F7F3E8] dark:border-emerald-900/50 dark:from-emerald-950/40 dark:via-[#052e22] dark:to-emerald-950/30 lg:block"
+      className="relative z-30 hidden border-t border-emerald-50 bg-gradient-to-l from-emerald-50/40 via-white to-[#f0fdf4] dark:border-emerald-900/50 dark:from-emerald-950/40 dark:via-[#052e22] dark:to-emerald-950/30 lg:block"
       aria-label="ناوبری اصلی"
     >
       <ul
@@ -106,8 +106,8 @@ export default function DesktopNav() {
                 className={cn(
                   'relative flex min-h-11 items-center px-3 text-fluid-sm font-medium transition-colors duration-200',
                   isActive
-                    ? 'text-[#0F8A5F] dark:text-lime-300'
-                    : 'text-slate-600 hover:text-[#0F8A5F] dark:text-emerald-100 dark:hover:text-lime-300',
+                    ? 'text-[#15803d] dark:text-lime-300'
+                    : 'text-slate-600 hover:text-[#15803d] dark:text-emerald-100 dark:hover:text-lime-300',
                 )}
                 aria-current={isActive ? 'page' : undefined}
               >
@@ -149,7 +149,7 @@ export default function DesktopNav() {
           </li>
         ))}
 
-        <li className="ms-auto hidden items-center gap-1.5 py-1 text-fluid-2xs font-semibold text-[#0F8A5F] dark:text-lime-300 xl:flex">
+        <li className="ms-auto hidden items-center gap-1.5 py-1 text-fluid-2xs font-semibold text-[#15803d] dark:text-lime-300 xl:flex">
           <span className="relative flex h-2 w-2">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
             <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
@@ -193,8 +193,8 @@ function NavGroup({
         className={cn(
           'flex min-h-11 items-center gap-1 rounded-lg px-3 text-fluid-sm font-medium transition-colors duration-200',
           open || hasActive
-            ? 'text-[#0F8A5F] dark:text-lime-300'
-            : 'text-slate-600 hover:text-[#0F8A5F] dark:text-emerald-100 dark:hover:text-lime-300',
+            ? 'text-[#15803d] dark:text-lime-300'
+            : 'text-slate-600 hover:text-[#15803d] dark:text-emerald-100 dark:hover:text-lime-300',
         )}
       >
         {section.title}
@@ -205,6 +205,16 @@ function NavGroup({
         />
       </button>
 
+      {/* Sections with many destinations (بلاگ و راهنما) open as a two-column
+          mega panel: nine stacked rows used to reach 785px — taller than the
+          viewport — while the same content in two columns fits comfortably
+          and reads like the shop panels users already know. Wide panels are
+          fixed centred strips under the header: the group buttons sit at both
+          ends of the RTL row, so any absolutely-anchored wide panel overflows
+          the viewport on one side or the other. Small sections
+          (راهنما و پشتیبانی) share the same strip as icon cards: three items
+          in one narrow list looked like a stray column; the same items as
+          cards read as a deliberate launcher. */}
       <AnimatePresence>
         {open && (
           <motion.div
@@ -215,55 +225,113 @@ function NavGroup({
             transition={{ duration: 0.16, ease: 'easeOut' }}
             role="menu"
             aria-label={section.title}
-            className="absolute start-0 top-[calc(100%+2px)] z-50 w-72 overflow-hidden rounded-2xl border border-emerald-100 bg-white p-1.5 shadow-2xl shadow-emerald-900/10 dark:border-emerald-800 dark:bg-emerald-950"
+            className={cn(
+              'z-50 overflow-hidden overflow-y-auto overscroll-contain rounded-2xl border border-emerald-100 bg-white p-1.5 shadow-2xl shadow-emerald-900/10 dark:border-emerald-800 dark:bg-emerald-950',
+              section.items.length >= 3
+                ? // Fixed strip centred under the header row — always inside
+                  // the viewport, whichever end of the RTL row opened it.
+                  'fixed inset-x-0 mx-auto w-[min(40rem,calc(100vw-2rem))] max-h-[70dvh] top-[var(--header-height,76px)]'
+                : 'absolute start-0 top-[calc(100%+2px)] w-72 max-h-[70dvh]',
+            )}
           >
-            {section.items.map((item) => {
-              const Icon = item.icon;
-              const isActive = isItemActive(pathname, item.to);
-              const label = (() => {
-                const key = `nav.${item.id}`;
-                const translated = t(key);
-                return translated === key ? item.label : translated;
-              })();
+            <div
+              className={cn(
+                section.items.length >= 6
+                  ? 'grid grid-cols-2 gap-x-1 gap-y-0.5'
+                  : section.items.length >= 3
+                    ? 'grid grid-cols-3 gap-1'
+                    : 'flex flex-col',
+              )}
+            >
+              {section.items.map((item) => {
+                const Icon = item.icon;
+                const isActive = isItemActive(pathname, item.to);
+                const label = (() => {
+                  const key = `nav.${item.id}`;
+                  const translated = t(key);
+                  return translated === key ? item.label : translated;
+                })();
+                const card = section.items.length < 6 && section.items.length >= 3;
 
-              return (
-                <Link
-                  key={item.id}
-                  to={item.to}
-                  role="menuitem"
-                  onClick={onClose}
-                  aria-current={isActive ? 'page' : undefined}
-                  className={cn(
-                    'flex items-start gap-3 rounded-xl px-3 py-2.5 transition-colors',
-                    isActive
-                      ? 'bg-emerald-600 text-white'
-                      : 'text-slate-600 hover:bg-emerald-50 dark:text-emerald-100 dark:hover:bg-emerald-900/60',
-                  )}
-                >
-                  <Icon
-                    size={16}
-                    aria-hidden="true"
-                    className={cn(
-                      'mt-0.5 shrink-0',
-                      isActive ? 'text-white' : 'text-emerald-600 dark:text-lime-300',
-                    )}
-                  />
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-fluid-sm font-bold">{label}</span>
-                    {item.description && (
+                if (card) {
+                  return (
+                    <Link
+                      key={item.id}
+                      to={item.to}
+                      role="menuitem"
+                      onClick={onClose}
+                      aria-current={isActive ? 'page' : undefined}
+                      className={cn(
+                        'group flex flex-col items-center gap-2 rounded-xl px-3 py-4 text-center transition-colors',
+                        isActive
+                          ? 'bg-emerald-600 text-white'
+                          : 'text-slate-600 hover:bg-emerald-50 dark:text-emerald-100 dark:hover:bg-emerald-900/60',
+                      )}
+                    >
                       <span
                         className={cn(
-                          'mt-0.5 block text-fluid-2xs leading-5',
-                          isActive ? 'text-emerald-50' : 'text-slate-500 dark:text-emerald-300/70',
+                          'flex h-12 w-12 items-center justify-center rounded-2xl transition-transform duration-200 group-hover:scale-105',
+                          isActive
+                            ? 'bg-white/15 text-white'
+                            : 'bg-gradient-to-br from-emerald-50 to-lime-50 text-emerald-600 dark:from-emerald-900 dark:to-emerald-950 dark:text-lime-300',
                         )}
                       >
-                        {item.description}
+                        <Icon size={22} aria-hidden="true" />
                       </span>
+                      <span className="text-fluid-sm font-bold">{label}</span>
+                      {item.description && (
+                        <span
+                          className={cn(
+                            'block text-fluid-2xs leading-5',
+                            isActive ? 'text-emerald-50' : 'text-slate-500 dark:text-emerald-300/70',
+                          )}
+                        >
+                          {item.description}
+                        </span>
+                      )}
+                    </Link>
+                  );
+                }
+
+                return (
+                  <Link
+                    key={item.id}
+                    to={item.to}
+                    role="menuitem"
+                    onClick={onClose}
+                    aria-current={isActive ? 'page' : undefined}
+                    className={cn(
+                      'flex items-start gap-3 rounded-xl px-3 py-2 transition-colors',
+                      isActive
+                        ? 'bg-emerald-600 text-white'
+                        : 'text-slate-600 hover:bg-emerald-50 dark:text-emerald-100 dark:hover:bg-emerald-900/60',
                     )}
-                  </span>
-                </Link>
-              );
-            })}
+                  >
+                    <Icon
+                      size={16}
+                      aria-hidden="true"
+                      className={cn(
+                        'mt-0.5 shrink-0',
+                        isActive ? 'text-white' : 'text-emerald-600 dark:text-lime-300',
+                      )}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-fluid-sm font-bold">{label}</span>
+                      {item.description && (
+                        <span
+                          className={cn(
+                            'mt-0.5 block text-fluid-2xs leading-5',
+                            isActive ? 'text-emerald-50' : 'text-slate-500 dark:text-emerald-300/70',
+                          )}
+                        >
+                          {item.description}
+                        </span>
+                      )}
+                    </span>
+                  </Link>
+                );
+              })}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

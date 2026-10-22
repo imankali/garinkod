@@ -4,7 +4,7 @@
 // original price next to the final one, run a countdown, and disappear when
 // the shop has nothing discounted — an empty red panel would be a lie.
 
-import { screen, fireEvent } from '@testing-library/react';
+import { screen, fireEvent, createEvent } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import AmazingOffers from './AmazingOffers';
@@ -68,15 +68,38 @@ describe('the flash-deal panel', () => {
     expect(link).toHaveAttribute('href', '/products?collection=discounted');
   });
 
-  it('scrolls the rail with the round arrow buttons', async () => {
+  it('moves the rail by mouse drag without touching the page scroll', async () => {
     await renderAppSettled(<AmazingOffers />, { route: '/' });
     await screen.findByText('کود نیتروژن');
     // The regression this guards: a rail move must never drag the page's
     // vertical scroll with it (scrollIntoView used to do exactly that).
+    // The rail is dragged now — arrows were removed in favour of drag/swipe.
     const windowScrollSpy = vi.spyOn(window, 'scrollTo').mockName('window.scrollTo');
     const documentScrollSpy = vi.spyOn(document.documentElement, 'scrollTop', 'set');
-    fireEvent.click(screen.getByRole('button', { name: 'محصولات بعدی' }));
-    fireEvent.click(screen.getByRole('button', { name: 'محصولات قبلی' }));
+    const rail = screen.getByRole('region', { name: 'کارت‌های پیشنهادهای شگفت‌انگیز' });
+    Object.defineProperty(rail, 'scrollBy', { value: vi.fn(), configurable: true });
+    // jsdom's fireEvent drops PointerEvent init values (pointerType, pointerId
+    // all read undefined), so each event is built by its own creator and the
+    // missing init values are patched on by hand.
+    const pointer = (
+      type: 'pointerdown' | 'pointermove' | 'pointerup',
+      clientX: number,
+    ) => {
+      const creator =
+        type === 'pointerdown' ? createEvent.pointerDown
+        : type === 'pointermove' ? createEvent.pointerMove
+        : createEvent.pointerUp;
+      const event = creator(rail, { clientX, button: 0 });
+      Object.defineProperty(event, 'pointerType', { value: 'mouse' });
+      Object.defineProperty(event, 'pointerId', { value: 7 });
+      Object.defineProperty(event, 'button', { value: 0 });
+      Object.defineProperty(event, 'clientX', { value: clientX });
+      fireEvent(rail, event);
+    };
+    pointer('pointerdown', 200);
+    pointer('pointermove', 60);
+    pointer('pointerup', 60);
+    expect(rail.scrollBy).toHaveBeenCalled();
     expect(windowScrollSpy).not.toHaveBeenCalled();
     expect(documentScrollSpy).not.toHaveBeenCalled();
   });

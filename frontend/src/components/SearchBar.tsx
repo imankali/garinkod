@@ -284,7 +284,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
         onSubmit={handleSubmit}
         className={`group flex items-stretch rounded-2xl border-2 bg-white shadow-sm transition-colors duration-300 dark:bg-emerald-950 ${
           isFocused
-            ? "border-[#0F8A5F] shadow-lg shadow-emerald-100 ring-4 ring-emerald-100/50 dark:shadow-none dark:ring-emerald-900/50"
+            ? "border-[#15803d] shadow-lg shadow-emerald-100 ring-4 ring-emerald-100/50 dark:shadow-none dark:ring-emerald-900/50"
             : "border-emerald-100 hover:border-emerald-300 dark:border-emerald-900/60"
         }`}
       >
@@ -307,7 +307,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
           className={`relative flex min-h-11 min-w-11 items-center justify-center transition-colors ${
             isListening
               ? "text-rose-500"
-              : "text-slate-400 hover:text-[#0F8A5F] dark:text-emerald-400 dark:hover:text-lime-300"
+              : "text-slate-400 hover:text-[#15803d] dark:text-emerald-400 dark:hover:text-lime-300"
           }`}
           aria-label="جستجوی صوتی"
         >
@@ -333,8 +333,8 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
           type="button"
           onClick={toggleFilters}
           aria-expanded={showAdvanced}
-          className={`relative flex min-h-11 items-center gap-1 border-s border-emerald-100 px-3 text-slate-500 transition-colors hover:text-[#0F8A5F] dark:border-emerald-900 dark:text-emerald-400 ${
-            showAdvanced ? "bg-emerald-50 text-[#0F8A5F] dark:bg-emerald-900/60 dark:text-lime-300" : ""
+          className={`relative flex min-h-11 items-center gap-1 border-s border-emerald-100 px-3 text-slate-500 transition-colors hover:text-[#15803d] dark:border-emerald-900 dark:text-emerald-400 ${
+            showAdvanced ? "bg-emerald-50 text-[#15803d] dark:bg-emerald-900/60 dark:text-lime-300" : ""
           }`}
           aria-label="فیلترهای پیشرفته"
         >
@@ -396,7 +396,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
                     onClick={() => handleQuickFilter('inStock', null)}
                     className={`flex min-h-9 items-center gap-1.5 rounded-full px-3 py-1.5 text-fluid-xs font-semibold transition-colors ${
                       inStockOnly
-                        ? "bg-[#0F8A5F] text-white"
+                        ? "bg-[#15803d] text-white"
                         : "bg-white text-slate-600 ring-1 ring-slate-200 dark:bg-emerald-900 dark:text-emerald-100 dark:ring-emerald-800"
                     }`}
                   >
@@ -416,7 +416,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
                       onClick={() => handleQuickFilter('category', cat.id)}
                       className={`flex min-h-9 items-center gap-1.5 rounded-full px-3 py-1.5 text-fluid-xs font-semibold transition-colors ${
                         activeCategory === cat.id
-                          ? "bg-[#0F8A5F] text-white"
+                          ? "bg-[#15803d] text-white"
                           : "bg-white text-slate-600 ring-1 ring-slate-200 dark:bg-emerald-900 dark:text-emerald-100 dark:ring-emerald-800"
                       }`}
                     >
@@ -606,7 +606,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
                             ناموجود
                           </span>
                         )}
-                        <span className="shrink-0 text-xs font-semibold text-[#0F8A5F] dark:text-lime-300">
+                        <span className="shrink-0 text-xs font-semibold text-[#15803d] dark:text-lime-300">
                           {product.price.toLocaleString("fa-IR")}
                         </span>
                       </button>

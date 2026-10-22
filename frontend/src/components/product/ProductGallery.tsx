@@ -39,9 +39,13 @@ export default function ProductGallery({
   const shown = (peeking && second ? second : list[active]) ?? first;
 
   return (
-    <div>
+    // On desktop the gallery column is as tall as the info column beside it;
+    // letting the shot grow into that height (thumbs and caption pinned to
+    // the bottom) is what keeps the card from ending in a dead void under
+    // the thumbnails. Mobile keeps the plain square-then-thumbs flow.
+    <div className="flex flex-col md:h-full">
       <div
-        className="relative overflow-hidden rounded-2xl bg-emerald-50 dark:bg-emerald-900/30"
+        className="relative aspect-square overflow-hidden rounded-2xl bg-emerald-50 dark:bg-emerald-900/30 md:aspect-auto md:min-h-0 md:flex-1"
         onMouseEnter={() => setPeeking(true)}
         onMouseLeave={() => setPeeking(false)}
       >
@@ -61,7 +65,7 @@ export default function ProductGallery({
             height={600}
             decoding="async"
             fetchPriority="high"
-            className="aspect-square h-full w-full object-cover"
+            className="h-full w-full object-cover"
             onError={(event) => {
               event.currentTarget.src = FALLBACK;
             }}

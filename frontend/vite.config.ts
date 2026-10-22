@@ -16,7 +16,7 @@ const __dirname = path.dirname(__filename);
 // ========================================
 // Vite Configuration
 // ========================================
-export default defineConfig({
+export default defineConfig(({
   // ========================================
   // Plugins
   // ========================================
@@ -39,8 +39,8 @@ export default defineConfig({
         start_url: '/',
         scope: '/',
         display: 'standalone',
-        background_color: '#f7f3e8',
-        theme_color: '#0f8a5f',
+        background_color: '#f0fdf4',
+        theme_color: '#15803d',
         categories: ['shopping', 'business', 'utilities'],
         icons: [
           { src: '/images/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
@@ -173,11 +173,8 @@ export default defineConfig({
     // ✅ همه درخواست‌های /api و /media را به Django می‌فرستد
     // ========================================
     proxy: {
-      // changeOrigin stays false: the phone/host must reach Django with its
-      // real Host header so pagination links, CSRF and absolute URLs in the
-      // API envelope keep pointing at the address the browser actually uses.
       '/api': {
-        target: 'http://127.0.0.1:8000',
+        target: djangoTarget(),
         changeOrigin: false,
         secure: false,
 
@@ -193,13 +190,13 @@ export default defineConfig({
       },
 
       '/media': {
-        target: 'http://127.0.0.1:8000',
+        target: djangoTarget(),
         changeOrigin: false,
         secure: false,
       },
 
       '/static': {
-        target: 'http://127.0.0.1:8000',
+        target: djangoTarget(),
         changeOrigin: false,
         secure: false,
       },
@@ -281,9 +278,9 @@ export default defineConfig({
     // Playwright/Lighthouse exercise the production bundle. Keep browser API
     // calls same-origin just like development and the production reverse proxy.
     proxy: {
-      '/api': { target: 'http://127.0.0.1:8000', changeOrigin: true },
-      '/media': { target: 'http://127.0.0.1:8000', changeOrigin: true },
-      '/static': { target: 'http://127.0.0.1:8000', changeOrigin: true },
+      '/api': { target: djangoTarget(), changeOrigin: true },
+      '/media': { target: djangoTarget(), changeOrigin: true },
+      '/static': { target: djangoTarget(), changeOrigin: true },
     },
   },
 
@@ -293,4 +290,10 @@ export default defineConfig({
   css: {
     devSourcemap: true,
   },
-});
+}));
+
+/** Backend origin for the dev/preview proxies — DJANGO_PORT wins so a busy
+ *  8000 (another local app) only needs this env switch, no config edits. */
+function djangoTarget() {
+  return `http://127.0.0.1:${process.env.DJANGO_PORT || '8000'}`;
+}

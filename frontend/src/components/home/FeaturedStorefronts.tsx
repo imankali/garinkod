@@ -27,6 +27,79 @@ export default function FeaturedStorefronts() {
   const touchPause = useRef(false);
   const cancelTween = useRef<(() => void) | null>(null);
 
+  /** Mouse drag-to-scroll — the same contract as ListingRail: touch already
+   *  pans natively, so only the mouse path is hijacked; a drag suppresses
+   *  the click that follows so grabbing the rail never opens a stall. */
+  const drag = useRef<{ pointerId: number; startX: number; lastX: number; moved: boolean; active: boolean } | null>(null);
+
+  const endDrag = () => {
+    const d = drag.current;
+    const rail = railRef.current;
+    if (d) d.active = false;
+    if (rail) {
+      rail.style.scrollSnapType = '';
+      rail.style.userSelect = '';
+      rail.style.cursor = '';
+    }
+  };
+
+  const onDragStart = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType !== 'mouse' || event.button !== 0) return;
+    const rail = railRef.current;
+    if (!rail) return;
+    cancelTween.current?.();
+    // Capture and grab-styling wait for the first real movement: capturing on
+    // pointerdown makes Chromium retarget the following click to the rail and
+    // silently swallow the stall links inside it.
+    drag.current = { pointerId: event.pointerId, startX: event.clientX, lastX: event.clientX, moved: false, active: true };
+  };
+
+  const onDragMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const d = drag.current;
+    const rail = railRef.current;
+    if (!d?.active || !rail || event.pointerId !== d.pointerId) return;
+    const dx = event.clientX - d.lastX;
+    d.lastX = event.clientX;
+    if (!d.moved) {
+      // Dead-zone: under ~5px the gesture is a click, not a drag.
+      if (Math.abs(event.clientX - d.startX) < 5) return;
+      d.moved = true;
+      rail.style.scrollSnapType = 'none';
+      rail.style.userSelect = 'none';
+      rail.style.cursor = 'grabbing';
+      try { rail.setPointerCapture(event.pointerId); } catch { /* older browsers */ }
+    }
+    rail.scrollBy({ left: dx, behavior: 'instant' as ScrollBehavior });
+  };
+
+  const onDragEnd = () => endDrag();
+
+  const onRailClickCapture = (event: React.MouseEvent) => {
+    if (drag.current?.moved) {
+      event.preventDefault();
+      event.stopPropagation();
+      drag.current.moved = false;
+    }
+  };
+
+  // The grab cursor is an affordance — it is only honest while the rail can
+  // actually be dragged. With a handful of stalls the row fits its container
+  // and a grab cursor that drags nothing reads as a bug.
+  const [canScroll, setCanScroll] = useState(false);
+  useEffect(() => {
+    const rail = railRef.current;
+    if (!rail) return undefined;
+    const update = () => setCanScroll(rail.scrollWidth > rail.clientWidth + 4);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(rail);
+    window.addEventListener('resize', update);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', update);
+    };
+  }, [loading, storefronts.length]);
+
   useEffect(() => {
     let cancelled = false;
     storefrontsApi
@@ -94,20 +167,7 @@ export default function FeaturedStorefronts() {
     animateTo(sign * index * unit);
   };
 
-  const move = (direction: -1 | 1) => {
-    const rail = railRef.current;
-    if (!rail) return;
-    const unit = Math.max(columnStep(rail), 1);
-    const travelled = Math.abs(rail.scrollLeft);
-    const currentIndex = Number.isFinite(travelled / unit)
-      ? Math.round(travelled / unit)
-      : 0;
-    const nextIndex = Math.min(
-      Math.max(currentIndex + direction, 0),
-      rail.children.length - 1,
-    );
-    scrollToColumn(nextIndex);
-  };
+
 
   const inViewRef = useRef(false);
   useEffect(() => {
@@ -189,8 +249,13 @@ export default function FeaturedStorefronts() {
       <div className="relative mt-5">
         <div
           ref={railRef}
+          onClickCapture={onRailClickCapture}
+          onPointerDown={onDragStart}
+          onPointerMove={onDragMove}
+          onPointerUp={onDragEnd}
+          onPointerCancel={onDragEnd}
           onPointerEnter={() => { hoverPause.current = true; }}
-          onPointerLeave={() => { hoverPause.current = false; }}
+          onPointerLeave={() => { hoverPause.current = false; endDrag(); }}
           onTouchStart={() => {
             cancelTween.current?.();
             touchPause.current = true;
@@ -198,7 +263,7 @@ export default function FeaturedStorefronts() {
           onTouchEnd={() => {
             window.setTimeout(() => { touchPause.current = false; }, 2500);
           }}
-          className="rail-scroll flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain pb-2 touch-pan-x"
+          className={`rail-scroll flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain pb-2 touch-pan-x ${canScroll ? 'cursor-grab' : ''}`}
           role="region"
           aria-label="غرفه‌های منتخب، قابل پیمایش افقی"
         >
@@ -260,23 +325,9 @@ export default function FeaturedStorefronts() {
           </div>
         </div>
 
-        {/* Round edge arrows — desktop only; touch widths swipe natively. */}
-        <button
-          type="button"
-          onClick={() => move(1)}
-          aria-label="غرفه‌های بعدی"
-          className="absolute left-1 top-1/2 z-20 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-slate-700 shadow-lg ring-1 ring-slate-200 transition hover:scale-105 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-300 md:flex dark:bg-emerald-950 dark:text-white dark:ring-emerald-700"
-        >
-          <ArrowLeft size={18} aria-hidden="true" />
-        </button>
-        <button
-          type="button"
-          onClick={() => move(-1)}
-          aria-label="غرفه‌های قبلی"
-          className="absolute right-1 top-1/2 z-20 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-slate-700 shadow-lg ring-1 ring-slate-200 transition hover:scale-105 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-300 md:flex dark:bg-emerald-950 dark:text-white dark:ring-emerald-700"
-        >
-          <ArrowLeft size={18} aria-hidden="true" className="rotate-180" />
-        </button>
+        {/* Round edge arrows removed: the rail drags with the mouse on
+            desktop (pointer capture, snap on release) and swipes natively on
+            touch — one gesture model across every rail on the site. */}
       </div>
     </section>
   );

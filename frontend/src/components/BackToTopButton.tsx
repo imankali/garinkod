@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowUp } from "lucide-react";
 
@@ -24,8 +24,40 @@ export default function BackToTopButton({ cartDrawerOpen = false }: { cartDrawer
     return () => window.removeEventListener("scroll", updateVisibility);
   }, []);
 
+  // A JS tween rather than CSS `behavior: "smooth"`: the global CSS smooth
+  // was removed (it animated framer-motion's internal window scrolls and
+  // swallowed user scrolling), so the niceness has to come from here. The
+  // tween is cancelled by any real wheel/touch — a user interrupting the
+  // glide wins over the animation, which native smooth would not allow.
+  const rafRef = useRef<number>(0);
+  useEffect(() => () => cancelAnimationFrame(rafRef.current), []);
   const scrollToTop = () => {
-    window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+    const start = window.scrollY;
+    if (start <= 0) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce) {
+      window.scrollTo(0, 0);
+      return;
+    }
+    const duration = Math.min(700, 250 + start * 0.12);
+    const t0 = performance.now();
+    const cancel = () => cancelAnimationFrame(rafRef.current);
+    const stop = () => {
+      cancel();
+      window.removeEventListener("wheel", stop, { passive: true } as EventListenerOptions);
+      window.removeEventListener("touchstart", stop, { passive: true } as EventListenerOptions);
+    };
+    stop();
+    window.addEventListener("wheel", stop, { passive: true } as EventListenerOptions);
+    window.addEventListener("touchstart", stop, { passive: true } as EventListenerOptions);
+    const easeOut = (t: number) => 1 - Math.pow(1 - t, 3);
+    const step = (now: number) => {
+      const p = Math.min((now - t0) / duration, 1);
+      window.scrollTo(0, Math.round(start * (1 - easeOut(p))));
+      if (p < 1) rafRef.current = requestAnimationFrame(step);
+      else stop();
+    };
+    rafRef.current = requestAnimationFrame(step);
   };
 
   // Suppressed drawers unmount the whole thing instantly — a button fading

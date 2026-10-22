@@ -280,9 +280,10 @@ function productOrderCeiling(item: CartItem): number {
                   onClick={onClose}
                   whileHover={reduceMotion ? undefined : { scale: 1.05 }}
                   whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+                  aria-label="بستن سبد خرید"
                   className="flex min-h-11 min-w-11 items-center justify-center rounded-full bg-white/15 transition-colors hover:bg-white/25"
                 >
-                  <X size={20} />
+                  <X size={20} aria-hidden="true" />
                 </motion.button>
               </div>
 

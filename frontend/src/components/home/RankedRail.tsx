@@ -74,7 +74,7 @@ export default function RankedRail({
           <span className="text-fluid-xs text-slate-500 dark:text-emerald-200">{hint}</span>
           <Link
             to={moreTo}
-            className="ms-auto inline-flex items-center gap-1 text-fluid-sm font-bold text-emerald-700 transition hover:text-emerald-900 dark:text-lime-300"
+            className="ms-auto inline-flex min-h-6 items-center gap-1 py-1 text-fluid-sm font-bold text-emerald-700 transition hover:text-emerald-900 dark:text-lime-300"
           >
             {moreLabel}
             <ChevronLeft size={16} aria-hidden="true" />

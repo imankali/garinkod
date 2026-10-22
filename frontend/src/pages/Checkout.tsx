@@ -293,7 +293,10 @@ export default function Checkout() {
 
   return (
     <main className="mx-auto max-w-6xl px-[var(--page-gutter)] [&_button]:min-h-11 [&_button]:min-w-11 py-7 md:py-10">
-      <Link to="/" className="inline-flex items-center gap-2 text-sm font-bold text-emerald-700 dark:text-lime-300">بازگشت به فروشگاه</Link>
+      {/* The measured anchor was a 19px-tall target — under the product's own
+          44px rule on the highest-stakes form in the funnel. min-h plus aligned
+          padding keeps the text identical and grows only the hit box. */}
+      <Link to="/" className="inline-flex min-h-11 items-center gap-2 py-2 text-sm font-bold text-emerald-700 dark:text-lime-300">بازگشت به فروشگاه</Link>
       <PurchaseSteps currentStep="details" className="mt-5" />
       <div className="mt-5 grid gap-6 lg:grid-cols-[1fr_360px]">
         <form onSubmit={submit} className="space-y-5 rounded-3xl border border-slate-100 bg-white p-5 shadow-sm md:p-7 dark:border-emerald-900 dark:bg-emerald-950">
@@ -322,7 +325,7 @@ export default function Checkout() {
 
           <div>
             <label htmlFor="checkout-address" className="block text-sm font-bold text-slate-700 dark:text-emerald-50">
-              نشانی کامل تحویل <span className="text-rose-500">*</span>
+              نشانی کامل تحویل <span className="text-rose-600 dark:text-rose-400">*</span>
             </label>
             <textarea
               id="checkout-address"
@@ -539,7 +542,7 @@ function Field({ id, label, value, onChange, type = "text", inputMode, required 
   return (
     <div>
       <label htmlFor={id} className="block text-sm font-bold text-slate-700 dark:text-emerald-50">
-        {label} {required && <span className="text-rose-500">*</span>}
+        {label} {required && <span className="text-rose-600 dark:text-rose-400">*</span>}
       </label>
       <input
         id={id}

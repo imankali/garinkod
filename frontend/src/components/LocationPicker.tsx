@@ -103,7 +103,7 @@ export default function LocationPicker({
           className="mb-1 block text-xs font-bold text-slate-600 dark:text-emerald-100"
         >
           <MapPin size={12} className="me-1 inline" />
-          استان {required && <span className="text-rose-500">*</span>}
+          استان {required && <span className="text-rose-600 dark:text-rose-400">*</span>}
         </label>
         <select
           id={provinceId}
@@ -138,7 +138,7 @@ export default function LocationPicker({
           htmlFor={cityId}
           className="mb-1 block text-xs font-bold text-slate-600 dark:text-emerald-100"
         >
-          شهر {required && <span className="text-rose-500">*</span>}
+          شهر {required && <span className="text-rose-600 dark:text-rose-400">*</span>}
         </label>
         <select
           id={cityId}

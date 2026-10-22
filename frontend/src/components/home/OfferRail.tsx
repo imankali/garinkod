@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { Link } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, ShoppingCart, Star } from 'lucide-react';
+import { ShoppingCart, Star } from 'lucide-react';
 
 import { formatPrice } from '../../utils/formatPrice';
 import { toPersianDigits } from '../../utils/normalizeDigits';
@@ -35,7 +35,15 @@ import type { ProductList } from '@/types/shop';
  */
 const AUTOPLAY_MS = 2000;
 
-export default function OfferRail({ products }: { products: ProductList[] }) {
+export default function OfferRail({
+  products,
+  label = 'کارت‌های قابل پیمایش افقی',
+}: {
+  products: ProductList[];
+  /** Accessible name of the scroll region — lets each panel (flash deals,
+   *  best-sellers, …) be told apart by screen readers and tests. */
+  label?: string;
+}) {
   const queryClient = useQueryClient();
   const railRef = useRef<HTMLDivElement>(null);
   const hoverPause = useRef(false);
@@ -43,6 +51,61 @@ export default function OfferRail({ products }: { products: ProductList[] }) {
   const busyId = useRef<number | null>(null);
   const cancelTween = useRef<(() => void) | null>(null);
   const addToCart = useCartStore((state) => state.addToCart);
+
+  /** Mouse drag-to-scroll — the shared rail contract (see ListingRail):
+   *  touch pans natively, so only the mouse path is hijacked; a drag
+   *  suppresses the click that follows so grabbing never opens a product. */
+  const drag = useRef<{ pointerId: number; startX: number; lastX: number; moved: boolean; active: boolean } | null>(null);
+
+  const endDrag = () => {
+    const d = drag.current;
+    const rail = railRef.current;
+    if (d) d.active = false;
+    if (rail) {
+      rail.style.scrollSnapType = '';
+      rail.style.userSelect = '';
+      rail.style.cursor = '';
+    }
+  };
+
+  const onDragStart = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType !== 'mouse' || event.button !== 0) return;
+    const rail = railRef.current;
+    if (!rail) return;
+    cancelTween.current?.();
+    // Capture and grab-styling wait for the first real movement: capturing on
+    // pointerdown makes Chromium retarget the following click to the rail and
+    // silently swallow every button inside it (افزودن / product links).
+    drag.current = { pointerId: event.pointerId, startX: event.clientX, lastX: event.clientX, moved: false, active: true };
+  };
+
+  const onDragMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const d = drag.current;
+    const rail = railRef.current;
+    if (!d?.active || !rail || event.pointerId !== d.pointerId) return;
+    const dx = event.clientX - d.lastX;
+    d.lastX = event.clientX;
+    if (!d.moved) {
+      // Dead-zone: under ~5px the gesture is a click, not a drag.
+      if (Math.abs(event.clientX - d.startX) < 5) return;
+      d.moved = true;
+      rail.style.scrollSnapType = 'none';
+      rail.style.userSelect = 'none';
+      rail.style.cursor = 'grabbing';
+      try { rail.setPointerCapture(event.pointerId); } catch { /* older browsers */ }
+    }
+    rail.scrollBy({ left: dx, behavior: 'instant' as ScrollBehavior });
+  };
+
+  const onDragEnd = () => endDrag();
+
+  const onRailClickCapture = (event: React.MouseEvent) => {
+    if (drag.current?.moved) {
+      event.preventDefault();
+      event.stopPropagation();
+      drag.current.moved = false;
+    }
+  };
 
   // Pair the products into two-row columns: [0,1], [2,3], … The leftover
   // product of an odd list fills the top row of the last column alone.
@@ -114,21 +177,6 @@ export default function OfferRail({ products }: { products: ProductList[] }) {
     animateTo(sign * index * unit);
   };
 
-  const move = (direction: -1 | 1) => {
-    const rail = railRef.current;
-    if (!rail) return;
-    const unit = Math.max(cardStep(rail), 1);
-    // Current column index from scroll offset (scrollLeft is negative in RTL).
-    const travelled = Math.abs(rail.scrollLeft);
-    const currentIndex = Number.isFinite(travelled / unit)
-      ? Math.round(travelled / unit)
-      : 0;
-    const nextIndex = Math.min(
-      Math.max(currentIndex + direction, 0),
-      rail.children.length - 1,
-    );
-    scrollToCard(nextIndex);
-  };
 
   // Autoplay runs only while the rail is actually on screen: a rail parked
   // far down the page neither moves itself nor nudges the reader's place.
@@ -208,7 +256,7 @@ export default function OfferRail({ products }: { products: ProductList[] }) {
       <div className="relative">
         <img
           src={product.image_url}
-          alt=""
+          alt={product.title}
           width={280}
           height={224}
           loading="lazy"
@@ -271,8 +319,13 @@ export default function OfferRail({ products }: { products: ProductList[] }) {
     <div className="group/rail relative">
       <div
         ref={railRef}
+        onClickCapture={onRailClickCapture}
+        onPointerDown={onDragStart}
+        onPointerMove={onDragMove}
+        onPointerUp={onDragEnd}
+        onPointerCancel={onDragEnd}
         onPointerEnter={() => { hoverPause.current = true; }}
-        onPointerLeave={() => { hoverPause.current = false; }}
+        onPointerLeave={() => { hoverPause.current = false; endDrag(); }}
         onTouchStart={() => {
           // A finger on the rail takes over from any running animation:
           // cancel it and hand snap back before the browser records the swipe.
@@ -283,9 +336,9 @@ export default function OfferRail({ products }: { products: ProductList[] }) {
           // Give momentum scrolling a beat to settle before autoplay resumes.
           window.setTimeout(() => { touchPause.current = false; }, 2500);
         }}
-        className="rail-scroll mt-4 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-4 pb-4 touch-pan-x sm:px-6"
+        className="rail-scroll mt-4 flex snap-x snap-mandatory cursor-grab gap-3 overflow-x-auto overscroll-x-contain px-4 pb-4 touch-pan-x sm:px-6"
         role="region"
-        aria-label="کارت‌های قابل پیمایش افقی"
+        aria-label={label}
       >
         {columns.map((column, columnIndex) => (
           <div
@@ -297,28 +350,8 @@ export default function OfferRail({ products }: { products: ProductList[] }) {
         ))}
       </div>
 
-      {/* Round controls — DESKTOP ONLY: on touch widths the rail pans with the
-          finger and the arrows only crowded it. Same contract as ProductCarousel
-          (`hidden md:flex`). RTL carousel contract (Digikala-style): the RIGHT
-          button slides the content rightward, bringing the earlier (right-side)
-          products into view; the LEFT button slides content leftward for the
-          later ones. The chevrons point the way the CONTENT moves. */}
-      <button
-        type="button"
-        onClick={() => move(1)}
-        aria-label="محصولات بعدی"
-        className="absolute left-1 top-1/2 z-20 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-slate-700 shadow-lg ring-1 ring-slate-200 transition hover:scale-105 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-300 md:flex dark:bg-emerald-950 dark:text-white dark:ring-emerald-700"
-      >
-        <ChevronLeft size={18} aria-hidden="true" />
-      </button>
-      <button
-        type="button"
-        onClick={() => move(-1)}
-        aria-label="محصولات قبلی"
-        className="absolute right-1 top-1/2 z-20 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-slate-700 shadow-lg ring-1 ring-slate-200 transition hover:scale-105 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-300 md:flex dark:bg-emerald-950 dark:text-white dark:ring-emerald-700"
-      >
-        <ChevronRight size={18} aria-hidden="true" />
-      </button>
+      {/* Round arrows removed: the rail drags with the mouse on desktop and
+          pans natively on touch — one gesture model across every rail. */}
     </div>
   );
 }

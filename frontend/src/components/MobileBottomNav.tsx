@@ -58,7 +58,11 @@ export default function MobileBottomNav({
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
                     exit={{ scale: 0 }}
-                    className="absolute -end-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-orange-500 px-1 text-fluid-2xs font-bold text-white"
+                    // bg-orange-500 under white text measured 2.89:1 — under
+                    // AA for the one number a buyer must read. The harvest
+                    // gold (#a16207) is the palette's accent and clears 4.5:1
+                    // with the same white.
+                    className="absolute -end-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#a16207] px-1 text-fluid-2xs font-bold text-white"
                   >
                     {cartCount > 9 ? '۹+' : cartCount.toLocaleString('fa-IR')}
                   </motion.span>

@@ -927,6 +927,9 @@ export const storefrontPostsApi = {
     shuffle?: boolean;
     /** Pin the shuffle so a paginated scroll keeps one coherent ordering. */
     seed?: number;
+    /** Ranked (unshuffled) feed that still skips this reader's served posts —
+     *  کاوش uses this so the explore grid never repeats what was shown. */
+    exclude_seen?: boolean;
   }) => apiClient.get<PaginatedResponse<StorefrontPost>>('/marketplace/posts/', { params }),
   mine: () => apiClient.get<StorefrontPost[]>('/marketplace/posts/mine/'),
 

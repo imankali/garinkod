@@ -45,6 +45,13 @@ export interface StorefrontHighlightItem {
   image_url: string;
   caption: string;
   created_at: string;
+  /** Snapshot of the source post's social state, so the story viewer can
+      offer like/reply on highlight items exactly as it does on live stories. */
+  is_liked?: boolean;
+  like_count?: number;
+  storefront_slug?: string;
+  storefront_name?: string;
+  storefront_avatar_url?: string;
 }
 
 export interface StorefrontHighlight {

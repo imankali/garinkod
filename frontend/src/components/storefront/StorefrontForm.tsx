@@ -257,7 +257,7 @@ export default function StorefrontForm({
       <div className="mt-5 grid gap-4 md:grid-cols-2">
         <div>
           <label htmlFor="store-name" className="block text-sm font-bold text-slate-700 dark:text-emerald-50">
-            نام غرفه <span className="text-rose-500">*</span>
+            نام غرفه <span className="text-rose-600 dark:text-rose-400">*</span>
           </label>
           <div className="relative mt-2">
             <input
@@ -379,7 +379,7 @@ export default function StorefrontForm({
       */}
       <fieldset className="mt-5 rounded-2xl border border-emerald-100 bg-emerald-50/40 p-4 dark:border-emerald-800 dark:bg-emerald-900/30">
         <legend className="px-1 text-sm font-extrabold text-slate-800 dark:text-white">
-          هویت صاحب غرفه <span className="text-rose-500">*</span>
+          هویت صاحب غرفه <span className="text-rose-600 dark:text-rose-400">*</span>
         </legend>
         <p className="mb-3 text-fluid-xs leading-6 text-slate-500 dark:text-emerald-200">
           این اطلاعات فقط برای احراز هویت و رسیدگی به اختلاف‌هاست و در صفحه عمومی غرفه نمایش داده نمی‌شود.
@@ -421,7 +421,7 @@ export default function StorefrontForm({
       */}
       <fieldset className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50/40 p-4 dark:border-emerald-800 dark:bg-emerald-900/30">
         <legend className="px-1 text-sm font-extrabold text-slate-800 dark:text-white">
-          تسویه درآمد و قوانین <span className="text-rose-500">*</span>
+          تسویه درآمد و قوانین <span className="text-rose-600 dark:text-rose-400">*</span>
         </legend>
         <div className="grid gap-4 sm:grid-cols-2">
           <IdentityField

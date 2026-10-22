@@ -1157,11 +1157,40 @@ class StorefrontHighlightItemSerializer(serializers.ModelSerializer):
     image_url = serializers.CharField(source='post.image_url', read_only=True)
     caption = serializers.CharField(source='post.caption', read_only=True)
     created_at = serializers.DateTimeField(source='post.created_at', read_only=True)
+    # Social snapshot of the source post: the story viewer offers like/reply
+    # on highlight items exactly as it does on live stories, and a like made
+    # here lands on the same post the feed counts.
+    is_liked = serializers.SerializerMethodField()
+    like_count = serializers.SerializerMethodField()
+    storefront_slug = serializers.CharField(source='post.storefront.slug', read_only=True)
+    storefront_name = serializers.CharField(source='post.storefront.name', read_only=True)
+    storefront_avatar_url = serializers.CharField(source='post.storefront.avatar_url', read_only=True)
 
     class Meta:
         model = StorefrontHighlightItem
-        fields = ['id', 'post', 'position', 'image_url', 'caption', 'created_at']
-        read_only_fields = ['id', 'image_url', 'caption', 'created_at']
+        fields = [
+            'id', 'post', 'position', 'image_url', 'caption', 'created_at',
+            'is_liked', 'like_count', 'storefront_slug', 'storefront_name',
+            'storefront_avatar_url',
+        ]
+        read_only_fields = ['id', 'image_url', 'caption', 'created_at',
+                            'is_liked', 'like_count', 'storefront_slug',
+                            'storefront_name', 'storefront_avatar_url']
+
+    def get_is_liked(self, obj) -> bool:
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        if not user or not user.is_authenticated:
+            return False
+        post = getattr(obj, 'post', None)
+        return bool(post and post.likes.filter(user=user).exists())
+
+    def get_like_count(self, obj) -> int:
+        post = getattr(obj, 'post', None)
+        if not post:
+            return 0
+        annotated = getattr(post, 'likes_total', None)
+        return annotated if annotated is not None else post.likes.count()
 
 
 class StorefrontHighlightSerializer(serializers.ModelSerializer):

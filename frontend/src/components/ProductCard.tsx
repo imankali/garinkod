@@ -52,8 +52,12 @@ export default function ProductCard({
 }: ProductCardProps) {
   const reduceMotion = useReducedMotion();
   const cardMotion = reduceMotion ? {} : {
-    initial: { opacity: 0, y: 20 },
-    whileInView: { opacity: 1, y: 0 },
+    /* Fade only: a y-offset here makes framer-motion measure the card against
+       the window and restore window.scrollY around the keyframe pass, which
+       raced the route's scroll-reset and landed /storefronts deep on entry. */
+    initial: { opacity: 0 },
+    whileInView: { opacity: 1 },
+    viewport: { once: true, amount: 0.1 },
   };
   const desktopHover = reduceMotion ? undefined : { y: -4 };
 
@@ -122,7 +126,7 @@ export default function ProductCard({
       {/* ======================================== */}
       {/* Product Image */}
       {/* ======================================== */}
-      <div className="relative aspect-[4/3] h-40 w-full overflow-hidden bg-gradient-to-br from-emerald-50 via-white to-[#F7F3E8] dark:from-emerald-950 dark:to-emerald-900 md:h-48">
+      <div className="relative aspect-[4/3] h-40 w-full overflow-hidden bg-gradient-to-br from-emerald-50 via-white to-[#f0fdf4] dark:from-emerald-950 dark:to-emerald-900 md:h-48">
         <a
           href={productUrl || '#'}
           aria-label={`مشاهده ${product.name}`}
@@ -223,7 +227,7 @@ export default function ProductCard({
       <div className="flex flex-1 flex-col p-4">
         {/* Category & Brand */}
         <div className="mb-1 flex items-center justify-between">
-          <p className="text-fluid-xs font-medium text-[#0F8A5F] dark:text-lime-300">{product.category}</p>
+          <p className="text-fluid-xs font-medium text-[#15803d] dark:text-lime-300">{product.category}</p>
           <p className="text-fluid-2xs text-slate-400">{product.brand}</p>
         </div>
 
@@ -234,7 +238,7 @@ export default function ProductCard({
               href={productUrl}
               // The stretched link makes the whole card tappable, which is the
               // real target on a phone rather than the two-line title itself.
-              className="line-clamp-2 min-h-11 py-1.5 leading-6 transition-colors before:absolute before:inset-0 before:z-[1] before:content-[''] hover:text-[#0F8A5F]"
+              className="line-clamp-2 min-h-11 py-1.5 leading-6 transition-colors before:absolute before:inset-0 before:z-[1] before:content-[''] hover:text-[#15803d]"
             >
               {product.name}
             </a>
@@ -242,7 +246,7 @@ export default function ProductCard({
             <button
               type="button"
               onClick={() => onQuickView(product)}
-              className="line-clamp-2 min-h-11 py-1.5 text-start leading-6 transition-colors hover:text-[#0F8A5F]"
+              className="line-clamp-2 min-h-11 py-1.5 text-start leading-6 transition-colors hover:text-[#15803d]"
             >
               {product.name}
             </button>
@@ -324,8 +328,8 @@ export default function ProductCard({
             title={isComparing ? "حذف از مقایسه" : "افزودن به مقایسه"}
             className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-colors disabled:cursor-not-allowed disabled:opacity-30 dark:border-emerald-700 ${
               isComparing
-                ? "border-[#0F8A5F] bg-emerald-50 text-[#0F8A5F] dark:bg-emerald-900 dark:text-lime-300"
-                : "border-slate-200 text-slate-400 hover:text-[#0F8A5F] dark:text-emerald-400"
+                ? "border-[#15803d] bg-emerald-50 text-[#15803d] dark:bg-emerald-900 dark:text-lime-300"
+                : "border-slate-200 text-slate-400 hover:text-[#15803d] dark:text-emerald-400"
             }`}
           >
             <GitCompare size={15} />

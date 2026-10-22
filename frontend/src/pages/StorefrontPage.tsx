@@ -110,6 +110,50 @@ export default function StorefrontPage() {
   const [contentBusy, setContentBusy] = useState(false);
   const [contentError, setContentError] = useState('');
 
+  // When the category grid view opens (via the rail's «مشاهده بیشتر» push or
+  // a shared deep link), bring it to the top of the viewport — the reader
+  // tapped a button that promised a page, not a section somewhere below.
+  // After hardware Back the position restores through ScrollToTop's memory,
+  // so the scroll is deliberately one-way: PUSH/REPLACE only.
+  const listingsAllTab = searchParams.get('tab') === 'listings-all';
+  const categoryPanelRef = useRef<HTMLDivElement>(null);
+  // Scroll the category grid to the viewport top when it opens. The POP guard
+  // is subtle: React Router reports POP for the *initial page load* too, and
+  // a deep link/shared URL must scroll like a PUSH does. What we must not
+  // scroll is hardware-Back returning to an already-rendering page —
+  // ScrollToTop's per-entry memory owns that restore. Both are POP, so the
+  // tell is the memory itself: an entry Back revisits was saved with a
+  // non-zero depth; a first visit has none.
+  // StrictMode note: dev double-mounts (mount → cleanup → mount). The seen
+  // check must live OUTSIDE the cancelled-first-cycle path, so the marker is
+  // recorded only after the entry's loop actually performs its scroll — the
+  // abandoned StrictMode cycle never marks, and the real mount proceeds.
+  const seenEntries = useRef<Set<string>>(new Set());
+  const markedEntries = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!listingsAllTab) return;
+    const entryKey = (history.state as { key?: string } | null)?.key ?? 'unknown';
+    if (markedEntries.current.has(entryKey)) return; // Back/Forward revisit — ScrollToTop restores
+    seenEntries.current.add(entryKey);
+    let raf = 0;
+    const startedAt = performance.now();
+    const bring = () => {
+      const panel = categoryPanelRef.current;
+      if (panel) {
+        const top = panel.getBoundingClientRect().top + window.scrollY;
+        window.scrollTo({ top: Math.max(top - 8, 0), behavior: 'instant' as ScrollBehavior });
+        const settled = Math.abs(panel.getBoundingClientRect().top - 8) < 40;
+        if (settled || performance.now() - startedAt > 3000) {
+          markedEntries.current.add(entryKey);
+          return;
+        }
+      }
+      raf = requestAnimationFrame(bring);
+    };
+    raf = requestAnimationFrame(bring);
+    return () => cancelAnimationFrame(raf);
+  }, [listingsAllTab]);
+
   const { isAuthenticated } = useAuthStore();
   const addToCart = useCartStore((state) => state.addToCart);
   const openDirect = useDirectStore((state) => state.openDirect);
@@ -385,7 +429,7 @@ export default function StorefrontPage() {
           return (
             <button
               type="button"
-              onClick={() => setViewer({ posts: stories, index: 0 })}
+              onClick={() => setViewer({ posts: stories, index: 0 })} // stories carry social fields natively
               className="group relative h-[104px] w-[104px] shrink-0 rounded-full p-[4px] transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-300 sm:h-[120px] sm:w-[120px]"
               aria-label={
                 allSeen
@@ -537,10 +581,18 @@ export default function StorefrontPage() {
         onChanged={load}
         onOpenHighlight={(highlight) =>
           setViewer({
+            /* Highlight items pass their source post's social state through,
+               so likes made inside a highlight land on the real post — the
+               same post the feed and the live story show. */
             posts: highlight.items.map((item) => ({
               id: item.post,
               image_url: item.image_url,
               caption: item.caption,
+              is_liked: item.is_liked,
+              like_count: item.like_count,
+              storefront_slug: item.storefront_slug || storefront.slug,
+              storefront_name: item.storefront_name || storefront.name,
+              storefront_avatar_url: item.storefront_avatar_url || storefront.avatar_url,
             })),
             index: 0,
           })
@@ -722,7 +774,9 @@ export default function StorefrontPage() {
           {listings.length === 0 ? (
             <EmptyState text={isOwner ? 'هنوز آگهی‌ای ثبت نکرده‌اید؛ اولین آگهی را از دکمه بالا اضافه کنید.' : 'این غرفه هنوز آگهی منتشرشده‌ای ندارد.'} />
           ) : (
-            <div className="space-y-6">
+            // فریم هر دسته برداشته شده؛ این ریتم عمودی بلندتر جای قاب را می‌گیرد
+            // و شلف‌ها را بدون خط و کادر از هم جدا می‌کند.
+            <div className="space-y-8 md:space-y-12">
               {/* هر دسته یک ریل افقی کاروسلی (الگوی «پرفروش‌ترین‌های بانی‌مد»):
                   کارت‌ها در یک ردیف می‌لغزند، فلش‌های گرد سر لبه‌اند و «همه»
                   گرید کامل همان دسته را باز می‌کند. */}
@@ -738,10 +792,14 @@ export default function StorefrontPage() {
                   onDelete={isOwner ? (listing) => void deleteListing(listing) : undefined}
                   onSendToDirect={isOwner ? undefined : (listing) => sendListingToDirect(listing)}
                   onOpenAll={() => {
+                    // PUSH (not replace): the category grid becomes its own
+                    // history entry, so the phone's hardware Back closes it
+                    // and lands back here — on the same rail, at the same
+                    // depth — instead of leaving the storefront entirely.
                     const next = new URLSearchParams(searchParams);
                     next.set('tab', 'listings-all');
                     next.set('category', groupName);
-                    setSearchParams(next, { replace: true });
+                    setSearchParams(next, { replace: false });
                   }}
                 />
               ))}
@@ -758,8 +816,30 @@ export default function StorefrontPage() {
       {tab === 'listings' && searchParams.get('tab') === 'listings-all' && contentResults === null && (() => {
         const categoryName = searchParams.get('category') || '';
         const groupItems = listingGroups.find(([name]) => name === categoryName)?.[1] ?? [];
+        // Each category's «مشاهده بیشتر» view is its own indexable page: it has
+        // a stable address (`?tab=listings-all&category=…`), a self-canonical
+        // URL (so the storefront page and every category page never compete),
+        // and per-category OG tags so a shared link previews the category, not
+        // the bare storefront.
+        const categoryUrl = `${siteUrl}/storefronts/${encodeURIComponent(storefront.slug)}?tab=listings-all&category=${encodeURIComponent(categoryName)}`;
+        const categoryTitle = `${categoryName} در ${storefront.name} | گرین کود`;
+        const categoryDescription = `همه آگهی‌های ${categoryName} از ${storefront.name} (${storefront.seller_type_label}) — قیمت به‌روز، موجودی تأییدشده و خرید مستقیم در بازار گرین کود.`.slice(0, 160);
         return (
-          <div role="tabpanel" aria-label={`همه آگهی‌های دسته ${categoryName}`} className="mt-4">
+          <div ref={categoryPanelRef} role="tabpanel" aria-label={`همه آگهی‌های دسته ${categoryName}`} className="mt-4">
+            <Helmet>
+              <title>{categoryTitle}</title>
+              <meta name="description" content={categoryDescription} />
+              <meta name="robots" content="index,follow,max-image-preview:large" />
+              <link rel="canonical" href={categoryUrl} />
+              <meta property="og:type" content="website" />
+              <meta property="og:title" content={categoryTitle} />
+              <meta property="og:description" content={categoryDescription} />
+              <meta property="og:url" content={categoryUrl} />
+              {socialImage && <meta property="og:image" content={new URL(socialImage, `${siteUrl}/`).href} />}
+              <meta name="twitter:card" content={socialImage ? 'summary_large_image' : 'summary'} />
+              <meta name="twitter:title" content={categoryTitle} />
+              <meta name="twitter:description" content={categoryDescription} />
+            </Helmet>
             {/* Header band — the digipay promotion-page header. */}
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-gradient-to-l from-emerald-800 to-emerald-700 p-4 text-white shadow-sm dark:from-emerald-950 dark:to-emerald-900">
               <div className="flex min-w-0 items-center gap-2.5">
@@ -782,10 +862,16 @@ export default function StorefrontPage() {
             <button
               type="button"
               onClick={() => {
-                const next = new URLSearchParams(searchParams);
-                next.delete('tab');
-                next.delete('category');
-                setSearchParams(next, { replace: true });
+                // The in-page back button mirrors the hardware Back: it pops
+                // the history entry the rail's «مشاهده بیشتر» pushed, so both
+                // paths land on the same place — the rail, at its depth.
+                if (window.history.length > 1) window.history.back();
+                else {
+                  const next = new URLSearchParams(searchParams);
+                  next.delete('tab');
+                  next.delete('category');
+                  setSearchParams(next, { replace: true });
+                }
               }}
               className="mt-3 inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-emerald-200 px-3 text-xs font-bold text-emerald-700 transition hover:bg-emerald-50 dark:border-emerald-800 dark:text-lime-300 dark:hover:bg-emerald-900"
             >

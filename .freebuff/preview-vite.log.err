@@ -1,0 +1,285 @@
+[2m8:22:49 PM[22m [31m[1m[vite][22m[39m [31mInternal server error: D:\project\mysite\frontend\src\components\MobileBottomNav.tsx: Unexpected token, expected "..." (64:60)
+
+[0m [90m 62 |[31m [90m                        under AA for the one number a buyer must read. The[31m
+ [90m 63 |[31m [90m                        harvest gold (#a16207) is the palette's accent and[31m
+[31m[1m>[22m[31m[90m 64 |[31m [90m                        clears 4.5:1 with the same white. */[31m}
+ [90m    |[31m                                                             [31m[1m^[22m[31m
+ [90m 65 |[31m                     className[33m=[31m[32m"absolute -end-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#a16207] px-1 text-fluid-2xs font-bold text-white"[31m
+ [90m 66 |[31m                   [33m>[31m
+ [90m 67 |[31m                     {cartCount [33m>[31m [35m9[31m [33m?[31m [32m'۹+'[31m [33m:[31m cartCount[33m.[31mtoLocaleString([32m'fa-IR'[31m)}[0m[39m
+  Plugin: [35mvite:react-babel[39m
+  File: [36mD:/project/mysite/frontend/src/components/MobileBottomNav.tsx[39m:64:60
+[33m  63 |                          harvest gold (#a16207) is the palette's accent and
+  64 |                          clears 4.5:1 with the same white. */}
+  65 |                      className="absolute -end-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#a16207] px-1 text-fluid-2xs font-bold text-white"
+     |                                                               ^
+  66 |                    >
+  67 |                      {cartCount > 9 ? '۹+' : cartCount.toLocaleString('fa-IR')}[39m
+      at constructor (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:369:19)
+      at TypeScriptParserMixin.raise (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:6620:19)
+      at TypeScriptParserMixin.unexpected (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:6640:16)
+      at TypeScriptParserMixin.expect (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:6920:12)
+      at TypeScriptParserMixin.jsxParseAttribute (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:4661:12)
+      at TypeScriptParserMixin.jsxParseOpeningElementAfterName (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:4683:28)
+      at TypeScriptParserMixin.jsxParseOpeningElementAfterName (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10064:18)
+      at TypeScriptParserMixin.jsxParseOpeningElementAt (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:4678:17)
+      at TypeScriptParserMixin.jsxParseElementAt (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:4702:33)
+      at TypeScriptParserMixin.jsxParseElement (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:4765:17)
+      at TypeScriptParserMixin.parseExprAtom (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:4775:19)
+      at TypeScriptParserMixin.parseExprSubscripts (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:11102:23)
+      at TypeScriptParserMixin.parseUpdate (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:11087:21)
+      at TypeScriptParserMixin.parseMaybeUnary (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:11067:23)
+      at TypeScriptParserMixin.parseMaybeUnary (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:9858:18)
+      at TypeScriptParserMixin.parseMaybeUnaryOrPrivate (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10920:61)
+      at TypeScriptParserMixin.parseExprOps (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10925:23)
+      at TypeScriptParserMixin.parseMaybeConditional (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10902:23)
+      at TypeScriptParserMixin.parseMaybeAssign (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10852:21)
+      at D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:9796:39
+      at TypeScriptParserMixin.tryParse (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:6928:20)
+      at TypeScriptParserMixin.parseMaybeAssign (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:9796:18)
+      at D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10821:39
+      at TypeScriptParserMixin.allowInAnd (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:12455:12)
+      at TypeScriptParserMixin.parseMaybeAssignAllowIn (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10821:17)
+      at TypeScriptParserMixin.parseMaybeAssignAllowInOrVoidPattern (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:12522:17)
+      at TypeScriptParserMixin.parseParenAndDistinguishExpression (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:11701:28)
+      at TypeScriptParserMixin.parseExprAtom (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:11357:23)
+      at TypeScriptParserMixin.parseExprAtom (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:4780:20)
+      at TypeScriptParserMixin.parseExprSubscripts (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:11102:23)
+      at TypeScriptParserMixin.parseUpdate (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:11087:21)
+      at TypeScriptParserMixin.parseMaybeUnary (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:11067:23)
+      at TypeScriptParserMixin.parseMaybeUnary (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:9858:18)
+      at TypeScriptParserMixin.parseMaybeUnaryOrPrivate (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10920:61)
+      at TypeScriptParserMixin.parseExprOpBaseRightExpr (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:11007:34)
+      at TypeScriptParserMixin.parseExprOpRightExpr (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:11002:21)
+      at TypeScriptParserMixin.parseExprOp (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10968:27)
+      at TypeScriptParserMixin.parseExprOp (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:9327:18)
+      at TypeScriptParserMixin.parseExprOp (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10974:21)
+      at TypeScriptParserMixin.parseExprOp (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:9327:18)
+      at TypeScriptParserMixin.parseExprOps (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10929:17)
+      at TypeScriptParserMixin.parseMaybeConditional (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10902:23)
+      at TypeScriptParserMixin.parseMaybeAssign (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10852:21)
+      at TypeScriptParserMixin.parseMaybeAssign (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:9807:20)
+      at TypeScriptParserMixin.parseExpressionBase (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10805:23)
+      at D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10801:39
+      at TypeScriptParserMixin.allowInAnd (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:12455:12)
+      at TypeScriptParserMixin.parseExpression (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10801:17)
+      at TypeScriptParserMixin.jsxParseExpressionContainer (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:4648:31)
+      at TypeScriptParserMixin.jsxParseElementAt (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:4727:36)
+[2m8:23:22 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: D:\project\mysite\frontend\src\components\MobileBottomNav.tsx: Unexpected token, expected "..." (64:60)
+
+[0m [90m 62 |[39m [90m                        under AA for the one number a buyer must read. The[39m
+ [90m 63 |[39m [90m                        harvest gold (#a16207) is the palette's accent and[39m
+[31m[1m>[22m[39m[90m 64 |[39m [90m                        clears 4.5:1 with the same white. */[39m}
+ [90m    |[39m                                                             [31m[1m^[22m[39m
+ [90m 65 |[39m                     className[33m=[39m[32m"absolute -end-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#a16207] px-1 text-fluid-2xs font-bold text-white"[39m
+ [90m 66 |[39m                   [33m>[39m
+ [90m 67 |[39m                     {cartCount [33m>[39m [35m9[39m [33m?[39m [32m'۹+'[39m [33m:[39m cartCount[33m.[39mtoLocaleString([32m'fa-IR'[39m)}[0m
+  Plugin: [35mvite:react-babel[39m
+  File: [36mD:/project/mysite/frontend/src/components/MobileBottomNav.tsx[39m:64:60
+[33m  63 |                          harvest gold (#a16207) is the palette's accent and
+  64 |                          clears 4.5:1 with the same white. */}
+  65 |                      className="absolute -end-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#a16207] px-1 text-fluid-2xs font-bold text-white"
+     |                                                               ^
+  66 |                    >
+  67 |                      {cartCount > 9 ? '۹+' : cartCount.toLocaleString('fa-IR')}[39m
+[2m8:23:22 PM[22m [31m[1m[vite][22m[39m [31mInternal server error: D:\project\mysite\frontend\src\components\MobileBottomNav.tsx: Unexpected token, expected "..." (64:60)
+
+[0m [90m 62 |[31m [90m                        under AA for the one number a buyer must read. The[31m
+ [90m 63 |[31m [90m                        harvest gold (#a16207) is the palette's accent and[31m
+[31m[1m>[22m[31m[90m 64 |[31m [90m                        clears 4.5:1 with the same white. */[31m}
+ [90m    |[31m                                                             [31m[1m^[22m[31m
+ [90m 65 |[31m                     className[33m=[31m[32m"absolute -end-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#a16207] px-1 text-fluid-2xs font-bold text-white"[31m
+ [90m 66 |[31m                   [33m>[31m
+ [90m 67 |[31m                     {cartCount [33m>[31m [35m9[31m [33m?[31m [32m'۹+'[31m [33m:[31m cartCount[33m.[31mtoLocaleString([32m'fa-IR'[31m)}[0m[39m
+  Plugin: [35mvite:react-babel[39m
+  File: [36mD:/project/mysite/frontend/src/components/MobileBottomNav.tsx[39m:64:60
+[33m  63 |                          harvest gold (#a16207) is the palette's accent and
+  64 |                          clears 4.5:1 with the same white. */}
+  65 |                      className="absolute -end-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#a16207] px-1 text-fluid-2xs font-bold text-white"
+     |                                                               ^
+  66 |                    >
+  67 |                      {cartCount > 9 ? '۹+' : cartCount.toLocaleString('fa-IR')}[39m
+      at constructor (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:369:19)
+      at TypeScriptParserMixin.raise (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:6620:19)
+      at TypeScriptParserMixin.unexpected (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:6640:16)
+      at TypeScriptParserMixin.expect (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:6920:12)
+      at TypeScriptParserMixin.jsxParseAttribute (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:4661:12)
+      at TypeScriptParserMixin.jsxParseOpeningElementAfterName (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:4683:28)
+      at TypeScriptParserMixin.jsxParseOpeningElementAfterName (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10064:18)
+      at TypeScriptParserMixin.jsxParseOpeningElementAt (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:4678:17)
+      at TypeScriptParserMixin.jsxParseElementAt (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:4702:33)
+      at TypeScriptParserMixin.jsxParseElement (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:4765:17)
+      at TypeScriptParserMixin.parseExprAtom (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:4775:19)
+      at TypeScriptParserMixin.parseExprSubscripts (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:11102:23)
+      at TypeScriptParserMixin.parseUpdate (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:11087:21)
+      at TypeScriptParserMixin.parseMaybeUnary (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:11067:23)
+      at TypeScriptParserMixin.parseMaybeUnary (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:9858:18)
+      at TypeScriptParserMixin.parseMaybeUnaryOrPrivate (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10920:61)
+      at TypeScriptParserMixin.parseExprOps (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10925:23)
+      at TypeScriptParserMixin.parseMaybeConditional (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10902:23)
+      at TypeScriptParserMixin.parseMaybeAssign (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10852:21)
+      at D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:9796:39
+      at TypeScriptParserMixin.tryParse (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:6928:20)
+      at TypeScriptParserMixin.parseMaybeAssign (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:9796:18)
+      at D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10821:39
+      at TypeScriptParserMixin.allowInAnd (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:12455:12)
+      at TypeScriptParserMixin.parseMaybeAssignAllowIn (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10821:17)
+      at TypeScriptParserMixin.parseMaybeAssignAllowInOrVoidPattern (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:12522:17)
+      at TypeScriptParserMixin.parseParenAndDistinguishExpression (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:11701:28)
+      at TypeScriptParserMixin.parseExprAtom (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:11357:23)
+      at TypeScriptParserMixin.parseExprAtom (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:4780:20)
+      at TypeScriptParserMixin.parseExprSubscripts (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:11102:23)
+      at TypeScriptParserMixin.parseUpdate (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:11087:21)
+      at TypeScriptParserMixin.parseMaybeUnary (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:11067:23)
+      at TypeScriptParserMixin.parseMaybeUnary (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:9858:18)
+      at TypeScriptParserMixin.parseMaybeUnaryOrPrivate (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10920:61)
+      at TypeScriptParserMixin.parseExprOpBaseRightExpr (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:11007:34)
+      at TypeScriptParserMixin.parseExprOpRightExpr (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:11002:21)
+      at TypeScriptParserMixin.parseExprOp (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10968:27)
+      at TypeScriptParserMixin.parseExprOp (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:9327:18)
+      at TypeScriptParserMixin.parseExprOp (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10974:21)
+      at TypeScriptParserMixin.parseExprOp (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:9327:18)
+      at TypeScriptParserMixin.parseExprOps (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10929:17)
+      at TypeScriptParserMixin.parseMaybeConditional (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10902:23)
+      at TypeScriptParserMixin.parseMaybeAssign (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10852:21)
+      at TypeScriptParserMixin.parseMaybeAssign (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:9807:20)
+      at TypeScriptParserMixin.parseExpressionBase (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10805:23)
+      at D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10801:39
+      at TypeScriptParserMixin.allowInAnd (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:12455:12)
+      at TypeScriptParserMixin.parseExpression (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10801:17)
+      at TypeScriptParserMixin.jsxParseExpressionContainer (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:4648:31)
+      at TypeScriptParserMixin.jsxParseElementAt (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:4727:36)
+[2m8:27:45 PM[22m [31m[1m[vite][22m[39m [31mInternal server error: D:\project\mysite\frontend\src\components\MobileBottomNav.tsx: Unexpected token, expected "..." (64:60)
+
+[0m [90m 62 |[31m [90m                        under AA for the one number a buyer must read. The[31m
+ [90m 63 |[31m [90m                        harvest gold (#a16207) is the palette's accent and[31m
+[31m[1m>[22m[31m[90m 64 |[31m [90m                        clears 4.5:1 with the same white. */[31m}
+ [90m    |[31m                                                             [31m[1m^[22m[31m
+ [90m 65 |[31m                     className[33m=[31m[32m"absolute -end-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#a16207] px-1 text-fluid-2xs font-bold text-white"[31m
+ [90m 66 |[31m                   [33m>[31m
+ [90m 67 |[31m                     {cartCount [33m>[31m [35m9[31m [33m?[31m [32m'۹+'[31m [33m:[31m cartCount[33m.[31mtoLocaleString([32m'fa-IR'[31m)}[0m[39m
+  Plugin: [35mvite:react-babel[39m
+  File: [36mD:/project/mysite/frontend/src/components/MobileBottomNav.tsx[39m:64:60
+[33m  63 |                          harvest gold (#a16207) is the palette's accent and
+  64 |                          clears 4.5:1 with the same white. */}
+  65 |                      className="absolute -end-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#a16207] px-1 text-fluid-2xs font-bold text-white"
+     |                                                               ^
+  66 |                    >
+  67 |                      {cartCount > 9 ? '۹+' : cartCount.toLocaleString('fa-IR')}[39m
+      at constructor (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:369:19)
+      at TypeScriptParserMixin.raise (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:6620:19)
+      at TypeScriptParserMixin.unexpected (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:6640:16)
+      at TypeScriptParserMixin.expect (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:6920:12)
+      at TypeScriptParserMixin.jsxParseAttribute (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:4661:12)
+      at TypeScriptParserMixin.jsxParseOpeningElementAfterName (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:4683:28)
+      at TypeScriptParserMixin.jsxParseOpeningElementAfterName (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10064:18)
+      at TypeScriptParserMixin.jsxParseOpeningElementAt (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:4678:17)
+      at TypeScriptParserMixin.jsxParseElementAt (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:4702:33)
+      at TypeScriptParserMixin.jsxParseElement (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:4765:17)
+      at TypeScriptParserMixin.parseExprAtom (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:4775:19)
+      at TypeScriptParserMixin.parseExprSubscripts (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:11102:23)
+      at TypeScriptParserMixin.parseUpdate (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:11087:21)
+      at TypeScriptParserMixin.parseMaybeUnary (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:11067:23)
+      at TypeScriptParserMixin.parseMaybeUnary (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:9858:18)
+      at TypeScriptParserMixin.parseMaybeUnaryOrPrivate (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10920:61)
+      at TypeScriptParserMixin.parseExprOps (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10925:23)
+      at TypeScriptParserMixin.parseMaybeConditional (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10902:23)
+      at TypeScriptParserMixin.parseMaybeAssign (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10852:21)
+      at D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:9796:39
+      at TypeScriptParserMixin.tryParse (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:6928:20)
+      at TypeScriptParserMixin.parseMaybeAssign (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:9796:18)
+      at D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10821:39
+      at TypeScriptParserMixin.allowInAnd (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:12455:12)
+      at TypeScriptParserMixin.parseMaybeAssignAllowIn (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10821:17)
+      at TypeScriptParserMixin.parseMaybeAssignAllowInOrVoidPattern (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:12522:17)
+      at TypeScriptParserMixin.parseParenAndDistinguishExpression (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:11701:28)
+      at TypeScriptParserMixin.parseExprAtom (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:11357:23)
+      at TypeScriptParserMixin.parseExprAtom (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:4780:20)
+      at TypeScriptParserMixin.parseExprSubscripts (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:11102:23)
+      at TypeScriptParserMixin.parseUpdate (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:11087:21)
+      at TypeScriptParserMixin.parseMaybeUnary (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:11067:23)
+      at TypeScriptParserMixin.parseMaybeUnary (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:9858:18)
+      at TypeScriptParserMixin.parseMaybeUnaryOrPrivate (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10920:61)
+      at TypeScriptParserMixin.parseExprOpBaseRightExpr (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:11007:34)
+      at TypeScriptParserMixin.parseExprOpRightExpr (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:11002:21)
+      at TypeScriptParserMixin.parseExprOp (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10968:27)
+      at TypeScriptParserMixin.parseExprOp (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:9327:18)
+      at TypeScriptParserMixin.parseExprOp (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10974:21)
+      at TypeScriptParserMixin.parseExprOp (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:9327:18)
+      at TypeScriptParserMixin.parseExprOps (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10929:17)
+      at TypeScriptParserMixin.parseMaybeConditional (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10902:23)
+      at TypeScriptParserMixin.parseMaybeAssign (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10852:21)
+      at TypeScriptParserMixin.parseMaybeAssign (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:9807:20)
+      at TypeScriptParserMixin.parseExpressionBase (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10805:23)
+      at D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10801:39
+      at TypeScriptParserMixin.allowInAnd (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:12455:12)
+      at TypeScriptParserMixin.parseExpression (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10801:17)
+      at TypeScriptParserMixin.jsxParseExpressionContainer (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:4648:31)
+      at TypeScriptParserMixin.jsxParseElementAt (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:4727:36)
+[2m8:28:25 PM[22m [31m[1m[vite][22m[39m [31mInternal server error: D:\project\mysite\frontend\src\components\MobileBottomNav.tsx: Unexpected token, expected "..." (64:60)
+
+[0m [90m 62 |[31m [90m                        under AA for the one number a buyer must read. The[31m
+ [90m 63 |[31m [90m                        harvest gold (#a16207) is the palette's accent and[31m
+[31m[1m>[22m[31m[90m 64 |[31m [90m                        clears 4.5:1 with the same white. */[31m}
+ [90m    |[31m                                                             [31m[1m^[22m[31m
+ [90m 65 |[31m                     className[33m=[31m[32m"absolute -end-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#a16207] px-1 text-fluid-2xs font-bold text-white"[31m
+ [90m 66 |[31m                   [33m>[31m
+ [90m 67 |[31m                     {cartCount [33m>[31m [35m9[31m [33m?[31m [32m'۹+'[31m [33m:[31m cartCount[33m.[31mtoLocaleString([32m'fa-IR'[31m)}[0m[39m
+  Plugin: [35mvite:react-babel[39m
+  File: [36mD:/project/mysite/frontend/src/components/MobileBottomNav.tsx[39m:64:60
+[33m  63 |                          harvest gold (#a16207) is the palette's accent and
+  64 |                          clears 4.5:1 with the same white. */}
+  65 |                      className="absolute -end-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#a16207] px-1 text-fluid-2xs font-bold text-white"
+     |                                                               ^
+  66 |                    >
+  67 |                      {cartCount > 9 ? '۹+' : cartCount.toLocaleString('fa-IR')}[39m
+      at constructor (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:369:19)
+      at TypeScriptParserMixin.raise (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:6620:19)
+      at TypeScriptParserMixin.unexpected (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:6640:16)
+      at TypeScriptParserMixin.expect (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:6920:12)
+      at TypeScriptParserMixin.jsxParseAttribute (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:4661:12)
+      at TypeScriptParserMixin.jsxParseOpeningElementAfterName (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:4683:28)
+      at TypeScriptParserMixin.jsxParseOpeningElementAfterName (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10064:18)
+      at TypeScriptParserMixin.jsxParseOpeningElementAt (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:4678:17)
+      at TypeScriptParserMixin.jsxParseElementAt (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:4702:33)
+      at TypeScriptParserMixin.jsxParseElement (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:4765:17)
+      at TypeScriptParserMixin.parseExprAtom (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:4775:19)
+      at TypeScriptParserMixin.parseExprSubscripts (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:11102:23)
+      at TypeScriptParserMixin.parseUpdate (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:11087:21)
+      at TypeScriptParserMixin.parseMaybeUnary (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:11067:23)
+      at TypeScriptParserMixin.parseMaybeUnary (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:9858:18)
+      at TypeScriptParserMixin.parseMaybeUnaryOrPrivate (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10920:61)
+      at TypeScriptParserMixin.parseExprOps (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10925:23)
+      at TypeScriptParserMixin.parseMaybeConditional (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10902:23)
+      at TypeScriptParserMixin.parseMaybeAssign (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10852:21)
+      at D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:9796:39
+      at TypeScriptParserMixin.tryParse (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:6928:20)
+      at TypeScriptParserMixin.parseMaybeAssign (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:9796:18)
+      at D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10821:39
+      at TypeScriptParserMixin.allowInAnd (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:12455:12)
+      at TypeScriptParserMixin.parseMaybeAssignAllowIn (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10821:17)
+      at TypeScriptParserMixin.parseMaybeAssignAllowInOrVoidPattern (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:12522:17)
+      at TypeScriptParserMixin.parseParenAndDistinguishExpression (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:11701:28)
+      at TypeScriptParserMixin.parseExprAtom (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:11357:23)
+      at TypeScriptParserMixin.parseExprAtom (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:4780:20)
+      at TypeScriptParserMixin.parseExprSubscripts (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:11102:23)
+      at TypeScriptParserMixin.parseUpdate (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:11087:21)
+      at TypeScriptParserMixin.parseMaybeUnary (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:11067:23)
+      at TypeScriptParserMixin.parseMaybeUnary (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:9858:18)
+      at TypeScriptParserMixin.parseMaybeUnaryOrPrivate (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10920:61)
+      at TypeScriptParserMixin.parseExprOpBaseRightExpr (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:11007:34)
+      at TypeScriptParserMixin.parseExprOpRightExpr (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:11002:21)
+      at TypeScriptParserMixin.parseExprOp (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10968:27)
+      at TypeScriptParserMixin.parseExprOp (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:9327:18)
+      at TypeScriptParserMixin.parseExprOp (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10974:21)
+      at TypeScriptParserMixin.parseExprOp (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:9327:18)
+      at TypeScriptParserMixin.parseExprOps (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10929:17)
+      at TypeScriptParserMixin.parseMaybeConditional (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10902:23)
+      at TypeScriptParserMixin.parseMaybeAssign (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10852:21)
+      at TypeScriptParserMixin.parseMaybeAssign (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:9807:20)
+      at TypeScriptParserMixin.parseExpressionBase (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10805:23)
+      at D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10801:39
+      at TypeScriptParserMixin.allowInAnd (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:12455:12)
+      at TypeScriptParserMixin.parseExpression (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:10801:17)
+      at TypeScriptParserMixin.jsxParseExpressionContainer (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:4648:31)
+      at TypeScriptParserMixin.jsxParseElementAt (D:\project\mysite\frontend\node_modules\@babel\parser\lib\index.js:4727:36)

@@ -41,6 +41,7 @@ import { useAuthStore } from "../store/authStore";
 import { useAuthModalStore } from "../store/authModalStore";
 import { useCartStore } from "../store/cartStore";
 import { useSiteContact, whatsappHref } from "../hooks/useSiteContact";
+import { useDragToScroll } from "../hooks/useDragToScroll";
 import type { ProductList } from '@/types/shop';
 import type { Comment } from '@/types/content';
 import { formatPrice } from "../utils/formatPrice";
@@ -104,6 +105,8 @@ export default function ProductPage() {
   const similarRef = useRef<HTMLDivElement>(null);
   const guidesVisible = useIntersectionOnce(guidesRef);
   const similarVisible = useIntersectionOnce(similarRef);
+  // Mouse drag for the similar-products rail (touch pans natively).
+  const similarRail = useDragToScroll<HTMLDivElement>();
 
   const { data: product, isLoading, isError } = useQuery({
     queryKey: ["product", slug],
@@ -530,8 +533,12 @@ export default function ProductPage() {
         </div>
       </article>
 
-      <aside className="space-y-4">
+      {/* Flex column so the small proof notes can anchor to the card's bottom
+          edge on desktop — the column otherwise ends in a dead void under the
+          consult card while the article beside it runs tall. */}
+      <aside className="flex flex-col gap-4">
         <ConsultCard productTitle={product.title} productUrl={productUrl} />
+        <div className="space-y-4 md:mt-auto">
         {product.stock > 0 && product.stock <= 5 && (
           <p className="rounded-2xl bg-rose-50 px-4 py-3 text-fluid-xs font-bold text-rose-700 dark:bg-rose-950/50 dark:text-rose-200">
             تنها {product.stock.toLocaleString('fa-IR')} عدد در انبار باقی مانده است.
@@ -542,6 +549,7 @@ export default function ProductPage() {
             <strong className="text-slate-800 dark:text-white">{product.sales_count.toLocaleString('fa-IR')}</strong> خرید از زمان انتشار این کالا.
           </p>
         )}
+        </div>
       </aside>
     </div>
 
@@ -773,7 +781,13 @@ export default function ProductPage() {
         </div>
         {/* Horizontal rail instead of a wrapping grid — one row, snap points,
             thin scrollbar. */}
-        <div className="rail-scroll mt-4 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-3 touch-pan-x" role="region" aria-label="محصولات مشابه، قابل پیمایش افقی">
+        <div
+          ref={similarRail.ref}
+          {...similarRail.handlers}
+          className="rail-scroll mt-4 flex cursor-grab select-none snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-3 touch-pan-x"
+          role="region"
+          aria-label="محصولات مشابه، قابل پیمایش افقی"
+        >
           {similar.map((item) => <div key={item.id} className="w-44 shrink-0 snap-start sm:w-52"><SimilarCard product={item} /></div>)}
         </div>
       </section>
