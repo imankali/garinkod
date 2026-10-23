@@ -13,6 +13,8 @@
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
+import PageHeader from '../components/ui/PageHeader';
+import EmptyState from '../components/ui/EmptyState';
 import { Building2, Tags, Warehouse } from 'lucide-react';
 
 import { catalogApi } from '../api/services';
@@ -41,27 +43,23 @@ export default function Brands() {
       </Helmet>
 
       <main className="mx-auto max-w-6xl px-[var(--page-gutter)] py-8 md:py-12">
-        <header>
-          <p className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-fluid-2xs font-bold text-emerald-700 dark:bg-emerald-900/60 dark:text-lime-300">
-            <Building2 size={13} aria-hidden="true" />
-            فهرست گروه‌ها
-          </p>
-          <h1 className="mt-3 text-2xl font-extrabold leading-10 text-slate-800 md:text-3xl dark:text-white">
-            برندها، دسته‌ها و برچسب‌های گرین کود
-          </h1>
-          <p className="mt-2 max-w-2xl text-fluid-sm leading-8 text-slate-600 dark:text-emerald-100">
-            هر نام، صفحه‌ی خودش را با همان کالاها و قیمت‌های فهرست باز می‌کند. چیزی که اینجا نیست،
-            امروز کالای منتشرشده‌ای ندارد.
-          </p>
-        </header>
+        <PageHeader
+          eyebrow="فهرست گروه‌ها"
+          icon={Building2}
+          breadcrumbs={[{ label: 'خانه', to: '/' }, { label: 'برندها و دسته‌ها' }]}
+          title="برندها، دسته‌ها و برچسب‌های گرین کود"
+          description="هر نام، صفحه‌ی خودش را با همان کالاها و قیمت‌های فهرست باز می‌کند. چیزی که اینجا نیست، امروز کالای منتشرشده‌ای ندارد."
+        />
 
         {isLoading && <div className="mt-8 h-40 animate-pulse rounded-3xl bg-slate-100 dark:bg-emerald-950" />}
 
         {!isLoading && !brands.length && (
-          <p className="mt-8 rounded-2xl border border-dashed border-slate-200 p-6 text-fluid-sm leading-8 text-slate-500 dark:border-emerald-800 dark:text-emerald-200">
-            هنوز کالایی با نام برند منتشر نشده است. به محض آنکه فروشندگان برند کالا را پر کنند،
-            همین فهرست ساخته می‌شود.
-          </p>
+          <EmptyState
+            icon={Building2}
+            title="هنوز برندی در فهرست نیست"
+            description="به محض آنکه فروشندگان، کالای برنددار منتشر کنند، همین فهرست خودکار ساخته می‌شود."
+            className="mt-8"
+          />
         )}
 
         {!!brands.length && (

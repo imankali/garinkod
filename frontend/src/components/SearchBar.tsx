@@ -7,9 +7,18 @@ import toast from "react-hot-toast";
 import { useQuery } from "@tanstack/react-query";
 
 import {
-  Search, X, Clock, SlidersHorizontal,
-  PackageCheck, Mic, Sparkles, Tag, Flame
-} from "lucide-react";
+  Search,
+  SearchX,
+  X,
+  Clock,
+  SlidersHorizontal,
+  PackageCheck,
+  Mic,
+  Sparkles,
+  Tag,
+  Flame,
+} from 'lucide-react';
+import EmptyState from "./ui/EmptyState";
 import { categories } from "../data/shopData";
 import { productsApi } from "../api/services";
 import { useTranslation } from "../i18n";
@@ -489,7 +498,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {trendingSearches.map((term) => (
-                      <button
+                      <button type="button"
                         key={term}
                         onClick={() => {
                           setQuery(term);
@@ -512,7 +521,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {categories.map((cat) => (
-                      <button
+                      <button type="button"
                         key={cat.id}
                         onClick={() => setActiveCategory(cat.id)}
                         className="flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-emerald-100 hover:text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-200"
@@ -532,7 +541,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
                     </p>
                     <div className="flex flex-wrap gap-2">
                       {recent.map((term) => (
-                        <button
+                        <button type="button"
                           key={term}
                           onClick={() => setQuery(term)}
                           className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600 transition-colors hover:bg-emerald-100 hover:text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-200"
@@ -549,10 +558,13 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
                   <p className="mb-1 flex items-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-lime-300">
                     <Sparkles size={12} /> راهنمای جستجو
                   </p>
-                  <ul className="space-y-1 text-fluid-xs text-slate-600 dark:text-emerald-200">
-                    <li>• برای جستجوی دقیق، نام کامل محصول را وارد کنید</li>
-                    <li>• از فیلترهای پیشرفته برای محدود کردن نتایج استفاده کنید</li>
-                    <li>• با کلیک روی 🎤 جستجوی صوتی انجام دهید</li>
+                  <ul className="space-y-1.5 text-fluid-xs text-slate-600 dark:text-emerald-200">
+                    <li>برای جستجوی دقیق، نام کامل محصول را وارد کنید.</li>
+                    <li>از فیلترهای پیشرفته برای محدود کردن نتایج استفاده کنید.</li>
+                    <li className="flex items-start gap-1.5">
+                      <Mic size={12} aria-hidden="true" className="mt-0.5 shrink-0" />
+                      <span>جستجوی صوتی: روی آیکون میکروفن در نوار جستجو بزنید</span>
+                    </li>
                   </ul>
                 </div>
               </div>
@@ -568,7 +580,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
                     {filteredProducts.length} نتیجه یافت شد
                   </p>
                   {activeFacetCount > 0 && (
-                    <button onClick={resetFacets} className="text-fluid-2xs text-rose-500 hover:underline">
+                    <button type="button" onClick={resetFacets} className="text-fluid-2xs text-rose-500 hover:underline">
                       حذف فیلترها
                     </button>
                   )}
@@ -578,7 +590,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
                 <ul className="max-h-80 space-y-1 overflow-y-auto">
                   {filteredProducts.map((product) => (
                     <li key={product.id}>
-                      <button
+                      <button type="button"
                         onClick={() => {
                           openProduct(product);
                           setPanel("none");
@@ -616,11 +628,15 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
               </div>
             ) : (
               <div className="flex flex-col items-center gap-2 py-8 text-center">
-                <span className="text-3xl">🔍</span>
-                <p className="text-sm text-slate-500">نتیجه‌ای یافت نشد.</p>
-                <p className="text-xs text-slate-400">فیلترها را تغییر دهید یا عبارت دیگری جستجو کنید</p>
+                <EmptyState
+                  compact
+                  icon={SearchX}
+                  title="نتیجه‌ای یافت نشد"
+                  description="فیلترها را تغییر دهید یا عبارت دیگری جستجو کنید."
+                  className="w-full border-0 bg-transparent dark:bg-transparent"
+                />
                 {activeFacetCount > 0 && (
-                  <button
+                  <button type="button"
                     onClick={resetFacets}
                     className="mt-2 rounded-lg bg-emerald-100 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900 dark:text-lime-300"
                   >

@@ -19,6 +19,7 @@ import { LifeBuoy, Scale } from 'lucide-react';
 
 import { sitePagesApi } from '../api/services';
 import { LEGAL_CORE_LINKS } from '../config/legal';
+import PageHeader from '../components/ui/PageHeader';
 import FaqList, { faqPairsOfBlock } from '../components/FaqList';
 import type { SitePageBlock } from '@/types/content';
 
@@ -69,17 +70,13 @@ export default function Faq() {
       </Helmet>
 
       <main className="mx-auto max-w-4xl px-[var(--page-gutter)] py-8 md:py-12">
-        <header>
-          <p className="text-fluid-2xs font-bold text-emerald-700 dark:text-lime-300">{data?.badge || 'راهنما'}</p>
-          <h1 className="mt-1.5 text-2xl font-extrabold leading-10 text-slate-800 md:text-3xl dark:text-white">
-            {data?.title || 'سؤالات متداول'}
-          </h1>
-          {data?.hero_text && (
-            <p className="mt-3 whitespace-pre-line text-fluid-sm leading-8 text-slate-600 dark:text-emerald-100">
-              {data.hero_text}
-            </p>
-          )}
-        </header>
+        <PageHeader
+          eyebrow={data?.badge || 'راهنما'}
+          icon={LifeBuoy}
+          breadcrumbs={[{ label: 'خانه', to: '/' }, { label: 'سؤالات متداول' }]}
+          title={data?.title || 'سؤالات متداول'}
+          description={data?.hero_text}
+        />
 
         {isLoading && <div className="mt-8 h-64 animate-pulse rounded-3xl bg-slate-100 dark:bg-emerald-950" />}
 

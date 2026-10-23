@@ -2,7 +2,18 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, LayoutGrid } from "lucide-react";
+import {
+  ArrowLeft,
+  FlaskConical,
+  LayoutGrid,
+  Package,
+  SprayCan,
+  Tractor,
+  Droplets,
+  Wheat,
+  Wrench,
+  type LucideIcon,
+} from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { categoriesApi } from "../api/services";
 import type { Category } from '@/types/shop';
@@ -11,7 +22,7 @@ import type { Category } from '@/types/shop';
 // Types
 // ========================================
 interface CategoryIcons {
-  [key: string]: string;
+  [key: string]: LucideIcon;
 }
 
 interface CategoryColors {
@@ -20,15 +31,17 @@ interface CategoryColors {
 
 // ========================================
 // Category Icons & Colors Mapping
-// ✅ نگاشت slug به آیکون و رنگ (بر اساس دسته‌بندی‌های UI)
+// نگاشت slug به آیکون و رنگ (بر اساس دسته‌بندی‌های UI)
 // ========================================
+// Structural icons, not emoji: emoji render differently on every platform and
+// are announced as words by screen readers, so they cannot carry meaning here.
 const categoryIcons: CategoryIcons = {
-  'pesticide': '',
-  'fertilizer': '',
-  'seed': '🌾',
-  'equipment': '🚜',
-  'irrigation': '💧',
-  'tools': '🔧',
+  'pesticide': SprayCan,
+  'fertilizer': FlaskConical,
+  'seed': Wheat,
+  'equipment': Tractor,
+  'irrigation': Droplets,
+  'tools': Wrench,
 };
 
 const categoryColors: CategoryColors = {
@@ -43,6 +56,12 @@ const categoryColors: CategoryColors = {
 // ========================================
 // MegaMenu Component
 // ========================================
+/** One place that resolves a category slug to its icon, with a neutral fallback. */
+function CategoryGlyph({ slug, size }: { slug: string; size: number }) {
+  const Icon = categoryIcons[slug] || Package;
+  return <Icon size={size} aria-hidden="true" />;
+}
+
 export default function MegaMenu() {
   const [open, setOpen] = useState(false);
   const [activeSlug, setActiveSlug] = useState<string>("");
@@ -121,7 +140,7 @@ export default function MegaMenu() {
       {/* ======================================== */}
       {/* Toggle Button */}
       {/* ======================================== */}
-      <button
+      <button type="button"
         onClick={() => setOpen((v) => !v)}
         className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-300 ${
           open
@@ -152,7 +171,7 @@ export default function MegaMenu() {
             <ul className="w-56 border-e border-slate-100 bg-slate-50/60 p-2 dark:border-emerald-800 dark:bg-emerald-900/30">
               {categories.map((cat) => (
                 <li key={cat.slug}>
-                  <button
+                  <button type="button"
                     onMouseEnter={() => setActiveSlug(cat.slug)}
                     onClick={() => setActiveSlug(cat.slug)}
                     className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-start text-sm font-medium transition-colors ${
@@ -166,7 +185,7 @@ export default function MegaMenu() {
                         categoryColors[cat.slug] || 'from-emerald-500 to-lime-500'
                       } text-white`}
                     >
-                      {categoryIcons[cat.slug] || '📦'}
+                      <CategoryGlyph slug={cat.slug} size={16} />
                     </span>
                     <span className="flex-1 text-start">{cat.name}</span>
                     {cat.product_count > 0 && (
@@ -197,7 +216,7 @@ export default function MegaMenu() {
                       categoryColors[activeCategory.slug] || 'from-emerald-500 to-lime-500'
                     } text-white shadow-lg`}
                   >
-                    {categoryIcons[activeCategory.slug] || '📦'}
+                    <CategoryGlyph slug={activeCategory.slug} size={22} />
                   </span>
                   <div>
                     <p className="font-bold text-slate-800 dark:text-white">{activeCategory.name}</p>

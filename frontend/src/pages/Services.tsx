@@ -250,7 +250,7 @@ export default function Services() {
 
         <label className="mt-4 block text-sm font-bold text-slate-700 dark:text-emerald-50">شرح نیاز <textarea required value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 p-3 font-normal outline-none focus:border-emerald-500 dark:border-emerald-700 dark:bg-emerald-900" rows={5} placeholder="نوع زمین، مشکل فعلی، زمان مورد انتظار و اطلاعاتی که به کارشناس کمک می‌کند..." /></label>
         <div className="mt-5 flex flex-wrap items-center gap-3">
-          <button disabled={submitting} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-emerald-600 px-5 text-sm font-bold text-white disabled:opacity-50">
+          <button type="submit" disabled={submitting} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-emerald-600 px-5 text-sm font-bold text-white disabled:opacity-50">
             {submitting ? <Loader2 size={16} className="animate-spin" /> : null}
             {submitting ? 'در حال ثبت...' : 'ثبت درخواست خدمت'}
           </button>

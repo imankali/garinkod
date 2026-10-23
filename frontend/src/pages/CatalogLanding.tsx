@@ -12,6 +12,7 @@
 // published product is a real state of a catalogue, and the page says so and
 // offers the desk instead of inventing stock.
 
+import EmptyState from '../components/ui/EmptyState';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { Helmet } from 'react-helmet-async';
@@ -206,10 +207,20 @@ export default function CatalogLanding({ kind }: { kind: CatalogKind }) {
           </div>
 
           {empty ? (
-            <p className="mt-4 rounded-2xl border border-dashed border-slate-200 p-6 text-fluid-sm leading-8 text-slate-500 dark:border-emerald-800 dark:text-emerald-200">
-              فعلاً کالای منتشرشده‌ای در این {kind === 'brand' ? 'برند' : 'گروه'} نیست. اگر دنبال کالای خاصی هستید، در
-              میز مشاوره بپرسید؛ تأمین‌کننده‌ها هر هفته فهرست را به‌روز می‌کنند.
-            </p>
+            <EmptyState
+              icon={PackageSearch}
+              title={`فعلاً کالایی در این ${kind === 'brand' ? 'برند' : 'گروه'} منتشر نشده`}
+              description="تأمین‌کننده‌ها هر هفته فهرست را به‌روز می‌کنند؛ اگر کالای مشخصی می‌خواهید، از میز مشاوره بپرسید."
+              action={
+                <Link
+                  to="/support"
+                  className="min-h-11 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-emerald-700"
+                >
+                  پرسش از کارشناس
+                </Link>
+              }
+              className="mt-4"
+            />
           ) : (
             <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {products.map((product, index) => (

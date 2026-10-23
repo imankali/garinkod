@@ -57,7 +57,7 @@ export default function HealthPanel() {
         <p className="mt-2 text-sm leading-7">
           این بخش فقط برای دسترسی مدیریتی باز می‌شود. اگر تازه وارد شده‌اید، یک بار صفحه را تازه کنید.
         </p>
-        <button onClick={() => health.refetch()} className="mt-4 rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white">
+        <button type="button" onClick={() => health.refetch()} className="mt-4 rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white">
           تلاش دوباره
         </button>
       </section>
@@ -81,7 +81,7 @@ export default function HealthPanel() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <button
+            <button type="button"
               onClick={() => health.refetch()}
               className="rounded-xl bg-slate-100 px-3.5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-200 dark:bg-emerald-900/50 dark:text-emerald-100"
             >
@@ -266,10 +266,10 @@ function OnlinePeople() {
       </div>
       {rows.length === 8 && (
         <div className="mt-3 flex items-center justify-end gap-2">
-          <button onClick={() => setPage((value) => Math.max(1, value - 1))} className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600 disabled:opacity-40 dark:bg-emerald-900/50 dark:text-emerald-100" disabled={page === 1}>
+          <button type="button" onClick={() => setPage((value) => Math.max(1, value - 1))} className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600 disabled:opacity-40 dark:bg-emerald-900/50 dark:text-emerald-100" disabled={page === 1}>
  قبلی</button>
           <span className="text-xs text-slate-500">صفحهٔ {fa(page)}</span>
-          <button onClick={() => setPage((value) => value + 1)} className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600 dark:bg-emerald-900/50 dark:text-emerald-100">
+          <button type="button" onClick={() => setPage((value) => value + 1)} className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600 dark:bg-emerald-900/50 dark:text-emerald-100">
  بعدی</button>
         </div>
       )}
@@ -416,7 +416,7 @@ function LogNotebook() {
         </h2>
         <div className="flex items-center gap-2 text-xs">
           {LEVELS.map((item) => (
-            <button
+            <button type="button"
               key={item.value || 'all'}
               onClick={() => setLevel(item.value)}
               className={`rounded-full px-3 py-1.5 font-bold transition ${
@@ -469,12 +469,12 @@ function LogNotebook() {
 
       {(logs.data?.pages ?? 1) > 1 && (
         <div className="mt-4 flex items-center justify-end gap-2 text-xs">
-          <button onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={page === 1} className="rounded-lg bg-slate-100 px-3 py-1.5 font-bold text-slate-600 disabled:opacity-40 dark:bg-emerald-900/50 dark:text-emerald-100">
+          <button type="button" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={page === 1} className="rounded-lg bg-slate-100 px-3 py-1.5 font-bold text-slate-600 disabled:opacity-40 dark:bg-emerald-900/50 dark:text-emerald-100">
  قبلی</button>
           <span className="text-slate-500">
             {fa(page)} از {fa(logs.data?.pages ?? 1)}
           </span>
-          <button onClick={() => setPage((value) => Math.min(logs.data?.pages ?? 1, value + 1))} disabled={page >= (logs.data?.pages ?? 1)} className="rounded-lg bg-slate-100 px-3 py-1.5 font-bold text-slate-600 disabled:opacity-40 dark:bg-emerald-900/50 dark:text-emerald-100">
+          <button type="button" onClick={() => setPage((value) => Math.min(logs.data?.pages ?? 1, value + 1))} disabled={page >= (logs.data?.pages ?? 1)} className="rounded-lg bg-slate-100 px-3 py-1.5 font-bold text-slate-600 disabled:opacity-40 dark:bg-emerald-900/50 dark:text-emerald-100">
  بعدی</button>
         </div>
       )}
@@ -524,11 +524,11 @@ function LogRow({ row, onAct }: { row: OpsLogRow; onAct: (row: OpsLogRow, action
           ) : null}
           <div className="flex items-center gap-2">
             {row.is_open ? (
-              <button onClick={() => act('resolve')} disabled={busy} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-60">
+              <button type="button" onClick={() => act('resolve')} disabled={busy} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-60">
                 <Check size={14} /> برطرف شد
               </button>
             ) : (
-              <button onClick={() => act('reopen')} disabled={busy} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-amber-500 px-3.5 text-xs font-bold text-white hover:bg-amber-600 disabled:opacity-60">
+              <button type="button" onClick={() => act('reopen')} disabled={busy} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-amber-500 px-3.5 text-xs font-bold text-white hover:bg-amber-600 disabled:opacity-60">
                 <RotateCcw size={14} /> دوباره باز کن
               </button>
             )}

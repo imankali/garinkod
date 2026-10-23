@@ -14,6 +14,7 @@ import { useEffect, useRef } from 'react';
 import type { MessageChannel } from '@/types/messaging';
 import { cn } from '../../utils/cn';
 import { useDragToScroll } from '../../hooks/useDragToScroll';
+import { useTabListKeys } from '../../hooks/useTabListKeys';
 
 export type ChannelFilter = 'all' | MessageChannel;
 
@@ -35,7 +36,12 @@ export default function ChannelChips({
   const scrollerRef = useRef<HTMLDivElement>(null);
   // Mouse drag-to-scroll, momentum and click suppression come from the shared
   // rail hook; it also paints the edge fade through data-overflow/edge flags.
-  const scrollerDrag = useDragToScroll<HTMLDivElement>(scrollerRef);
+  // `focusable: false` keeps the tablist out of the tab order; the chips
+  // themselves are the tab stops, and each focused chip scrolls into view.
+  const scrollerDrag = useDragToScroll<HTMLDivElement>(scrollerRef, { focusable: false });
+  // role="tablist" promises ← → Home End; the row implements them here on
+  // the same node the drag hook owns.
+  const channelTabs = useTabListKeys<HTMLDivElement>(scrollerRef);
 
   // Keep the active chip in view when it changes (e.g. picked via keyboard).
   useEffect(() => {
@@ -61,6 +67,10 @@ export default function ChannelChips({
         aria-label="فیلتر منبع پیام"
         onWheel={onWheel}
         {...scrollerDrag.handlers}
+        onKeyDown={(event) => {
+          channelTabs.onKeyDown(event);
+          scrollerDrag.handlers.onKeyDown(event);
+        }}
         className="no-scrollbar flex snap-x snap-proximity gap-1 overflow-x-auto scroll-px-3 px-3 py-2 [-webkit-overflow-scrolling:touch] [overscroll-behavior-x:contain]"
       >
         <Chip label={allLabel} active={value === 'all'} count={total} onClick={() => onChange('all')} />

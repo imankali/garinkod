@@ -1,5 +1,6 @@
 // frontend/src/pages/Login.tsx
 
+import { useTabListKeys } from '../hooks/useTabListKeys';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { motion } from 'framer-motion';
@@ -50,6 +51,7 @@ const EMPTY_PASSWORD_FORM: PasswordFormData = {
 };
 
 export default function Login() {
+  const methodTabs = useTabListKeys<HTMLDivElement>();
   const [authMethod, setAuthMethod] = useState<AuthMethod>('otp');
   const [isRegister, setIsRegister] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -213,7 +215,7 @@ export default function Login() {
             </p>
           </header>
 
-          <div className="mb-6 grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1 dark:bg-emerald-950" role="tablist" aria-label="روش ورود">
+          <div className="mb-6 grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1 dark:bg-emerald-950" role="tablist" aria-label="روش ورود" ref={methodTabs.ref} onKeyDown={methodTabs.onKeyDown}>
             <button
               type="button"
               role="tab"

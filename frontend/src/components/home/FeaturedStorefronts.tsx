@@ -9,12 +9,13 @@
 // other rails, so the scroll personality (rAF tween, snap on touch, autoplay
 // that pauses on hover) is shared everywhere.
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { ArrowLeft, BadgeCheck, PlusCircle, Sprout } from 'lucide-react';
 
 import { storefrontsApi } from '../../api/services';
 import { useDragToScroll } from '../../hooks/useDragToScroll';
+import PlaybackToggle from '../ui/PlaybackToggle';
 import type { Storefront } from '@/types/storefront';
 
 const AUTOPLAY_MS = 4000;
@@ -32,6 +33,8 @@ export default function FeaturedStorefronts() {
    *  suppression). The hook also marks rail overflow, so the grab cursor is
    *  only shown when there is something left to drag. */
   const railDrag = useDragToScroll<HTMLDivElement>(railRef);
+  // Explicit stop for the autoplay, as WCAG 2.2.2 requires.
+  const [playing, setPlaying] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -52,7 +55,7 @@ export default function FeaturedStorefronts() {
   }, []);
 
   /** rAF tween of the rail's own scrollLeft — identical to the other rails. */
-  const animateTo = (targetLeft: number) => {
+  const animateTo = useCallback((targetLeft: number) => {
     const rail = railRef.current;
     if (!rail) return;
     cancelTween.current?.();
@@ -79,16 +82,16 @@ export default function FeaturedStorefronts() {
       window.cancelAnimationFrame(raf);
       done();
     };
-  };
+  }, []);
 
   /** One column = the scroll step (mydigipay pairs two stalls per column). */
-  const columnStep = (rail: HTMLDivElement): number => {
+  const columnStep = useCallback((rail: HTMLDivElement): number => {
     const first = rail.children[0] as HTMLElement | undefined;
     const width = first ? first.getBoundingClientRect().width : 0;
     return width > 0 ? width + 16 : Math.max(rail.clientWidth * 0.4, 160);
-  };
+  }, []);
 
-  const scrollToColumn = (index: number) => {
+  const scrollToColumn = useCallback((index: number) => {
     const rail = railRef.current;
     if (!rail) return;
     const unit = Math.max(columnStep(rail), 1);
@@ -98,7 +101,7 @@ export default function FeaturedStorefronts() {
       : at > 0 ? 1
       : getComputedStyle(rail).direction === 'rtl' ? -1 : 1;
     animateTo(sign * index * unit);
-  };
+  }, [animateTo, columnStep]);
 
 
 
@@ -120,7 +123,7 @@ export default function FeaturedStorefronts() {
   // Gentle autoplay, consistent with the home rails; pauses on hover/touch
   // and respects reduced-motion.
   useEffect(() => {
-    if (loading || storefronts.length < 4) return;
+    if (!playing || loading || storefronts.length < 4) return;
     const reduceMotion =
       typeof window !== 'undefined' &&
       window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -141,7 +144,7 @@ export default function FeaturedStorefronts() {
       else scrollToColumn(Math.min(currentIndex + 1, rail.children.length - 1));
     }, AUTOPLAY_MS);
     return () => window.clearInterval(timer);
-  }, [loading, storefronts.length]);
+  }, [loading, storefronts.length, playing, scrollToColumn, columnStep]);
 
   useEffect(() => () => cancelTween.current?.(), []);
 
@@ -170,13 +173,22 @@ export default function FeaturedStorefronts() {
             مستقیم از غرفه کشاورزان — بدون واسطه، با قیمت درب مزرعه
           </p>
         </div>
-        <Link
-          to="/storefronts"
-          className="inline-flex min-h-11 items-center gap-1 rounded-xl px-3 text-fluid-xs font-bold text-emerald-700 transition hover:bg-emerald-50 dark:text-lime-300 dark:hover:bg-emerald-900"
-        >
-          همه
-          <ArrowLeft size={14} aria-hidden="true" />
-        </Link>
+        <div className="flex items-center gap-1">
+          {storefronts.length > 3 && (
+            <PlaybackToggle
+              playing={playing}
+              onToggle={() => setPlaying((value) => !value)}
+              subject="غرفه‌ها"
+            />
+          )}
+          <Link
+            to="/storefronts"
+            className="inline-flex min-h-11 items-center gap-1 rounded-xl px-3 text-fluid-xs font-bold text-emerald-700 transition hover:bg-emerald-50 dark:text-lime-300 dark:hover:bg-emerald-900"
+          >
+            همه
+            <ArrowLeft size={14} aria-hidden="true" />
+          </Link>
+        </div>
       </div>
 
       <div className="relative mt-5">

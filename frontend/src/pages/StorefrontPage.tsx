@@ -1,5 +1,6 @@
 // frontend/src/pages/StorefrontPage.tsx
 
+import { useTabListKeys } from '../hooks/useTabListKeys';
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {Link, useParams, useSearchParams} from 'react-router';
 import {AnimatePresence, motion, useReducedMotion} from 'framer-motion';
@@ -56,6 +57,7 @@ const TABS: { key: TabKey; labelKey: string; icon: typeof Grid3x3 }[] = [
  * messages to ask for advice.
  */
 export default function StorefrontPage() {
+  const contentTabs = useTabListKeys<HTMLDivElement>();
   const reduceMotion = useReducedMotion();
   const { slug = '' } = useParams<{ slug: string }>();
   const { t } = useTranslation();
@@ -724,7 +726,7 @@ export default function StorefrontPage() {
       {isOwner && <OwnerComposer onPublished={load} />}
 
       {/* Tabs */}
-      <div role="tablist" aria-label="محتوای غرفه" className="mt-6 flex border-b border-slate-200 dark:border-emerald-900">
+      <div role="tablist" aria-label="محتوای غرفه" className="mt-6 flex border-b border-slate-200 dark:border-emerald-900" ref={contentTabs.ref} onKeyDown={contentTabs.onKeyDown}>
         {TABS.map(({ key, labelKey, icon: Icon }) => (
           <motion.button
             key={key}

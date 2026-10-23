@@ -4,6 +4,7 @@
 // the consultant write here; consultant entries carry a badge. Events can be
 // marked done/cancelled, deleted, and new ones added inline.
 
+import { useTabListKeys } from '../../hooks/useTabListKeys';
 import { FormEvent, useMemo, useState } from 'react';
 import { CalendarPlus, Check, Droplets, FlaskConical, Sprout, Trash2, X } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -32,6 +33,7 @@ export default function LandCalendar({
 }) {
   const { t } = useTranslation();
   const [kindFilter, setKindFilter] = useState<FarmEventKind | 'all'>('all');
+  const kindTabs = useTabListKeys<HTMLDivElement>();
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState<FarmEventPayload>({ kind: 'spraying', title: '', date: '', notes: '' });
   const [busy, setBusy] = useState(false);
@@ -103,7 +105,7 @@ export default function LandCalendar({
       </div>
 
       {/* Kind filter */}
-      <div className="no-scrollbar mt-3 flex gap-1.5 overflow-x-auto pb-0.5" role="tablist" aria-label="فیلتر نوع عملیات">
+      <div className="no-scrollbar mt-3 flex gap-1.5 overflow-x-auto pb-0.5" role="tablist" aria-label="فیلتر نوع عملیات" ref={kindTabs.ref} onKeyDown={kindTabs.onKeyDown}>
         <button
           type="button"
           role="tab"

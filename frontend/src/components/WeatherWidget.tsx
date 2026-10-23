@@ -1,7 +1,14 @@
 // frontend/src/components/WeatherWidget.tsx
 
 import { useCallback, useState } from "react";
-import { AlertTriangle, CloudRain, Droplets, Sun, Wind } from "lucide-react";
+import {
+  AlertTriangle,
+  CloudRain,
+  Droplets,
+  Sun,
+  Wind,
+  Check,
+} from 'lucide-react';
 import ClimateSelector, { type ClimateSelection } from "./ClimateSelector";
 
 // ========================================
@@ -23,7 +30,7 @@ interface WeatherDataMap {
 
 // ========================================
 // Weather Data Configuration
-// ✅ داده‌های هواشناسی برای استان‌های مختلف
+// داده‌های هواشناسی برای استان‌های مختلف
 // ========================================
 const CLIMATE_KEY_BY_PROVINCE_SLUG: Record<string, string> = {
   fars: "fars",
@@ -126,7 +133,15 @@ export default function WeatherWidget() {
                       : "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300"
                   }`}
                 >
-                  {data.canSpray ? "✔ شرایط مساعد سمپاشی" : "⚠ نامساعد برای سمپاشی"}
+                  {data.canSpray ? (
+                    <>
+                      <Check size={13} aria-hidden="true" /> شرایط مساعد سمپاشی
+                    </>
+                  ) : (
+                    <>
+                      <AlertTriangle size={13} aria-hidden="true" /> نامساعد برای سمپاشی
+                    </>
+                  )}
                 </span>
               </div>
               <h3 className="text-sm font-bold text-slate-800 dark:text-white md:text-base">

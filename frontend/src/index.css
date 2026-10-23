@@ -154,6 +154,11 @@ html {
   -webkit-text-size-adjust: 100%;
   -ms-text-size-adjust: 100%;
   scroll-padding-top: var(--header-height);
+  /* Reserve the scrollbar's width in both states: routes whose content is
+     shorter than the viewport used to lose the gutter, shifting the centred
+     header and every page by ~10px on navigation — the "header jumps" report
+     that kept coming back. */
+  scrollbar-gutter: stable;
 }
 
 body {
@@ -436,6 +441,50 @@ body {
  * ======================================== */
 button, a, input, select, textarea {
   transition: all var(--transition-base);
+}
+
+/*
+ * Affordance and typographic polish — three tokens the ui-ux-pro-max
+ * pre-delivery checklist asks for that this stylesheet was missing.
+ *
+ * 1. Cursor. Tailwind v4's preflight leaves <button> on the UA's default
+ *    cursor, so every non-anchor control on the site — the cart button, the
+ *    rail arrows, the quantity stepper — rendered with a text/arrow cursor and
+ *    read as "not clickable" to anyone testing with a mouse.
+ * 2. Wrapping. `balance` on headings stops a two-line title from leaving one
+ *    orphan word on the second line; `pretty` on body copy does the same for
+ *    paragraphs and list items without changing the measure.
+ * 3. Selection. The browser default selection colour is the OS accent, which
+ *    lands as a blue-grey block on this palette. The brand tint keeps selected
+ *    text legible and on-brand.
+ */
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+summary {
+  cursor: pointer;
+}
+
+button:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+h1, h2, h3 {
+  text-wrap: balance;
+}
+
+p, li, dd, figcaption {
+  text-wrap: pretty;
+}
+
+::selection {
+  background: #bbf7d0;
+  color: #052e22;
+}
+
+.dark ::selection {
+  background: #166534;
+  color: #f7fee7;
 }
 
 /* ========================================

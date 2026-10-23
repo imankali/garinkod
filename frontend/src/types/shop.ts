@@ -138,7 +138,7 @@ export interface Product {
   /** Purchasable packagings; one implicit row when none are declared. */
   packages?: ProductPackage[];
 
-  // ✅ فیلدهای detail (اختیاری - فقط در detail endpoint برمی‌گردند)
+  // فیلدهای detail (اختیاری - فقط در detail endpoint برمی‌گردند)
   fertilizer_detail?: FertilizerDetail;
   pesticide_detail?: PesticideDetail;
   seed_detail?: SeedDetail;

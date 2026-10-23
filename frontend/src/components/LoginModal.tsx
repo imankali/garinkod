@@ -8,6 +8,7 @@
 // than duplicating the flow; /login remains for deep links, the PWA start URL
 // and anyone who wants the full-page experience with registration.
 
+import { useTabListKeys } from '../hooks/useTabListKeys';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router';
 import { ArrowLeft, KeyRound, Loader2, LogIn, Phone, ShieldCheck } from 'lucide-react';
@@ -23,6 +24,7 @@ const INPUT =
   'w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm outline-none transition focus:border-emerald-500 dark:border-emerald-800 dark:bg-emerald-950 dark:text-white';
 
 export default function LoginModal() {
+  const loginTabs = useTabListKeys<HTMLDivElement>();
   const { open, reason, next, close } = useAuthModalStore();
   const { login, requestOtp, verifyOtp, isAuthenticated, isLoading } = useAuthStore();
   const navigate = useNavigate();
@@ -124,7 +126,7 @@ export default function LoginModal() {
       size="sm"
     >
       <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1 dark:bg-emerald-900/60" role="tablist" aria-label="روش ورود">
+        <div className="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1 dark:bg-emerald-900/60" role="tablist" aria-label="روش ورود" ref={loginTabs.ref} onKeyDown={loginTabs.onKeyDown}>
           {(
             [
               { id: 'otp', label: 'کد یک‌بارمصرف', icon: Phone },

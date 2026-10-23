@@ -1,6 +1,6 @@
 // frontend/src/components/home/OfferRail.tsx
 
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { ShoppingCart, Star } from 'lucide-react';
@@ -9,6 +9,7 @@ import { formatPrice } from '../../utils/formatPrice';
 import { toPersianDigits } from '../../utils/normalizeDigits';
 import { useCartStore } from '../../store/cartStore';
 import { useDragToScroll } from '../../hooks/useDragToScroll';
+import PlaybackToggle from '../ui/PlaybackToggle';
 import { productsApi } from '../../api/services';
 import toast from 'react-hot-toast';
 import type { ProductList } from '@/types/shop';
@@ -57,6 +58,8 @@ export default function OfferRail({
    *  mouse grab follows the pointer, a drag swallows the click that follows
    *  it, and a flick keeps gliding after release. */
   const railDrag = useDragToScroll<HTMLDivElement>(railRef);
+  // WCAG 2.2.2: rotation stops when the visitor says so, not only on hover.
+  const [playing, setPlaying] = useState(true);
 
   // Pair the products into two-row columns: [0,1], [2,3], … The leftover
   // product of an odd list fills the top row of the last column alone.
@@ -76,7 +79,7 @@ export default function OfferRail({
    *  collapses this tween into a single-frame jump (measured: intermediate
    *  values never land). So the tween suspends snap for its 450 ms and hands
    *  it back afterwards; manual swipes still snap. */
-  const animateTo = (targetLeft: number) => {
+  const animateTo = useCallback((targetLeft: number) => {
     const rail = railRef.current;
     if (!rail) return;
     cancelTween.current?.();
@@ -103,20 +106,20 @@ export default function OfferRail({
       window.cancelAnimationFrame(raf);
       done();
     };
-  };
+  }, []);
 
   /** Pixel advance of one column (column + gap). Without layout (jsdom,
    *  hidden node) it falls back to the ~80%-viewport page step. */
-  const cardStep = (rail: HTMLDivElement): number => {
+  const cardStep = useCallback((rail: HTMLDivElement): number => {
     const first = rail.children[0] as HTMLElement | undefined;
     const width = first ? first.getBoundingClientRect().width : 0;
     return width > 0 ? width + 12 : Math.max(rail.clientWidth * 0.8, 280);
-  };
+  }, []);
 
   /** Bring column `index` flush to the start edge. The RTL sign comes from the
    *  live scroll position (negative while scrolled in Chromium RTL), falling
    *  back to the computed direction when the rail sits at 0. */
-  const scrollToCard = (index: number) => {
+  const scrollToCard = useCallback((index: number) => {
     const rail = railRef.current;
     if (!rail) return;
     const unit = Math.max(cardStep(rail), 1);
@@ -126,7 +129,7 @@ export default function OfferRail({
       : at > 0 ? 1
       : getComputedStyle(rail).direction === 'rtl' ? -1 : 1;
     animateTo(sign * index * unit);
-  };
+  }, [animateTo, cardStep]);
 
 
   // Autoplay runs only while the rail is actually on screen: a rail parked
@@ -149,7 +152,7 @@ export default function OfferRail({
   // Autoplay: one column per 2s. Pointer hover or an active touch pauses it —
   // the standard carousel contract; moving the pointer away resumes.
   useEffect(() => {
-    if (products.length < 2) return;
+    if (!playing || products.length < 2) return;
     const reduceMotion =
       typeof window !== 'undefined' &&
       window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -173,7 +176,7 @@ export default function OfferRail({
       }
     }, AUTOPLAY_MS);
     return () => window.clearInterval(timer);
-  }, [products.length]);
+  }, [products.length, playing, scrollToCard, cardStep]);
 
   async function quickAdd(product: ProductList) {
     if (busyId.current === product.id) return;
@@ -268,6 +271,16 @@ export default function OfferRail({
 
   return (
     <div className="group/rail relative">
+      {products.length > 1 && (
+        <div className="mb-1 flex justify-end">
+          <PlaybackToggle
+            playing={playing}
+            onToggle={() => setPlaying((value) => !value)}
+            subject="پیشنهادها"
+            variant="chip"
+          />
+        </div>
+      )}
       <div
         ref={railRef}
         {...railDrag.handlers}
@@ -284,7 +297,7 @@ export default function OfferRail({
           // Give momentum scrolling a beat to settle before autoplay resumes.
           window.setTimeout(() => { touchPause.current = false; }, 2500);
         }}
-        className="rail-scroll mt-4 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-4 pb-4 touch-pan-x sm:px-6"
+        className="rail-scroll mt-2 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-4 pb-4 touch-pan-x sm:px-6"
         role="region"
         aria-label={label}
       >

@@ -1,3 +1,4 @@
+import { useTabListKeys } from '../hooks/useTabListKeys';
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -60,6 +61,7 @@ const TABS: Array<{ id: Tab; label: string; icon: typeof Beaker }> = [
 ];
 
 export default function ProductPage() {
+  const productTabs = useTabListKeys<HTMLDivElement>();
   const reduceMotion = useReducedMotion();
   const { slug = "" } = useParams();
   /*
@@ -557,7 +559,7 @@ export default function ProductPage() {
 
     {/* Tabs: توضیحات / ویژگی‌ها / دیدگاه‌ها */}
     <div id="product-tabs" className="mt-9 scroll-mt-24">
-      <div className="flex gap-1 overflow-x-auto rounded-2xl bg-slate-100 p-1 dark:bg-emerald-900/60" role="tablist" aria-label="بخش‌های محصول">
+      <div className="flex gap-1 overflow-x-auto rounded-2xl bg-slate-100 p-1 dark:bg-emerald-900/60" role="tablist" aria-label="بخش‌های محصول" ref={productTabs.ref} onKeyDown={productTabs.onKeyDown}>
         {TABS.map((item) => {
           const count = item.id === 'reviews' ? comments.length : item.id === 'specs' ? specRows.length : 0;
           return (
@@ -646,13 +648,17 @@ export default function ProductPage() {
                 <div className="flex flex-wrap items-center gap-2">{STICKERS.map((item) => <button key={item} type="button" onClick={() => setSticker(sticker === item ? "" : item)} className={cn("rounded-lg px-2 py-1 text-lg", sticker === item ? "bg-emerald-100 ring-1 ring-emerald-400 dark:bg-emerald-900" : "bg-slate-50 dark:bg-emerald-900/40")}>{item}</button>)}
                   <input ref={imageRef} type="file" aria-label="افزودن تصویر به دیدگاه" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => setCommentImage(event.target.files?.[0] || null)} />
                   <button type="button" onClick={() => imageRef.current?.click()} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 dark:border-emerald-700 dark:text-emerald-100"><ImagePlus size={15} />{commentImage ? commentImage.name : "افزودن عکس"}</button>
-                  <button disabled={reviewSubmit.isPending} className="ms-auto inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"><Send size={16} />{reviewSubmit.isPending ? "در حال ثبت..." : "ثبت نظر"}</button>
+                  <button type="submit" disabled={reviewSubmit.isPending} className="ms-auto inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"><Send size={16} />{reviewSubmit.isPending ? "در حال ثبت..." : "ثبت نظر"}</button>
                 </div>
               </form>
             </div>
 
             <div className="space-y-4">
-              {commentsFetching && !comments.length && <p className="text-fluid-sm text-slate-400">در حال بارگذاری دیدگاه‌ها...</p>}
+              {commentsFetching && !comments.length && (
+                <p role="status" aria-busy="true" className="text-fluid-sm text-slate-400">
+                  در حال بارگذاری دیدگاه‌ها...
+                </p>
+              )}
               {!comments.length && <p className="rounded-2xl bg-slate-50 p-5 text-sm text-slate-500 dark:bg-emerald-900/40 dark:text-emerald-200">هنوز نظری ثبت نشده است. اولین تجربه خرید را بنویسید.</p>}
               {visibleReviews.length > 0 && (
                 <div className="space-y-3">
@@ -955,7 +961,7 @@ function CommentCard({ comment, onReply, nested = false, highlighted = false }: 
         گزارش‌شده
       </span>
     )}
-    <button onClick={() => onReply(comment)} className="ms-auto text-fluid-2xs font-bold text-emerald-700 hover:underline dark:text-lime-300">پاسخ دادن</button>
+    <button type="button" onClick={() => onReply(comment)} className="ms-auto text-fluid-2xs font-bold text-emerald-700 hover:underline dark:text-lime-300">پاسخ دادن</button>
   </div>
   {!nested && showReportBox && (
     <form

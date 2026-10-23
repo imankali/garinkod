@@ -18,6 +18,7 @@ import { BadgeCheck, MessageSquareQuote, Quote, ThumbsUp } from 'lucide-react';
 
 import { testimonialsApi } from '../api/services';
 import { StarRow } from '../components/StarRating';
+import EmptyState from '../components/ui/EmptyState';
 import { cn } from '../utils/cn';
 
 const MODE_NOTE: Record<'curated' | 'verified' | 'open', { label: string; hint: string }> = {
@@ -77,18 +78,33 @@ export default function Customers() {
         </header>
 
         {isLoading && (
-          <div className="mt-6 grid gap-4 md:grid-cols-2">
+          <div role="status" aria-busy="true" className="mt-6 grid gap-4 md:grid-cols-2">
+            <span className="sr-only">در حال خواندن دیدگاه خریداران…</span>
             {[0, 1, 2, 3].map((item) => (
-              <div key={item} className="h-44 animate-pulse rounded-3xl bg-slate-100 dark:bg-emerald-950" />
+              <div
+                key={item}
+                aria-hidden="true"
+                className="h-44 animate-pulse rounded-3xl bg-slate-100 dark:bg-emerald-950"
+              />
             ))}
           </div>
         )}
 
         {!isLoading && !items.length && (
-          <p className="mt-6 rounded-2xl border border-dashed border-slate-200 p-6 text-fluid-sm leading-8 text-slate-500 dark:border-emerald-800 dark:text-emerald-200">
-            هنوز دیدگاه امتیازداری منتشر نشده است. پس از آنکه نخستین خریداران تجربه‌شان را بنویسند،
-            همین صفحه پر می‌شود — چیزی که اینجا نمی‌خوانید ساخته نشده است.
-          </p>
+          <EmptyState
+            className="mt-6"
+            icon={MessageSquareQuote}
+            title="هنوز دیدگاه امتیازداری منتشر نشده است"
+            description="پس از آنکه نخستین خریداران تجربه‌شان را بنویسند، همین صفحه پر می‌شود — چیزی که اینجا نمی‌خوانید ساخته نشده است."
+            action={
+              <Link
+                to="/products"
+                className="inline-flex min-h-11 items-center rounded-xl bg-emerald-600 px-5 text-fluid-sm font-bold text-white"
+              >
+                دیدن کالاها
+              </Link>
+            }
+          />
         )}
 
         <div className="mt-6 grid gap-4 md:grid-cols-2">

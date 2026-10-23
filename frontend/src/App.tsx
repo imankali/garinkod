@@ -1,5 +1,5 @@
 // frontend/src/App.tsx
-// ✅ فایل اصلی اپلیکیشن - نقطه اتصال همه کامپوننت‌ها
+// فایل اصلی اپلیکیشن - نقطه اتصال همه کامپوننت‌ها
 
 import { useEffect, useMemo, useRef, useState, lazy, Suspense } from "react";
 import { BrowserRouter, Navigate, Routes, Route } from 'react-router';
@@ -372,8 +372,8 @@ export default function App() {
 
         {/* ======================================== */}
         {/* Main Content */}
-        {/* ✅ pb-24 برای MobileBottomNav در موبایل */}
-        {/* ✅ lg:pb-8 برای دسکتاپ */}
+        {/* pb-24 برای MobileBottomNav در موبایل */}
+        {/* lg:pb-8 برای دسکتاپ */}
         {/* ======================================== */}
         <main
           id="main-content"
@@ -717,7 +717,7 @@ export default function App() {
 
         {/* ======================================== */}
         {/* Wishlist Modal */}
-        {/* ✅ فقط وقتی wishlistOpen true است render می‌شود */}
+        {/* فقط وقتی wishlistOpen true است render می‌شود */}
         {/* ======================================== */}
         {wishlistOpen && (
           <Suspense fallback={null}>

@@ -26,6 +26,7 @@ import { useEffect, useRef } from 'react';
 import type { RefObject } from 'react';
 import type {
   DragEvent as ReactDragEvent,
+  KeyboardEvent as ReactKeyboardEvent,
   MouseEvent as ReactMouseEvent,
   PointerEvent as ReactPointerEvent,
 } from 'react';
@@ -50,11 +51,20 @@ const MIN_VELOCITY = 0.02;
 /** A flick faster than this is clamped — prevents a whole-rail jump. */
 const MAX_VELOCITY = 3;
 
+interface DragToScrollOptions {
+  /** Make the rail itself a tab stop (default true). A rail that already
+   *  contains a managed composite widget — the tablist of message channels —
+   *  turns this off so the ARIA pattern keeps its own focus order. */
+  focusable?: boolean;
+}
+
 export function useDragToScroll<T extends HTMLElement>(
   /** A rail that already owns its ref (for autoplay tweens) can hand it over
    *  instead of threading a second ref through every scroll calculation. */
   externalRef?: RefObject<T>,
+  options: DragToScrollOptions = {},
 ) {
+  const focusable = options.focusable !== false;
   const internalRef = useRef<T>(null);
   const ref = externalRef ?? internalRef;
   const drag = useRef<DragState | null>(null);
@@ -200,6 +210,44 @@ export function useDragToScroll<T extends HTMLElement>(
     if (drag.current?.active) endDrag(ref.current, false);
   };
 
+  /** Keyboard alternative to dragging (WCAG 2.2 SC 2.5.7): a rail that can be
+   *  dragged with a mouse must be scrollable from the keyboard too. Only acts
+   *  when the rail itself has focus, so tab strips and chip rows inside keep
+   *  their own arrow-key behaviour. */
+  const onKeyDown = (event: ReactKeyboardEvent<T>) => {
+    const el = ref.current;
+    if (!el || event.target !== el) return;
+    const max = el.scrollWidth - el.clientWidth;
+    if (max <= 4) return;
+    const rtl = getComputedStyle(el).direction === 'rtl';
+    const page = Math.max(el.clientWidth * 0.8, 120);
+    const reduceMotion =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const behavior: ScrollBehavior = reduceMotion ? 'auto' : 'smooth';
+
+    switch (event.key) {
+      case 'ArrowRight':
+      case 'ArrowLeft': {
+        // Follow the physical arrow: ArrowRight moves the viewport right,
+        // which in RTL means scrolling toward the start of the content.
+        const forward = event.key === 'ArrowRight';
+        const delta = (rtl ? !forward : forward) ? page : -page;
+        el.scrollBy({ left: delta, behavior });
+        break;
+      }
+      case 'Home':
+        el.scrollTo({ left: 0, behavior });
+        break;
+      case 'End':
+        el.scrollTo({ left: rtl ? -max : max, behavior });
+        break;
+      default:
+        return;
+    }
+    event.preventDefault();
+  };
+
   const onClickCapture = (event: ReactMouseEvent) => {
     // A drag must not activate the card or button the mouse released over.
     if (drag.current?.moved) {
@@ -280,7 +328,11 @@ export function useDragToScroll<T extends HTMLElement>(
       onPointerCancel,
       onLostPointerCapture,
       onClickCapture,
+      onKeyDown,
       onDragStart: onNativeDragStart,
+      // A scrollable region must be reachable without a pointer, otherwise
+      // the drag becomes the only way to see the cut-off end of the rail.
+      tabIndex: focusable ? 0 : undefined,
     },
   };
 }

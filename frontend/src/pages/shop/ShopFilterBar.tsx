@@ -21,7 +21,12 @@
 // پرفروش‌ترین + پربازدیدترین) stack into a real multi-key ORDER BY.
 
 import { useEffect, useMemo, useState } from 'react';
-import { Check, ChevronDown, Star } from 'lucide-react';
+import {
+  Check,
+  ChevronDown,
+  Star,
+  X,
+} from 'lucide-react';
 
 import { FilterShell, MultiSelectFacet, type FacetOption } from '../../components/shop/FilterPopover';
 import { cn } from '../../utils/cn';
@@ -442,9 +447,9 @@ export default function ShopFilterBar({
                 type="button"
                 onClick={chip.onRemove}
                 aria-label={`حذف ${chip.label}`}
-                className="rounded-full p-0.5 transition-colors hover:bg-emerald-200/70 dark:hover:bg-emerald-800"
+                className="grid h-5 w-5 place-items-center rounded-full transition-colors hover:bg-emerald-200/70 dark:hover:bg-emerald-800"
               >
-                ✕
+                <X size={12} aria-hidden="true" />
               </button>
             </span>
           ))}

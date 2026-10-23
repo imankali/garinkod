@@ -234,7 +234,7 @@ export default function ProductDetailModal({
                   className="mb-3 flex cursor-grab select-none gap-1 overflow-x-auto rounded-xl bg-slate-50 p-1 no-scrollbar"
                 >
                   {tabs.map((tab) => (
-                    <button
+                    <button type="button"
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
                       className={`relative flex min-h-11 min-w-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 text-fluid-xs font-bold transition-colors ${
@@ -375,7 +375,7 @@ export default function ProductDetailModal({
                         transition={{ duration: 0.2 }}
                       >
                         {product.brochureAvailable ? (
-                          <button className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-emerald-200 bg-emerald-50/50 py-4 text-xs font-bold text-[#15803d] transition-colors hover:bg-emerald-50">
+                          <button type="button" className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-emerald-200 bg-emerald-50/50 py-4 text-xs font-bold text-[#15803d] transition-colors hover:bg-emerald-50">
                             <Download size={15} />
                             دانلود برگه آنالیز و بروشور محصول (PDF)
                           </button>

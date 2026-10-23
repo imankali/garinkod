@@ -297,7 +297,15 @@ function Block({ block }: { block: SitePageBlock }) {
       if (!block.image_url) return null;
       return (
         <figure>
-          <img src={block.image_url} alt={block.title || ''} className="w-full rounded-3xl object-cover shadow-sm" loading="lazy" />
+          <img
+            src={block.image_url}
+            alt={block.title || ''}
+            width={1200}
+            height={675}
+            className="h-auto w-full rounded-3xl object-cover shadow-sm"
+            loading="lazy"
+            decoding="async"
+          />
           {block.text && <figcaption className="mt-2 text-center text-fluid-2xs text-slate-400">{block.text}</figcaption>}
         </figure>
       );

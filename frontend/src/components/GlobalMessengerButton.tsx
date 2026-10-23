@@ -159,7 +159,7 @@ export default function GlobalMessengerButton({ cartDrawerOpen = false }: { cart
               aria-label="پیام‌رسان گارین‌کود"
             >
               <div className="relative bg-brand-gradient px-5 py-5 text-white">
-                <button
+                <button type="button"
                   onClick={() => setOpen(false)}
                   className="tap-target absolute end-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-white/20 transition-colors hover:bg-white/30"
                   aria-label="بستن"

@@ -8,7 +8,7 @@
 // rAF tween the home rails use so the whole site shares one scroll personality:
 // snap on touch, tweened on the arrow buttons, pause on hover.
 
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ShoppingCart } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -17,6 +17,7 @@ import { useDragToScroll } from '../../hooks/useDragToScroll';
 import { formatPrice } from '../../utils/formatPrice';
 import { cn } from '../../utils/cn';
 import { isLowStock } from '../listing/StockBadge';
+import PlaybackToggle from '../ui/PlaybackToggle';
 import type { MarketplaceListing } from '@/types/storefront';
 
 type Listing = MarketplaceListing;
@@ -51,10 +52,12 @@ export default function ListingRail({
   const busyId = useRef<number | null>(null);
   const cancelTween = useRef<(() => void) | null>(null);
   const addToCart = useCartStore((state) => state.addToCart);
+  // Autoplay is opt-out, not opt-in: it must stop on request (WCAG 2.2.2).
+  const [playing, setPlaying] = useState(true);
 
   /** rAF tween of the rail's own scrollLeft — identical to the home rails so
    *  every carousel on the site moves the same way. */
-  const animateTo = (targetLeft: number) => {
+  const animateTo = useCallback((targetLeft: number) => {
     const rail = railRef.current;
     if (!rail) return;
     cancelTween.current?.();
@@ -81,15 +84,15 @@ export default function ListingRail({
       window.cancelAnimationFrame(raf);
       done();
     };
-  };
+  }, []);
 
-  const cardStep = (rail: HTMLDivElement): number => {
+  const cardStep = useCallback((rail: HTMLDivElement): number => {
     const first = rail.children[0] as HTMLElement | undefined;
     const width = first ? first.getBoundingClientRect().width : 0;
     return width > 0 ? width + 12 : Math.max(rail.clientWidth * 0.7, 240);
-  };
+  }, []);
 
-  const scrollToCard = (index: number) => {
+  const scrollToCard = useCallback((index: number) => {
     const rail = railRef.current;
     if (!rail) return;
     const unit = Math.max(cardStep(rail), 1);
@@ -99,7 +102,7 @@ export default function ListingRail({
       : at > 0 ? 1
       : getComputedStyle(rail).direction === 'rtl' ? -1 : 1;
     animateTo(sign * index * unit);
-  };
+  }, [animateTo, cardStep]);
 
   const inViewRef = useRef(false);
   /** Mouse drag-to-scroll — shared with every other rail on the site. Touch
@@ -124,7 +127,7 @@ export default function ListingRail({
   // Autoplay like the home rails, slower here: a storefront shelf is content
   // the visitor is browsing, not a flash-deal strip to chase.
   useEffect(() => {
-    if (items.length < 2) return;
+    if (!playing || items.length < 2) return;
     const reduceMotion =
       typeof window !== 'undefined' &&
       window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -145,7 +148,7 @@ export default function ListingRail({
       else scrollToCard(Math.min(currentIndex + 1, rail.children.length - 1));
     }, AUTOPLAY_MS);
     return () => window.clearInterval(timer);
-  }, [items.length]);
+  }, [items.length, playing, scrollToCard, cardStep]);
 
   async function quickAdd(listing: Listing) {
     if (busyId.current === listing.id) return;
@@ -173,16 +176,25 @@ export default function ListingRail({
             {count.toLocaleString('fa-IR')} آگهی
           </span>
         </div>
-        {onOpenAll && (
-          <button
-            type="button"
-            onClick={onOpenAll}
-            className="ms-auto inline-flex shrink-0 items-center gap-1 text-fluid-xs font-bold text-emerald-700 transition hover:text-emerald-900 dark:text-lime-300"
-          >
-            مشاهده بیشتر
-            <ChevronLeft size={14} aria-hidden="true" />
-          </button>
-        )}
+        <div className="ms-auto flex shrink-0 items-center gap-1">
+          {items.length > 1 && (
+            <PlaybackToggle
+              playing={playing}
+              onToggle={() => setPlaying((value) => !value)}
+              subject="کارت‌های این دسته"
+            />
+          )}
+          {onOpenAll && (
+            <button
+              type="button"
+              onClick={onOpenAll}
+              className="inline-flex shrink-0 items-center gap-1 text-fluid-xs font-bold text-emerald-700 transition hover:text-emerald-900 dark:text-lime-300"
+            >
+              مشاهده بیشتر
+              <ChevronLeft size={14} aria-hidden="true" />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="relative mt-4">

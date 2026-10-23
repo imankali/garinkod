@@ -13,6 +13,7 @@ import { useTranslation } from '../../i18n';
 import type { FarmLand } from '@/types/farming';
 import ConsultationsPanel from './ConsultationsPanel';
 import LandDetailDrawer from './LandDetailDrawer';
+import LandTypeGlyph from './LandTypeGlyph';
 import LandFormModal from './LandFormModal';
 
 export default function FarmPanel() {
@@ -81,7 +82,7 @@ export default function FarmPanel() {
             onClick={openNew}
             className="mt-4 flex w-full flex-col items-center gap-2 rounded-3xl border-2 border-dashed border-emerald-200 py-10 text-center transition hover:border-emerald-400 dark:border-emerald-800"
           >
-            <span className="text-3xl">🌱</span>
+            <Sprout size={30} aria-hidden="true" className="text-emerald-600 dark:text-lime-300" />
             <span className="text-sm font-bold text-slate-600 dark:text-emerald-100">
               هنوز زمینی ثبت نکرده‌اید
             </span>
@@ -97,8 +98,8 @@ export default function FarmPanel() {
                   className="group flex w-full flex-col rounded-3xl border border-emerald-100 bg-gradient-to-b from-emerald-50/60 to-white p-4 text-start shadow-sm transition hover:border-emerald-300 hover:shadow-md dark:border-emerald-900 dark:from-emerald-900/30 dark:to-emerald-950"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-2xl shadow-sm dark:bg-emerald-900">
-                      {land.land_type === 'orchard' ? '🌳' : land.land_type === 'greenhouse' ? '🏡' : '🌾'}
+                    <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm dark:bg-emerald-900">
+                      <LandTypeGlyph landType={land.land_type} size={24} className="text-emerald-600 dark:text-lime-300" />
                     </span>
                     <span className="rounded-full bg-emerald-600/10 px-2.5 py-1 text-fluid-2xs font-bold text-emerald-700 dark:bg-emerald-900 dark:text-lime-300">
                       {land.land_type_label}

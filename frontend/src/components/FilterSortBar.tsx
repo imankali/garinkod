@@ -267,7 +267,7 @@ export default function FilterSortBar({
                   >
                     <div className="p-1">
                       {sortOptions.map((opt) => (
-                        <button
+                        <button type="button"
                           key={opt.id}
                           onClick={() => handleSortSelect(opt.id)}
                           className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-start text-sm font-semibold transition-colors ${
@@ -317,7 +317,7 @@ export default function FilterSortBar({
                       حذف همه فیلترها
                     </button>
                   )}
-                <button
+                <button type="button"
                   onClick={() => setPanel("none")}
                   className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-400 hover:text-rose-500 dark:bg-emerald-950"
                   aria-label="بستن فیلترها"
@@ -349,7 +349,7 @@ export default function FilterSortBar({
               </div>
 
               {/* In Stock Only */}
-              <button
+              <button type="button"
                 onClick={() => onInStockChange(!inStockOnly)}
                 className={`flex min-h-11 items-center gap-1.5 rounded-full px-3.5 text-xs font-semibold transition-colors ${
                   inStockOnly

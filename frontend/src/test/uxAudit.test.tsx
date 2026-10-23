@@ -18,6 +18,9 @@ import { Check, Eye, X } from 'lucide-react';
 import MarketplaceListingCard from '../components/MarketplaceListingCard';
 import MobileBottomNav from '../components/MobileBottomNav';
 import ProductCard from '../components/ProductCard';
+import EmptyState from '../components/ui/EmptyState';
+import PageHeader from '../components/ui/PageHeader';
+import PlaybackToggle from '../components/ui/PlaybackToggle';
 import { renderApp } from './render';
 import { auditUx, guarantees44px } from './uxAudit';
 import { useCartStore } from '../store/cartStore';
@@ -208,5 +211,48 @@ describe('the component gallery passes the UX audit', () => {
   it('product card', () => {
     const { container } = renderApp(<ProductCard product={product()} {...cardProps} />);
     expect(messages(container)).toEqual([]);
+  });
+
+  // The three primitives that replaced the ad-hoc page openings and empty
+  // screens: if one of them grows a small control, this fails here rather than
+  // on whichever page happens to adopt it next.
+  it('page header with breadcrumbs and an action', () => {
+    const { container } = renderApp(
+      <PageHeader
+        title="فهرست اسناد حقوقی"
+        eyebrow="قوانین"
+        icon={Check}
+        description="هر آنچه پیش از خرید باید بدانید."
+        breadcrumbs={[{ label: 'خانه', to: '/' }, { label: 'اسناد' }]}
+        actions={
+          <a href="/support" className="min-h-11 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white">
+            پشتیبانی
+          </a>
+        }
+      />,
+    );
+    expect(messages(container)).toEqual([]);
+  });
+
+  it('empty state with an action', () => {
+    const { container } = renderApp(
+      <EmptyState
+        title="سفارشی ثبت نشده"
+        description="پس از نخستین خرید، سفارش‌ها همین‌جا می‌مانند."
+        action={
+          <a href="/products" className="min-h-11 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white">
+            دیدن کالاها
+          </a>
+        }
+      />,
+    );
+    expect(messages(container)).toEqual([]);
+  });
+
+  it('rotating-content pause control in both states', () => {
+    const playing = renderApp(<PlaybackToggle playing onToggle={vi.fn()} subject="اسلایدها" />);
+    expect(messages(playing.container)).toEqual([]);
+    const paused = renderApp(<PlaybackToggle playing={false} onToggle={vi.fn()} subject="اسلایدها" variant="chip" />);
+    expect(messages(paused.container)).toEqual([]);
   });
 });

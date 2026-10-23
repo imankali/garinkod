@@ -127,7 +127,7 @@ export default function Messages() {
 
   if (!isSessionChecked || loading) {
     return (
-      <main className="flex min-h-[55dvh] items-center justify-center">
+      <main className="flex min-h-[55dvh] items-center justify-center" aria-busy="true" role="status">
         <p className="text-sm text-slate-500 dark:text-emerald-200">{t('common.loading')}</p>
       </main>
     );

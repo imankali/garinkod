@@ -40,6 +40,7 @@ import PostCard from '../components/social/PostCard';
 import { useTranslation } from '../i18n';
 import { cn } from '../utils/cn';
 import { useDragToScroll } from '../hooks/useDragToScroll';
+import EmptyState from '../components/ui/EmptyState';
 import type { MarketplaceListing, Storefront, StorefrontPost } from '@/types/storefront';
 import type { Location } from '@/types/farming';
 
@@ -570,9 +571,22 @@ export default function Storefronts() {
             </button>
           </div>
         ) : storefronts.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-slate-200 py-12 text-center text-sm text-slate-400 dark:border-emerald-800">
-            غرفه‌ای با این مشخصات پیدا نشد.
-          </p>
+          <EmptyState
+            icon={Store}
+            title="غرفه‌ای با این مشخصات پیدا نشد"
+            description="فیلترها را بردارید یا شهر دیگری را ببینید؛ غرفه‌های تازه هر هفته اضافه می‌شوند."
+            action={
+              activeCount > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => { resetFilters(); setSearchInput(''); }}
+                  className="min-h-11 rounded-xl border border-emerald-200 bg-white px-4 text-xs font-bold text-emerald-700 dark:border-emerald-700 dark:bg-emerald-950 dark:text-lime-300"
+                >
+                  پاک کردن فیلترها
+                </button>
+              ) : undefined
+            }
+          />
         ) : (
           <>
             <p className="mb-3 text-xs font-bold text-slate-500 dark:text-emerald-200">

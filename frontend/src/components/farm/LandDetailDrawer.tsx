@@ -4,6 +4,7 @@
 // consultation form for this specific land. Slides in as a drawer on mobile,
 // a centered dialog on larger screens.
 
+import { useTabListKeys } from '../../hooks/useTabListKeys';
 import { useCallback, useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Droplets, MapPin, Pencil, Ruler, Sprout, X } from 'lucide-react';
@@ -14,6 +15,7 @@ import { useTranslation } from '../../i18n';
 import type { FarmCalendarEvent, FarmLand } from '@/types/farming';
 import { formatFaDate } from './farmOptions';
 import LandCalendar from './LandCalendar';
+import LandTypeGlyph from './LandTypeGlyph';
 
 type TabKey = 'id' | 'calendar';
 
@@ -30,6 +32,7 @@ export default function LandDetailDrawer({
 }) {
   const { t } = useTranslation();
   const [tab, setTab] = useState<TabKey>('id');
+  const fileTabs = useTabListKeys<HTMLDivElement>();
   const [events, setEvents] = useState<FarmCalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -75,8 +78,8 @@ export default function LandDetailDrawer({
           <header className="border-b border-emerald-100 bg-white p-4 dark:border-emerald-900 dark:bg-emerald-950">
             <div className="flex items-center justify-between gap-2">
               <div className="flex min-w-0 items-center gap-2">
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-600 text-xl text-white">
-                  {land.land_type === 'orchard' ? '🌳' : land.land_type === 'greenhouse' ? '🏡' : '🌾'}
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-600 text-white">
+                  <LandTypeGlyph landType={land.land_type} size={22} />
                 </span>
                 <div className="min-w-0">
                   <h2 className="min-w-0 truncate text-sm font-extrabold text-slate-800 dark:text-white">{land.name}</h2>
@@ -106,14 +109,14 @@ export default function LandDetailDrawer({
               </div>
             </div>
 
-            <div className="mt-3 flex" role="tablist" aria-label="بخش‌های پرونده زمین">
+            <div className="mt-3 flex" role="tablist" aria-label="بخش‌های پرونده زمین" ref={fileTabs.ref} onKeyDown={fileTabs.onKeyDown}>
               {(
                 [
                   { key: 'id', label: 'شناسنامه زمین' },
                   { key: 'calendar', label: 'تقویم کشاورزی' },
                 ] as const
               ).map(({ key, label }) => (
-                <button
+                <button type="button"
                   key={key}
                   role="tab"
                   aria-selected={tab === key}

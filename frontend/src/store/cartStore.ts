@@ -63,7 +63,7 @@ export const useCartStore = create<CartState>((set, get) => ({
 
       // ========================================
       // Fetch Cart Action
-      // ✅ پشتیبانی از Guest Cart (بدون نیاز به لاگین)
+      // پشتیبانی از Guest Cart (بدون نیاز به لاگین)
       // ========================================
       fetchCart: async () => {
         set({ isLoading: true });

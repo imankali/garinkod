@@ -192,7 +192,7 @@ export interface AboutResponse {
 // ========================================
 // MockProduct (برای کامپوننت‌های فرانت‌اند)
 // ========================================
-// ✅ این interface برای داده‌های استاتیک در shopData.ts و تبدیل API به فرمت UI استفاده می‌شود
+// این interface برای داده‌های استاتیک در shopData.ts و تبدیل API به فرمت UI استفاده می‌شود
 
 export interface Comment {
   id: number;

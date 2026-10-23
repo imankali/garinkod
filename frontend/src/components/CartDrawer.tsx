@@ -11,6 +11,7 @@ import {
   Plus,
   ShieldCheck,
   ShoppingBag,
+  ShoppingCart,
   Sparkles,
   Trash2,
   Truck,
@@ -19,6 +20,7 @@ import {
 import { useFocusTrap } from "../hooks/useFocusTrap";
 import { useCartStore } from "../store/cartStore";
 import PurchaseSteps from "./PurchaseSteps";
+import EmptyState from "./ui/EmptyState";
 import { productsApi } from "../api/services";
 import type { ProductList } from '@/types/shop';
 import type { CartItem } from '@/types/commerce';
@@ -151,7 +153,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
   const total = subtotal + shipping;
   const totalItems = cart?.total_items || 0;
 
-  // ✅ بررسی وجود سموم در سبد (برای نمایش هشدار ایمنی)
+  // بررسی وجود سموم در سبد (برای نمایش هشدار ایمنی)
   const hasPesticide = items.some((item) =>
     item.product?.category === "سموم دفع آفات" ||
     item.product?.category?.toString().toLowerCase().includes("pesticide")
@@ -365,11 +367,13 @@ function productOrderCeiling(item: CartItem): number {
                   animate={{ opacity: 1, scale: 1 }}
                   className="flex h-full flex-col items-center justify-center gap-4 text-center"
                 >
-                  <span className="text-7xl">🛒</span>
-                  <div>
-                    <p className="text-lg font-bold text-slate-700 dark:text-white">سبد خرید شما خالی است</p>
-                    <p className="mt-1 text-sm text-slate-400">محصولات مورد علاقه خود را اضافه کنید</p>
-                  </div>
+                  <EmptyState
+                    compact
+                    icon={ShoppingCart}
+                    title="سبد خرید شما خالی است"
+                    description="کالاهای مورد نیاز مزرعه را ببینید و با یک کلیک اضافه کنید."
+                    className="border-0 bg-transparent px-2 dark:bg-transparent"
+                  />
                   <motion.button
                     onClick={() => {
                       onClose();

@@ -9,9 +9,11 @@
 // grid, so the back gesture returns to the exact same scroll position.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Compass, Heart, MessageCircle, X } from 'lucide-react';
 
+import EmptyState from '../components/ui/EmptyState';
 import { storefrontPostsApi } from '../api/services';
 import PostCard from '../components/social/PostCard';
 import { useAuthStore } from '../store/authStore';
@@ -122,13 +124,23 @@ export default function StorefrontExplore() {
       </header>
 
       {loading ? (
-        <p role="status" className="py-16 text-center text-sm text-slate-500">
+        <p role="status" aria-busy="true" className="py-16 text-center text-sm text-slate-500">
           در حال بارگذاری…
         </p>
       ) : posts.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-slate-200 py-16 text-center text-sm text-slate-400 dark:border-emerald-800">
-          هنوز پستی منتشر نشده است.
-        </p>
+        <EmptyState
+          icon={Compass}
+          title="هنوز پستی برای کاوش نیست"
+          description="غرفه‌داران با هر پست تازه این صفحه را پر می‌کنند؛ تا آن موقع می‌توانید فهرست غرفه‌ها را ببینید."
+          action={
+            <Link
+              to="/storefronts"
+              className="min-h-11 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-emerald-700"
+            >
+              دیدن غرفه‌ها
+            </Link>
+          }
+        />
       ) : (
         <ul className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 sm:gap-2 lg:grid-cols-4">
           {posts.map((post, index) => (

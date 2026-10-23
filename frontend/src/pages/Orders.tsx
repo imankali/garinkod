@@ -1,7 +1,7 @@
 // frontend/src/pages/Orders.tsx
 
 import { FormEvent, useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import {
   AlertTriangle,
   Check,
@@ -17,6 +17,8 @@ import {
   XCircle,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+
+import EmptyState from '../components/ui/EmptyState';
 
 import { ordersApi, paymentsApi } from '../api/services';
 import { parseApiError, type FieldErrors } from '../api/errors';
@@ -139,6 +141,10 @@ export default function Orders() {
   const [phone, setPhone] = useState(() => localStorage.getItem('last_order_phone') || '');
   const [foundOrder, setFoundOrder] = useState<Order | null>(null);
   const [myOrders, setMyOrders] = useState<Order[]>([]);
+  /** The history has three honest states; an empty array on its own cannot
+   *  tell "still loading" from "read failed" from "you really have none". */
+  const [historyState, setHistoryState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [historyReload, setHistoryReload] = useState(0);
   const [loading, setLoading] = useState(false);
   const [restartingOrderId, setRestartingOrderId] = useState<number | null>(null);
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -149,11 +155,18 @@ export default function Orders() {
   const [trackingByOrderCode, setTrackingByOrderCode] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated) {
+      setHistoryState('idle');
+      return;
+    }
+    setHistoryState('loading');
     ordersApi
       .mine()
-      .then((response) => setMyOrders(response.data))
-      .catch(() => undefined);
+      .then((response) => {
+        setMyOrders(response.data);
+        setHistoryState('ready');
+      })
+      .catch(() => setHistoryState('error'));
     getMyShipments()
       .then((shipments) =>
         setTrackingByOrderCode(
@@ -163,7 +176,7 @@ export default function Orders() {
         ),
       )
       .catch(() => undefined);
-  }, [isAuthenticated]);
+  }, [isAuthenticated, historyReload]);
 
   useEffect(() => {
     const result = searchParams.get('payment');
@@ -349,16 +362,46 @@ export default function Orders() {
             </h2>
           </div>
 
-          {myOrders.length ? (
+          {historyState === 'loading' ? (
+            <div role="status" aria-busy="true" className="space-y-4">
+              <span className="sr-only">در حال خواندن سفارش‌های شما…</span>
+              {[0, 1].map((item) => (
+                <div key={item} aria-hidden="true" className="h-40 animate-pulse rounded-3xl bg-slate-100 dark:bg-emerald-950" />
+              ))}
+            </div>
+          ) : historyState === 'error' ? (
+            <EmptyState
+              icon={AlertTriangle}
+              compact
+              title="سفارش‌ها خوانده نشد"
+              description="ارتباط با سرور برقرار نشد. یک بار دیگر تلاش کنید؛ سبد و پرداخت‌های نیمه‌کاره دست‌نخورده می‌مانند."
+              action={
+                <Button type="button" variant="secondary" icon={RefreshCw} onClick={() => setHistoryReload((value) => value + 1)}>
+                  تلاش دوباره
+                </Button>
+              }
+            />
+          ) : myOrders.length ? (
             <div className="space-y-4">
               {myOrders.map((order) => (
                 <OrderCard key={order.id} order={order} onCancel={cancel} onRestartPayment={restartPayment} restarting={restartingOrderId === order.id} trackingCode={trackingByOrderCode[order.code]} />
               ))}
             </div>
           ) : (
-            <p className="rounded-2xl border border-dashed border-slate-200 p-8 text-center text-fluid-sm text-slate-400 dark:border-emerald-800 dark:text-emerald-300">
-              هنوز سفارشی ثبت نکرده‌اید.
-            </p>
+            <EmptyState
+              icon={ClipboardList}
+              compact
+              title="هنوز سفارشی ثبت نکرده‌اید"
+              description="پس از نخستین خرید، سفارش، مرسوله و امکان پیگیری در همین صفحه می‌ماند."
+              action={
+                <Link
+                  to="/products"
+                  className="min-h-11 rounded-xl bg-emerald-600 px-5 py-3 text-fluid-xs font-bold text-white transition hover:bg-emerald-700"
+                >
+                  دیدن کالاهای موجود
+                </Link>
+              }
+            />
           )}
         </section>
       )}

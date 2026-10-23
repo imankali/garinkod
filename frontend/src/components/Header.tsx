@@ -26,7 +26,7 @@ const SPRING = { type: "spring", damping: 28, stiffness: 320, mass: 0.6 } as con
 const SPRING_SOFT = { type: "spring", damping: 22, stiffness: 260 } as const;
 
 // ========================================
-// ✅ Animated Number - انیمیشن flip برای تغییر عدد
+// Animated Number - انیمیشن flip برای تغییر عدد
 // ========================================
 const AnimatedCount = memo(function AnimatedCount({ value }: { value: number }) {
   return (
@@ -47,7 +47,7 @@ const AnimatedCount = memo(function AnimatedCount({ value }: { value: number }) 
 });
 
 // ========================================
-// ✅ Cart Button - خارج از Header تا remount نشود
+// Cart Button - خارج از Header تا remount نشود
 // ========================================
 interface CartButtonProps {
   mobile?: boolean;
@@ -151,7 +151,7 @@ const CartButton = memo(function CartButton({
 });
 
 // ========================================
-// ✅ Icon Button قابل استفاده مجدد
+// Icon Button قابل استفاده مجدد
 // ========================================
 const IconButton = memo(function IconButton({
   onClick,
@@ -201,7 +201,7 @@ interface HeaderProps {
 }
 
 // ========================================
-// 🎯 Header Component
+// Header Component
 // ========================================
 export default function Header({
   cartOpen,
@@ -225,7 +225,7 @@ export default function Header({
   const headerRef = useRef<HTMLElement>(null);
 
   // ========================================
-  // ✅ ارتفاع واقعی هدر را در --header-height منتشر می‌کنیم.
+  // ارتفاع واقعی هدر را در --header-height منتشر می‌کنیم.
   //    هدر sticky است و ارتفاعش با اسکرول و اندازه صفحه تغییر می‌کند؛ بدون این
   //    مقدار، نوارهای sticky داخل صفحه و پرش به لنگرها زیر هدر پنهان می‌شدند.
   // ========================================
@@ -250,7 +250,7 @@ export default function Header({
     };
   }, []);
 
-  // ✨ نوار پیشرفت اسکرول
+  // نوار پیشرفت اسکرول
   const { scrollYProgress } = useScroll();
   const progressScaleX = useSpring(scrollYProgress, {
     stiffness: 120,
@@ -259,7 +259,7 @@ export default function Header({
   });
 
   // ========================================
-  // ✅ هدر هوشمند — جهت اسکرول:
+  // هدر هوشمند — جهت اسکرول:
   //    اسکرول به پایین → فقط ردیف اصلی (لوگو/جستجو/سبد) چسبان می‌ماند و
   //    نوار اعلان، جستجوی موبایل و ناوبری دسکتاپ جمع می‌شوند؛
   //    اولین اسکرول رو به بالا همه برمی‌گردند. بالای صفحه همیشه هدر کامل است.
@@ -272,7 +272,7 @@ export default function Header({
   });
 
   // ========================================
-  // ✅ Bump فقط هنگام «افزایش» تعداد (نه حذف آیتم)
+  // Bump فقط هنگام «افزایش» تعداد (نه حذف آیتم)
   // ========================================
   useEffect(() => {
     if (cartCount > prevCountRef.current) {
@@ -335,7 +335,7 @@ export default function Header({
               scrolled ? "py-2 sm:py-2.5" : "py-2.5 sm:py-3 md:py-3.5"
             }`}
           >
-            {/* ✅ Menu Toggle - آیکون morph بین Menu و X */}
+            {/* Menu Toggle - آیکون morph بین Menu و X */}
             <motion.button
               onClick={() => onMobileOpenChange(!mobileOpen)}
               whileHover={prefersReducedMotion ? undefined : { scale: 1.05 }}
@@ -421,7 +421,7 @@ export default function Header({
             </div>
           </div>
 
-          {/* ✅ Mobile Search — collapses with the header on scroll-down. */}
+          {/* Mobile Search — collapses with the header on scroll-down. */}
           <AnimatePresence initial={false}>
             {!headerCollapsed && (
               <motion.div
@@ -459,7 +459,7 @@ export default function Header({
             )}
           </AnimatePresence>
 
-          {/* ✨ نوار پیشرفت اسکرول */}
+          {/* نوار پیشرفت اسکرول */}
           <motion.div
             aria-hidden="true"
             style={{ scaleX: progressScaleX, transformOrigin: "right" }}

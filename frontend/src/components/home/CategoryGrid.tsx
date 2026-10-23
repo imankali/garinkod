@@ -2,30 +2,53 @@
 
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
-import { ArrowLeft, LayoutGrid } from 'lucide-react';
+import {
+  ArrowLeft,
+  Beef,
+  Droplets,
+  FlaskConical,
+  House,
+  LayoutGrid,
+  Package,
+  Sprout,
+  Tractor,
+  Wheat,
+  Wrench,
+  type LucideIcon,
+} from 'lucide-react';
 
 import { categoriesApi } from '../../api/services';
 import { useDragToScroll } from '../../hooks/useDragToScroll';
 import type { Category } from '@/types/shop';
 
+/**
+ * Category glyphs.
+ *
+ * These were emoji (🌱🧪🌾🚜). Emoji are font-dependent, differ between
+ * Windows/Android/iOS, cannot inherit the brand colour, and cannot be hidden
+ * from assistive tech as a set — the ui-ux-pro-max rule "no emoji as structural
+ * icons" exists for exactly this tile. Each category now gets a Lucide glyph,
+ * inheriting `currentColor`, with a neutral fallback for categories the map has
+ * not met yet.
+ */
+const ICONS: Record<string, LucideIcon> = {
+  fertilizer: Sprout,
+  pesticide: FlaskConical,
+  seed: Wheat,
+  equipment: Tractor,
+  irrigation: Droplets,
+  greenhouse: House,
+  'animal-feed': Beef,
+  tools: Wrench,
+};
+
 /** Fallback tiles so the section is still useful before categories exist. */
 const FALLBACK = [
-  { name: 'کود', slug: 'fertilizer', emoji: '🌱' },
-  { name: 'سم', slug: 'pesticide', emoji: '🧪' },
-  { name: 'بذر', slug: 'seed', emoji: '🌾' },
-  { name: 'ادوات', slug: 'equipment', emoji: '🚜' },
+  { name: 'کود', slug: 'fertilizer' },
+  { name: 'سم', slug: 'pesticide' },
+  { name: 'بذر', slug: 'seed' },
+  { name: 'ادوات', slug: 'equipment' },
 ];
-
-const EMOJI: Record<string, string> = {
-  fertilizer: '🌱',
-  pesticide: '🧪',
-  seed: '🌾',
-  equipment: '🚜',
-  irrigation: '💧',
-  greenhouse: '🏡',
-  'animal-feed': '🐄',
-  tools: '🛠️',
-};
 
 /**
  * Browse by category.
@@ -57,7 +80,6 @@ export default function CategoryGrid() {
     ? categories.slice(0, 8).map((category) => ({
         name: category.name,
         slug: category.slug,
-        emoji: EMOJI[category.slug] ?? '🧺',
         count: category.product_count,
       }))
     : FALLBACK.map((tile) => ({ ...tile, count: undefined as number | undefined }));
@@ -100,8 +122,11 @@ export default function CategoryGrid() {
               to={`/products?category=${tile.slug}`}
               className="group flex h-full min-h-11 flex-col items-center justify-start gap-1 rounded-2xl p-1.5 transition focus-visible:outline-2 focus-visible:outline-emerald-600 sm:gap-2 sm:p-2"
             >
-              <span className="flex h-14 w-14 items-center justify-center rounded-full border border-emerald-100 bg-gradient-to-b from-emerald-50 to-white text-2xl shadow-sm transition duration-300 group-hover:-translate-y-1 group-hover:border-emerald-300 group-hover:shadow-md motion-reduce:group-hover:translate-y-0 dark:border-emerald-900 dark:from-emerald-950 dark:to-emerald-900/30 sm:h-20 sm:w-20 sm:text-4xl">
-                <span aria-hidden="true">{tile.emoji}</span>
+              <span className="flex h-14 w-14 items-center justify-center rounded-full border border-emerald-100 bg-gradient-to-b from-emerald-50 to-white text-emerald-700 shadow-sm transition duration-300 group-hover:-translate-y-1 group-hover:border-emerald-300 group-hover:shadow-md motion-reduce:group-hover:translate-y-0 dark:border-emerald-900 dark:from-emerald-950 dark:to-emerald-900/30 dark:text-lime-300 sm:h-20 sm:w-20">
+                {(() => {
+                  const Icon = ICONS[tile.slug] ?? Package;
+                  return <Icon size={26} aria-hidden="true" strokeWidth={1.6} className="sm:h-9 sm:w-9" />;
+                })()}
               </span>
               <span className="line-clamp-2 min-h-[2lh] text-[10px] font-bold leading-tight text-slate-800 dark:text-white sm:text-fluid-xs">
                 {tile.name}
