@@ -135,6 +135,7 @@ export default function FilterSortBar({
         className="no-scrollbar mb-4 flex items-center gap-2 overflow-x-auto pb-1"
       >
         <motion.button
+      type="button"
           whileTap={{ scale: 0.95 }}
           onClick={() => onCategoryChange("all")}
           className={`flex min-h-11 shrink-0 items-center rounded-full px-4 text-xs font-semibold transition-all ${
@@ -154,6 +155,7 @@ export default function FilterSortBar({
         ) : (
           categories.map((cat) => (
             <motion.button
+      type="button"
               key={cat.slug}
               whileTap={{ scale: 0.95 }}
               onClick={() => onCategoryChange(cat.slug)}
@@ -193,6 +195,7 @@ export default function FilterSortBar({
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-2">
           {/* Filters Button */}
           <motion.button
+      type="button"
             whileTap={{ scale: 0.95 }}
             onClick={() => togglePanel("filters")}
             className={`relative flex min-h-11 items-center gap-1.5 rounded-xl px-3.5 text-xs font-semibold transition-colors ${
@@ -217,6 +220,7 @@ export default function FilterSortBar({
           <div className="relative">
             {/* Sort Trigger Button (با آیکون فلش) */}
             <motion.button
+      type="button"
               whileTap={{ scale: 0.95 }}
               onClick={() => togglePanel("sort")}
               className="flex min-h-11 w-full items-center justify-between gap-2 rounded-xl bg-slate-50 px-3 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100 dark:bg-emerald-900 dark:text-emerald-100 dark:hover:bg-emerald-800 sm:w-auto sm:justify-start"

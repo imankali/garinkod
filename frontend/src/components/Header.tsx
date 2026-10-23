@@ -68,6 +68,7 @@ const CartButton = memo(function CartButton({
 
   return (
     <motion.button
+      type="button"
       id={mobile ? "cart-icon-target-mobile" : "cart-icon-target"}
       onClick={onOpen}
       whileHover={prefersReducedMotion ? undefined : { scale: 1.05, y: -1 }}
@@ -169,6 +170,7 @@ const IconButton = memo(function IconButton({
   const prefersReducedMotion = useReducedMotion();
   return (
     <motion.button
+      type="button"
       onClick={onClick}
       whileHover={
         prefersReducedMotion
@@ -337,6 +339,7 @@ export default function Header({
           >
             {/* Menu Toggle - آیکون morph بین Menu و X */}
             <motion.button
+      type="button"
               onClick={() => onMobileOpenChange(!mobileOpen)}
               whileHover={prefersReducedMotion ? undefined : { scale: 1.05 }}
               whileTap={{ scale: 0.92 }}

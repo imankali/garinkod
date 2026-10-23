@@ -66,6 +66,7 @@ export default function MegaMenu() {
   const [open, setOpen] = useState(false);
   const [activeSlug, setActiveSlug] = useState<string>("");
   const ref = useRef<HTMLDivElement>(null);
+  const toggleRef = useRef<HTMLButtonElement>(null);
 
   // ========================================
   // دریافت دسته‌بندی‌ها از API
@@ -96,14 +97,27 @@ export default function MegaMenu() {
   }, [categories, activeSlug]);
 
   // ========================================
-  // بستن منو هنگام کلیک بیرون
+  // بستن منو هنگام کلیک بیرون یا Escape
   // ========================================
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     }
+    // A keyboard user opens the panel with Enter and must be able to close it
+    // with Escape without hunting for the toggle again, so focus returns there.
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key !== "Escape") return;
+      setOpen((wasOpen) => {
+        if (wasOpen) toggleRef.current?.focus();
+        return false;
+      });
+    }
     document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
   }, []);
 
   // ========================================
@@ -144,16 +158,21 @@ export default function MegaMenu() {
       {/* ======================================== */}
       {/* Toggle Button */}
       {/* ======================================== */}
-      <button type="button"
+      <button
+        ref={toggleRef}
+        type="button"
         onClick={() => setOpen((v) => !v)}
-        className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-300 ${
+        aria-haspopup="true"
+        aria-expanded={open}
+        aria-controls="mega-menu-panel"
+        className={`flex min-h-11 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-300 ${
           open
             ? "bg-emerald-600 text-white shadow-lg shadow-emerald-200"
             : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
         }`}
         aria-label="منوی دسته‌بندی‌ها"
       >
-        <LayoutGrid size={17} />
+        <LayoutGrid size={17} aria-hidden="true" />
         همه دسته‌بندی‌ها
       </button>
 
@@ -163,6 +182,9 @@ export default function MegaMenu() {
       <AnimatePresence>
         {open && (
           <motion.div
+            id="mega-menu-panel"
+            role="region"
+            aria-label="دسته‌بندی محصولات"
             initial={{ opacity: 0, y: -12, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -12, scale: 0.98 }}
@@ -175,9 +197,28 @@ export default function MegaMenu() {
             <ul className="w-56 border-e border-slate-100 bg-slate-50/60 p-2 dark:border-emerald-800 dark:bg-emerald-900/30">
               {categories.map((cat) => (
                 <li key={cat.slug}>
-                  <button type="button"
+                  <button
+                    type="button"
                     onMouseEnter={() => setActiveSlug(cat.slug)}
                     onClick={() => setActiveSlug(cat.slug)}
+                    data-mega-item
+                    onKeyDown={(event) => {
+                      // Up/Down move between departments, as in any vertical
+                      // tab strip; the panel beside it follows the selection.
+                      if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+                      const items = Array.from(
+                        event.currentTarget
+                          .closest("ul")
+                          ?.querySelectorAll<HTMLButtonElement>("[data-mega-item]") ?? [],
+                      );
+                      const at = items.indexOf(event.currentTarget);
+                      const next = items[(at + (event.key === "ArrowDown" ? 1 : items.length - 1)) % items.length];
+                      if (next) {
+                        event.preventDefault();
+                        next.focus();
+                        next.click();
+                      }
+                    }}
                     className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-start text-sm font-medium transition-colors ${
                       activeSlug === cat.slug
                         ? "bg-white text-emerald-700 shadow-sm dark:bg-emerald-800 dark:text-lime-300"

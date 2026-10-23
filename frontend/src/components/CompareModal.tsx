@@ -211,6 +211,7 @@ export default function CompareModal({ isOpen, items, onClose, onAddToCart }: Co
                     {items.map((p) => (
                       <td key={p.id} className="p-2">
                         <motion.button
+      type="button"
                           whileHover={{ scale: p.inStock ? 1.05 : 1 }}
                           whileTap={{ scale: p.inStock ? 0.95 : 1 }}
                           onClick={() => onAddToCart(p)}

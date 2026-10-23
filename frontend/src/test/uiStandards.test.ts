@@ -67,9 +67,13 @@ describe('ui standards — every page', () => {
   });
 
   it('gives every button an explicit type', () => {
-    const offenders = sourceFiles.flatMap((file) =>
-      matches(file, /<button(?![^>]*\btype=)/),
-    );
+    // motion.button is the same HTML element with animation props: without a
+    // type it defaults to submit inside any ancestor form, which is how a
+    // quantity stepper ends up placing an order.
+    const offenders = sourceFiles.flatMap((file) => [
+      ...matches(file, /<button(?![^>]*\btype=)/),
+      ...matches(file, /<motion\.button(?![^>]*\btype=)/),
+    ]);
     expect(offenders).toEqual([]);
   });
 

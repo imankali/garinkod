@@ -22,6 +22,7 @@ import { useBackgroundPolling } from '../hooks/useBackgroundPolling';
 import { useAuthStore } from '../store/authStore';
 import { useDirectStore } from '../store/directStore';
 import { cn } from '../utils/cn';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 
 const PHONE_NUMBER = import.meta.env.VITE_PHONE_NUMBER?.trim();
 const WHATSAPP_NUMBER = import.meta.env.VITE_WHATSAPP_NUMBER?.replace(/\D/g, '');
@@ -41,6 +42,9 @@ const HIDDEN_ON = ['/messages', '/checkout'];
 
 export default function GlobalMessengerButton({ cartDrawerOpen = false }: { cartDrawerOpen?: boolean }) {
   const [open, setOpen] = useState(false);
+  // The messenger popover is a modal dialog: Tab stays inside it and Escape
+  // closes it, returning focus to the floating button that opened it.
+  const panelRef = useFocusTrap<HTMLDivElement>(open, { onEscape: () => setOpen(false) });
   const { pathname } = useLocation();
   const { isAuthenticated, isSessionChecked } = useAuthStore();
   const openDirect = useDirectStore((state) => state.openDirect);
@@ -99,6 +103,7 @@ export default function GlobalMessengerButton({ cartDrawerOpen = false }: { cart
   return (
     <>
       <motion.button
+      type="button"
         initial={{ opacity: 0, scale: 0 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ delay: 0.8, type: 'spring' }}
@@ -149,6 +154,7 @@ export default function GlobalMessengerButton({ cartDrawerOpen = false }: { cart
             />
 
             <motion.div
+              ref={panelRef}
               initial={{ opacity: 0, y: 40, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 40, scale: 0.95 }}

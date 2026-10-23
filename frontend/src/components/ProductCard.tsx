@@ -110,6 +110,7 @@ export default function ProductCard({
             the CTAs, but rides the same easing so the card feels like one
             material, not five. */}
         <motion.button
+      type="button"
           onClick={() => onToggleWishlist(product)}
           whileHover={reduceMotion ? undefined : { scale: 1.08 }}
           whileTap={reduceMotion ? undefined : { scale: 0.97 }}
@@ -296,6 +297,7 @@ export default function ProductCard({
               the premium touch; it is intentionally absent when the item is
               out of stock, because a dead button should not pretend to live. */}
           <motion.button
+      type="button"
             onClick={(e) => onAddToCart(product, e)}
             disabled={!product.inStock}
             whileHover={!reduceMotion && product.inStock ? { y: -4 } : undefined}
@@ -320,6 +322,7 @@ export default function ProductCard({
 
           {/* Compare Button — hover/tap only when it can actually respond. */}
           <motion.button
+      type="button"
             onClick={() => onToggleCompare(product)}
             disabled={!compareInteractive}
             whileHover={!reduceMotion && compareInteractive ? { y: -4 } : undefined}

@@ -279,6 +279,7 @@ function productOrderCeiling(item: CartItem): number {
                   </div>
                 </div>
                 <motion.button
+      type="button"
                   onClick={onClose}
                   whileHover={reduceMotion ? undefined : { scale: 1.05 }}
                   whileTap={reduceMotion ? undefined : { scale: 0.97 }}
@@ -375,6 +376,7 @@ function productOrderCeiling(item: CartItem): number {
                     className="border-0 bg-transparent px-2 dark:bg-transparent"
                   />
                   <motion.button
+      type="button"
                     onClick={() => {
                       onClose();
                       navigate('/products');

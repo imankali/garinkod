@@ -729,6 +729,7 @@ export default function StorefrontPage() {
       <div role="tablist" aria-label="محتوای غرفه" className="mt-6 flex border-b border-slate-200 dark:border-emerald-900" ref={contentTabs.ref} onKeyDown={contentTabs.onKeyDown}>
         {TABS.map(({ key, labelKey, icon: Icon }) => (
           <motion.button
+      type="button"
             key={key}
             role="tab"
             whileTap={reduceMotion ? undefined : { scale: 0.97 }}

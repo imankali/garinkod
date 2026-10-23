@@ -436,7 +436,7 @@ export default function Checkout() {
             </p>
           )}
 
-          <motion.button disabled={submitting || !cart?.items.length || shippingLoading || Boolean(shippingError)} whileHover={!reduceMotion && !submitting && !shippingError ? { y: -4 } : undefined} whileTap={!reduceMotion && !submitting && !shippingError ? { scale: 0.97 } : undefined} className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-l from-emerald-600 to-lime-500 px-5 py-3.5 text-sm font-extrabold text-white shadow-md disabled:cursor-not-allowed disabled:opacity-50">
+          <motion.button type="submit" disabled={submitting || !cart?.items.length || shippingLoading || Boolean(shippingError)} whileHover={!reduceMotion && !submitting && !shippingError ? { y: -4 } : undefined} whileTap={!reduceMotion && !submitting && !shippingError ? { scale: 0.97 } : undefined} className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-l from-emerald-600 to-lime-500 px-5 py-3.5 text-sm font-extrabold text-white shadow-md disabled:cursor-not-allowed disabled:opacity-50">
             <PackageCheck size={18} /> {submitting ? "در حال ثبت سفارش..." : form.payment_method === 'zarinpal' ? 'ثبت سفارش و رفتن به درگاه' : 'ثبت سفارش و درخواست هماهنگی'}
           </motion.button>
         </form>

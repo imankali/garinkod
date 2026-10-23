@@ -142,6 +142,7 @@ export default function ProductDetailModal({
           >
             {/* Close Button */}
             <motion.button
+      type="button"
               onClick={onClose}
               whileHover={reduceMotion ? undefined : { scale: 1.05 }}
               whileTap={reduceMotion ? undefined : { scale: 0.97 }}
@@ -403,6 +404,7 @@ export default function ProductDetailModal({
                   {/* Quantity Selector */}
                   <div className={priceOnRequest ? "hidden" : "flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 shadow-sm"}>
                     <motion.button
+      type="button"
                       whileTap={reduceMotion ? undefined : { scale: 0.97 }}
                       onClick={() => setQty((q) => q + 1)}
                       className="flex h-11 w-11 items-center justify-center text-green-700 hover:bg-emerald-50"
@@ -412,6 +414,7 @@ export default function ProductDetailModal({
                     </motion.button>
                     <span className="w-8 text-center font-bold">{qty}</span>
                     <motion.button
+      type="button"
                       whileTap={reduceMotion ? undefined : { scale: 0.97 }}
                       onClick={() => setQty((q) => Math.max(1, q - 1))}
                       className="flex h-11 w-11 items-center justify-center text-slate-500 hover:bg-slate-100"
@@ -424,6 +427,7 @@ export default function ProductDetailModal({
                   {/* Add to Cart Button */}
                   {!priceOnRequest && (
                   <motion.button
+      type="button"
                     onClick={handleAdd}
                     disabled={!product.inStock}
                     whileHover={!reduceMotion && product.inStock ? { y: -4 } : undefined}
@@ -449,6 +453,7 @@ export default function ProductDetailModal({
 
                   {/* Wishlist Button */}
                   <motion.button
+      type="button"
                     onClick={() => onToggleWishlist(product)}
                     whileHover={reduceMotion ? undefined : { y: -4 }}
                     whileTap={reduceMotion ? undefined : { scale: 0.97 }}

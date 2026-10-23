@@ -108,6 +108,7 @@ export default function CompareBar({
 
               {/* Compare Button */}
               <motion.button
+      type="button"
                 whileHover={{ scale: items.length >= 2 ? 1.04 : 1 }}
                 whileTap={{ scale: items.length >= 2 ? 0.96 : 1 }}
                 disabled={items.length < 2}
