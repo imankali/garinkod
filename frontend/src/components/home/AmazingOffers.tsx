@@ -59,8 +59,9 @@ export default function AmazingOffers() {
   if (isLoading) {
     return (
       <div
-        className="h-64 animate-pulse rounded-2xl bg-emerald-900/10"
+        className="page-shell py-6 sm:py-8"
         role="status"
+        aria-busy="true"
         aria-label="در حال بارگذاری پیشنهادهای شگفت‌انگیز"
       />
     );
@@ -68,11 +69,11 @@ export default function AmazingOffers() {
   if (!products.length) return null;
 
   return (
-    <section aria-labelledby="amazing-offers-title" className="overflow-hidden rounded-2xl bg-gradient-to-bl from-emerald-950 via-emerald-900 to-emerald-800 text-white">
+    <section aria-labelledby="amazing-offers-title">
       <div className="page-shell py-6 sm:py-8">
-        <div className="flex flex-wrap items-center gap-3 px-4 sm:px-6">
-          <Zap size={22} className="text-rose-400" aria-hidden="true" />
-          <h2 id="amazing-offers-title" className="text-fluid-xl font-extrabold">
+        <div className="flex flex-wrap items-center gap-3">
+          <Zap size={22} className="text-rose-600 dark:text-rose-400" aria-hidden="true" />
+          <h2 id="amazing-offers-title" className="text-fluid-xl font-extrabold text-slate-900 dark:text-white">
             پیشنهادهای شگفت‌انگیز
           </h2>
           <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-500/90 px-3 py-1 text-fluid-xs font-bold tabular-nums">
@@ -84,14 +85,14 @@ export default function AmazingOffers() {
           </span>
           <Link
             to="/products?collection=discounted"
-            className="ms-auto inline-flex min-h-6 items-center gap-1 py-1 text-fluid-sm font-bold text-lime-200 transition hover:text-white"
+            className="ms-auto inline-flex min-h-6 items-center gap-1 py-1 text-fluid-sm font-bold text-emerald-700 transition hover:text-emerald-900 dark:text-lime-300 dark:hover:text-white"
           >
             همه تخفیف‌ها
             <ChevronLeft size={16} aria-hidden="true" />
           </Link>
         </div>
 
-        <OfferRail products={products} label="کارت‌های پیشنهادهای شگفت‌انگیز" />
+        <OfferRail products={products} label="کارت‌های پیشنهادهای شگفت‌انگیز" inset={false} />
       </div>
     </section>
   );

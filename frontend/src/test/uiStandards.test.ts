@@ -129,6 +129,21 @@ describe('ui standards — every page', () => {
     expect(offenders).toEqual([]);
   });
 
+  it('hides the scrollbar on horizontal rails but keeps them operable', () => {
+    // A rail is drag/touch/wheel/keyboard operable and shows an edge fade, so
+    // a permanent grey strip under every panel is decoration, not affordance.
+    // The bar may only be hidden together with a keyboard path: if someone
+    // later removes the tabIndex from useDragToScroll, this pairing is wrong.
+    const css = readFileSync(path.join(root, 'src', 'index.css'), 'utf8');
+    const block = css.match(/\.rail-scroll\s*\{([^}]*)\}/)?.[1] ?? '';
+    expect(block).toMatch(/scrollbar-width:\s*none/);
+    expect(css).toMatch(/\.rail-scroll::-webkit-scrollbar\s*\{[^}]*display:\s*none/);
+
+    const dragHook = readFileSync(path.join(root, 'src', 'hooks', 'useDragToScroll.ts'), 'utf8');
+    expect(dragHook).toMatch(/tabIndex:\s*focusable\s*\?\s*0/);
+    expect(dragHook).toMatch(/case 'ArrowRight'/);
+  });
+
   it('does not use emoji as a structural icon', () => {
     // Emoji in copy (a toast, a ticker string) is allowed; an emoji inside a
     // decorative icon slot is not — it renders differently per platform and

@@ -296,7 +296,7 @@ export default function OfferRail({
           // Give momentum scrolling a beat to settle before autoplay resumes.
           window.setTimeout(() => { touchPause.current = false; }, 2500);
         }}
-        className={`rail-scroll mt-2 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-4 touch-pan-x ${
+        className={`rail-scroll mt-2 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-2 touch-pan-x ${
           inset ? 'px-4 sm:px-6' : ''
         }`}
         role="region"

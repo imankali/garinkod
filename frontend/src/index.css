@@ -293,36 +293,28 @@ body {
 }
 
 /*
- * Horizontal rails (home panels, similar products, guides). Setting the
- * standard `scrollbar-*` properties alone would make Chromium ignore the
- * site-wide ::-webkit-scrollbar theming above and fall back to the OS
- * scrollbar — arrows and all. Both layers are declared together so the rail
- * gets a slim, emerald-themed bar in every engine.
+ * Horizontal rails (home panels, similar products, guides).
+ *
+ * The bar is hidden, not disabled: a rail is already operable four ways — drag
+ * with the mouse, pan on touch, wheel/trackpad, and ←/→/Home/End from the
+ * keyboard — and the edge fade plus the overflow marker say "there is more on
+ * that side". The scrollbar sat under every rail as a permanent grey strip on
+ * a design that has no other visible chrome, and on Windows it was the widest
+ * element in the row.
+ *
+ * `scrollbar-width: none` covers Firefox and Chromium 121+; the
+ * `::-webkit-scrollbar` rule covers older WebKit, where the site-wide themed
+ * scrollbar would otherwise be drawn instead.
  */
 .rail-scroll {
-  scrollbar-width: thin;
-  scrollbar-color: #22c55e transparent;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 .rail-scroll::-webkit-scrollbar {
-  height: 8px;
-}
-
-.rail-scroll::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.rail-scroll::-webkit-scrollbar-thumb {
-  background: linear-gradient(90deg, #22c55e, #84cc16);
-  border-radius: 999px;
-}
-
-.dark .rail-scroll {
-  scrollbar-color: #34d399 #0a3d2e;
-}
-
-.dark .rail-scroll::-webkit-scrollbar-track {
-  background: #0a3d2e;
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 /*

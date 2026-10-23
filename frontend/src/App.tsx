@@ -420,9 +420,7 @@ export default function App() {
                     </Reveal>
 
                     <Reveal>
-                      <div className="page-shell py-4">
-                        <AmazingOffers />
-                      </div>
+                      <AmazingOffers />
                     </Reveal>
 
                     <Reveal>
