@@ -11,6 +11,7 @@ import toast from 'react-hot-toast';
 import { farmApi, type FarmLandPayload } from '../../api/services';
 import { parseApiError } from '../../api/errors';
 import { useTranslation } from '../../i18n';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 import type { FarmLand } from '@/types/farming';
 import { AREA_UNITS, IRRIGATION_TYPES, LAND_TYPES, SOIL_TYPES } from './farmOptions';
 
@@ -41,6 +42,9 @@ export default function LandFormModal({
   onSaved: () => void | Promise<void>;
 }) {
   const { t } = useTranslation();
+  // Escape closes, Tab stays inside the dialog, and closing returns focus to
+  // the «افزودن زمین» button that opened it.
+  const panelRef = useFocusTrap<HTMLFormElement>(open, { onEscape: onClose });
   const [form, setForm] = useState<FarmLandPayload>(EMPTY);
   const [saving, setSaving] = useState(false);
 
@@ -110,6 +114,7 @@ export default function LandFormModal({
             className="absolute inset-0 bg-emerald-950/40 backdrop-blur-sm"
           />
           <motion.form
+            ref={panelRef}
             initial={{ y: 60, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 60, opacity: 0 }}
@@ -127,7 +132,7 @@ export default function LandFormModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-emerald-900"
+                className="tap-target flex h-9 w-9 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-emerald-900"
                 aria-label={t('common.close')}
               >
                 <X size={17} />

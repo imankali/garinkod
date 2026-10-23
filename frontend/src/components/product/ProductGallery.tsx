@@ -38,6 +38,24 @@ export default function ProductGallery({
   const second = list[1];
   const shown = (peeking && second ? second : list[active]) ?? first;
 
+  /** ← → walk the gallery when it has focus; the RTL order matches the visual
+   *  order of the thumbnails (ArrowLeft advances). */
+  const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!multiple) return;
+    if (event.key === 'ArrowLeft') {
+      setActive((index) => (index + 1) % list.length);
+    } else if (event.key === 'ArrowRight') {
+      setActive((index) => (index - 1 + list.length) % list.length);
+    } else if (event.key === 'Home') {
+      setActive(0);
+    } else if (event.key === 'End') {
+      setActive(list.length - 1);
+    } else {
+      return;
+    }
+    event.preventDefault();
+  };
+
   return (
     // On desktop the gallery column is as tall as the info column beside it;
     // letting the shot grow into that height (thumbs and caption pinned to
@@ -48,6 +66,11 @@ export default function ProductGallery({
         className="relative aspect-square overflow-hidden rounded-2xl bg-emerald-50 dark:bg-emerald-900/30 md:aspect-auto md:min-h-0 md:flex-1"
         onMouseEnter={() => setPeeking(true)}
         onMouseLeave={() => setPeeking(false)}
+        onKeyDown={onKeyDown}
+        tabIndex={multiple ? 0 : -1}
+        role={multiple ? 'group' : undefined}
+        aria-roledescription={multiple ? 'گالری تصاویر' : undefined}
+        aria-label={multiple ? `تصاویر ${title}` : undefined}
       >
         {/* Main gallery image: near-LCP on the product page, so it loads
             eagerly like the home hero — variants come from the same pipeline. */}
@@ -72,8 +95,16 @@ export default function ProductGallery({
           />
         </picture>
         {multiple && (
-          <span className="pointer-events-none absolute bottom-3 start-3 rounded-full bg-black/45 px-2.5 py-1 text-fluid-2xs font-bold text-white backdrop-blur">
+          <span
+            aria-live="polite"
+            className="pointer-events-none absolute bottom-3 start-3 rounded-full bg-black/45 px-2.5 py-1 text-fluid-2xs font-bold text-white backdrop-blur"
+          >
             {(active + 1).toLocaleString('fa-IR')} از {list.length.toLocaleString('fa-IR')}
+          </span>
+        )}
+        {multiple && (
+          <span className="sr-only">
+            برای ورق زدن تصاویر از کلیدهای چپ و راست استفاده کنید.
           </span>
         )}
       </div>

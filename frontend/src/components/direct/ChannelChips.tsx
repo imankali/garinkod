@@ -5,14 +5,16 @@
 // The chips used to be one oversized row that overflowed the drawer with no
 // hint that more existed. This version is compact (small text, tight padding),
 // swipes horizontally with momentum on touch, drag-scrolls with the mouse on
-// desktop (the same grab pattern as the home product rails), shows a fade on
-// the overflowing edge so the cut-off is visible, and — on wide screens — lets
-// the user scroll it with the mouse wheel.
+// desktop through the shared useDragToScroll hook, lets that hook fade the
+// overflowing edge so the cut-off is visible, and — on wide screens — lets the
+// user scroll it with the mouse wheel.
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 
 import type { MessageChannel } from '@/types/messaging';
 import { cn } from '../../utils/cn';
+import { useDragToScroll } from '../../hooks/useDragToScroll';
+import { useTabListKeys } from '../../hooks/useTabListKeys';
 
 export type ChannelFilter = 'all' | MessageChannel;
 
@@ -32,86 +34,14 @@ export default function ChannelChips({
   className?: string;
 }) {
   const scrollerRef = useRef<HTMLDivElement>(null);
-  const [edges, setEdges] = useState({ start: false, end: false });
-
-  // Mouse drag-to-scroll, the pattern the home rails use: grab with the left
-  // button, the row follows the pointer 1:1, and a dead-zone keeps the chip
-  // click working for small jitters. Touch keeps its native swipe.
-  const drag = useRef<{ pointerId: number; startX: number; lastX: number; moved: boolean; active: boolean } | null>(null);
-
-  const endDrag = () => {
-    const scroller = scrollerRef.current;
-    if (drag.current) drag.current.active = false;
-    if (scroller) {
-      scroller.style.scrollSnapType = '';
-      scroller.style.userSelect = '';
-      scroller.style.cursor = '';
-    }
-  };
-
-  const onDragStart = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.pointerType !== 'mouse' || event.button !== 0) return;
-    const scroller = scrollerRef.current;
-    if (!scroller || scroller.scrollWidth <= scroller.clientWidth) return;
-    // Capture and grab-styling wait for the first real movement: capturing on
-    // pointerdown makes Chromium retarget the following click to the scroller
-    // and silently swallow the chip clicks inside it.
-    drag.current = { pointerId: event.pointerId, startX: event.clientX, lastX: event.clientX, moved: false, active: true };
-  };
-
-  const onDragMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    const state = drag.current;
-    const scroller = scrollerRef.current;
-    if (!state?.active || !scroller || event.pointerId !== state.pointerId) return;
-    const dx = event.clientX - state.lastX;
-    state.lastX = event.clientX;
-    // Dead-zone: under ~5px this is a click on a chip, not a drag.
-    if (!state.moved && Math.abs(event.clientX - state.startX) < 5) return;
-    if (!state.moved) {
-      state.moved = true;
-      scroller.style.scrollSnapType = 'none';
-      scroller.style.userSelect = 'none';
-      scroller.style.cursor = 'grabbing';
-      try { scroller.setPointerCapture(event.pointerId); } catch { /* older engines */ }
-    }
-    scroller.scrollBy({ left: dx, behavior: 'instant' as ScrollBehavior });
-  };
-
-  const onDragEnd = () => endDrag();
-
-  // A drag that ends over a chip must not activate it.
-  const onClickCapture = (event: React.MouseEvent) => {
-    if (drag.current?.moved) {
-      event.preventDefault();
-      event.stopPropagation();
-      drag.current.moved = false;
-    }
-  };
-
-  // Track which edges are cut off so the fades only show when they mean it.
-  useEffect(() => {
-    const element = scrollerRef.current;
-    if (!element) return undefined;
-
-    const update = () => {
-      const max = element.scrollWidth - element.clientWidth;
-      if (max <= 1) {
-        setEdges({ start: false, end: false });
-        return;
-      }
-      // In RTL, scrollLeft runs from 0 to -max in modern engines.
-      const offset = Math.abs(element.scrollLeft);
-      setEdges({ start: offset > 1, end: offset < max - 1 });
-    };
-    update();
-    element.addEventListener('scroll', update, { passive: true });
-    const observer = new ResizeObserver(update);
-    observer.observe(element);
-    return () => {
-      element.removeEventListener('scroll', update);
-      observer.disconnect();
-    };
-  }, [channels.length]);
+  // Mouse drag-to-scroll, momentum and click suppression come from the shared
+  // rail hook; it also paints the edge fade through data-overflow/edge flags.
+  // `focusable: false` keeps the tablist out of the tab order; the chips
+  // themselves are the tab stops, and each focused chip scrolls into view.
+  const scrollerDrag = useDragToScroll<HTMLDivElement>(scrollerRef, { focusable: false });
+  // role="tablist" promises ← → Home End; the row implements them here on
+  // the same node the drag hook owns.
+  const channelTabs = useTabListKeys<HTMLDivElement>(scrollerRef);
 
   // Keep the active chip in view when it changes (e.g. picked via keyboard).
   useEffect(() => {
@@ -136,12 +66,12 @@ export default function ChannelChips({
         role="tablist"
         aria-label="فیلتر منبع پیام"
         onWheel={onWheel}
-        onPointerDown={onDragStart}
-        onPointerMove={onDragMove}
-        onPointerUp={onDragEnd}
-        onPointerCancel={onDragEnd}
-        onClickCapture={onClickCapture}
-        className="no-scrollbar flex cursor-grab snap-x snap-proximity gap-1 overflow-x-auto scroll-px-3 px-3 py-2 [-webkit-overflow-scrolling:touch] [overscroll-behavior-x:contain]"
+        {...scrollerDrag.handlers}
+        onKeyDown={(event) => {
+          channelTabs.onKeyDown(event);
+          scrollerDrag.handlers.onKeyDown(event);
+        }}
+        className="no-scrollbar flex snap-x snap-proximity gap-1 overflow-x-auto scroll-px-3 px-3 py-2 [-webkit-overflow-scrolling:touch] [overscroll-behavior-x:contain]"
       >
         <Chip label={allLabel} active={value === 'all'} count={total} onClick={() => onChange('all')} />
         {channels.map((channel) => (
@@ -154,22 +84,6 @@ export default function ChannelChips({
           />
         ))}
       </div>
-
-      {/* Edge fades: a visible cue that the row keeps going. */}
-      <span
-        aria-hidden="true"
-        className={cn(
-          'pointer-events-none absolute inset-y-0 start-0 w-8 bg-gradient-to-l from-white to-transparent transition-opacity dark:from-emerald-950',
-          edges.start ? 'opacity-100' : 'opacity-0',
-        )}
-      />
-      <span
-        aria-hidden="true"
-        className={cn(
-          'pointer-events-none absolute inset-y-0 end-0 w-8 bg-gradient-to-r from-white to-transparent transition-opacity dark:from-emerald-950',
-          edges.end ? 'opacity-100' : 'opacity-0',
-        )}
-      />
     </div>
   );
 }

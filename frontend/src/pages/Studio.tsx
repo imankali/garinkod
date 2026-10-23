@@ -69,10 +69,10 @@ export default function Studio() {
 
   if (gate === 'checking') {
     return (
-      <main className="mx-auto max-w-3xl px-[var(--page-gutter)] py-16 text-center text-sm text-slate-500 dark:text-emerald-200">
+      <div className="mx-auto max-w-3xl px-[var(--page-gutter)] py-16 text-center text-sm text-slate-500 dark:text-emerald-200">
         <span className="sr-only">در حال بررسی وضعیت غرفه</span>
         <span className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-emerald-200 border-t-emerald-600" aria-hidden="true" />
-      </main>
+      </div>
     );
   }
 
@@ -90,7 +90,7 @@ export default function Studio() {
   }
 
   return (
-    <main className="mx-auto max-w-3xl px-[var(--page-gutter)] py-10">
+    <div className="mx-auto max-w-3xl px-[var(--page-gutter)] py-10">
       <header className="rounded-3xl bg-gradient-to-l from-violet-700 via-fuchsia-700 to-emerald-600 p-6 text-white shadow-xl shadow-violet-900/15 sm:p-8">
         <p className="flex items-center gap-2 text-fluid-xs font-extrabold text-lime-200">
           <Camera size={14} aria-hidden="true" />
@@ -122,6 +122,6 @@ export default function Studio() {
         </Link>
         ببینید.
       </p>
-    </main>
+    </div>
   );
 }

@@ -28,7 +28,7 @@ const DEFAULT_IMAGE = "/images/hero-farm.jpg";
 
 // ========================================
 // CompareModal Component
-// ✅ مودال مقایسه محصولات
+// مودال مقایسه محصولات
 // ========================================
 export default function CompareModal({ isOpen, items, onClose, onAddToCart }: CompareModalProps) {
   const panelRef = useFocusTrap<HTMLDivElement>(isOpen, { onEscape: onClose });
@@ -43,7 +43,7 @@ export default function CompareModal({ isOpen, items, onClose, onAddToCart }: Co
     {
       label: "قیمت",
       render: (p) => (
-        <span className="font-bold text-[#15803d] dark:text-lime-300">
+        <span className="font-bold text-green-700 dark:text-lime-300">
           {formatPrice(p.price)}
         </span>
       ),
@@ -137,7 +137,7 @@ export default function CompareModal({ isOpen, items, onClose, onAddToCart }: Co
                   {items.length.toLocaleString("fa-IR")} محصول در حال مقایسه
                 </p>
               </div>
-              <button
+              <button type="button"
                 onClick={onClose}
                 className="tap-target flex h-9 w-9 items-center justify-center rounded-full bg-white/20 transition-colors hover:bg-white/30"
                 aria-label="بستن"
@@ -211,6 +211,7 @@ export default function CompareModal({ isOpen, items, onClose, onAddToCart }: Co
                     {items.map((p) => (
                       <td key={p.id} className="p-2">
                         <motion.button
+      type="button"
                           whileHover={{ scale: p.inStock ? 1.05 : 1 }}
                           whileTap={{ scale: p.inStock ? 0.95 : 1 }}
                           onClick={() => onAddToCart(p)}
@@ -232,7 +233,7 @@ export default function CompareModal({ isOpen, items, onClose, onAddToCart }: Co
             {/* Footer - Close Button */}
             {/* ======================================== */}
             <div className="border-t border-slate-100 bg-slate-50 p-4 text-center dark:border-emerald-800 dark:bg-emerald-900/30">
-              <button
+              <button type="button"
                 onClick={onClose}
                 className="rounded-xl bg-slate-200 px-6 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-300 dark:bg-emerald-800 dark:text-emerald-100 dark:hover:bg-emerald-700"
               >

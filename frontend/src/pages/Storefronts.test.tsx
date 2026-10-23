@@ -197,7 +197,7 @@ describe('the directory', () => {
   it('admits when nothing matches, instead of showing an empty box', async () => {
     vi.mocked(storefrontsApi.list).mockResolvedValue(emptyPage() as never);
     await renderPage();
-    expect(await screen.findByText('غرفه‌ای با این مشخصات پیدا نشد.')).toBeInTheDocument();
+    expect(await screen.findByText('غرفه‌ای با این مشخصات پیدا نشد')).toBeInTheDocument();
   });
 });
 

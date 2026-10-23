@@ -3,9 +3,9 @@
 // Geometry-exact loading skeletons for the two catalogue card shapes.
 // The whole point of a skeleton is to hold the *layout* steady while data
 // arrives, so every block below mirrors the real card's box model:
-// same outer border/radius, same aspect-[4/3] media zone (with ProductCard's
-// fixed h-40/md:h-48 heights), same p-4 / p-3.5 content padding, same button
-// row heights (h-11 / h-10). When the real card swaps in, nothing shifts —
+// same outer border/radius, same aspect-square media zone (the card keeps one
+// ratio that scales with its width, never a fixed height), same p-2.5/p-3
+// content padding, same 40px button row with a 44px hit area. When the real card swaps in, nothing shifts —
 // which is exactly what our CLS = 0 Lighthouse budget pays for.
 //
 // The shimmer is a framer-motion gradient sweep (not the one-note
@@ -59,30 +59,30 @@ function ShimmerBlock({ className }: { className?: string }) {
 /** Mirrors ProductCard's box model exactly (fixed media height included). */
 function ProductSkeleton() {
   return (
-    <div className="flex flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm dark:border-emerald-900/40 dark:bg-[#08392a]">
-      {/* Media zone — ProductCard pins both the ratio and the heights. */}
-      <ShimmerBlock className="aspect-[4/3] h-40 w-full rounded-none md:h-48" />
+    <div className="flex flex-col overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm dark:border-emerald-900/40 dark:bg-ink">
+      {/* Media zone — ProductCard keeps one square ratio that scales with the card. */}
+      <ShimmerBlock className="aspect-square w-full rounded-none" />
 
-      <div className="flex flex-1 flex-col p-4">
+      <div className="flex flex-1 flex-col p-2.5 sm:p-3">
         {/* Category & brand row */}
         <div className="mb-1 flex items-center justify-between">
           <ShimmerBlock className="h-3 w-20" />
           <ShimmerBlock className="h-2.5 w-12" />
         </div>
         {/* Title — the real one is a two-line clamp with min-h-11 */}
-        <div className="mb-2 min-h-11 space-y-2 py-1.5">
+        <div className="mb-1.5 min-h-10 space-y-2 py-0.5">
           <ShimmerBlock className="h-3.5 w-full" />
           <ShimmerBlock className="h-3.5 w-4/5" />
         </div>
         {/* Price row */}
-        <div className="mb-3 flex items-baseline gap-2">
+        <div className="mb-2 flex items-baseline gap-2">
           <ShimmerBlock className="h-4 w-24" />
           <ShimmerBlock className="h-3 w-14" />
         </div>
         {/* Actions: primary button + square companion, both min-h-11 */}
-        <div className="flex items-center gap-2">
-          <ShimmerBlock className="h-11 w-full flex-1 rounded-xl" />
-          <ShimmerBlock className="h-11 w-11 shrink-0 rounded-xl" />
+        <div className="flex items-center gap-1.5">
+          <ShimmerBlock className="h-11 w-full flex-1 rounded-lg" />
+          <ShimmerBlock className="h-11 w-11 shrink-0 rounded-lg" />
         </div>
       </div>
     </div>
@@ -92,13 +92,13 @@ function ProductSkeleton() {
 /** Mirrors MarketplaceListingCard's box model exactly (ratio-only media). */
 function ListingSkeleton() {
   return (
-    <div className="flex flex-col overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-sm dark:border-emerald-900 dark:bg-[#08392a]">
+    <div className="flex flex-col overflow-hidden rounded-xl border border-emerald-100 bg-white shadow-sm dark:border-emerald-900 dark:bg-ink">
       {/* Media zone — the listing card holds the ratio, no fixed height. */}
-      <ShimmerBlock className="aspect-[4/3] w-full rounded-none" />
+      <ShimmerBlock className="aspect-square w-full rounded-none" />
 
-      <div className="flex flex-1 flex-col p-3.5">
+      <div className="flex flex-1 flex-col p-3">
         {/* Title — two-line clamp like the real Link */}
-        <div className="min-h-11 space-y-2 py-1">
+        <div className="min-h-10 space-y-2 py-0.5">
           <ShimmerBlock className="h-3.5 w-full" />
           <ShimmerBlock className="h-3.5 w-3/5" />
         </div>

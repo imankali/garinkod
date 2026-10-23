@@ -18,16 +18,19 @@
 // * every axis took exactly one value. «کود و سم» or «این برند یا آن برند» meant
 //   losing a selection to make another, so a multi-select is one click each way.
 
+import { useTabListKeys } from '../hooks/useTabListKeys';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import SkeletonCard from '../components/ui/SkeletonCard';
+import EmptyState from '../components/ui/EmptyState';
 import {
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
   Flame,
+  SearchX,
   Sparkles,
   TrendingUp,
   type LucideIcon,
@@ -194,6 +197,7 @@ function readFilters(params: URLSearchParams, source: 'products' | 'marketplace'
 }
 
 export default function Shop({ compareItems, onToggleCompare }: ShopProps) {
+  const sourceTabs = useTabListKeys<HTMLDivElement>();
   const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -381,7 +385,7 @@ export default function Shop({ compareItems, onToggleCompare }: ShopProps) {
         : t('shop.allProducts');
 
   return (
-    <main className="min-h-dvh bg-gradient-to-b from-emerald-50/60 via-white to-white pb-10 dark:from-emerald-950/40 dark:via-[#052e22] dark:to-emerald-950">
+    <div className="min-h-dvh bg-gradient-to-b from-emerald-50/60 via-white to-white pb-10 dark:from-emerald-950/40 dark:via-ink-deep dark:to-emerald-950">
       {/* Page header + the one filter bar both tabs share */}
       <section className="border-b border-emerald-100 bg-white/70 py-6 dark:border-emerald-900/50 dark:bg-emerald-950/40 md:py-8">
         <div className="mx-auto max-w-7xl px-[var(--page-gutter)]">
@@ -395,7 +399,7 @@ export default function Shop({ compareItems, onToggleCompare }: ShopProps) {
               </p>
             </div>
 
-            <div className="inline-flex rounded-2xl bg-emerald-50 p-1 dark:bg-emerald-900/50" role="tablist" aria-label="منبع کاتالوگ">
+            <div className="inline-flex rounded-2xl bg-emerald-50 p-1 dark:bg-emerald-900/50" role="tablist" aria-label="منبع کاتالوگ" ref={sourceTabs.ref} onKeyDown={sourceTabs.onKeyDown}>
               <button
                 type="button"
                 role="tab"
@@ -525,29 +529,30 @@ export default function Shop({ compareItems, onToggleCompare }: ShopProps) {
           {loading ? (
             // Geometry-exact shimmers instead of a centered spinner: the grid
             // takes its final shape immediately and nothing jumps on swap-in.
-            <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5">
               {Array.from({ length: 8 }).map((_, index) => (
                 <SkeletonCard key={index} variant={source === 'marketplace' ? 'listing' : 'product'} />
               ))}
             </div>
           ) : (source === 'products' ? products.length === 0 : listings.length === 0) ? (
-            <div className="flex flex-col items-center justify-center py-14 text-center">
-              <div className="text-5xl">🔍</div>
-              <p className="mt-4 text-fluid-lg font-bold text-slate-700 dark:text-white">
-                {t('shop.noProducts')}
-              </p>
-              {filtersActive && (
-                <button
-                  type="button"
-                  onClick={resetFilters}
-                  className="mt-3 min-h-11 rounded-xl border border-emerald-200 px-4 text-fluid-xs font-bold text-emerald-700 transition hover:bg-emerald-50 dark:border-emerald-700 dark:text-lime-300"
-                >
-                  حذف فیلترها و دیدن همه
-                </button>
-              )}
-            </div>
+            <EmptyState
+              icon={SearchX}
+              title={t('shop.noProducts')}
+              description="با این فیلترها چیزی پیدا نشد. محدوده قیمت یا دسته را تغییر دهید؛ همهٔ کالاهای موجود همچنان در دسترس‌اند."
+              action={
+                filtersActive ? (
+                  <button
+                    type="button"
+                    onClick={resetFilters}
+                    className="min-h-11 rounded-xl border border-emerald-200 bg-white px-4 text-fluid-xs font-bold text-emerald-700 transition hover:bg-emerald-50 dark:border-emerald-700 dark:bg-emerald-950 dark:text-lime-300"
+                  >
+                    حذف فیلترها و دیدن همه
+                  </button>
+                ) : undefined
+              }
+            />
           ) : (
-            <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5">
               {source === 'products'
                 ? products.map((product, index) => (
                   <ProductCard
@@ -635,7 +640,7 @@ export default function Shop({ compareItems, onToggleCompare }: ShopProps) {
         isWishlisted={selectedProduct ? wishlist.some((p) => p.id === selectedProduct.id) : false}
         onToggleWishlist={toggleWishlist}
       />
-    </main>
+    </div>
   );
 }
 

@@ -1,7 +1,14 @@
 // frontend/src/components/WeatherWidget.tsx
 
 import { useCallback, useState } from "react";
-import { AlertTriangle, CloudRain, Droplets, Sun, Wind } from "lucide-react";
+import {
+  AlertTriangle,
+  CloudRain,
+  Droplets,
+  Sun,
+  Wind,
+  Check,
+} from 'lucide-react';
 import ClimateSelector, { type ClimateSelection } from "./ClimateSelector";
 
 // ========================================
@@ -23,7 +30,7 @@ interface WeatherDataMap {
 
 // ========================================
 // Weather Data Configuration
-// ✅ داده‌های هواشناسی برای استان‌های مختلف
+// داده‌های هواشناسی برای استان‌های مختلف
 // ========================================
 const CLIMATE_KEY_BY_PROVINCE_SLUG: Record<string, string> = {
   fars: "fars",
@@ -104,14 +111,14 @@ export default function WeatherWidget() {
 
   return (
     <section className="mx-auto max-w-7xl px-4 pt-6 pb-2">
-      <div className="rounded-2xl border border-emerald-100 bg-white p-4 shadow-md dark:border-emerald-900/40 dark:bg-[#08392a] md:p-5">
+      <div className="rounded-2xl border border-emerald-100 bg-white p-4 shadow-md dark:border-emerald-900/40 dark:bg-ink md:p-5">
         
         {/* ======================================== */}
         {/* Header */}
         {/* ======================================== */}
         <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
           <div className="flex items-center gap-3">
-            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-[#15803d] dark:bg-emerald-950 dark:text-lime-300">
+            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-green-700 dark:bg-emerald-950 dark:text-lime-300">
               <IconComponent size={24} />
             </span>
             <div>
@@ -122,11 +129,19 @@ export default function WeatherWidget() {
                 <span
                   className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-fluid-2xs font-bold ${
                     data.canSpray
-                      ? "bg-emerald-100 text-[#15803d] dark:bg-emerald-900 dark:text-lime-300"
+                      ? "bg-emerald-100 text-green-700 dark:bg-emerald-900 dark:text-lime-300"
                       : "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300"
                   }`}
                 >
-                  {data.canSpray ? "✔ شرایط مساعد سمپاشی" : "⚠ نامساعد برای سمپاشی"}
+                  {data.canSpray ? (
+                    <>
+                      <Check size={13} aria-hidden="true" /> شرایط مساعد سمپاشی
+                    </>
+                  ) : (
+                    <>
+                      <AlertTriangle size={13} aria-hidden="true" /> نامساعد برای سمپاشی
+                    </>
+                  )}
                 </span>
               </div>
               <h3 className="text-sm font-bold text-slate-800 dark:text-white md:text-base">
@@ -176,7 +191,7 @@ export default function WeatherWidget() {
           <div
             className={`col-span-2 flex items-center gap-2 rounded-xl p-2.5 sm:col-span-1 ${
               data.canSpray
-                ? "bg-emerald-50/80 text-[#15803d] dark:bg-emerald-900/30 dark:text-lime-300"
+                ? "bg-emerald-50/80 text-green-700 dark:bg-emerald-900/30 dark:text-lime-300"
                 : "bg-orange-50 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300"
             }`}
           >

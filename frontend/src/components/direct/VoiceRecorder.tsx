@@ -157,7 +157,7 @@ export default function VoiceRecorder({
         type="button"
         onClick={stopAndSend}
         aria-label="ارسال پیام صوتی"
-        className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 text-white transition hover:bg-emerald-700"
+        className="tap-target flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 text-white transition hover:bg-emerald-700"
       >
         <Send size={15} className="-translate-x-px -scale-x-100" />
       </button>

@@ -1,5 +1,5 @@
 // frontend/src/App.tsx
-// ✅ فایل اصلی اپلیکیشن - نقطه اتصال همه کامپوننت‌ها
+// فایل اصلی اپلیکیشن - نقطه اتصال همه کامپوننت‌ها
 
 import { useEffect, useMemo, useRef, useState, lazy, Suspense } from "react";
 import { BrowserRouter, Navigate, Routes, Route } from 'react-router';
@@ -130,6 +130,7 @@ import { useWishlistStore } from "./store/wishlistStore";
 // ========================================
 import { useThemeStore, applyThemeClass } from "./store/themeStore";
 import { useTranslation } from "./i18n";
+import PageLoader from "./components/ui/PageLoader";
 
 // ========================================
 // Types
@@ -144,11 +145,9 @@ const HAS_CROP_TAGS = false;
 // Loading Spinner Component
 // ========================================
 function LoadingSpinner() {
-  return (
-    <div className="flex min-h-[50dvh] items-center justify-center py-12">
-      <div className="h-12 w-12 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent"></div>
-    </div>
-  );
+  // Route-level suspense fallback: named for screen readers instead of an
+  // anonymous ring, and the same shape as ui/PageLoader.
+  return <PageLoader label="در حال آماده‌سازی صفحه…" className="py-12" />;
 }
 
 // ========================================
@@ -372,8 +371,8 @@ export default function App() {
 
         {/* ======================================== */}
         {/* Main Content */}
-        {/* ✅ pb-24 برای MobileBottomNav در موبایل */}
-        {/* ✅ lg:pb-8 برای دسکتاپ */}
+        {/* pb-24 برای MobileBottomNav در موبایل */}
+        {/* lg:pb-8 برای دسکتاپ */}
         {/* ======================================== */}
         <main
           id="main-content"
@@ -421,9 +420,7 @@ export default function App() {
                     </Reveal>
 
                     <Reveal>
-                      <div className="page-shell py-4">
-                        <AmazingOffers />
-                      </div>
+                      <AmazingOffers />
                     </Reveal>
 
                     <Reveal>
@@ -431,16 +428,14 @@ export default function App() {
                     </Reveal>
 
                     <Reveal>
-                      <div className="page-shell pb-4">
-                        <RankedRail
-                          railId="best_sellers"
-                          title="پرفروش‌ترین کالاها"
-                          hint="بر اساس تعداد سفارش ثبت‌شده در گرین کود"
-                          icon={TrendingUp}
-                          params={{ ordering: "-sales_count" }}
-                          moreTo="/products?ordering=-sales_count"
-                        />
-                      </div>
+                      <RankedRail
+                        railId="best_sellers"
+                        title="پرفروش‌ترین کالاها"
+                        hint="بر اساس تعداد سفارش ثبت‌شده در گرین کود"
+                        icon={TrendingUp}
+                        params={{ ordering: "-sales_count" }}
+                        moreTo="/products?ordering=-sales_count"
+                      />
                     </Reveal>
 
                     <Reveal>
@@ -468,16 +463,14 @@ export default function App() {
                         (آبیاری و گلخانه), then the magazine with the sellers'
                         ads under it. */}
                     <Reveal>
-                      <div className="page-shell py-4">
-                        <RankedRail
-                          railId="newest"
-                          title="تازه‌های انبار"
-                          hint="نهادهایی که در هفته‌های اخیر به گرین کود اضافه شده‌اند."
-                          icon={Sparkles}
-                          params={{ ordering: "-publish" }}
-                          moreTo="/products?ordering=-publish"
-                        />
-                      </div>
+                      <RankedRail
+                        railId="newest"
+                        title="تازه‌های انبار"
+                        hint="نهادهایی که در هفته‌های اخیر به گرین کود اضافه شده‌اند."
+                        icon={Sparkles}
+                        params={{ ordering: "-publish" }}
+                        moreTo="/products?ordering=-publish"
+                      />
                     </Reveal>
                     <CategorySections
                       group="primary"
@@ -717,7 +710,7 @@ export default function App() {
 
         {/* ======================================== */}
         {/* Wishlist Modal */}
-        {/* ✅ فقط وقتی wishlistOpen true است render می‌شود */}
+        {/* فقط وقتی wishlistOpen true است render می‌شود */}
         {/* ======================================== */}
         {wishlistOpen && (
           <Suspense fallback={null}>

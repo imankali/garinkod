@@ -7,9 +7,18 @@ import toast from "react-hot-toast";
 import { useQuery } from "@tanstack/react-query";
 
 import {
-  Search, X, Clock, SlidersHorizontal,
-  PackageCheck, Mic, Sparkles, Tag, Flame
-} from "lucide-react";
+  Search,
+  SearchX,
+  X,
+  Clock,
+  SlidersHorizontal,
+  PackageCheck,
+  Mic,
+  Sparkles,
+  Tag,
+  Flame,
+} from 'lucide-react';
+import EmptyState from "./ui/EmptyState";
 import { categories } from "../data/shopData";
 import { productsApi } from "../api/services";
 import { useTranslation } from "../i18n";
@@ -284,7 +293,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
         onSubmit={handleSubmit}
         className={`group flex items-stretch rounded-2xl border-2 bg-white shadow-sm transition-colors duration-300 dark:bg-emerald-950 ${
           isFocused
-            ? "border-[#15803d] shadow-lg shadow-emerald-100 ring-4 ring-emerald-100/50 dark:shadow-none dark:ring-emerald-900/50"
+            ? "border-green-700 shadow-lg shadow-emerald-100 ring-4 ring-emerald-100/50 dark:shadow-none dark:ring-emerald-900/50"
             : "border-emerald-100 hover:border-emerald-300 dark:border-emerald-900/60"
         }`}
       >
@@ -307,7 +316,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
           className={`relative flex min-h-11 min-w-11 items-center justify-center transition-colors ${
             isListening
               ? "text-rose-500"
-              : "text-slate-400 hover:text-[#15803d] dark:text-emerald-400 dark:hover:text-lime-300"
+              : "text-slate-400 hover:text-green-700 dark:text-emerald-400 dark:hover:text-lime-300"
           }`}
           aria-label="جستجوی صوتی"
         >
@@ -333,8 +342,8 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
           type="button"
           onClick={toggleFilters}
           aria-expanded={showAdvanced}
-          className={`relative flex min-h-11 items-center gap-1 border-s border-emerald-100 px-3 text-slate-500 transition-colors hover:text-[#15803d] dark:border-emerald-900 dark:text-emerald-400 ${
-            showAdvanced ? "bg-emerald-50 text-[#15803d] dark:bg-emerald-900/60 dark:text-lime-300" : ""
+          className={`relative flex min-h-11 items-center gap-1 border-s border-emerald-100 px-3 text-slate-500 transition-colors hover:text-green-700 dark:border-emerald-900 dark:text-emerald-400 ${
+            showAdvanced ? "bg-emerald-50 text-green-700 dark:bg-emerald-900/60 dark:text-lime-300" : ""
           }`}
           aria-label="فیلترهای پیشرفته"
         >
@@ -396,7 +405,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
                     onClick={() => handleQuickFilter('inStock', null)}
                     className={`flex min-h-9 items-center gap-1.5 rounded-full px-3 py-1.5 text-fluid-xs font-semibold transition-colors ${
                       inStockOnly
-                        ? "bg-[#15803d] text-white"
+                        ? "bg-green-700 text-white"
                         : "bg-white text-slate-600 ring-1 ring-slate-200 dark:bg-emerald-900 dark:text-emerald-100 dark:ring-emerald-800"
                     }`}
                   >
@@ -416,7 +425,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
                       onClick={() => handleQuickFilter('category', cat.id)}
                       className={`flex min-h-9 items-center gap-1.5 rounded-full px-3 py-1.5 text-fluid-xs font-semibold transition-colors ${
                         activeCategory === cat.id
-                          ? "bg-[#15803d] text-white"
+                          ? "bg-green-700 text-white"
                           : "bg-white text-slate-600 ring-1 ring-slate-200 dark:bg-emerald-900 dark:text-emerald-100 dark:ring-emerald-800"
                       }`}
                     >
@@ -489,7 +498,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {trendingSearches.map((term) => (
-                      <button
+                      <button type="button"
                         key={term}
                         onClick={() => {
                           setQuery(term);
@@ -512,7 +521,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {categories.map((cat) => (
-                      <button
+                      <button type="button"
                         key={cat.id}
                         onClick={() => setActiveCategory(cat.id)}
                         className="flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-emerald-100 hover:text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-200"
@@ -532,7 +541,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
                     </p>
                     <div className="flex flex-wrap gap-2">
                       {recent.map((term) => (
-                        <button
+                        <button type="button"
                           key={term}
                           onClick={() => setQuery(term)}
                           className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600 transition-colors hover:bg-emerald-100 hover:text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-200"
@@ -549,16 +558,20 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
                   <p className="mb-1 flex items-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-lime-300">
                     <Sparkles size={12} /> راهنمای جستجو
                   </p>
-                  <ul className="space-y-1 text-fluid-xs text-slate-600 dark:text-emerald-200">
-                    <li>• برای جستجوی دقیق، نام کامل محصول را وارد کنید</li>
-                    <li>• از فیلترهای پیشرفته برای محدود کردن نتایج استفاده کنید</li>
-                    <li>• با کلیک روی 🎤 جستجوی صوتی انجام دهید</li>
+                  <ul className="space-y-1.5 text-fluid-xs text-slate-600 dark:text-emerald-200">
+                    <li>برای جستجوی دقیق، نام کامل محصول را وارد کنید.</li>
+                    <li>از فیلترهای پیشرفته برای محدود کردن نتایج استفاده کنید.</li>
+                    <li className="flex items-start gap-1.5">
+                      <Mic size={12} aria-hidden="true" className="mt-0.5 shrink-0" />
+                      <span>جستجوی صوتی: روی آیکون میکروفن در نوار جستجو بزنید</span>
+                    </li>
                   </ul>
                 </div>
               </div>
             ) : isLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="h-8 w-8 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent"></div>
+              <div role="status" aria-busy="true" className="flex flex-col items-center justify-center gap-2 py-8">
+                <div aria-hidden="true" className="h-8 w-8 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent"></div>
+                <span className="text-xs font-semibold text-slate-500 dark:text-emerald-200">در حال جستجو…</span>
               </div>
             ) : filteredProducts.length > 0 ? (
               <div>
@@ -568,7 +581,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
                     {filteredProducts.length} نتیجه یافت شد
                   </p>
                   {activeFacetCount > 0 && (
-                    <button onClick={resetFacets} className="text-fluid-2xs text-rose-500 hover:underline">
+                    <button type="button" onClick={resetFacets} className="text-fluid-2xs text-rose-500 hover:underline">
                       حذف فیلترها
                     </button>
                   )}
@@ -578,7 +591,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
                 <ul className="max-h-80 space-y-1 overflow-y-auto">
                   {filteredProducts.map((product) => (
                     <li key={product.id}>
-                      <button
+                      <button type="button"
                         onClick={() => {
                           openProduct(product);
                           setPanel("none");
@@ -606,7 +619,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
                             ناموجود
                           </span>
                         )}
-                        <span className="shrink-0 text-xs font-semibold text-[#15803d] dark:text-lime-300">
+                        <span className="shrink-0 text-xs font-semibold text-green-700 dark:text-lime-300">
                           {product.price.toLocaleString("fa-IR")}
                         </span>
                       </button>
@@ -616,11 +629,15 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
               </div>
             ) : (
               <div className="flex flex-col items-center gap-2 py-8 text-center">
-                <span className="text-3xl">🔍</span>
-                <p className="text-sm text-slate-500">نتیجه‌ای یافت نشد.</p>
-                <p className="text-xs text-slate-400">فیلترها را تغییر دهید یا عبارت دیگری جستجو کنید</p>
+                <EmptyState
+                  compact
+                  icon={SearchX}
+                  title="نتیجه‌ای یافت نشد"
+                  description="فیلترها را تغییر دهید یا عبارت دیگری جستجو کنید."
+                  className="w-full border-0 bg-transparent dark:bg-transparent"
+                />
                 {activeFacetCount > 0 && (
-                  <button
+                  <button type="button"
                     onClick={resetFacets}
                     className="mt-2 rounded-lg bg-emerald-100 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900 dark:text-lime-300"
                   >

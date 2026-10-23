@@ -4,15 +4,18 @@
 // growing guide. `/blog` shows both, `/guides` shows only «راهنمای کشت» with the
 // crop index, mirroring how a nursery site organises its plant advice.
 
+import { useTabListKeys } from '../hooks/useTabListKeys';
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import { BookOpen, Search, Sprout, X } from 'lucide-react';
+import { BookOpen, Search, SearchX, Sprout, X } from 'lucide-react';
 
 import ArticleCard, { articleHref } from '../components/article/ArticleCard';
 import RouteSeo from '../components/RouteSeo';
 import { articlesApi } from '../api/services';
 import { cn } from '../utils/cn';
+import { useDragToScroll } from '../hooks/useDragToScroll';
+import EmptyState from '../components/ui/EmptyState';
 
 type View = 'all' | 'article' | 'guide';
 
@@ -24,6 +27,7 @@ const TABS: Array<{ id: View; label: string; hint: string }> = [
 
 export default function Blog({ fixedKind }: { fixedKind?: 'guide' | 'article' }) {
   const [searchParams] = useSearchParams();
+  const viewTabs = useTabListKeys<HTMLDivElement>();
   // /blog?kind=article keeps a single component for both views, so a "مقاله‌ها"
   // tab is a real URL a reader can share.
   const queryKind = searchParams.get('kind');
@@ -31,6 +35,7 @@ export default function Blog({ fixedKind }: { fixedKind?: 'guide' | 'article' })
   const [search, setSearch] = useState('');
   const [crop, setCrop] = useState('');
   const isGuideHub = kind === 'guide';
+  const cropRail = useDragToScroll<HTMLDivElement>();
 
   const { data: articles = [], isFetching } = useQuery({
     queryKey: ['articles', kind || 'all', search.trim(), crop],
@@ -63,7 +68,7 @@ export default function Blog({ fixedKind }: { fixedKind?: 'guide' | 'article' })
   const hero = featured.find((item) => item.kind !== 'guide') || featured[0];
 
   return (
-    <main className="page-shell py-8 md:py-10">
+    <div className="page-shell py-8 md:py-10">
       <RouteSeo />
 
       <header className="max-w-3xl">
@@ -84,7 +89,7 @@ export default function Blog({ fixedKind }: { fixedKind?: 'guide' | 'article' })
       {/* Controls */}
       <div className="mt-7 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         {!fixedKind && (
-          <div className="flex gap-1 rounded-2xl bg-slate-100 p-1 dark:bg-emerald-900/60" role="tablist" aria-label="نوع مطلب">
+          <div className="flex gap-1 rounded-2xl bg-slate-100 p-1 dark:bg-emerald-900/60" role="tablist" aria-label="نوع مطلب" ref={viewTabs.ref} onKeyDown={viewTabs.onKeyDown}>
             {TABS.map((tab) => (
               <Link
                 key={tab.id}
@@ -128,7 +133,13 @@ export default function Blog({ fixedKind }: { fixedKind?: 'guide' | 'article' })
       </div>
 
       {isGuideHub && crops.length > 0 && (
-        <div className="no-scrollbar mt-4 flex gap-2 overflow-x-auto pb-1" aria-label="فهرست گیاهان" role="group">
+        <div
+          ref={cropRail.ref}
+          {...cropRail.handlers}
+          className="no-scrollbar mt-4 flex gap-2 overflow-x-auto pb-1"
+          aria-label="فهرست گیاهان"
+          role="group"
+        >
           <button
             type="button"
             onClick={() => setCrop('')}
@@ -189,7 +200,12 @@ export default function Blog({ fixedKind }: { fixedKind?: 'guide' | 'article' })
       {/* Grid */}
       <section className="mt-7" aria-live="polite">
         {isFetching && !articles.length ? (
-          <div className="flex min-h-[30dvh] items-center justify-center">
+          <div
+            role="status"
+            aria-busy="true"
+            aria-label="در حال بارگذاری مطالب"
+            className="flex min-h-[30dvh] items-center justify-center"
+          >
             <div className="h-10 w-10 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" />
           </div>
         ) : articles.length ? (
@@ -199,26 +215,27 @@ export default function Blog({ fixedKind }: { fixedKind?: 'guide' | 'article' })
             ))}
           </div>
         ) : (
-          <div className="rounded-3xl border border-dashed border-emerald-200 bg-white/60 p-10 text-center dark:border-emerald-800 dark:bg-emerald-950/50">
-            <p className="text-fluid-lg font-extrabold text-slate-700 dark:text-white">مطالبی با این فیلترها پیدا نشد</p>
-            <p className="mt-2 text-fluid-sm text-slate-500 dark:text-emerald-200">
-              عبارت جستجو را کوتاه‌تر کنید یا فهرست گیاهان را تغییر دهید.
-            </p>
-            {(search || crop) && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSearch('');
-                  setCrop('');
-                }}
-                className="mt-4 min-h-11 rounded-xl bg-emerald-600 px-4 text-fluid-xs font-bold text-white"
-              >
-                حذف فیلترها
-              </button>
-            )}
-          </div>
+          <EmptyState
+            icon={SearchX}
+            title="مطالبی با این فیلترها پیدا نشد"
+            description="عبارت جستجو را کوتاه‌تر کنید یا فهرست گیاهان را تغییر دهید."
+            action={
+              (search || crop) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearch('');
+                    setCrop('');
+                  }}
+                  className="min-h-11 rounded-xl bg-emerald-600 px-4 text-fluid-xs font-bold text-white"
+                >
+                  حذف فیلترها
+                </button>
+              )
+            }
+          />
         )}
       </section>
-    </main>
+    </div>
   );
 }

@@ -2,7 +2,18 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, LayoutGrid } from "lucide-react";
+import {
+  ArrowLeft,
+  FlaskConical,
+  LayoutGrid,
+  Package,
+  SprayCan,
+  Tractor,
+  Droplets,
+  Wheat,
+  Wrench,
+  type LucideIcon,
+} from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { categoriesApi } from "../api/services";
 import type { Category } from '@/types/shop';
@@ -11,7 +22,7 @@ import type { Category } from '@/types/shop';
 // Types
 // ========================================
 interface CategoryIcons {
-  [key: string]: string;
+  [key: string]: LucideIcon;
 }
 
 interface CategoryColors {
@@ -20,22 +31,24 @@ interface CategoryColors {
 
 // ========================================
 // Category Icons & Colors Mapping
-// ✅ نگاشت slug به آیکون و رنگ (بر اساس دسته‌بندی‌های UI)
+// نگاشت slug به آیکون و رنگ (بر اساس دسته‌بندی‌های UI)
 // ========================================
+// Structural icons, not emoji: emoji render differently on every platform and
+// are announced as words by screen readers, so they cannot carry meaning here.
 const categoryIcons: CategoryIcons = {
-  'pesticide': '',
-  'fertilizer': '',
-  'seed': '🌾',
-  'equipment': '🚜',
-  'irrigation': '💧',
-  'tools': '🔧',
+  'pesticide': SprayCan,
+  'fertilizer': FlaskConical,
+  'seed': Wheat,
+  'equipment': Tractor,
+  'irrigation': Droplets,
+  'tools': Wrench,
 };
 
 const categoryColors: CategoryColors = {
-  'pesticide': 'from-[#15803d] to-[#166534]',
-  'fertilizer': 'from-emerald-500 to-[#15803d]',
+  'pesticide': 'from-green-700 to-green-800',
+  'fertilizer': 'from-emerald-500 to-green-700',
   'seed': 'from-amber-500 to-orange-500',
-  'equipment': 'from-lime-600 to-[#15803d]',
+  'equipment': 'from-lime-600 to-green-700',
   'irrigation': 'from-sky-500 to-cyan-600',
   'tools': 'from-teal-500 to-emerald-600',
 };
@@ -43,10 +56,17 @@ const categoryColors: CategoryColors = {
 // ========================================
 // MegaMenu Component
 // ========================================
+/** One place that resolves a category slug to its icon, with a neutral fallback. */
+function CategoryGlyph({ slug, size }: { slug: string; size: number }) {
+  const Icon = categoryIcons[slug] || Package;
+  return <Icon size={size} aria-hidden="true" />;
+}
+
 export default function MegaMenu() {
   const [open, setOpen] = useState(false);
   const [activeSlug, setActiveSlug] = useState<string>("");
   const ref = useRef<HTMLDivElement>(null);
+  const toggleRef = useRef<HTMLButtonElement>(null);
 
   // ========================================
   // دریافت دسته‌بندی‌ها از API
@@ -77,14 +97,27 @@ export default function MegaMenu() {
   }, [categories, activeSlug]);
 
   // ========================================
-  // بستن منو هنگام کلیک بیرون
+  // بستن منو هنگام کلیک بیرون یا Escape
   // ========================================
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     }
+    // A keyboard user opens the panel with Enter and must be able to close it
+    // with Escape without hunting for the toggle again, so focus returns there.
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key !== "Escape") return;
+      setOpen((wasOpen) => {
+        if (wasOpen) toggleRef.current?.focus();
+        return false;
+      });
+    }
     document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
   }, []);
 
   // ========================================
@@ -98,9 +131,13 @@ export default function MegaMenu() {
   if (isLoading) {
     return (
       <div className="hidden lg:block">
-        <div className="flex items-center gap-2 rounded-xl bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700">
-          <div className="h-4 w-4 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent"></div>
-          در حال بارگذاری...
+        <div
+          role="status"
+          aria-busy="true"
+          className="flex items-center gap-2 rounded-xl bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700 dark:bg-emerald-900/50 dark:text-lime-200"
+        >
+          <div aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent"></div>
+          در حال بارگذاری دسته‌ها…
         </div>
       </div>
     );
@@ -122,15 +159,20 @@ export default function MegaMenu() {
       {/* Toggle Button */}
       {/* ======================================== */}
       <button
+        ref={toggleRef}
+        type="button"
         onClick={() => setOpen((v) => !v)}
-        className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-300 ${
+        aria-haspopup="true"
+        aria-expanded={open}
+        aria-controls="mega-menu-panel"
+        className={`flex min-h-11 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-300 ${
           open
             ? "bg-emerald-600 text-white shadow-lg shadow-emerald-200"
             : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
         }`}
         aria-label="منوی دسته‌بندی‌ها"
       >
-        <LayoutGrid size={17} />
+        <LayoutGrid size={17} aria-hidden="true" />
         همه دسته‌بندی‌ها
       </button>
 
@@ -140,6 +182,9 @@ export default function MegaMenu() {
       <AnimatePresence>
         {open && (
           <motion.div
+            id="mega-menu-panel"
+            role="region"
+            aria-label="دسته‌بندی محصولات"
             initial={{ opacity: 0, y: -12, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -12, scale: 0.98 }}
@@ -153,8 +198,27 @@ export default function MegaMenu() {
               {categories.map((cat) => (
                 <li key={cat.slug}>
                   <button
+                    type="button"
                     onMouseEnter={() => setActiveSlug(cat.slug)}
                     onClick={() => setActiveSlug(cat.slug)}
+                    data-mega-item
+                    onKeyDown={(event) => {
+                      // Up/Down move between departments, as in any vertical
+                      // tab strip; the panel beside it follows the selection.
+                      if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+                      const items = Array.from(
+                        event.currentTarget
+                          .closest("ul")
+                          ?.querySelectorAll<HTMLButtonElement>("[data-mega-item]") ?? [],
+                      );
+                      const at = items.indexOf(event.currentTarget);
+                      const next = items[(at + (event.key === "ArrowDown" ? 1 : items.length - 1)) % items.length];
+                      if (next) {
+                        event.preventDefault();
+                        next.focus();
+                        next.click();
+                      }
+                    }}
                     className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-start text-sm font-medium transition-colors ${
                       activeSlug === cat.slug
                         ? "bg-white text-emerald-700 shadow-sm dark:bg-emerald-800 dark:text-lime-300"
@@ -166,7 +230,7 @@ export default function MegaMenu() {
                         categoryColors[cat.slug] || 'from-emerald-500 to-lime-500'
                       } text-white`}
                     >
-                      {categoryIcons[cat.slug] || '📦'}
+                      <CategoryGlyph slug={cat.slug} size={16} />
                     </span>
                     <span className="flex-1 text-start">{cat.name}</span>
                     {cat.product_count > 0 && (
@@ -197,7 +261,7 @@ export default function MegaMenu() {
                       categoryColors[activeCategory.slug] || 'from-emerald-500 to-lime-500'
                     } text-white shadow-lg`}
                   >
-                    {categoryIcons[activeCategory.slug] || '📦'}
+                    <CategoryGlyph slug={activeCategory.slug} size={22} />
                   </span>
                   <div>
                     <p className="font-bold text-slate-800 dark:text-white">{activeCategory.name}</p>

@@ -3,8 +3,9 @@
 // The quick-view's tab strip overflows at every width the modal opens at —
 // five tabs inside a half-modal column — and hides its scrollbar, so before
 // the strip could be dragged the far tabs were unreachable with a mouse.
-// These tests pin the drag: the storefront rails' pointer pattern, with the
-// 5px dead-zone that keeps grabbing the strip from clicking a tab.
+// These tests pin the drag: the shared useDragToScroll hook, with the 5px
+// dead-zone that keeps grabbing the strip from clicking a tab, and the grab
+// direction the rest of the site's rails share.
 
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -80,13 +81,19 @@ describe('the quick-view tab strip drag', () => {
     expect(scrollBy).not.toHaveBeenCalled();
 
     firePointer(strip, 'pointermove', 320); // 20px — a real drag
-    expect(scrollBy).toHaveBeenCalledWith({ left: 18, behavior: 'instant' });
+    // Grab direction: dragging right walks the content right, so the scroll
+    // position moves the other way (-18).
+    expect(scrollBy).toHaveBeenCalledWith({ left: -18, behavior: 'instant' });
     expect(strip.style.cursor).toBe('grabbing');
     expect(strip.style.userSelect).toBe('none');
 
     firePointer(strip, 'pointerup', 320);
     expect(strip.style.cursor).toBe('');
     expect(strip.style.userSelect).toBe('');
+    // The released flick glides for a frame (jsdom's stubbed scroll never
+    // moves, so the glide parks immediately); snap comes back after it.
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    expect(strip.style.scrollSnapType).toBe('');
   });
 
   it('does not switch tabs when the mouse releases after a drag', async () => {

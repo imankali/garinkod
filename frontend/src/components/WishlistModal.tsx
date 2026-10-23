@@ -68,7 +68,7 @@ export default function WishlistModal({
                 {wishlist.length.toLocaleString("fa-IR")} محصول
               </span>
             </div>
-            <button
+            <button type="button"
               onClick={onClose}
               className="tap-target flex h-9 w-9 items-center justify-center rounded-full bg-white/20 transition-colors hover:bg-white/30"
               aria-label="بستن"
@@ -91,9 +91,9 @@ export default function WishlistModal({
                   لیست علاقه‌مندی‌های شما خالی است
                 </p>
                 <p className="mt-2 text-sm text-slate-500 dark:text-emerald-300">
-                  محصولات مورد علاقه خود را با کلیک روی ❤️ اضافه کنید
+                  محصولات مورد علاقه خود را با زدن آیکون قلب روی هر کالا اضافه کنید.
                 </p>
-                <button
+                <button type="button"
                   onClick={onClose}
                   className="mt-6 rounded-xl bg-gradient-to-r from-emerald-600 to-lime-500 px-6 py-3 text-sm font-bold text-white shadow-lg hover:shadow-xl transition-shadow"
                 >
@@ -143,7 +143,7 @@ export default function WishlistModal({
                     {/* Actions */}
                     <div className="flex flex-col gap-2">
                       {/* Add to Cart */}
-                      <button
+                      <button type="button"
                         onClick={(e) => {
                           onAddToCart(product, 1, e);
                         }}
@@ -155,7 +155,7 @@ export default function WishlistModal({
                       </button>
 
                       {/* Remove from Wishlist */}
-                      <button
+                      <button type="button"
                         onClick={() => onRemove(product.id)}
                         className="flex items-center gap-1 rounded-lg bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-500 hover:bg-rose-100 dark:bg-rose-950/40 dark:text-rose-300 transition-colors"
                         aria-label={`حذف ${product.name} از علاقه‌مندی‌ها`}

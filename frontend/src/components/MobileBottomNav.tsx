@@ -62,7 +62,7 @@ export default function MobileBottomNav({
                     // AA for the one number a buyer must read. The harvest
                     // gold (#a16207) is the palette's accent and clears 4.5:1
                     // with the same white.
-                    className="absolute -end-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#a16207] px-1 text-fluid-2xs font-bold text-white"
+                    className="absolute -end-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-yellow-700 px-1 text-fluid-2xs font-bold text-white"
                   >
                     {cartCount > 9 ? '۹+' : cartCount.toLocaleString('fa-IR')}
                   </motion.span>

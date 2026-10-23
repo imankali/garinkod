@@ -1,5 +1,5 @@
 // frontend/src/main.tsx
-// ✅ نقطه ورود اصلی اپلیکیشن React
+// نقطه ورود اصلی اپلیکیشن React
 
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
@@ -27,7 +27,7 @@ if (sentryDsn) {
 
 // ========================================
 // React Query Client Configuration
-// ✅ تنظیمات بهینه برای cache و retry
+// تنظیمات بهینه برای cache و retry
 // ========================================
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -35,24 +35,24 @@ const queryClient = new QueryClient({
       //  غیرفعال کردن refetch هنگام focus (برای جلوگیری از درخواست‌های تکراری)
       refetchOnWindowFocus: false,
 
-      // ✅ فقط یک بار retry در صورت خطا (برای UX بهتر)
+      // فقط یک بار retry در صورت خطا (برای UX بهتر)
       retry: 1,
 
-      // ✅ داده‌ها برای ۵ دقیقه fresh هستند (بعد از آن stale می‌شوند)
+      // داده‌ها برای ۵ دقیقه fresh هستند (بعد از آن stale می‌شوند)
       staleTime: 5 * 60 * 1000,
 
-      // ✅ داده‌های cache شده برای ۱۰ دقیقه در حافظه می‌مانند
+      // داده‌های cache شده برای ۱۰ دقیقه در حافظه می‌مانند
       gcTime: 10 * 60 * 1000,
 
-      // ✅ retry با تأخیر exponential (1s, 2s, 4s, ...)
+      // retry با تأخیر exponential (1s, 2s, 4s, ...)
       retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
 
-      // ✅ refetch هنگام reconnect به اینترنت
+      // refetch هنگام reconnect به اینترنت
       refetchOnReconnect: true,
     },
 
     mutations: {
-      // ✅ mutationها فقط یک بار retry می‌شوند
+      // mutationها فقط یک بار retry می‌شوند
       retry: 1,
     },
   },
@@ -117,7 +117,7 @@ class ErrorBoundary extends (await import("react")).Component<
               </p>
             ) : null}
             <div className="flex flex-wrap items-center justify-center gap-3">
-              <button
+              <button type="button"
                 onClick={() => window.location.reload()}
                 className="rounded-xl bg-gradient-to-r from-emerald-600 to-lime-500 px-6 py-3 text-sm font-bold text-white shadow-lg"
               >

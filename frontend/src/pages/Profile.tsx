@@ -151,7 +151,7 @@ export default function Profile() {
   }
 
   if (!isSessionChecked || !isAuthenticated || isLoading) {
-    return <main className="flex min-h-[55dvh] items-center justify-center"><div className="text-center"><div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" /><p className="mt-4 text-sm text-slate-500">{t("common.loading")}</p></div></main>;
+    return <div className="flex min-h-[55dvh] items-center justify-center"><div role="status" aria-busy="true" className="text-center"><div aria-hidden="true" className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" /><p className="mt-4 text-sm text-slate-500 dark:text-emerald-200">{t("common.loading")}</p></div></div>;
   }
 
   const fullName = [user?.first_name, user?.last_name].filter(Boolean).join(" ") || user?.username || "—";
@@ -166,7 +166,7 @@ export default function Profile() {
   ];
 
   return (
-    <main className="min-h-dvh bg-gradient-to-b from-emerald-50 via-[#f8faf6] to-white px-[var(--page-gutter)] py-6 dark:from-emerald-950 dark:via-[#062d21] dark:to-emerald-950 md:py-8">
+    <div className="min-h-dvh bg-gradient-to-b from-emerald-50 via-parchment to-white px-[var(--page-gutter)] py-6 dark:from-emerald-950 dark:via-ink-deep dark:to-emerald-950 md:py-8">
       <div className="mx-auto max-w-7xl">
         <section className="overflow-hidden rounded-3xl bg-gradient-to-l from-emerald-800 via-emerald-700 to-lime-600 p-5 text-white shadow-xl shadow-emerald-900/15 sm:p-6 md:p-8">
           <div className="flex flex-col justify-between gap-5 md:flex-row md:items-center">
@@ -186,7 +186,7 @@ export default function Profile() {
             <div className="flex flex-wrap items-center gap-2">
               <span className="flex min-h-11 items-center rounded-full bg-white/15 px-3 text-fluid-xs font-bold" title={account?.level_label || ''}><UserRound size={14} className="me-1 inline" />{account?.level_short_label || account?.level_label || t("role.buyer")}</span>
               {storefront && <span className="flex min-h-9 items-center rounded-full bg-lime-300/20 px-3 text-fluid-xs font-bold text-lime-100"><Store size={14} className="me-1 inline" />{t("role.seller")}</span>}
-              <button onClick={signOut} className="flex min-h-11 items-center rounded-full bg-white/15 px-4 text-fluid-xs font-bold transition hover:bg-white/25"><LogOut size={14} className="me-1 inline" />{t("account.signout")}</button>
+              <button type="button" onClick={signOut} className="flex min-h-11 items-center rounded-full bg-white/15 px-4 text-fluid-xs font-bold transition hover:bg-white/25"><LogOut size={14} className="me-1 inline" />{t("account.signout")}</button>
             </div>
           </div>
         </section>
@@ -219,7 +219,7 @@ export default function Profile() {
               aria-label="Account sections"
             >
               {navItems.map(({ id, label, icon: Icon }) => (
-                <button
+                <button type="button"
                   key={id}
                   onClick={() => setTab(id)}
                   aria-current={tab === id ? "page" : undefined}
@@ -245,7 +245,7 @@ export default function Profile() {
           </section>
         </div>
       </div>
-    </main>
+    </div>
   );
 }
 
@@ -421,13 +421,13 @@ function SettingsPanel({ form, setForm, editing, setEditing, saving, onSave, onC
             <p className="mt-2 text-sm text-slate-500 dark:text-emerald-200">اطلاعات تحویل برای خریدهای بعدی از اینجا تکمیل می‌شود.</p>
           </div>
           {!editing ? (
-            <button onClick={() => setEditing(true)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white">
+            <button type="button" onClick={() => setEditing(true)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white">
               <Edit3 size={16} />
               {t("common.edit")}
             </button>
           ) : (
             <div className="flex gap-2">
-              <button onClick={onCancel} className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold dark:border-emerald-700">
+              <button type="button" onClick={onCancel} className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold dark:border-emerald-700">
                 <X size={16} className="me-1 inline" />
                 {t("common.cancel")}
               </button>
@@ -445,7 +445,7 @@ function SettingsPanel({ form, setForm, editing, setEditing, saving, onSave, onC
             <p className="mt-1 font-bold text-slate-800 dark:text-white">{username}</p>
           </div>
           {editing && (
-            <button disabled={saving} className="inline-flex w-fit items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white disabled:opacity-50 sm:col-span-2">
+            <button type="submit" disabled={saving} className="inline-flex w-fit items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white disabled:opacity-50 sm:col-span-2">
               <Save size={16} />
               {saving ? t("common.loading") : t("common.save")}
             </button>
@@ -669,6 +669,6 @@ function SiteSettingsSection({ t }: { t: (key: string) => string }) {
 }
 
 function Stat({ icon: Icon, label, value }: { icon: typeof BarChart3; label: string; value: string }) { return <div className="rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm dark:border-emerald-900 dark:bg-emerald-950 sm:rounded-3xl sm:p-5"><Icon size={18} className="text-emerald-600 dark:text-lime-300" /><p className="mt-3 text-fluid-xl font-extrabold text-slate-800 dark:text-white">{value}</p><p className="mt-1 text-fluid-2xs leading-5 text-slate-500 dark:text-emerald-200">{label}</p></div>; }
-function Panel({ title, text, icon: Icon, action, onClick }: { title: string; text: string; icon: typeof Store; action: string; onClick: () => void }) { return <article className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm dark:border-emerald-900 dark:bg-emerald-950"><Icon className="text-emerald-600 dark:text-lime-300" /><h2 className="mt-4 text-xl font-extrabold text-slate-800 dark:text-white">{title}</h2><p className="mt-2 min-h-12 text-sm leading-6 text-slate-500 dark:text-emerald-200">{text}</p><button onClick={onClick} className="mt-4 inline-flex min-h-11 items-center text-fluid-sm font-bold text-emerald-700 dark:text-lime-300">{action}</button></article>; }
+function Panel({ title, text, icon: Icon, action, onClick }: { title: string; text: string; icon: typeof Store; action: string; onClick: () => void }) { return <article className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm dark:border-emerald-900 dark:bg-emerald-950"><Icon className="text-emerald-600 dark:text-lime-300" /><h2 className="mt-4 text-xl font-extrabold text-slate-800 dark:text-white">{title}</h2><p className="mt-2 min-h-12 text-sm leading-6 text-slate-500 dark:text-emerald-200">{text}</p><button type="button" onClick={onClick} className="mt-4 inline-flex min-h-11 items-center text-fluid-sm font-bold text-emerald-700 dark:text-lime-300">{action}</button></article>; }
 function Empty({ text }: { text: string }) { return <div className="mt-5 rounded-2xl bg-slate-50 p-5 text-sm text-slate-500 dark:bg-emerald-900/40 dark:text-emerald-200">{text}</div>; }
 function InfoField({ label, value, editing, onChange, type = "text", multiline = false }: { label: string; value: string; editing: boolean; onChange: (value: string) => void; type?: string; multiline?: boolean }) { return <label className={`block rounded-2xl bg-emerald-50 p-4 text-sm font-bold text-slate-700 dark:bg-emerald-900/40 dark:text-emerald-50 ${multiline ? "sm:col-span-2" : ""}`}><span className="text-xs text-slate-500 dark:text-emerald-200">{label}</span>{editing ? multiline ? <textarea value={value} onChange={(event) => onChange(event.target.value)} rows={3} className="mt-2 w-full rounded-xl border border-emerald-200 bg-white p-2.5 font-normal outline-none focus:border-emerald-500 dark:border-emerald-700 dark:bg-emerald-950" /> : <input type={type} value={value} onChange={(event) => onChange(event.target.value)} className="mt-2 w-full rounded-xl border border-emerald-200 bg-white px-3 py-2.5 font-normal outline-none focus:border-emerald-500 dark:border-emerald-700 dark:bg-emerald-950" /> : <p className="mt-2 font-bold">{value || "—"}</p>}</label>; }

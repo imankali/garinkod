@@ -26,6 +26,7 @@ import SharePanel from '../components/SharePanel';
 import { articlesApi } from '../api/services';
 import { formatPrice } from '../utils/formatPrice';
 import { cn } from '../utils/cn';
+import PageLoader from '../components/ui/PageLoader';
 
 const FALLBACK_IMAGE = '/images/hero-farm.jpg';
 
@@ -77,9 +78,7 @@ export default function ArticlePage() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-[50dvh] items-center justify-center">
-        <div className="h-12 w-12 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" />
-      </div>
+      <PageLoader label="در حال بارگذاری مطلب…" />
     );
   }
 

@@ -16,6 +16,7 @@ import {
   ArrowLeft,
   BadgeCheck,
   FileText,
+  FileWarning,
   Gift,
   LifeBuoy,
   RotateCcw,
@@ -27,6 +28,7 @@ import {
 
 import { legalApi } from '../api/services';
 import { useSiteContact } from '../hooks/useSiteContact';
+import EmptyState from '../components/ui/EmptyState';
 import type { LegalDocumentSummary } from '@/types/content';
 
 const ICONS: Record<string, typeof FileText> = {
@@ -59,22 +61,34 @@ export default function LegalHub() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-[50dvh] items-center justify-center">
-        <div className="h-12 w-12 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" />
+      <div
+        role="status"
+        aria-busy="true"
+        className="flex min-h-[50dvh] flex-col items-center justify-center gap-3"
+      >
+        <div aria-hidden="true" className="h-12 w-12 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" />
+        <span className="text-fluid-xs font-bold text-slate-500 dark:text-emerald-200">در حال باز کردن فهرست اسناد…</span>
       </div>
     );
   }
 
   if (isError || !data) {
     return (
-      <div className="page-shell flex min-h-[50dvh] flex-col items-center justify-center py-16 text-center">
-        <h1 className="text-fluid-xl font-extrabold text-slate-800 dark:text-white">فهرست اسناد باز نشد</h1>
-        <p className="mt-3 max-w-md text-fluid-sm leading-7 text-slate-500 dark:text-emerald-200">
-          یک بار دیگر تلاش کنید؛ اگر ادامه داشت، از صفحه پشتیبانی به ما خبر دهید.
-        </p>
-        <Link to="/support" className="mt-6 rounded-xl bg-emerald-600 px-5 py-3 text-fluid-sm font-bold text-white">
-          پشتیبانی
-        </Link>
+      <div className="page-shell flex min-h-[50dvh] flex-col items-center justify-center py-16">
+        <h1 className="sr-only">فهرست اسناد حقوقی باز نشد</h1>
+        <EmptyState
+          icon={FileWarning}
+          title="فهرست اسناد باز نشد"
+          description="یک بار دیگر تلاش کنید؛ اگر ادامه داشت، از صفحه پشتیبانی به ما خبر دهید."
+          action={
+            <Link
+              to="/support"
+              className="inline-flex min-h-11 items-center rounded-xl bg-emerald-600 px-5 text-fluid-sm font-bold text-white"
+            >
+              پشتیبانی
+            </Link>
+          }
+        />
       </div>
     );
   }

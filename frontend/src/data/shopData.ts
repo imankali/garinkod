@@ -1,6 +1,6 @@
 // frontend/src/data/shopData.ts
-// ✅ داده‌های استاتیک برای UI (دسته‌بندی‌ها، محصولات نمونه، و غیره)
-// ✅ این فایل فقط داده دارد، نه interface (interfaces در types/index.ts هستند)
+// داده‌های استاتیک برای UI (دسته‌بندی‌ها، محصولات نمونه، و غیره)
+// این فایل فقط داده دارد، نه interface (interfaces در types/index.ts هستند)
 
 import type { LucideIcon } from "lucide-react";
 import { Bug, Sprout, Wheat, Tractor, Droplets, Shovel } from "lucide-react";

@@ -26,7 +26,7 @@ const SPRING = { type: "spring", damping: 28, stiffness: 320, mass: 0.6 } as con
 const SPRING_SOFT = { type: "spring", damping: 22, stiffness: 260 } as const;
 
 // ========================================
-// ✅ Animated Number - انیمیشن flip برای تغییر عدد
+// Animated Number - انیمیشن flip برای تغییر عدد
 // ========================================
 const AnimatedCount = memo(function AnimatedCount({ value }: { value: number }) {
   return (
@@ -47,7 +47,7 @@ const AnimatedCount = memo(function AnimatedCount({ value }: { value: number }) 
 });
 
 // ========================================
-// ✅ Cart Button - خارج از Header تا remount نشود
+// Cart Button - خارج از Header تا remount نشود
 // ========================================
 interface CartButtonProps {
   mobile?: boolean;
@@ -68,6 +68,7 @@ const CartButton = memo(function CartButton({
 
   return (
     <motion.button
+      type="button"
       id={mobile ? "cart-icon-target-mobile" : "cart-icon-target"}
       onClick={onOpen}
       whileHover={prefersReducedMotion ? undefined : { scale: 1.05, y: -1 }}
@@ -128,7 +129,7 @@ const CartButton = memo(function CartButton({
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0, opacity: 0 }}
               transition={{ ...SPRING_SOFT, damping: 15 }}
-              className={`absolute flex items-center justify-center rounded-full bg-white font-bold text-[#15803d] shadow ring-2 ring-emerald-500/20 ${
+              className={`absolute flex items-center justify-center rounded-full bg-white font-bold text-green-700 shadow ring-2 ring-emerald-500/20 ${
                 mobile
                   ? "-end-2 -top-2.5 h-4 min-w-4 px-0.5 text-fluid-2xs"
                   : "-end-2 -top-2.5 h-4 min-w-4 px-0.5 text-fluid-2xs sm:-end-2.5 sm:-top-3 sm:h-5 sm:min-w-5 sm:text-fluid-2xs"
@@ -151,7 +152,7 @@ const CartButton = memo(function CartButton({
 });
 
 // ========================================
-// ✅ Icon Button قابل استفاده مجدد
+// Icon Button قابل استفاده مجدد
 // ========================================
 const IconButton = memo(function IconButton({
   onClick,
@@ -169,6 +170,7 @@ const IconButton = memo(function IconButton({
   const prefersReducedMotion = useReducedMotion();
   return (
     <motion.button
+      type="button"
       onClick={onClick}
       whileHover={
         prefersReducedMotion
@@ -201,7 +203,7 @@ interface HeaderProps {
 }
 
 // ========================================
-// 🎯 Header Component
+// Header Component
 // ========================================
 export default function Header({
   cartOpen,
@@ -225,7 +227,7 @@ export default function Header({
   const headerRef = useRef<HTMLElement>(null);
 
   // ========================================
-  // ✅ ارتفاع واقعی هدر را در --header-height منتشر می‌کنیم.
+  // ارتفاع واقعی هدر را در --header-height منتشر می‌کنیم.
   //    هدر sticky است و ارتفاعش با اسکرول و اندازه صفحه تغییر می‌کند؛ بدون این
   //    مقدار، نوارهای sticky داخل صفحه و پرش به لنگرها زیر هدر پنهان می‌شدند.
   // ========================================
@@ -250,7 +252,7 @@ export default function Header({
     };
   }, []);
 
-  // ✨ نوار پیشرفت اسکرول
+  // نوار پیشرفت اسکرول
   const { scrollYProgress } = useScroll();
   const progressScaleX = useSpring(scrollYProgress, {
     stiffness: 120,
@@ -259,7 +261,7 @@ export default function Header({
   });
 
   // ========================================
-  // ✅ هدر هوشمند — جهت اسکرول:
+  // هدر هوشمند — جهت اسکرول:
   //    اسکرول به پایین → فقط ردیف اصلی (لوگو/جستجو/سبد) چسبان می‌ماند و
   //    نوار اعلان، جستجوی موبایل و ناوبری دسکتاپ جمع می‌شوند؛
   //    اولین اسکرول رو به بالا همه برمی‌گردند. بالای صفحه همیشه هدر کامل است.
@@ -272,7 +274,7 @@ export default function Header({
   });
 
   // ========================================
-  // ✅ Bump فقط هنگام «افزایش» تعداد (نه حذف آیتم)
+  // Bump فقط هنگام «افزایش» تعداد (نه حذف آیتم)
   // ========================================
   useEffect(() => {
     if (cartCount > prevCountRef.current) {
@@ -310,7 +312,7 @@ export default function Header({
         </AnimatePresence>
 
         <div
-          className={`relative border-b border-emerald-100/70 bg-white/90 backdrop-blur-xl transition-shadow duration-300 dark:border-emerald-900/50 dark:bg-[#052e22]/90 ${
+          className={`relative border-b border-emerald-100/70 bg-white/90 backdrop-blur-xl transition-shadow duration-300 dark:border-emerald-900/50 dark:bg-ink-deep/90 ${
             scrolled ? "shadow-lg shadow-emerald-900/8" : ""
           }`}
         >
@@ -335,13 +337,14 @@ export default function Header({
               scrolled ? "py-2 sm:py-2.5" : "py-2.5 sm:py-3 md:py-3.5"
             }`}
           >
-            {/* ✅ Menu Toggle - آیکون morph بین Menu و X */}
+            {/* Menu Toggle - آیکون morph بین Menu و X */}
             <motion.button
+      type="button"
               onClick={() => onMobileOpenChange(!mobileOpen)}
               whileHover={prefersReducedMotion ? undefined : { scale: 1.05 }}
               whileTap={{ scale: 0.92 }}
               transition={SPRING}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-[#15803d] transition-colors hover:bg-emerald-100 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-green-700 transition-colors hover:bg-emerald-100 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300"
               aria-label={mobileOpen ? t("header.closeMenu") : t("header.openMenu")}
               aria-expanded={mobileOpen}
               aria-controls="mobile-menu"
@@ -421,7 +424,7 @@ export default function Header({
             </div>
           </div>
 
-          {/* ✅ Mobile Search — collapses with the header on scroll-down. */}
+          {/* Mobile Search — collapses with the header on scroll-down. */}
           <AnimatePresence initial={false}>
             {!headerCollapsed && (
               <motion.div
@@ -459,7 +462,7 @@ export default function Header({
             )}
           </AnimatePresence>
 
-          {/* ✨ نوار پیشرفت اسکرول */}
+          {/* نوار پیشرفت اسکرول */}
           <motion.div
             aria-hidden="true"
             style={{ scaleX: progressScaleX, transformOrigin: "right" }}

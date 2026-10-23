@@ -63,10 +63,10 @@ const POLL_MS = 4000;
 function quoteSummary(quote: QuotedMessage, t: (key: string) => string): string {
   if (quote.is_deleted) return t('direct.deleted');
   if (quote.body) return quote.body;
-  if (quote.attachment_type === 'image') return '🖼 تصویر';
-  if (quote.attachment_type === 'video') return '🎬 ویدیو';
-  if (quote.attachment_type === 'audio') return '🎤 پیام صوتی';
-  if (quote.listing_title) return `📦 ${quote.listing_title}`;
+  if (quote.attachment_type === 'image') return 'تصویر';
+  if (quote.attachment_type === 'video') return 'ویدیو';
+  if (quote.attachment_type === 'audio') return 'پیام صوتی';
+  if (quote.listing_title) return `آگهی: ${quote.listing_title}`;
   return '';
 }
 
@@ -625,7 +625,7 @@ export default function DirectThread({
             type="button"
             onClick={closeDirect}
             aria-label={t('common.close')}
-            className="-me-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-slate-400 transition hover:bg-emerald-50 hover:text-slate-600 dark:hover:bg-emerald-900 dark:hover:text-emerald-100"
+            className="tap-target -me-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-slate-400 transition hover:bg-emerald-50 hover:text-slate-600 dark:hover:bg-emerald-900 dark:hover:text-emerald-100"
           >
             <X size={16} />
           </button>
@@ -788,7 +788,7 @@ export default function DirectThread({
             <button
               type="button"
               onClick={() => attachListing(null)}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-white hover:text-rose-500 dark:hover:bg-emerald-950"
+              className="tap-target flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-white hover:text-rose-500 dark:hover:bg-emerald-950"
               aria-label={t('common.cancel')}
             >
               <X size={14} />
@@ -826,7 +826,7 @@ export default function DirectThread({
             <button
               type="button"
               onClick={clearPendingMedia}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-white hover:text-rose-500 dark:hover:bg-emerald-950"
+              className="tap-target flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-white hover:text-rose-500 dark:hover:bg-emerald-950"
               aria-label={t('common.cancel')}
             >
               <X size={14} />
@@ -1357,7 +1357,7 @@ function ComposerBanner({
         <button
           type="button"
           onClick={onCancel}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-white hover:text-rose-500 dark:hover:bg-emerald-950"
+          className="tap-target flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-white hover:text-rose-500 dark:hover:bg-emerald-950"
           aria-label={cancelLabel}
         >
           <X size={14} />

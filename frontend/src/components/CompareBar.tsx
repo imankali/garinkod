@@ -22,7 +22,7 @@ const MAX_COMPARE_ITEMS = 3;
 
 // ========================================
 // CompareBar Component
-// ✅ نوار مقایسه محصولات در پایین صفحه
+// نوار مقایسه محصولات در پایین صفحه
 // ========================================
 export default function CompareBar({
   items,
@@ -70,7 +70,7 @@ export default function CompareBar({
                       }}
                     />
                     {/* Remove Button */}
-                    <button
+                    <button type="button"
                       onClick={() => onRemove(item.id)}
                       className="absolute -end-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-white shadow-md transition-transform hover:scale-110"
                       aria-label={`حذف ${item.name} از مقایسه`}
@@ -98,7 +98,7 @@ export default function CompareBar({
             {/* ======================================== */}
             <div className="ms-auto flex shrink-0 items-center gap-2">
               {/* Clear Button */}
-              <button
+              <button type="button"
                 onClick={onClear}
                 className="text-xs text-slate-400 hover:text-rose-500 dark:text-emerald-400 dark:hover:text-rose-400"
                 aria-label="پاک کردن همه از مقایسه"
@@ -108,6 +108,7 @@ export default function CompareBar({
 
               {/* Compare Button */}
               <motion.button
+      type="button"
                 whileHover={{ scale: items.length >= 2 ? 1.04 : 1 }}
                 whileTap={{ scale: items.length >= 2 ? 0.96 : 1 }}
                 disabled={items.length < 2}

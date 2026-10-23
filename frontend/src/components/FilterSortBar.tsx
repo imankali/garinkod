@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowDownWideNarrow, Check, PackageCheck, SlidersHorizontal, X } from "lucide-react";
 import { categoriesApi } from "../api/services";
 import type { Category } from '@/types/shop';
+import { useDragToScroll } from '../hooks/useDragToScroll';
 
 // ========================================
 // Types
@@ -61,6 +62,9 @@ export default function FilterSortBar({
   className,
 }: FilterSortBarProps) {
   const showCategories = typeof onCategoryChange === 'function';
+  // Category chips: mouse-draggable like the rest of the site's rails. The
+  // hook also fades the cut-off edge so it is obvious the row continues.
+  const categoryRail = useDragToScroll<HTMLDivElement>();
   /**
    * Only one of the two panels is ever open.
    *
@@ -125,8 +129,13 @@ export default function FilterSortBar({
       {/* Category Chips */}
       {/* ======================================== */}
       {showCategories && (
-      <div className="no-scrollbar mb-4 flex items-center gap-2 overflow-x-auto pb-1">
+      <div
+        ref={categoryRail.ref}
+        {...categoryRail.handlers}
+        className="no-scrollbar mb-4 flex items-center gap-2 overflow-x-auto pb-1"
+      >
         <motion.button
+      type="button"
           whileTap={{ scale: 0.95 }}
           onClick={() => onCategoryChange("all")}
           className={`flex min-h-11 shrink-0 items-center rounded-full px-4 text-xs font-semibold transition-all ${
@@ -139,13 +148,14 @@ export default function FilterSortBar({
         </motion.button>
 
         {categoriesLoading ? (
-          <div className="flex items-center gap-2 px-4 py-2">
-            <div className="h-4 w-4 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent"></div>
-            <span className="text-xs text-slate-400">در حال بارگذاری...</span>
+          <div role="status" aria-busy="true" className="flex items-center gap-2 px-4 py-2">
+            <div aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent"></div>
+            <span className="text-xs text-slate-500 dark:text-emerald-200">در حال بارگذاری دسته‌ها…</span>
           </div>
         ) : (
           categories.map((cat) => (
             <motion.button
+      type="button"
               key={cat.slug}
               whileTap={{ scale: 0.95 }}
               onClick={() => onCategoryChange(cat.slug)}
@@ -176,7 +186,7 @@ export default function FilterSortBar({
           className={`text-xs text-slate-400 transition-opacity dark:text-emerald-300 ${loading ? "opacity-50" : ""}`}
           aria-live="polite"
         >
-          <span className="font-bold text-[#15803d] dark:text-lime-300">
+          <span className="font-bold text-green-700 dark:text-lime-300">
             {resultsCount.toLocaleString("fa-IR")}
           </span>{" "}
           محصول یافت شد
@@ -185,12 +195,13 @@ export default function FilterSortBar({
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-2">
           {/* Filters Button */}
           <motion.button
+      type="button"
             whileTap={{ scale: 0.95 }}
             onClick={() => togglePanel("filters")}
             className={`relative flex min-h-11 items-center gap-1.5 rounded-xl px-3.5 text-xs font-semibold transition-colors ${
               showFilters
-                ? "bg-[#15803d] text-white"
-                : "bg-emerald-50 text-[#15803d] hover:bg-emerald-100 dark:bg-emerald-900 dark:text-lime-300"
+                ? "bg-green-700 text-white"
+                : "bg-emerald-50 text-green-700 hover:bg-emerald-100 dark:bg-emerald-900 dark:text-lime-300"
             }`}
             aria-label="فیلترها"
           >
@@ -209,6 +220,7 @@ export default function FilterSortBar({
           <div className="relative">
             {/* Sort Trigger Button (با آیکون فلش) */}
             <motion.button
+      type="button"
               whileTap={{ scale: 0.95 }}
               onClick={() => togglePanel("sort")}
               className="flex min-h-11 w-full items-center justify-between gap-2 rounded-xl bg-slate-50 px-3 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100 dark:bg-emerald-900 dark:text-emerald-100 dark:hover:bg-emerald-800 sm:w-auto sm:justify-start"
@@ -259,18 +271,18 @@ export default function FilterSortBar({
                   >
                     <div className="p-1">
                       {sortOptions.map((opt) => (
-                        <button
+                        <button type="button"
                           key={opt.id}
                           onClick={() => handleSortSelect(opt.id)}
                           className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-start text-sm font-semibold transition-colors ${
                             sort === opt.id
-                              ? "bg-emerald-50 text-[#15803d] dark:bg-emerald-800 dark:text-lime-300"
+                              ? "bg-emerald-50 text-green-700 dark:bg-emerald-800 dark:text-lime-300"
                               : "text-slate-700 hover:bg-slate-50 dark:text-emerald-100 dark:hover:bg-emerald-800"
                           }`}
                         >
                           <span>{opt.label}</span>
                           {sort === opt.id && (
-                            <Check size={16} className="text-[#15803d] dark:text-lime-300" />
+                            <Check size={16} className="text-green-700 dark:text-lime-300" />
                           )}
                         </button>
                       ))}
@@ -309,7 +321,7 @@ export default function FilterSortBar({
                       حذف همه فیلترها
                     </button>
                   )}
-                <button
+                <button type="button"
                   onClick={() => setPanel("none")}
                   className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-400 hover:text-rose-500 dark:bg-emerald-950"
                   aria-label="بستن فیلترها"
@@ -323,7 +335,7 @@ export default function FilterSortBar({
               <div>
                 <div className="mb-2 flex items-center justify-between text-xs font-semibold text-slate-600 dark:text-emerald-200">
                   <span>حداکثر قیمت</span>
-                  <span className="text-[#15803d] dark:text-lime-300">
+                  <span className="text-green-700 dark:text-lime-300">
                     {priceLimit.toLocaleString("fa-IR")} تومان
                   </span>
                 </div>
@@ -336,16 +348,16 @@ export default function FilterSortBar({
                   aria-label="حداکثر قیمت"
                   aria-valuetext={`${priceLimit.toLocaleString('fa-IR')} تومان`}
                   onChange={(e) => onPriceLimitChange(Number(e.target.value))}
-                  className="h-2 w-full cursor-pointer appearance-none rounded-full bg-emerald-200 accent-[#15803d] dark:bg-emerald-800"
+                  className="h-2 w-full cursor-pointer appearance-none rounded-full bg-emerald-200 accent-green-700 dark:bg-emerald-800"
                 />
               </div>
 
               {/* In Stock Only */}
-              <button
+              <button type="button"
                 onClick={() => onInStockChange(!inStockOnly)}
                 className={`flex min-h-11 items-center gap-1.5 rounded-full px-3.5 text-xs font-semibold transition-colors ${
                   inStockOnly
-                    ? "bg-[#15803d] text-white"
+                    ? "bg-green-700 text-white"
                     : "bg-white text-slate-600 ring-1 ring-slate-200 dark:bg-emerald-900 dark:text-emerald-300 dark:ring-emerald-700"
                 }`}
                 aria-label="فقط کالای موجود"

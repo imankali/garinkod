@@ -1,6 +1,16 @@
 // frontend/src/components/CropSelector.tsx
 
 import { motion } from "framer-motion";
+import {
+  Cherry,
+  Citrus,
+  LayoutGrid,
+  Leaf,
+  Nut,
+  Sprout,
+  Wheat,
+  type LucideIcon,
+} from "lucide-react";
 
 // ========================================
 // Types
@@ -8,7 +18,8 @@ import { motion } from "framer-motion";
 interface Crop {
   id: string;
   label: string;
-  emoji: string;
+  /** A crisp vector glyph; emoji looked different on every OS and read aloud. */
+  icon: LucideIcon;
 }
 
 interface CropSelectorProps {
@@ -20,17 +31,17 @@ interface CropSelectorProps {
 // Constants
 // ========================================
 const CROPS: Crop[] = [
-  { id: "wheat", label: "گندم", emoji: "🌾" },
-  { id: "pistachio", label: "پسته", emoji: " " },
-  { id: "rice", label: "برنج", emoji: "🍚" },
-  { id: "tomato", label: "گوجه‌فرنگی", emoji: "🍅" },
-  { id: "cucumber", label: "خیار گلخانه‌ای", emoji: "🥒" },
-  { id: "citrus", label: "باغ مرکبات", emoji: "🍊" },
+  { id: "wheat", label: "گندم", icon: Wheat },
+  { id: "pistachio", label: "پسته", icon: Nut },
+  { id: "rice", label: "برنج", icon: Sprout },
+  { id: "tomato", label: "گوجه‌فرنگی", icon: Cherry },
+  { id: "cucumber", label: "خیار گلخانه‌ای", icon: Leaf },
+  { id: "citrus", label: "باغ مرکبات", icon: Citrus },
 ];
 
 // ========================================
 // CropSelector Component
-// ✅ انتخاب محصول کشاورزی برای فیلتر محصولات
+// انتخاب محصول کشاورزی برای فیلتر محصولات
 // ========================================
 export default function CropSelector({ activeCrop, onSelectCrop }: CropSelectorProps) {
   return (
@@ -45,7 +56,7 @@ export default function CropSelector({ activeCrop, onSelectCrop }: CropSelectorP
         transition={{ duration: 0.5 }}
         className="mb-6 text-center"
       >
-        <p className="mb-1 text-xs font-bold text-[#15803d] dark:text-lime-300">
+        <p className="mb-1 text-xs font-bold text-green-700 dark:text-lime-300">
           پیشنهاد هوشمند
         </p>
         <h2 className="text-2xl font-extrabold text-slate-800 dark:text-white md:text-3xl">
@@ -62,6 +73,7 @@ export default function CropSelector({ activeCrop, onSelectCrop }: CropSelectorP
       <div className="flex flex-wrap justify-center gap-3">
         {/* All Crops Button */}
         <motion.button
+          type="button"
           initial={{ opacity: 0, scale: 0.85 }}
           whileInView={{ opacity: 1, scale: 1 }}
           viewport={{ once: true }}
@@ -76,12 +88,14 @@ export default function CropSelector({ activeCrop, onSelectCrop }: CropSelectorP
           aria-pressed={activeCrop === null}
           aria-label="نمایش همه محصولات"
         >
-           همه محصولات
+          <LayoutGrid size={18} aria-hidden="true" />
+          همه محصولات
         </motion.button>
 
         {/* Individual Crop Buttons */}
         {CROPS.map((crop, idx) => (
           <motion.button
+            type="button"
             key={crop.id}
             initial={{ opacity: 0, scale: 0.85 }}
             whileInView={{ opacity: 1, scale: 1 }}
@@ -98,7 +112,7 @@ export default function CropSelector({ activeCrop, onSelectCrop }: CropSelectorP
             aria-pressed={activeCrop === crop.id}
             aria-label={`فیلتر محصولات ${crop.label}`}
           >
-            <span className="text-lg">{crop.emoji}</span>
+            <crop.icon size={18} aria-hidden="true" />
             {crop.label}
           </motion.button>
         ))}

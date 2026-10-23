@@ -6,6 +6,7 @@
 //   • farmers — the directory with each farmer's full dossier: profile, every
 //     land, every calendar, every request
 
+import EmptyState from '../components/ui/EmptyState';
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import {
@@ -21,6 +22,7 @@ import { cn } from '../utils/cn';
 import { useDirectStore } from '../store/directStore';
 import type { ConsultantFarmerDossier, ConsultantFarmerSummary, FarmCalendarEvent, FarmConsultationRequest, FarmEventKind, FarmLand } from '@/types/farming';
 import { EVENT_KINDS, formatFaDate } from '../components/farm/farmOptions';
+import LandTypeGlyph from '../components/farm/LandTypeGlyph';
 
 type View = 'requests' | 'farmers';
 
@@ -28,7 +30,7 @@ export default function Farmers() {
   const [view, setView] = useState<View>('requests');
 
   return (
-    <main className="mx-auto max-w-7xl px-[var(--page-gutter)] py-6 md:py-8">
+    <div className="mx-auto max-w-7xl px-[var(--page-gutter)] py-6 md:py-8">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-xl font-extrabold text-slate-800 dark:text-white md:text-2xl">
@@ -65,7 +67,7 @@ export default function Farmers() {
       </header>
 
       {view === 'requests' ? <RequestsView /> : <FarmersDirectory />}
-    </main>
+    </div>
   );
 }
 
@@ -236,7 +238,7 @@ function RequestWorkspace({
         <button
           type="button"
           onClick={onBack}
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 lg:hidden dark:hover:bg-emerald-900"
+          className="tap-target flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 lg:hidden dark:hover:bg-emerald-900"
           aria-label={t('common.back')}
         >
           <ArrowRight size={15} />
@@ -426,9 +428,17 @@ function FarmersDirectory() {
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-2.5">
           {loading ? (
-            <p className="py-10 text-center text-xs text-slate-400">{t('common.loading')}</p>
+            <p role="status" aria-busy="true" className="py-10 text-center text-xs text-slate-400">
+              {t('common.loading')}
+            </p>
           ) : farmers.length === 0 ? (
-            <p className="py-10 text-center text-xs text-slate-400">کشاورزی یافت نشد.</p>
+            <EmptyState
+              icon={Users}
+              compact
+              title="کشاورزی با این مشخصات پیدا نشد"
+              description="عبارت جستجو را کوتاه‌تر کنید یا فیلتر استان را بردارید."
+              className="m-2 border-0 bg-transparent dark:bg-transparent"
+            />
           ) : (
             <ul className="space-y-2">
               {farmers.map((farmer) => (
@@ -579,7 +589,7 @@ function LandDossierCard({ land }: { land: FarmLand & { events: FarmCalendarEven
     <section className="mt-3 rounded-2xl border border-emerald-100 bg-white p-3.5 dark:border-emerald-900 dark:bg-emerald-950">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h4 className="flex items-center gap-2 text-xs font-extrabold text-slate-800 dark:text-white">
-          <span>{land.land_type === 'orchard' ? '🌳' : land.land_type === 'greenhouse' ? '🏡' : '🌾'}</span>
+          <LandTypeGlyph landType={land.land_type} size={18} className="text-emerald-600 dark:text-lime-300" />
           {land.name}
           <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-fluid-2xs font-bold text-emerald-700 dark:bg-emerald-900 dark:text-lime-300">
             {land.land_type_label}

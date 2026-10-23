@@ -22,6 +22,7 @@ import ChannelChips, { type ChannelFilter } from './ChannelChips';
 import ConversationRow from './ConversationRow';
 import DeskEntries from './DeskEntries';
 import DirectThread from './DirectThread';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 
 const LIST_POLL_MS = 10000;
 
@@ -38,6 +39,10 @@ export default function DirectMessagesDrawer() {
     setUnreadTotal,
     closeDirect,
   } = useDirectStore();
+
+  // Focus is trapped inside the drawer and Escape closes it through the same
+  // action as the back button, so the store stays the only source of truth.
+  const panelRef = useFocusTrap<HTMLDivElement>(open, { onEscape: closeDirect });
 
   const [conversations, setConversations] = useState<StorefrontConversation[]>([]);
   const [channels, setChannels] = useState<{ value: MessageChannel; label: string }[]>([]);
@@ -165,6 +170,7 @@ export default function DirectMessagesDrawer() {
             // is where the menu and the thumb both are on a Persian layout.
             initial={{ x: slideOffset }}
             animate={{ x: 0 }}
+            ref={panelRef}
             exit={{ x: slideOffset }}
             transition={{ type: 'spring', damping: 30, stiffness: 300 }}
             // 100dvh (not the drawer's implicit 100vh) keeps the composer

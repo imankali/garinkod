@@ -36,6 +36,18 @@
 @theme {
   --color-emerald-600: #047857;
   --color-slate-400: #67778f;
+
+  /* Dark "ink" surfaces. These four values were typed as arbitrary classes in
+     a dozen components (bg-[#08392a], via-[#052e22], …), which is how a brand
+     colour drifts: nobody can find the palette, and one surface quietly ends up
+     a shade off. Named here once, they are now the only dark canvases in the
+     app, and `uiStandards.test.ts` refuses new arbitrary hex classes.
+     #062d21 and #06301f differ from ink-deep by at most one step per channel,
+     so they collapse into it instead of becoming tokens of their own. */
+  --color-ink-deep: #052e22;
+  --color-ink: #08392a;
+  --color-ink-olive: #1a2e15;
+  --color-parchment: #f8faf6;
 }
 
 .dark {
@@ -154,6 +166,11 @@ html {
   -webkit-text-size-adjust: 100%;
   -ms-text-size-adjust: 100%;
   scroll-padding-top: var(--header-height);
+  /* Reserve the scrollbar's width in both states: routes whose content is
+     shorter than the viewport used to lose the gutter, shifting the centred
+     header and every page by ~10px on navigation — the "header jumps" report
+     that kept coming back. */
+  scrollbar-gutter: stable;
 }
 
 body {
@@ -276,36 +293,118 @@ body {
 }
 
 /*
- * Horizontal rails (home panels, similar products, guides). Setting the
- * standard `scrollbar-*` properties alone would make Chromium ignore the
- * site-wide ::-webkit-scrollbar theming above and fall back to the OS
- * scrollbar — arrows and all. Both layers are declared together so the rail
- * gets a slim, emerald-themed bar in every engine.
+ * Horizontal rails (home panels, similar products, guides).
+ *
+ * The bar is hidden, not disabled: a rail is already operable four ways — drag
+ * with the mouse, pan on touch, wheel/trackpad, and ←/→/Home/End from the
+ * keyboard — and the edge fade plus the overflow marker say "there is more on
+ * that side". The scrollbar sat under every rail as a permanent grey strip on
+ * a design that has no other visible chrome, and on Windows it was the widest
+ * element in the row.
+ *
+ * `scrollbar-width: none` covers Firefox and Chromium 121+; the
+ * `::-webkit-scrollbar` rule covers older WebKit, where the site-wide themed
+ * scrollbar would otherwise be drawn instead.
  */
 .rail-scroll {
-  scrollbar-width: thin;
-  scrollbar-color: #22c55e transparent;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 .rail-scroll::-webkit-scrollbar {
-  height: 8px;
+  display: none;
+  width: 0;
+  height: 0;
 }
 
-.rail-scroll::-webkit-scrollbar-track {
-  background: transparent;
+/*
+ * Rail card width — one definition for every horizontal product rail on the
+ * site (home panels, department rails, storefront listings, similar products).
+ *
+ * These used to be typed per call site (w-[46%] sm:w-[30%] lg:w-[23%] in five
+ * files, and each one could drift). The widths are set here so a card is the
+ * same physical size wherever it appears: ~150px on a phone, ~250px on a
+ * laptop. They are deliberately narrower than the old values so the next card
+ * is always half-visible — the rail says "there is more" without a scrollbar
+ * and without an arrow.
+ */
+.rail-card {
+  flex: 0 0 auto;
+  width: 42%;
+  min-width: 0;
+  scroll-snap-align: start;
 }
 
-.rail-scroll::-webkit-scrollbar-thumb {
-  background: linear-gradient(90deg, #22c55e, #84cc16);
-  border-radius: 999px;
+@media (min-width: 640px) {
+  .rail-card {
+    width: 27%;
+  }
 }
 
-.dark .rail-scroll {
-  scrollbar-color: #34d399 #0a3d2e;
+@media (min-width: 1024px) {
+  .rail-card {
+    width: 20%;
+  }
 }
 
-.dark .rail-scroll::-webkit-scrollbar-track {
-  background: #0a3d2e;
+/*
+ * Draggable rails — edge affordance
+ * useDragToScroll marks every rail it drives with data-overflow plus the
+ * physical data-edge-left/right flags. The flags exist so a rail can show
+ * that content is cut off (a soft fade on that side) and only offer the grab
+ * cursor when a drag would actually move something.
+ */
+@property --gk-rail-fade-left {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --gk-rail-fade-right {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+[data-drag-scroll] {
+  --gk-rail-fade-left: 0px;
+  --gk-rail-fade-right: 0px;
+  transition:
+    --gk-rail-fade-left 220ms ease,
+    --gk-rail-fade-right 220ms ease;
+}
+
+[data-drag-scroll][data-overflow='1'] {
+  cursor: grab;
+  -webkit-mask-image: linear-gradient(
+    to left,
+    transparent 0,
+    #000 var(--gk-rail-fade-left),
+    #000 calc(100% - var(--gk-rail-fade-right)),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to left,
+    transparent 0,
+    #000 var(--gk-rail-fade-left),
+    #000 calc(100% - var(--gk-rail-fade-right)),
+    transparent 100%
+  );
+}
+
+[data-drag-scroll][data-edge-left='1'] {
+  --gk-rail-fade-left: 28px;
+}
+
+[data-drag-scroll][data-edge-right='1'] {
+  --gk-rail-fade-right: 28px;
+}
+
+/* A native HTML5 drag on a card image or link would cancel the pointer
+ * stream mid-pan; the rail drag owns that gesture instead. */
+[data-drag-scroll] img,
+[data-drag-scroll] a {
+  -webkit-user-drag: none;
 }
 
 /* ========================================
@@ -376,6 +475,50 @@ body {
  * ======================================== */
 button, a, input, select, textarea {
   transition: all var(--transition-base);
+}
+
+/*
+ * Affordance and typographic polish — three tokens the ui-ux-pro-max
+ * pre-delivery checklist asks for that this stylesheet was missing.
+ *
+ * 1. Cursor. Tailwind v4's preflight leaves <button> on the UA's default
+ *    cursor, so every non-anchor control on the site — the cart button, the
+ *    rail arrows, the quantity stepper — rendered with a text/arrow cursor and
+ *    read as "not clickable" to anyone testing with a mouse.
+ * 2. Wrapping. `balance` on headings stops a two-line title from leaving one
+ *    orphan word on the second line; `pretty` on body copy does the same for
+ *    paragraphs and list items without changing the measure.
+ * 3. Selection. The browser default selection colour is the OS accent, which
+ *    lands as a blue-grey block on this palette. The brand tint keeps selected
+ *    text legible and on-brand.
+ */
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+summary {
+  cursor: pointer;
+}
+
+button:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+h1, h2, h3 {
+  text-wrap: balance;
+}
+
+p, li, dd, figcaption {
+  text-wrap: pretty;
+}
+
+::selection {
+  background: #bbf7d0;
+  color: #052e22;
+}
+
+.dark ::selection {
+  background: #166534;
+  color: #f7fee7;
 }
 
 /* ========================================

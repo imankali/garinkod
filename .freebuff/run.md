@@ -32,3 +32,28 @@
 
 ## ۳) نکته دسترسی گوشی
 - IP وای‌فای واقعی (آداپتور Wi-Fi، نه آداپتورهای مجازی Hyper-V) + پورت 5173؛ قانون فایروال «GarinKood dev 5173» از قبل اضافه شده است.
+
+## ۴) اجرا در کانتینر لینوکسی (همین ورک‌تری)
+
+نکته: بخش‌های بالا برای ویندوز نوشته شده‌اند؛ در این محیط (Linux، bash) این مسیر اجرا شد:
+
+1) آرتیفکت‌ها
+   - `cd frontend && npm install` (وابستگی‌ها داخل `frontend/node_modules`)
+   - محیط پایتون بیرون از مخزن ساخته می‌شود تا snapshot سنگین نشود:
+     `python3 -m venv /tmp/gkvenv && /tmp/gkvenv/bin/pip install -r garinkood/requirements.txt -r garinkood/requirements-dev.txt`
+   - دیتابیس: `cd garinkood` و با
+     `DB_ENGINE=sqlite DEBUG=True SECRET_KEY=django-insecure-local-development-only` دستور
+     `manage.py migrate` (فایل `garinkood/db.sqlite3` ساخته می‌شود و در gitignore است).
+   - داده نمونه: `seed_locations`، `seed_agri_inputs`، `seed_site_content`، `seed_test_catalog`،
+     `seed_demo_marketplace`، `seed_test_community` (به همین ترتیب؛ حساب‌های تستی رمز `demo-12345`).
+
+2) سرورها (هر دو روی `0.0.0.0`)
+   - بک‌اند: از `garinkood/` ←
+     `DB_ENGINE=sqlite DEBUG=True SECRET_KEY=django-insecure-local-development-only /tmp/gkvenv/bin/python manage.py runserver 0.0.0.0:8000 --noreload`
+   - فرانت: از `frontend/` ← `DJANGO_PORT=8000 npm run dev` (پورت ۵۱۷۳، `allowedHosts` شامل `.e2b.app`).
+   - سلامت: `curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/health/live/` = ۲۰۰ و
+     `curl http://127.0.0.1:5173/api/marketplace/storefronts/` باید JSON واقعی بدهد.
+
+3) تست‌ها
+   - `cd frontend && npx tsc --noEmit && CI=true npx vitest run && npm run build`
+   - در این محیط مرورگر Playwright نصب نیست، پس تست e2e/بازبینی چشمی اینجا اجرا نمی‌شود.

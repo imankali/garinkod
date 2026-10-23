@@ -12,6 +12,7 @@
 // published product is a real state of a catalogue, and the page says so and
 // offers the desk instead of inventing stock.
 
+import EmptyState from '../components/ui/EmptyState';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { Helmet } from 'react-helmet-async';
@@ -53,20 +54,20 @@ export default function CatalogLanding({ kind }: { kind: CatalogKind }) {
 
   if (landingQuery.isLoading) {
     return (
-      <main className="mx-auto max-w-7xl px-[var(--page-gutter)] py-10">
+      <div className="mx-auto max-w-7xl px-[var(--page-gutter)] py-10">
         <div className="h-40 animate-pulse rounded-3xl bg-slate-100 dark:bg-emerald-950" />
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[0, 1, 2, 3].map((item) => (
             <div key={item} className="h-72 animate-pulse rounded-3xl bg-slate-100 dark:bg-emerald-950" />
           ))}
         </div>
-      </main>
+      </div>
     );
   }
 
   if (!landing) {
     return (
-      <main className="mx-auto max-w-3xl px-[var(--page-gutter)] py-16 text-center">
+      <div className="mx-auto max-w-3xl px-[var(--page-gutter)] py-16 text-center">
         <PackageSearch size={38} className="mx-auto text-slate-300 dark:text-emerald-800" />
         <h1 className="mt-4 text-xl font-extrabold text-slate-800 dark:text-white">چنین صفحه‌ای در فهرست نداریم</h1>
         <p className="mt-2 text-fluid-sm leading-7 text-slate-500 dark:text-emerald-200">
@@ -76,7 +77,7 @@ export default function CatalogLanding({ kind }: { kind: CatalogKind }) {
           همه محصولات
           <ArrowLeft size={16} />
         </Link>
-      </main>
+      </div>
     );
   }
 
@@ -93,7 +94,7 @@ export default function CatalogLanding({ kind }: { kind: CatalogKind }) {
         <link rel="canonical" href={`${ROUTE_FOR_KIND[kind]}/${slug}`} />
       </Helmet>
 
-      <main className="mx-auto max-w-7xl px-[var(--page-gutter)] py-8 md:py-10">
+      <div className="mx-auto max-w-7xl px-[var(--page-gutter)] py-8 md:py-10">
         <nav aria-label="مسیر دسترسی" className="flex flex-wrap items-center gap-1.5 text-fluid-2xs font-bold text-slate-400">
           {landing.breadcrumb.map((crumb, index) => (
             <span key={`${crumb.url}-${index}`} className="flex items-center gap-1.5">
@@ -206,10 +207,20 @@ export default function CatalogLanding({ kind }: { kind: CatalogKind }) {
           </div>
 
           {empty ? (
-            <p className="mt-4 rounded-2xl border border-dashed border-slate-200 p-6 text-fluid-sm leading-8 text-slate-500 dark:border-emerald-800 dark:text-emerald-200">
-              فعلاً کالای منتشرشده‌ای در این {kind === 'brand' ? 'برند' : 'گروه'} نیست. اگر دنبال کالای خاصی هستید، در
-              میز مشاوره بپرسید؛ تأمین‌کننده‌ها هر هفته فهرست را به‌روز می‌کنند.
-            </p>
+            <EmptyState
+              icon={PackageSearch}
+              title={`فعلاً کالایی در این ${kind === 'brand' ? 'برند' : 'گروه'} منتشر نشده`}
+              description="تأمین‌کننده‌ها هر هفته فهرست را به‌روز می‌کنند؛ اگر کالای مشخصی می‌خواهید، از میز مشاوره بپرسید."
+              action={
+                <Link
+                  to="/support"
+                  className="min-h-11 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-emerald-700"
+                >
+                  پرسش از کارشناس
+                </Link>
+              }
+              className="mt-4"
+            />
           ) : (
             <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {products.map((product, index) => (
@@ -253,7 +264,7 @@ export default function CatalogLanding({ kind }: { kind: CatalogKind }) {
             </ul>
           </section>
         )}
-      </main>
+      </div>
     </>
   );
 }

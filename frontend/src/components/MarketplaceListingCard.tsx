@@ -107,9 +107,9 @@ export default function MarketplaceListingCard({
       viewport={{ once: true, margin: '-60px' }}
       transition={{ delay: (index % 4) * 0.05, duration: 0.35 }}
       whileHover={{ y: -4 }}
-      className="group flex flex-col overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-sm transition-shadow duration-300 hover:shadow-lg hover:shadow-emerald-900/5 dark:border-emerald-900 dark:bg-[#08392a]"
+      className="group flex flex-col overflow-hidden rounded-xl border border-emerald-100 bg-white shadow-sm transition-shadow duration-300 hover:shadow-lg hover:shadow-emerald-900/5 dark:border-emerald-900 dark:bg-ink"
     >
-      <div className="relative aspect-[4/3] overflow-hidden bg-emerald-50 dark:bg-emerald-950">
+      <div className="relative aspect-square overflow-hidden bg-emerald-50 dark:bg-emerald-950">
         <Link
           to={listingHref(listing)}
           className="block h-full w-full"
@@ -207,10 +207,10 @@ export default function MarketplaceListingCard({
         </motion.button>
       </div>
 
-      <div className="flex flex-1 flex-col p-3.5">
+      <div className="flex flex-1 flex-col p-3">
         <Link
           to={listingHref(listing)}
-          className="line-clamp-2 min-h-11 py-1 text-fluid-sm font-extrabold text-slate-800 transition-colors hover:text-emerald-700 dark:text-white dark:hover:text-lime-300"
+          className="line-clamp-2 min-h-10 py-0.5 text-fluid-xs font-extrabold leading-5 text-slate-800 transition-colors hover:text-emerald-700 dark:text-white dark:hover:text-lime-300 sm:text-fluid-sm"
         >
           {listing.title}
         </Link>
@@ -220,8 +220,8 @@ export default function MarketplaceListingCard({
           {listing.category_label || listing.crop_name}
         </p>
 
-        <div className="mt-2.5 flex items-baseline gap-2">
-          <strong className="text-sm font-extrabold text-emerald-700 dark:text-lime-300">
+        <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+          <strong className="text-fluid-xs font-extrabold text-emerald-700 dark:text-lime-300 sm:text-fluid-sm">
             {formatPrice(listing.discounted_price)}
           </strong>
           {discount > 0 && variant === 'default' && (
@@ -230,7 +230,7 @@ export default function MarketplaceListingCard({
           <span className="text-fluid-2xs text-slate-400">/ {listing.unit}</span>
         </div>
 
-        <div className="mt-3 flex gap-2">
+        <div className="mt-2.5 flex gap-1.5">
           {/* Buy — the primary CTA. The 0.97 press sells the click; it is
               gated off when the listing cannot be purchased. */}
           <motion.button
@@ -240,7 +240,7 @@ export default function MarketplaceListingCard({
             whileHover={listing.is_purchasable ? { scale: 1.03 } : {}}
             whileTap={listing.is_purchasable ? { scale: 0.97 } : {}}
             transition={TACTILE}
-            className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-2 text-fluid-xs font-bold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-45"
+            className="flex min-h-11 min-w-0 flex-1 items-center justify-center gap-1 rounded-lg bg-emerald-600 px-2 text-fluid-2xs font-bold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-45 sm:text-fluid-xs"
             aria-label={t('shop.buy')}
           >
             <ShoppingCart size={14} aria-hidden="true" />
@@ -254,7 +254,7 @@ export default function MarketplaceListingCard({
             whileTap={{ scale: 0.94 }}
             transition={TACTILE}
             title={t('storefront.sendToDirectHint')}
-            className="tap-target flex min-h-10 w-10 items-center justify-center rounded-xl border border-emerald-200 text-emerald-700 transition-colors hover:bg-emerald-50 dark:border-emerald-700 dark:text-lime-300 dark:hover:bg-emerald-900"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-emerald-200 text-emerald-700 transition-colors hover:bg-emerald-50 dark:border-emerald-700 dark:text-lime-300 dark:hover:bg-emerald-900"
             aria-label={t('storefront.sendToDirect')}
           >
             <MessageCircle size={15} aria-hidden="true" />

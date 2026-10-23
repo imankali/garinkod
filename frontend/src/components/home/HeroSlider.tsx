@@ -1,5 +1,6 @@
 // frontend/src/components/home/HeroSlider.tsx
 
+import { useTabListKeys } from '../../hooks/useTabListKeys';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
@@ -7,6 +8,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useTranslation } from '../../i18n';
 import { cn } from '../../utils/cn';
 import { heroSlidesApi, type HeroSlideData } from '../../api/services';
+import PlaybackToggle from '../ui/PlaybackToggle';
 
 /**
  * The Digikala-style opening slider: full-width art slides, arrows, dots and
@@ -87,7 +89,11 @@ function useHeroSlides(): Slide[] {
 
 export default function HeroSlider() {
   const [index, setIndex] = useState(0);
+  const dotTabs = useTabListKeys<HTMLDivElement>();
   const [paused, setPaused] = useState(false);
+  // Distinct from `paused` (which hover/focus set temporarily): this is the
+  // visitor's own decision and must survive the pointer leaving the slider.
+  const [autoPlaying, setAutoPlaying] = useState(true);
   const touchStartX = useRef<number | null>(null);
 
   const reduceMotion =
@@ -101,10 +107,10 @@ export default function HeroSlider() {
   }, [slides.length]);
 
   useEffect(() => {
-    if (paused || reduceMotion) return;
+    if (!autoPlaying || paused || reduceMotion) return;
     const timer = window.setTimeout(() => go(index + 1), SLIDE_DWELL_MS);
     return () => window.clearTimeout(timer);
-  }, [index, paused, reduceMotion, go]);
+  }, [index, paused, autoPlaying, reduceMotion, go]);
 
   const onTouchStart = (event: React.TouchEvent) => {
     touchStartX.current = event.touches[0]?.clientX ?? null;
@@ -190,6 +196,17 @@ export default function HeroSlider() {
         ))}
       </div>
 
+      {/* The explicit stop for rotation. Top-left stays clear of the slide's
+          copy (which is right-aligned in RTL) and of the arrows/dots. */}
+      <div className="absolute left-3 top-3 z-10">
+        <PlaybackToggle
+          playing={autoPlaying}
+          onToggle={() => setAutoPlaying((value) => !value)}
+          subject="اسلایدها"
+          variant="chip"
+        />
+      </div>
+
       {/* Arrows — a small pair sitting together at the bottom-right corner,
           DESKTOP ONLY: touch widths swipe the slider natively and the arrows
           only crowded the small screen. In RTL the right-hand button is
@@ -214,7 +231,7 @@ export default function HeroSlider() {
       </div>
 
       {/* Dots: the active dot is a progress pill. */}
-      <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-2" role="tablist" aria-label="انتخاب اسلاید">
+      <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-2" role="tablist" aria-label="انتخاب اسلاید" ref={dotTabs.ref} onKeyDown={dotTabs.onKeyDown}>
         {slides.map((slide, dotIndex) => (
           <button
             key={slide.title}

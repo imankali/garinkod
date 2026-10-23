@@ -5,18 +5,28 @@
 // The old layout was a single grid with category chips above it: to see the
 // سم products you had to pick "سم", and then the کود products disappeared.
 // A shop window should show every department at once. Each section here has
-// its own heading ("سم:"), its own results/filter/sort bar and its own grid,
-// and — because sorting and filtering are per section — the state for each
-// lives inside the section, not in App.
+// its own heading ("سم:"), its own results/filter/sort bar and its own
+// single-row rail, and — because sorting and filtering are per section — the
+// state for each lives inside the section, not in App.
+//
+// The rail replaced a two-row grid: four departments stacked two rows each
+// meant eight rows of cards between the header and the magazine, and the second
+// row of every department was below the fold on a phone. One row per department
+// (the same shape as «پیشنهادهای شگفت‌انگیز») keeps the page a shop window
+// instead of a wall, and the section is now unframed — a border around every
+// department turned the home page into a stack of boxes.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from 'react-router';
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { ArrowLeft, ArrowRight, SearchX } from "lucide-react";
+
+import EmptyState from '../ui/EmptyState';
 
 import { categoriesApi, productsApi } from "../../api/services";
 import FilterSortBar, { type SortOption } from "../FilterSortBar";
 import ProductCard from "../ProductCard";
+import { useDragToScroll } from "../../hooks/useDragToScroll";
 import { useTranslation } from "../../i18n";
 import type { Category, MockProduct, ProductQueryParams } from '@/types/shop';
 import { convertToMockProduct } from "../../utils/convertProduct";
@@ -138,8 +148,9 @@ function CategorySection({
   const [sort, setSort] = useState<SortOption>("popular");
   const [priceLimit, setPriceLimit] = useState<number>(FALLBACK_MAX_PRICE);
   const [inStockOnly, setInStockOnly] = useState(false);
-  const [expanded, setExpanded] = useState(false);
   const sectionRef = useRef<HTMLElement>(null);
+  // Mouse drag, momentum and keyboard scrolling, identical to every other rail.
+  const railDrag = useDragToScroll<HTMLDivElement>();
   const isVisible = useLazyVisibility(sectionRef);
 
   const priceFilterActive = priceLimit < FALLBACK_MAX_PRICE;
@@ -196,9 +207,7 @@ function CategorySection({
   }, [products, priceFilterActive]);
   const maxPrice = ceiling || FALLBACK_MAX_PRICE;
 
-  const visible = expanded ? filtered : filtered.slice(0, PER_SECTION);
-  const hasMore = filtered.length > visible.length;
-  const moreOnServer = !activeCrop && (data?.count ?? 0) > products.length;
+  const visible = filtered.slice(0, PER_SECTION);
   // Total matching this section's filters: the API count when the crop filter
   // is off, otherwise what is left after filtering client-side.
   const resultsCount = activeCrop ? filtered.length : (data?.count ?? filtered.length);
@@ -209,7 +218,7 @@ function CategorySection({
     <section
       ref={sectionRef}
       aria-labelledby={headingId}
-      className="scroll-mt-[calc(var(--header-height,72px)+1rem)] rounded-3xl border border-emerald-100/80 bg-white/70 p-3 shadow-sm dark:border-emerald-900 dark:bg-emerald-950/40 sm:p-5"
+      className="scroll-mt-[calc(var(--header-height,72px)+1rem)]"
     >
       {/* Heading row: "سم:" + shortcut to the full catalogue of that department. */}
       <div className="mb-3 flex items-end justify-between gap-3">
@@ -248,63 +257,41 @@ function CategorySection({
       />
 
       {isLoading ? (
-        <GridSkeleton />
+        <RowSkeleton />
       ) : filtered.length === 0 ? (
         <EmptyGrid compact />
       ) : (
-        <>
-          <div
+        <div
+          ref={railDrag.ref}
+            {...railDrag.handlers}
             id={`${headingId}-grid`}
-            className={`grid grid-cols-2 gap-3 transition-opacity sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 ${
+            role="group"
+            aria-label={`محصولات ${category.name}`}
+            className={`rail-scroll flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-2 transition-opacity touch-pan-x ${
               isFetching ? "opacity-70" : ""
             }`}
           >
             {visible.map((product, position) => (
-              <ProductCard
+              <div
                 key={product.id}
-                product={product}
-                // Stagger within the section only; the page-level index would
-                // delay later sections by seconds.
-                index={Math.min(position, 7)}
-                isWishlisted={wishlistIds.has(product.id)}
-                isComparing={compareIds.has(product.id)}
-                compareDisabled={compareDisabled}
-                onToggleWishlist={onToggleWishlist}
-                onAddToCart={onAddToCart}
-                onQuickView={onQuickView}
-                onToggleCompare={onToggleCompare}
-              />
-            ))}
-          </div>
-
-          {(hasMore || expanded || moreOnServer) && (
-            <div className="mt-4 flex flex-wrap justify-center gap-2">
-              {(hasMore || expanded) && (
-                <button
-                  type="button"
-                  onClick={() => setExpanded((value) => !value)}
-                  className="min-h-11 rounded-xl border border-emerald-200 bg-white px-5 text-fluid-xs font-bold text-emerald-700 transition-colors hover:bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950 dark:text-lime-300 dark:hover:bg-emerald-900"
-                  aria-expanded={expanded}
-                  aria-controls={`${headingId}-grid`}
-                >
-                  {expanded
-                    ? "نمایش کمتر"
-                    : `نمایش ${(filtered.length - visible.length).toLocaleString("fa-IR")} محصول دیگر`}
-                </button>
-              )}
-              {/* Everything past what was fetched lives on the catalogue page. */}
-              {expanded && moreOnServer && (
-                <Link
-                  to={`/products?category=${encodeURIComponent(category.slug)}`}
-                  className="flex min-h-11 items-center gap-1 rounded-xl bg-emerald-600 px-5 text-fluid-xs font-bold text-white transition-colors hover:bg-emerald-700"
-                >
-                  مشاهده همه {resultsCount.toLocaleString("fa-IR")} محصول
-                  <SeeAllArrow size={14} aria-hidden="true" />
-                </Link>
-              )}
-            </div>
-          )}
-        </>
+                className="rail-card"
+              >
+                <ProductCard
+                  product={product}
+                  // Stagger within the section only; the page-level index would
+                  // delay later sections by seconds.
+                  index={Math.min(position, 7)}
+                  isWishlisted={wishlistIds.has(product.id)}
+                  isComparing={compareIds.has(product.id)}
+                  compareDisabled={compareDisabled}
+                  onToggleWishlist={onToggleWishlist}
+                  onAddToCart={onAddToCart}
+                  onQuickView={onQuickView}
+                  onToggleCompare={onToggleCompare}
+                />
+              </div>
+          ))}
+        </div>
       )}
     </section>
   );
@@ -341,23 +328,24 @@ function useLazyVisibility<T extends Element>(ref: React.RefObject<T | null>): b
 // ========================================
 function EmptyGrid({ compact = false }: { compact?: boolean }) {
   return (
-    <div className={`flex flex-col items-center justify-center text-center ${compact ? "py-8" : "py-12"}`}>
-      <div className={`${compact ? "text-4xl" : "text-6xl"} mb-3`} aria-hidden="true">
-        🔍
-      </div>
-      <p className="text-fluid-sm font-bold text-slate-700 dark:text-white">محصولی یافت نشد</p>
-      <p className="mt-1 text-fluid-xs text-slate-500 dark:text-emerald-300">
-        فیلترها را تغییر دهید یا عبارت دیگری جستجو کنید
-      </p>
-    </div>
+    <EmptyState
+      icon={SearchX}
+      compact={compact}
+      title="محصولی یافت نشد"
+      description="فیلترها را تغییر دهید یا عبارت دیگری جستجو کنید"
+    />
   );
 }
 
-function GridSkeleton() {
+/** Same geometry as the single-row rail, so the swap-in does not move the page. */
+function RowSkeleton() {
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4" aria-hidden="true">
+    <div className="flex gap-3 overflow-hidden" aria-hidden="true">
       {Array.from({ length: 4 }).map((_, index) => (
-        <div key={index} className="animate-pulse overflow-hidden rounded-2xl bg-white shadow-sm dark:bg-emerald-950">
+        <div
+          key={index}
+          className="rail-card animate-pulse overflow-hidden rounded-xl bg-white shadow-sm dark:bg-emerald-950"
+        >
           <div className="aspect-square bg-emerald-50 dark:bg-emerald-900/50" />
           <div className="space-y-2 p-3">
             <div className="h-3 w-3/4 rounded bg-emerald-50 dark:bg-emerald-900/50" />
@@ -371,10 +359,10 @@ function GridSkeleton() {
 
 function SectionSkeleton() {
   return (
-    <div className="rounded-3xl border border-emerald-100/80 p-5 dark:border-emerald-900" aria-hidden="true">
+    <div aria-hidden="true">
       <div className="mb-4 h-6 w-32 animate-pulse rounded bg-emerald-50 dark:bg-emerald-900/50" />
       <div className="mb-4 h-14 animate-pulse rounded-2xl bg-emerald-50 dark:bg-emerald-900/50" />
-      <GridSkeleton />
+      <RowSkeleton />
     </div>
   );
 }

@@ -27,7 +27,7 @@ const ANIMATION_DURATION = 0.7;
 
 // ========================================
 // FlyToCart Component
-// ✅ انیمیشن پرواز محصول به سبد خرید
+// انیمیشن پرواز محصول به سبد خرید
 // ========================================
 export default function FlyToCart({ items, onComplete }: FlyToCartProps) {
   // ذخیره target element (آیکون سبد خرید) برای جلوگیری از query مکرر
