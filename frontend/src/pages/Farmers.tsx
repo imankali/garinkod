@@ -30,7 +30,7 @@ export default function Farmers() {
   const [view, setView] = useState<View>('requests');
 
   return (
-    <main className="mx-auto max-w-7xl px-[var(--page-gutter)] py-6 md:py-8">
+    <div className="mx-auto max-w-7xl px-[var(--page-gutter)] py-6 md:py-8">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-xl font-extrabold text-slate-800 dark:text-white md:text-2xl">
@@ -67,7 +67,7 @@ export default function Farmers() {
       </header>
 
       {view === 'requests' ? <RequestsView /> : <FarmersDirectory />}
-    </main>
+    </div>
   );
 }
 
@@ -238,7 +238,7 @@ function RequestWorkspace({
         <button
           type="button"
           onClick={onBack}
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 lg:hidden dark:hover:bg-emerald-900"
+          className="tap-target flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 lg:hidden dark:hover:bg-emerald-900"
           aria-label={t('common.back')}
         >
           <ArrowRight size={15} />

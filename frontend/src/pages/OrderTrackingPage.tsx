@@ -115,7 +115,7 @@ export default function OrderTrackingPage() {
   const notFound = code.length > 0 && !isPending && !isError && !shipment;
 
   return (
-    <main className="page-shell py-8">
+    <div className="page-shell py-8">
       <Helmet>
         <title>{`رهگیری مرسوله ${code} | گرین کود`}</title>
         {/* Tracking pages are per-buyer and volatile; they must never be indexed. */}
@@ -259,6 +259,6 @@ export default function OrderTrackingPage() {
           </>
         ) : null}
       </div>
-    </main>
+    </div>
   );
 }

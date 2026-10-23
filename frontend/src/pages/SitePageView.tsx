@@ -32,6 +32,7 @@ import type { MockProduct } from '@/types/shop';
 import type { SitePageBlock } from '@/types/content';
 import { cn } from '../utils/cn';
 import FaqList, { faqPairsOfBlock } from '../components/FaqList';
+import PageLoader from '../components/ui/PageLoader';
 
 export default function SitePageView({ kind }: { kind: 'page' | 'landing' }) {
   const { slug = '' } = useParams();
@@ -45,9 +46,7 @@ export default function SitePageView({ kind }: { kind: 'page' | 'landing' }) {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-[50dvh] items-center justify-center">
-        <div className="h-12 w-12 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" />
-      </div>
+      <PageLoader label="در حال بارگذاری صفحه…" />
     );
   }
 
@@ -90,7 +89,7 @@ export default function SitePageView({ kind }: { kind: 'page' | 'landing' }) {
         {page.hero_image_url && <meta property="og:image" content={new URL(page.hero_image_url, `${siteUrl}/`).href} />}
       </Helmet>
 
-      <main className="page-shell py-8 md:py-10">
+      <div className="page-shell py-8 md:py-10">
         <Link
           to="/"
           className="inline-flex min-h-11 items-center gap-2 text-fluid-sm font-bold text-emerald-700 dark:text-lime-300"
@@ -206,7 +205,7 @@ export default function SitePageView({ kind }: { kind: 'page' | 'landing' }) {
             )}
           </aside>
         </div>
-      </main>
+      </div>
     </>
   );
 }

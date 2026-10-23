@@ -19,6 +19,7 @@ import PostCard from '../components/social/PostCard';
 import { useAuthStore } from '../store/authStore';
 import { cn } from '../utils/cn';
 import type { StorefrontPost } from '@/types/storefront';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 
 const PAGE_SIZE = 24;
 
@@ -31,6 +32,9 @@ export default function StorefrontExplore() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [openPost, setOpenPost] = useState<StorefrontPost | null>(null);
+  const postDialogRef = useFocusTrap<HTMLDivElement>(Boolean(openPost), {
+    onEscape: () => setOpenPost(null),
+  });
   const sentinel = useRef<HTMLDivElement | null>(null);
 
   const load = useCallback(
@@ -203,6 +207,7 @@ export default function StorefrontExplore() {
       <AnimatePresence>
         {openPost && (
           <motion.div
+            ref={postDialogRef}
             initial={reduceMotion ? false : { opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={reduceMotion ? undefined : { opacity: 0 }}

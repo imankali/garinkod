@@ -82,7 +82,7 @@ export default function ProductCard({
       viewport={{ once: true, margin: "-80px" }}
       transition={reduceMotion ? undefined : { delay: Math.min(index * 0.04, 0.2), duration: 0.35 }}
       whileHover={desktopHover}
-      className="group relative flex flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm transition-shadow duration-300 hover:shadow-2xl hover:shadow-emerald-900/10 dark:border-emerald-900/40 dark:bg-[#08392a]"
+      className="group relative flex flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm transition-shadow duration-300 hover:shadow-2xl hover:shadow-emerald-900/10 dark:border-emerald-900/40 dark:bg-ink"
     >
       {/* ======================================== */}
       {/* Badges & Wishlist Button */}
@@ -126,7 +126,7 @@ export default function ProductCard({
       {/* ======================================== */}
       {/* Product Image */}
       {/* ======================================== */}
-      <div className="relative aspect-[4/3] h-40 w-full overflow-hidden bg-gradient-to-br from-emerald-50 via-white to-[#f0fdf4] dark:from-emerald-950 dark:to-emerald-900 md:h-48">
+      <div className="relative aspect-[4/3] h-40 w-full overflow-hidden bg-gradient-to-br from-emerald-50 via-white to-green-50 dark:from-emerald-950 dark:to-emerald-900 md:h-48">
         <a
           href={productUrl || '#'}
           aria-label={`مشاهده ${product.name}`}
@@ -227,7 +227,7 @@ export default function ProductCard({
       <div className="flex flex-1 flex-col p-4">
         {/* Category & Brand */}
         <div className="mb-1 flex items-center justify-between">
-          <p className="text-fluid-xs font-medium text-[#15803d] dark:text-lime-300">{product.category}</p>
+          <p className="text-fluid-xs font-medium text-green-700 dark:text-lime-300">{product.category}</p>
           <p className="text-fluid-2xs text-slate-400">{product.brand}</p>
         </div>
 
@@ -238,7 +238,7 @@ export default function ProductCard({
               href={productUrl}
               // The stretched link makes the whole card tappable, which is the
               // real target on a phone rather than the two-line title itself.
-              className="line-clamp-2 min-h-11 py-1.5 leading-6 transition-colors before:absolute before:inset-0 before:z-[1] before:content-[''] hover:text-[#15803d]"
+              className="line-clamp-2 min-h-11 py-1.5 leading-6 transition-colors before:absolute before:inset-0 before:z-[1] before:content-[''] hover:text-green-700"
             >
               {product.name}
             </a>
@@ -246,7 +246,7 @@ export default function ProductCard({
             <button
               type="button"
               onClick={() => onQuickView(product)}
-              className="line-clamp-2 min-h-11 py-1.5 text-start leading-6 transition-colors hover:text-[#15803d]"
+              className="line-clamp-2 min-h-11 py-1.5 text-start leading-6 transition-colors hover:text-green-700"
             >
               {product.name}
             </button>
@@ -328,8 +328,8 @@ export default function ProductCard({
             title={isComparing ? "حذف از مقایسه" : "افزودن به مقایسه"}
             className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-colors disabled:cursor-not-allowed disabled:opacity-30 dark:border-emerald-700 ${
               isComparing
-                ? "border-[#15803d] bg-emerald-50 text-[#15803d] dark:bg-emerald-900 dark:text-lime-300"
-                : "border-slate-200 text-slate-400 hover:text-[#15803d] dark:text-emerald-400"
+                ? "border-green-700 bg-emerald-50 text-green-700 dark:bg-emerald-900 dark:text-lime-300"
+                : "border-slate-200 text-slate-400 hover:text-green-700 dark:text-emerald-400"
             }`}
           >
             <GitCompare size={15} />

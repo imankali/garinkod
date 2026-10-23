@@ -72,7 +72,7 @@ export default function CustomerProfileCard({
             type="button"
             onClick={onClose}
             aria-label="بستن"
-            className="-me-1 flex h-9 w-9 items-center justify-center rounded-xl text-slate-400 transition hover:bg-emerald-50 hover:text-slate-600 dark:hover:bg-emerald-900 dark:hover:text-emerald-100"
+            className="tap-target -me-1 flex h-9 w-9 items-center justify-center rounded-xl text-slate-400 transition hover:bg-emerald-50 hover:text-slate-600 dark:hover:bg-emerald-900 dark:hover:text-emerald-100"
           >
             <X size={16} />
           </button>

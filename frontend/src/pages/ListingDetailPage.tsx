@@ -42,16 +42,16 @@ export default function ListingDetailPage() {
 
   if (query.isLoading) {
     return (
-      <main className="mx-auto min-h-dvh max-w-5xl px-[var(--page-gutter)] py-10">
+      <div className="mx-auto min-h-dvh max-w-5xl px-[var(--page-gutter)] py-10">
         <ListingDetailState kind="loading" />
-      </main>
+      </div>
     );
   }
 
   if (query.isError || !query.data) {
     const message = query.error ? parseApiError(query.error).message : 'این آگهی در دسترس نیست.';
     return (
-      <main className="mx-auto min-h-dvh max-w-5xl px-[var(--page-gutter)] py-10">
+      <div className="mx-auto min-h-dvh max-w-5xl px-[var(--page-gutter)] py-10">
         <ListingDetailState
           kind="error"
           message={message}
@@ -60,7 +60,7 @@ export default function ListingDetailPage() {
             else navigate('/products?source=marketplace');
           }}
         />
-      </main>
+      </div>
     );
   }
 

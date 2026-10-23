@@ -10,9 +10,9 @@ export default function InstallmentBanner() {
   return (
     <section className="mx-auto max-w-7xl px-4 py-8">
       <div className="grid gap-4 md:grid-cols-2">
-        <article className="flex flex-col justify-between rounded-3xl border border-emerald-100 bg-gradient-to-br from-white to-emerald-50/50 p-6 shadow-md dark:border-emerald-900/40 dark:from-[#08392a] dark:to-[#052e22]">
+        <article className="flex flex-col justify-between rounded-3xl border border-emerald-100 bg-gradient-to-br from-white to-emerald-50/50 p-6 shadow-md dark:border-emerald-900/40 dark:from-ink dark:to-ink-deep">
           <div>
-            <span className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-[#15803d] dark:bg-emerald-900 dark:text-lime-300">
+            <span className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-green-700 dark:bg-emerald-900 dark:text-lime-300">
               <Calendar size={13} /> پیش‌ثبت‌نام خرید اعتباری
             </span>
             <h2 className="text-lg font-extrabold text-slate-800 dark:text-white md:text-xl">تأمین اعتباری برای فصل کشت</h2>
@@ -21,12 +21,12 @@ export default function InstallmentBanner() {
             </p>
           </div>
           <div className="mt-6 flex items-center justify-between border-t border-slate-100 pt-4 dark:border-emerald-900/40">
-            <span className="flex items-center gap-1.5 text-xs font-bold text-[#15803d] dark:text-lime-300"><Landmark size={14} /> هنوز پیشنهاد مالی قطعی صادر نشده است</span>
-            <a href={phoneNumber ? `tel:${phoneNumber.replace(/[^+\d]/g, '')}` : '/services'} className="inline-flex min-h-11 items-center rounded-xl bg-[#15803d] px-4 text-xs font-bold text-white shadow-md transition-colors hover:bg-[#14532d]">{phoneNumber ? 'گفت‌وگو با کارشناس' : 'ثبت درخواست'}</a>
+            <span className="flex items-center gap-1.5 text-xs font-bold text-green-700 dark:text-lime-300"><Landmark size={14} /> هنوز پیشنهاد مالی قطعی صادر نشده است</span>
+            <a href={phoneNumber ? `tel:${phoneNumber.replace(/[^+\d]/g, '')}` : '/services'} className="inline-flex min-h-11 items-center rounded-xl bg-green-700 px-4 text-xs font-bold text-white shadow-md transition-colors hover:bg-green-900">{phoneNumber ? 'گفت‌وگو با کارشناس' : 'ثبت درخواست'}</a>
           </div>
         </article>
 
-        <article className="flex flex-col justify-between rounded-3xl border border-amber-100 bg-gradient-to-br from-white to-amber-50/40 p-6 shadow-md dark:border-amber-900/30 dark:from-[#08392a] dark:to-[#1a2e15]">
+        <article className="flex flex-col justify-between rounded-3xl border border-amber-100 bg-gradient-to-br from-white to-amber-50/40 p-6 shadow-md dark:border-amber-900/30 dark:from-ink dark:to-ink-olive">
           <div>
             <span className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800 dark:bg-amber-900/50 dark:text-amber-300"><Percent size={13} /> تأمین عمده B2B</span>
             <h2 className="text-lg font-extrabold text-slate-800 dark:text-white md:text-xl">استعلام خرید عمده برای مزرعه، تعاونی و کسب‌وکار</h2>

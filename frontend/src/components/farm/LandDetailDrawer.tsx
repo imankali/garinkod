@@ -12,6 +12,7 @@ import toast from 'react-hot-toast';
 
 import { farmApi } from '../../api/services';
 import { useTranslation } from '../../i18n';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 import type { FarmCalendarEvent, FarmLand } from '@/types/farming';
 import { formatFaDate } from './farmOptions';
 import LandCalendar from './LandCalendar';
@@ -31,6 +32,7 @@ export default function LandDetailDrawer({
   onChanged: () => void | Promise<void>;
 }) {
   const { t } = useTranslation();
+  const panelRef = useFocusTrap<HTMLDivElement>(true, { onEscape: onClose });
   const [tab, setTab] = useState<TabKey>('id');
   const fileTabs = useTabListKeys<HTMLDivElement>();
   const [events, setEvents] = useState<FarmCalendarEvent[]>([]);
@@ -54,6 +56,7 @@ export default function LandDetailDrawer({
   return (
     <AnimatePresence>
       <motion.div
+        ref={panelRef}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -101,7 +104,7 @@ export default function LandDetailDrawer({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-emerald-900"
+                  className="tap-target flex h-9 w-9 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-emerald-900"
                   aria-label={t('common.close')}
                 >
                   <X size={17} />

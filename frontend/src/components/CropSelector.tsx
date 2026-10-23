@@ -56,7 +56,7 @@ export default function CropSelector({ activeCrop, onSelectCrop }: CropSelectorP
         transition={{ duration: 0.5 }}
         className="mb-6 text-center"
       >
-        <p className="mb-1 text-xs font-bold text-[#15803d] dark:text-lime-300">
+        <p className="mb-1 text-xs font-bold text-green-700 dark:text-lime-300">
           پیشنهاد هوشمند
         </p>
         <h2 className="text-2xl font-extrabold text-slate-800 dark:text-white md:text-3xl">

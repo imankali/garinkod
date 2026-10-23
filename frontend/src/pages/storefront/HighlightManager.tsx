@@ -435,7 +435,7 @@ function HighlightFormModal({
             type="button"
             onClick={onClose}
             aria-label="بستن"
-            className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-emerald-900"
+            className="tap-target flex h-9 w-9 items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-emerald-900"
           >
             <X size={16} aria-hidden="true" />
           </button>
@@ -591,7 +591,7 @@ function AddToHighlightModal({
             type="button"
             onClick={onClose}
             aria-label="بستن"
-            className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-emerald-900"
+            className="tap-target flex h-9 w-9 items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-emerald-900"
           >
             <X size={16} aria-hidden="true" />
           </button>

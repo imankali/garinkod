@@ -71,7 +71,7 @@ export default function Affiliate() {
     .reduce((sum, entry) => sum + entry.amount, 0);
 
   return (
-    <main className="mx-auto max-w-6xl px-[var(--page-gutter)] py-9">
+    <div className="mx-auto max-w-6xl px-[var(--page-gutter)] py-9">
       <section className="rounded-3xl bg-gradient-to-l from-emerald-900 via-emerald-700 to-lime-600 p-8 text-white">
         <p className="text-sm font-bold text-lime-200">همکاری در فروش شفاف</p>
         <h1 className="mt-2 text-fluid-3xl font-extrabold">
@@ -184,7 +184,7 @@ export default function Affiliate() {
           </section>
         </>
       )}
-    </main>
+    </div>
   );
 }
 function Stat({ icon: Icon, label, value }: { icon: typeof Gift; label: string; value: string }) {

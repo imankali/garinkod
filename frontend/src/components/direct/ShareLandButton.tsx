@@ -80,7 +80,7 @@ export function AttachedLandChip({
       <button
         type="button"
         onClick={onRemove}
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white hover:text-rose-500 dark:hover:bg-emerald-950"
+        className="tap-target flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white hover:text-rose-500 dark:hover:bg-emerald-950"
         aria-label="برداشتن پرونده زمین از پیام"
       >
         <X size={14} />

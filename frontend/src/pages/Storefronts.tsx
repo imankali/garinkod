@@ -43,6 +43,7 @@ import { useDragToScroll } from '../hooks/useDragToScroll';
 import EmptyState from '../components/ui/EmptyState';
 import type { MarketplaceListing, Storefront, StorefrontPost } from '@/types/storefront';
 import type { Location } from '@/types/farming';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 
 const DEFAULT_FILTERS = {
   search: '',
@@ -150,6 +151,11 @@ export default function Storefronts() {
   const [showFilters, setShowFilters] = useState(false);
   /** The dialog opens on the hero button, or from /studio?create=1. */
   const [creating, setCreating] = useState(searchParams.get('create') === '1');
+  // The create-storefront sheet is a dialog: focus stays inside it, Escape
+  // closes it, and focus returns to the button that opened it.
+  const createDialogRef = useFocusTrap<HTMLDivElement>(creating, {
+    onEscape: () => closeCreate(),
+  });
 
   const [provinces, setProvinces] = useState<Location[]>([]);
   const [cities, setCities] = useState<Location[]>([]);
@@ -633,6 +639,7 @@ export default function Storefronts() {
       <AnimatePresence>
         {creating && (
           <motion.div
+            ref={createDialogRef}
             initial={reduceMotion ? false : { opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={reduceMotion ? undefined : { opacity: 0 }}

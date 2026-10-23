@@ -128,7 +128,7 @@ const CartButton = memo(function CartButton({
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0, opacity: 0 }}
               transition={{ ...SPRING_SOFT, damping: 15 }}
-              className={`absolute flex items-center justify-center rounded-full bg-white font-bold text-[#15803d] shadow ring-2 ring-emerald-500/20 ${
+              className={`absolute flex items-center justify-center rounded-full bg-white font-bold text-green-700 shadow ring-2 ring-emerald-500/20 ${
                 mobile
                   ? "-end-2 -top-2.5 h-4 min-w-4 px-0.5 text-fluid-2xs"
                   : "-end-2 -top-2.5 h-4 min-w-4 px-0.5 text-fluid-2xs sm:-end-2.5 sm:-top-3 sm:h-5 sm:min-w-5 sm:text-fluid-2xs"
@@ -310,7 +310,7 @@ export default function Header({
         </AnimatePresence>
 
         <div
-          className={`relative border-b border-emerald-100/70 bg-white/90 backdrop-blur-xl transition-shadow duration-300 dark:border-emerald-900/50 dark:bg-[#052e22]/90 ${
+          className={`relative border-b border-emerald-100/70 bg-white/90 backdrop-blur-xl transition-shadow duration-300 dark:border-emerald-900/50 dark:bg-ink-deep/90 ${
             scrolled ? "shadow-lg shadow-emerald-900/8" : ""
           }`}
         >
@@ -341,7 +341,7 @@ export default function Header({
               whileHover={prefersReducedMotion ? undefined : { scale: 1.05 }}
               whileTap={{ scale: 0.92 }}
               transition={SPRING}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-[#15803d] transition-colors hover:bg-emerald-100 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-green-700 transition-colors hover:bg-emerald-100 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300"
               aria-label={mobileOpen ? t("header.closeMenu") : t("header.openMenu")}
               aria-expanded={mobileOpen}
               aria-controls="mobile-menu"

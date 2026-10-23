@@ -107,7 +107,7 @@ export default function MarketplaceListingCard({
       viewport={{ once: true, margin: '-60px' }}
       transition={{ delay: (index % 4) * 0.05, duration: 0.35 }}
       whileHover={{ y: -4 }}
-      className="group flex flex-col overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-sm transition-shadow duration-300 hover:shadow-lg hover:shadow-emerald-900/5 dark:border-emerald-900 dark:bg-[#08392a]"
+      className="group flex flex-col overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-sm transition-shadow duration-300 hover:shadow-lg hover:shadow-emerald-900/5 dark:border-emerald-900 dark:bg-ink"
     >
       <div className="relative aspect-[4/3] overflow-hidden bg-emerald-50 dark:bg-emerald-950">
         <Link

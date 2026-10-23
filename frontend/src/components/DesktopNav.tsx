@@ -83,7 +83,7 @@ export default function DesktopNav() {
   return (
     <nav
       ref={navRef}
-      className="relative z-30 hidden border-t border-emerald-50 bg-gradient-to-l from-emerald-50/40 via-white to-[#f0fdf4] dark:border-emerald-900/50 dark:from-emerald-950/40 dark:via-[#052e22] dark:to-emerald-950/30 lg:block"
+      className="relative z-30 hidden border-t border-emerald-50 bg-gradient-to-l from-emerald-50/40 via-white to-green-50 dark:border-emerald-900/50 dark:from-emerald-950/40 dark:via-ink-deep dark:to-emerald-950/30 lg:block"
       aria-label="ناوبری اصلی"
     >
       <ul
@@ -106,8 +106,8 @@ export default function DesktopNav() {
                 className={cn(
                   'relative flex min-h-11 items-center px-3 text-fluid-sm font-medium transition-colors duration-200',
                   isActive
-                    ? 'text-[#15803d] dark:text-lime-300'
-                    : 'text-slate-600 hover:text-[#15803d] dark:text-emerald-100 dark:hover:text-lime-300',
+                    ? 'text-green-700 dark:text-lime-300'
+                    : 'text-slate-600 hover:text-green-700 dark:text-emerald-100 dark:hover:text-lime-300',
                 )}
                 aria-current={isActive ? 'page' : undefined}
               >
@@ -149,7 +149,7 @@ export default function DesktopNav() {
           </li>
         ))}
 
-        <li className="ms-auto hidden items-center gap-1.5 py-1 text-fluid-2xs font-semibold text-[#15803d] dark:text-lime-300 xl:flex">
+        <li className="ms-auto hidden items-center gap-1.5 py-1 text-fluid-2xs font-semibold text-green-700 dark:text-lime-300 xl:flex">
           <span className="relative flex h-2 w-2">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
             <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
@@ -193,8 +193,8 @@ function NavGroup({
         className={cn(
           'flex min-h-11 items-center gap-1 rounded-lg px-3 text-fluid-sm font-medium transition-colors duration-200',
           open || hasActive
-            ? 'text-[#15803d] dark:text-lime-300'
-            : 'text-slate-600 hover:text-[#15803d] dark:text-emerald-100 dark:hover:text-lime-300',
+            ? 'text-green-700 dark:text-lime-300'
+            : 'text-slate-600 hover:text-green-700 dark:text-emerald-100 dark:hover:text-lime-300',
         )}
       >
         {section.title}

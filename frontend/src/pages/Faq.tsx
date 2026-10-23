@@ -69,7 +69,7 @@ export default function Faq() {
         )}
       </Helmet>
 
-      <main className="mx-auto max-w-4xl px-[var(--page-gutter)] py-8 md:py-12">
+      <div className="mx-auto max-w-4xl px-[var(--page-gutter)] py-8 md:py-12">
         <PageHeader
           eyebrow={data?.badge || 'راهنما'}
           icon={LifeBuoy}
@@ -111,7 +111,7 @@ export default function Faq() {
             ))}
           </div>
         </section>
-      </main>
+      </div>
     </>
   );
 }

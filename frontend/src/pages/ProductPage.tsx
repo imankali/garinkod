@@ -358,7 +358,7 @@ export default function ProductPage() {
     <meta name="twitter:description" content={seoDescription} />
     <meta name="twitter:image" content={imageUrl} />
     <script type="application/ld+json">{JSON.stringify(structuredData)}</script>
-  </Helmet><main className="mx-auto max-w-7xl px-[var(--page-gutter)] py-8 md:py-12 [&_button]:min-h-11 [&_button]:min-w-11">
+  </Helmet><div className="mx-auto max-w-7xl px-[var(--page-gutter)] py-8 md:py-12 [&_button]:min-h-11 [&_button]:min-w-11">
     <Link to="/products" className="mb-7 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-emerald-700 hover:text-emerald-900 dark:text-lime-300" aria-label="بازگشت به محصولات"><ArrowRight size={18} /> بازگشت به محصولات</Link>
 
     <div className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -802,7 +802,7 @@ export default function ProductPage() {
         </div>
       </section>
     )}</div>
-  </main></>;
+  </div></>;
 }
 
 function useIntersectionOnce(ref: React.RefObject<Element | null>) {
@@ -822,7 +822,7 @@ function useIntersectionOnce(ref: React.RefObject<Element | null>) {
 
 function ProductPageSkeleton() {
   const block = "animate-pulse rounded-xl bg-slate-100 dark:bg-emerald-900/60";
-  return <main className="mx-auto max-w-7xl px-[var(--page-gutter)] py-8 md:py-12" aria-busy="true" aria-label="در حال بارگذاری محصول">
+  return <div className="mx-auto max-w-7xl px-[var(--page-gutter)] py-8 md:py-12" aria-busy="true" aria-label="در حال بارگذاری محصول">
     <div className={`mb-7 h-11 w-40 ${block}`} />
     <div className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_320px]">
       <article className="grid gap-8 rounded-3xl border border-slate-100 bg-white p-5 md:grid-cols-2 md:p-8 dark:border-emerald-900 dark:bg-emerald-950">
@@ -836,7 +836,7 @@ function ProductPageSkeleton() {
       <aside className="space-y-4"><div className={`h-64 w-full ${block}`} /><div className={`h-24 w-full ${block}`} /></aside>
     </div>
     <div className={`mt-9 h-14 w-full ${block}`} /><div className={`mt-4 h-64 w-full ${block}`} />
-  </main>;
+  </div>;
 }
 
 function CommentCard({ comment, onReply, nested = false, highlighted = false }: { comment: Comment; onReply: (comment: Comment) => void; nested?: boolean; /** The comment an inbox notification was about. */ highlighted?: boolean }) {

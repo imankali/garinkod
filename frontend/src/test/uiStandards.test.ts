@@ -113,6 +113,18 @@ describe('ui standards — every page', () => {
     expect(offenders).toEqual([]);
   });
 
+  it('does not type raw hex colours into class names', () => {
+    // Every colour that has a name lives in the `@theme` block of index.css.
+    // An arbitrary `bg-[#08392a]` is how the palette drifted before: the same
+    // surface in two components ended a shade apart, and no one could grep the
+    // brand. Gradients and `url()` arbitrary values are fine — they are images,
+    // not palette entries.
+    const offenders = sourceFiles.flatMap((file) =>
+      matches(file, /\b[a-z-]+-\[#[0-9a-fA-F]{3,8}\]/),
+    );
+    expect(offenders).toEqual([]);
+  });
+
   it('does not use emoji as a structural icon', () => {
     // Emoji in copy (a toast, a ticker string) is allowed; an emoji inside a
     // decorative icon slot is not — it renders differently per platform and

@@ -130,6 +130,7 @@ import { useWishlistStore } from "./store/wishlistStore";
 // ========================================
 import { useThemeStore, applyThemeClass } from "./store/themeStore";
 import { useTranslation } from "./i18n";
+import PageLoader from "./components/ui/PageLoader";
 
 // ========================================
 // Types
@@ -144,11 +145,9 @@ const HAS_CROP_TAGS = false;
 // Loading Spinner Component
 // ========================================
 function LoadingSpinner() {
-  return (
-    <div className="flex min-h-[50dvh] items-center justify-center py-12">
-      <div className="h-12 w-12 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent"></div>
-    </div>
-  );
+  // Route-level suspense fallback: named for screen readers instead of an
+  // anonymous ring, and the same shape as ui/PageLoader.
+  return <PageLoader label="در حال آماده‌سازی صفحه…" className="py-12" />;
 }
 
 // ========================================

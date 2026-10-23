@@ -37,6 +37,7 @@ import { legalApi } from '../api/services';
 import { copyText } from '../utils/copyText';
 import { cn } from '../utils/cn';
 import type { LegalDocument } from '@/types/content';
+import PageLoader from '../components/ui/PageLoader';
 
 /** The registry names an icon; the component is chosen here. */
 const ICONS: Record<string, typeof FileText> = {
@@ -115,9 +116,7 @@ export default function Legal() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-[50dvh] items-center justify-center">
-        <div className="h-12 w-12 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" />
-      </div>
+      <PageLoader label="در حال بارگذاری سند…" />
     );
   }
 

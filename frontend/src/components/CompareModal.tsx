@@ -43,7 +43,7 @@ export default function CompareModal({ isOpen, items, onClose, onAddToCart }: Co
     {
       label: "قیمت",
       render: (p) => (
-        <span className="font-bold text-[#15803d] dark:text-lime-300">
+        <span className="font-bold text-green-700 dark:text-lime-300">
           {formatPrice(p.price)}
         </span>
       ),

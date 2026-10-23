@@ -36,6 +36,18 @@
 @theme {
   --color-emerald-600: #047857;
   --color-slate-400: #67778f;
+
+  /* Dark "ink" surfaces. These four values were typed as arbitrary classes in
+     a dozen components (bg-[#08392a], via-[#052e22], …), which is how a brand
+     colour drifts: nobody can find the palette, and one surface quietly ends up
+     a shade off. Named here once, they are now the only dark canvases in the
+     app, and `uiStandards.test.ts` refuses new arbitrary hex classes.
+     #062d21 and #06301f differ from ink-deep by at most one step per channel,
+     so they collapse into it instead of becoming tokens of their own. */
+  --color-ink-deep: #052e22;
+  --color-ink: #08392a;
+  --color-ink-olive: #1a2e15;
+  --color-parchment: #f8faf6;
 }
 
 .dark {

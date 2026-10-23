@@ -119,7 +119,7 @@ export function FilterShell({
           role="dialog"
           aria-label={label}
           className={cn(
-            'max-h-[min(70vh,26rem)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-xl dark:border-emerald-800 dark:bg-[#06301f]',
+            'max-h-[min(70vh,26rem)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-xl dark:border-emerald-800 dark:bg-ink-deep',
             'fixed inset-x-2 bottom-[calc(var(--mobile-nav-clearance,84px)+0.5rem)] z-[75] w-auto! max-w-[calc(100vw-1rem)] sm:absolute sm:inset-x-auto sm:bottom-auto sm:mt-2 sm:max-h-[min(70vh,26rem)] sm:max-w-none sm:w-auto!',
             align === 'end' ? 'sm:end-0' : 'sm:start-0',
             width,

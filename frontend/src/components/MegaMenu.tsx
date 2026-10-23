@@ -45,10 +45,10 @@ const categoryIcons: CategoryIcons = {
 };
 
 const categoryColors: CategoryColors = {
-  'pesticide': 'from-[#15803d] to-[#166534]',
-  'fertilizer': 'from-emerald-500 to-[#15803d]',
+  'pesticide': 'from-green-700 to-green-800',
+  'fertilizer': 'from-emerald-500 to-green-700',
   'seed': 'from-amber-500 to-orange-500',
-  'equipment': 'from-lime-600 to-[#15803d]',
+  'equipment': 'from-lime-600 to-green-700',
   'irrigation': 'from-sky-500 to-cyan-600',
   'tools': 'from-teal-500 to-emerald-600',
 };
@@ -117,9 +117,13 @@ export default function MegaMenu() {
   if (isLoading) {
     return (
       <div className="hidden lg:block">
-        <div className="flex items-center gap-2 rounded-xl bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700">
-          <div className="h-4 w-4 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent"></div>
-          در حال بارگذاری...
+        <div
+          role="status"
+          aria-busy="true"
+          className="flex items-center gap-2 rounded-xl bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700 dark:bg-emerald-900/50 dark:text-lime-200"
+        >
+          <div aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent"></div>
+          در حال بارگذاری دسته‌ها…
         </div>
       </div>
     );

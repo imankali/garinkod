@@ -42,7 +42,7 @@ export default function Brands() {
         />
       </Helmet>
 
-      <main className="mx-auto max-w-6xl px-[var(--page-gutter)] py-8 md:py-12">
+      <div className="mx-auto max-w-6xl px-[var(--page-gutter)] py-8 md:py-12">
         <PageHeader
           eyebrow="فهرست گروه‌ها"
           icon={Building2}
@@ -132,7 +132,7 @@ export default function Brands() {
             </ul>
           </section>
         )}
-      </main>
+      </div>
     </>
   );
 }

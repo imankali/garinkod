@@ -59,7 +59,7 @@ function ShimmerBlock({ className }: { className?: string }) {
 /** Mirrors ProductCard's box model exactly (fixed media height included). */
 function ProductSkeleton() {
   return (
-    <div className="flex flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm dark:border-emerald-900/40 dark:bg-[#08392a]">
+    <div className="flex flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm dark:border-emerald-900/40 dark:bg-ink">
       {/* Media zone — ProductCard pins both the ratio and the heights. */}
       <ShimmerBlock className="aspect-[4/3] h-40 w-full rounded-none md:h-48" />
 
@@ -92,7 +92,7 @@ function ProductSkeleton() {
 /** Mirrors MarketplaceListingCard's box model exactly (ratio-only media). */
 function ListingSkeleton() {
   return (
-    <div className="flex flex-col overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-sm dark:border-emerald-900 dark:bg-[#08392a]">
+    <div className="flex flex-col overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-sm dark:border-emerald-900 dark:bg-ink">
       {/* Media zone — the listing card holds the ratio, no fixed height. */}
       <ShimmerBlock className="aspect-[4/3] w-full rounded-none" />
 
