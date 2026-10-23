@@ -17,6 +17,7 @@ import { useMemo, useState } from 'react';
 import { storefrontPostsApi } from '../../api/services';
 import type { StorefrontPost } from '@/types/storefront';
 import { cn } from '../../utils/cn';
+import { useDragToScroll } from '../../hooks/useDragToScroll';
 import StoryViewer from './StoryViewer';
 
 /** One غرفه's stories, collapsed into a single circle. */
@@ -59,6 +60,9 @@ export default function StoriesRow({
   stories: StorefrontPost[];
   title?: string;
 }) {
+  // The strip drags with the mouse (touch pans natively); a drag must not
+  // open the story under the cursor, which the shared hook already enforces.
+  const rail = useDragToScroll<HTMLUListElement>();
   // Seen state is tracked locally as well as on the server so the ring greys
   // out the moment the viewer closes, without waiting for a refetch.
   const [seenIds, setSeenIds] = useState<Set<number>>(new Set());
@@ -106,7 +110,11 @@ export default function StoriesRow({
     <>
       <section className="mt-6" aria-label={title}>
         <h2 className="mb-3 text-fluid-sm font-extrabold text-slate-800 dark:text-white">{title}</h2>
-        <ul className="no-scrollbar flex gap-4 overflow-x-auto pb-1">
+        <ul
+          ref={rail.ref}
+          {...rail.handlers}
+          className="no-scrollbar flex gap-4 overflow-x-auto pb-1"
+        >
           {groups.map((group) => (
             <li key={group.slug}>
               <button

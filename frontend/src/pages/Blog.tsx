@@ -13,6 +13,7 @@ import ArticleCard, { articleHref } from '../components/article/ArticleCard';
 import RouteSeo from '../components/RouteSeo';
 import { articlesApi } from '../api/services';
 import { cn } from '../utils/cn';
+import { useDragToScroll } from '../hooks/useDragToScroll';
 
 type View = 'all' | 'article' | 'guide';
 
@@ -31,6 +32,7 @@ export default function Blog({ fixedKind }: { fixedKind?: 'guide' | 'article' })
   const [search, setSearch] = useState('');
   const [crop, setCrop] = useState('');
   const isGuideHub = kind === 'guide';
+  const cropRail = useDragToScroll<HTMLDivElement>();
 
   const { data: articles = [], isFetching } = useQuery({
     queryKey: ['articles', kind || 'all', search.trim(), crop],
@@ -128,7 +130,13 @@ export default function Blog({ fixedKind }: { fixedKind?: 'guide' | 'article' })
       </div>
 
       {isGuideHub && crops.length > 0 && (
-        <div className="no-scrollbar mt-4 flex gap-2 overflow-x-auto pb-1" aria-label="فهرست گیاهان" role="group">
+        <div
+          ref={cropRail.ref}
+          {...cropRail.handlers}
+          className="no-scrollbar mt-4 flex gap-2 overflow-x-auto pb-1"
+          aria-label="فهرست گیاهان"
+          role="group"
+        >
           <button
             type="button"
             onClick={() => setCrop('')}

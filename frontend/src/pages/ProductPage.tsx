@@ -107,6 +107,8 @@ export default function ProductPage() {
   const similarVisible = useIntersectionOnce(similarRef);
   // Mouse drag for the similar-products rail (touch pans natively).
   const similarRail = useDragToScroll<HTMLDivElement>();
+  // The «راهنمای کشت» shelf drags exactly like the similar-products rail.
+  const guidesRail = useDragToScroll<HTMLDivElement>();
 
   const { data: product, isLoading, isError } = useQuery({
     queryKey: ["product", slug],
@@ -714,6 +716,8 @@ export default function ProductPage() {
                       a wrapping grid: reading order stays one line, and the
                       row scrolls rather than reflowing the whole page. */}
                   <div
+                    ref={guidesRail.ref}
+                    {...guidesRail.handlers}
                     className="rail-scroll mt-3 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-3 touch-pan-x"
                     role="region"
                     aria-label="راهنماهای کشت مرتبط، قابل پیمایش افقی"
@@ -784,7 +788,7 @@ export default function ProductPage() {
         <div
           ref={similarRail.ref}
           {...similarRail.handlers}
-          className="rail-scroll mt-4 flex cursor-grab select-none snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-3 touch-pan-x"
+          className="rail-scroll mt-4 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-3 touch-pan-x"
           role="region"
           aria-label="محصولات مشابه، قابل پیمایش افقی"
         >

@@ -8,6 +8,7 @@ import { ShoppingCart, Star } from 'lucide-react';
 import { formatPrice } from '../../utils/formatPrice';
 import { toPersianDigits } from '../../utils/normalizeDigits';
 import { useCartStore } from '../../store/cartStore';
+import { useDragToScroll } from '../../hooks/useDragToScroll';
 import { productsApi } from '../../api/services';
 import toast from 'react-hot-toast';
 import type { ProductList } from '@/types/shop';
@@ -52,60 +53,10 @@ export default function OfferRail({
   const cancelTween = useRef<(() => void) | null>(null);
   const addToCart = useCartStore((state) => state.addToCart);
 
-  /** Mouse drag-to-scroll — the shared rail contract (see ListingRail):
-   *  touch pans natively, so only the mouse path is hijacked; a drag
-   *  suppresses the click that follows so grabbing never opens a product. */
-  const drag = useRef<{ pointerId: number; startX: number; lastX: number; moved: boolean; active: boolean } | null>(null);
-
-  const endDrag = () => {
-    const d = drag.current;
-    const rail = railRef.current;
-    if (d) d.active = false;
-    if (rail) {
-      rail.style.scrollSnapType = '';
-      rail.style.userSelect = '';
-      rail.style.cursor = '';
-    }
-  };
-
-  const onDragStart = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.pointerType !== 'mouse' || event.button !== 0) return;
-    const rail = railRef.current;
-    if (!rail) return;
-    cancelTween.current?.();
-    // Capture and grab-styling wait for the first real movement: capturing on
-    // pointerdown makes Chromium retarget the following click to the rail and
-    // silently swallow every button inside it (افزودن / product links).
-    drag.current = { pointerId: event.pointerId, startX: event.clientX, lastX: event.clientX, moved: false, active: true };
-  };
-
-  const onDragMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    const d = drag.current;
-    const rail = railRef.current;
-    if (!d?.active || !rail || event.pointerId !== d.pointerId) return;
-    const dx = event.clientX - d.lastX;
-    d.lastX = event.clientX;
-    if (!d.moved) {
-      // Dead-zone: under ~5px the gesture is a click, not a drag.
-      if (Math.abs(event.clientX - d.startX) < 5) return;
-      d.moved = true;
-      rail.style.scrollSnapType = 'none';
-      rail.style.userSelect = 'none';
-      rail.style.cursor = 'grabbing';
-      try { rail.setPointerCapture(event.pointerId); } catch { /* older browsers */ }
-    }
-    rail.scrollBy({ left: dx, behavior: 'instant' as ScrollBehavior });
-  };
-
-  const onDragEnd = () => endDrag();
-
-  const onRailClickCapture = (event: React.MouseEvent) => {
-    if (drag.current?.moved) {
-      event.preventDefault();
-      event.stopPropagation();
-      drag.current.moved = false;
-    }
-  };
+  /** Mouse drag-to-scroll — the shared rails hook: touch pans natively, the
+   *  mouse grab follows the pointer, a drag swallows the click that follows
+   *  it, and a flick keeps gliding after release. */
+  const railDrag = useDragToScroll<HTMLDivElement>(railRef);
 
   // Pair the products into two-row columns: [0,1], [2,3], … The leftover
   // product of an odd list fills the top row of the last column alone.
@@ -319,13 +270,10 @@ export default function OfferRail({
     <div className="group/rail relative">
       <div
         ref={railRef}
-        onClickCapture={onRailClickCapture}
-        onPointerDown={onDragStart}
-        onPointerMove={onDragMove}
-        onPointerUp={onDragEnd}
-        onPointerCancel={onDragEnd}
+        {...railDrag.handlers}
+        onPointerDownCapture={() => cancelTween.current?.()}
         onPointerEnter={() => { hoverPause.current = true; }}
-        onPointerLeave={() => { hoverPause.current = false; endDrag(); }}
+        onPointerLeave={() => { hoverPause.current = false; }}
         onTouchStart={() => {
           // A finger on the rail takes over from any running animation:
           // cancel it and hand snap back before the browser records the swipe.
@@ -336,7 +284,7 @@ export default function OfferRail({
           // Give momentum scrolling a beat to settle before autoplay resumes.
           window.setTimeout(() => { touchPause.current = false; }, 2500);
         }}
-        className="rail-scroll mt-4 flex snap-x snap-mandatory cursor-grab gap-3 overflow-x-auto overscroll-x-contain px-4 pb-4 touch-pan-x sm:px-6"
+        className="rail-scroll mt-4 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-4 pb-4 touch-pan-x sm:px-6"
         role="region"
         aria-label={label}
       >

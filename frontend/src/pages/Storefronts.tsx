@@ -39,6 +39,7 @@ import StorefrontForm from '../components/storefront/StorefrontForm';
 import PostCard from '../components/social/PostCard';
 import { useTranslation } from '../i18n';
 import { cn } from '../utils/cn';
+import { useDragToScroll } from '../hooks/useDragToScroll';
 import type { MarketplaceListing, Storefront, StorefrontPost } from '@/types/storefront';
 import type { Location } from '@/types/farming';
 
@@ -127,6 +128,7 @@ export default function Storefronts() {
   const { filters, setFilter, setFilters, resetFilters, activeCount } = useUrlFilters(DEFAULT_FILTERS);
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchInput, setSearchInput] = useState(filters.search);
+  const featuredRail = useDragToScroll<HTMLUListElement>();
   const debouncedSearch = useDebouncedValue(searchInput, 350);
 
   const [storefront, setStorefront] = useState<Storefront | null>(null);
@@ -369,7 +371,11 @@ export default function Storefronts() {
           </div>
           {/* Horizontal rail instead of a wrapping grid — same rail pattern
               as the product panels: one row, snap points, themed scrollbar. */}
-          <ul className="rail-scroll mt-3 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-3 touch-pan-x">
+          <ul
+            ref={featuredRail.ref}
+            {...featuredRail.handlers}
+            className="rail-scroll mt-3 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-3 touch-pan-x"
+          >
             {featured.map((item) => (
               <li key={item.id} className="w-64 shrink-0 snap-start sm:w-72">
                 <StorefrontCard storefront={item} />

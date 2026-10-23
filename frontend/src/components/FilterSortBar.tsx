@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowDownWideNarrow, Check, PackageCheck, SlidersHorizontal, X } from "lucide-react";
 import { categoriesApi } from "../api/services";
 import type { Category } from '@/types/shop';
+import { useDragToScroll } from '../hooks/useDragToScroll';
 
 // ========================================
 // Types
@@ -61,6 +62,9 @@ export default function FilterSortBar({
   className,
 }: FilterSortBarProps) {
   const showCategories = typeof onCategoryChange === 'function';
+  // Category chips: mouse-draggable like the rest of the site's rails. The
+  // hook also fades the cut-off edge so it is obvious the row continues.
+  const categoryRail = useDragToScroll<HTMLDivElement>();
   /**
    * Only one of the two panels is ever open.
    *
@@ -125,7 +129,11 @@ export default function FilterSortBar({
       {/* Category Chips */}
       {/* ======================================== */}
       {showCategories && (
-      <div className="no-scrollbar mb-4 flex items-center gap-2 overflow-x-auto pb-1">
+      <div
+        ref={categoryRail.ref}
+        {...categoryRail.handlers}
+        className="no-scrollbar mb-4 flex items-center gap-2 overflow-x-auto pb-1"
+      >
         <motion.button
           whileTap={{ scale: 0.95 }}
           onClick={() => onCategoryChange("all")}

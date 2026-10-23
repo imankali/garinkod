@@ -13,6 +13,7 @@ import { ChevronLeft, ShoppingCart } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 import { useCartStore } from '../../store/cartStore';
+import { useDragToScroll } from '../../hooks/useDragToScroll';
 import { formatPrice } from '../../utils/formatPrice';
 import { cn } from '../../utils/cn';
 import { isLowStock } from '../listing/StockBadge';
@@ -101,61 +102,10 @@ export default function ListingRail({
   };
 
   const inViewRef = useRef(false);
-  /** Mouse drag-to-scroll state — touch already pans natively, so only the
-   *  mouse path is hijacked. `moved` suppresses the click that follows a drag
-   *  so grabbing the rail never opens the listing under the cursor. */
-  const drag = useRef<{ pointerId: number; startX: number; lastX: number; moved: boolean; active: boolean } | null>(null);
-
-  const endDrag = () => {
-    const d = drag.current;
-    const rail = railRef.current;
-    if (d) d.active = false;
-    if (rail) {
-      rail.style.scrollSnapType = '';
-      rail.style.userSelect = '';
-      rail.style.cursor = '';
-    }
-  };
-
-  const onRailPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.pointerType !== 'mouse' || event.button !== 0) return;
-    const rail = railRef.current;
-    if (!rail) return;
-    cancelTween.current?.();
-    // Capture and grab-styling wait for the first real movement: capturing on
-    // pointerdown makes Chromium retarget the following click to the rail and
-    // silently swallow every button inside it (افزودن به سبد / پرسش / links).
-    drag.current = { pointerId: event.pointerId, startX: event.clientX, lastX: event.clientX, moved: false, active: true };
-  };
-
-  const onRailPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    const d = drag.current;
-    const rail = railRef.current;
-    if (!d?.active || !rail || event.pointerId !== d.pointerId) return;
-    const dx = event.clientX - d.lastX;
-    d.lastX = event.clientX;
-    if (!d.moved) {
-      // Dead-zone: under ~5px the gesture is a click, not a drag.
-      if (Math.abs(event.clientX - d.startX) < 5) return;
-      d.moved = true;
-      rail.style.scrollSnapType = 'none';
-      rail.style.userSelect = 'none';
-      rail.style.cursor = 'grabbing';
-      try { rail.setPointerCapture(event.pointerId); } catch { /* older browsers */ }
-    }
-    // Drag the content like a sheet of paper: moving the mouse left brings
-    // the next cards (which live to the left in RTL) into view. scrollBy
-    // handles the browser's scrollLeft sign convention for us.
-    rail.scrollBy({ left: dx, behavior: 'instant' as ScrollBehavior });
-  };
-
-  const onRailClickCapture = (event: React.MouseEvent) => {
-    if (drag.current?.moved) {
-      event.preventDefault();
-      event.stopPropagation();
-      drag.current.moved = false;
-    }
-  };
+  /** Mouse drag-to-scroll — shared with every other rail on the site. Touch
+   *  pans natively; the hook handles the mouse grab, the click suppression
+   *  and the momentum after release. */
+  const railDrag = useDragToScroll<HTMLDivElement>(railRef);
 
   useEffect(() => {
     const rail = railRef.current;
@@ -238,13 +188,10 @@ export default function ListingRail({
       <div className="relative mt-4">
         <div
           ref={railRef}
+          {...railDrag.handlers}
+          onPointerDownCapture={() => cancelTween.current?.()}
           onPointerEnter={() => { hoverPause.current = true; }}
-          onPointerLeave={() => { hoverPause.current = false; endDrag(); }}
-          onPointerDown={onRailPointerDown}
-          onPointerMove={onRailPointerMove}
-          onPointerUp={endDrag}
-          onPointerCancel={endDrag}
-          onClickCapture={onRailClickCapture}
+          onPointerLeave={() => { hoverPause.current = false; }}
           onTouchStart={() => {
             cancelTween.current?.();
             touchPause.current = true;
@@ -252,7 +199,7 @@ export default function ListingRail({
           onTouchEnd={() => {
             window.setTimeout(() => { touchPause.current = false; }, 2500);
           }}
-          className="rail-scroll flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-2 touch-pan-x cursor-grab select-none"
+          className="rail-scroll flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-2 touch-pan-x"
           role="region"
           aria-label={`کارت‌های دسته ${title}`}
         >

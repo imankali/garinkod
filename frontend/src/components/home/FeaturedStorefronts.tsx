@@ -14,6 +14,7 @@ import { Link } from 'react-router';
 import { ArrowLeft, BadgeCheck, PlusCircle, Sprout } from 'lucide-react';
 
 import { storefrontsApi } from '../../api/services';
+import { useDragToScroll } from '../../hooks/useDragToScroll';
 import type { Storefront } from '@/types/storefront';
 
 const AUTOPLAY_MS = 4000;
@@ -27,78 +28,10 @@ export default function FeaturedStorefronts() {
   const touchPause = useRef(false);
   const cancelTween = useRef<(() => void) | null>(null);
 
-  /** Mouse drag-to-scroll — the same contract as ListingRail: touch already
-   *  pans natively, so only the mouse path is hijacked; a drag suppresses
-   *  the click that follows so grabbing the rail never opens a stall. */
-  const drag = useRef<{ pointerId: number; startX: number; lastX: number; moved: boolean; active: boolean } | null>(null);
-
-  const endDrag = () => {
-    const d = drag.current;
-    const rail = railRef.current;
-    if (d) d.active = false;
-    if (rail) {
-      rail.style.scrollSnapType = '';
-      rail.style.userSelect = '';
-      rail.style.cursor = '';
-    }
-  };
-
-  const onDragStart = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.pointerType !== 'mouse' || event.button !== 0) return;
-    const rail = railRef.current;
-    if (!rail) return;
-    cancelTween.current?.();
-    // Capture and grab-styling wait for the first real movement: capturing on
-    // pointerdown makes Chromium retarget the following click to the rail and
-    // silently swallow the stall links inside it.
-    drag.current = { pointerId: event.pointerId, startX: event.clientX, lastX: event.clientX, moved: false, active: true };
-  };
-
-  const onDragMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    const d = drag.current;
-    const rail = railRef.current;
-    if (!d?.active || !rail || event.pointerId !== d.pointerId) return;
-    const dx = event.clientX - d.lastX;
-    d.lastX = event.clientX;
-    if (!d.moved) {
-      // Dead-zone: under ~5px the gesture is a click, not a drag.
-      if (Math.abs(event.clientX - d.startX) < 5) return;
-      d.moved = true;
-      rail.style.scrollSnapType = 'none';
-      rail.style.userSelect = 'none';
-      rail.style.cursor = 'grabbing';
-      try { rail.setPointerCapture(event.pointerId); } catch { /* older browsers */ }
-    }
-    rail.scrollBy({ left: dx, behavior: 'instant' as ScrollBehavior });
-  };
-
-  const onDragEnd = () => endDrag();
-
-  const onRailClickCapture = (event: React.MouseEvent) => {
-    if (drag.current?.moved) {
-      event.preventDefault();
-      event.stopPropagation();
-      drag.current.moved = false;
-    }
-  };
-
-  // The grab cursor is an affordance — it is only honest while the rail can
-  // actually be dragged. With a handful of stalls the row fits its container
-  // and a grab cursor that drags nothing reads as a bug.
-  const [canScroll, setCanScroll] = useState(false);
-  useEffect(() => {
-    const rail = railRef.current;
-    if (!rail) return undefined;
-    const update = () => setCanScroll(rail.scrollWidth > rail.clientWidth + 4);
-    update();
-    const observer = new ResizeObserver(update);
-    observer.observe(rail);
-    window.addEventListener('resize', update);
-    return () => {
-      observer.disconnect();
-      window.removeEventListener('resize', update);
-    };
-  }, [loading, storefronts.length]);
+  /** Mouse drag-to-scroll — the shared rails hook (grab, momentum, click
+   *  suppression). The hook also marks rail overflow, so the grab cursor is
+   *  only shown when there is something left to drag. */
+  const railDrag = useDragToScroll<HTMLDivElement>(railRef);
 
   useEffect(() => {
     let cancelled = false;
@@ -249,13 +182,10 @@ export default function FeaturedStorefronts() {
       <div className="relative mt-5">
         <div
           ref={railRef}
-          onClickCapture={onRailClickCapture}
-          onPointerDown={onDragStart}
-          onPointerMove={onDragMove}
-          onPointerUp={onDragEnd}
-          onPointerCancel={onDragEnd}
+          {...railDrag.handlers}
+          onPointerDownCapture={() => cancelTween.current?.()}
           onPointerEnter={() => { hoverPause.current = true; }}
-          onPointerLeave={() => { hoverPause.current = false; endDrag(); }}
+          onPointerLeave={() => { hoverPause.current = false; }}
           onTouchStart={() => {
             cancelTween.current?.();
             touchPause.current = true;
@@ -263,7 +193,7 @@ export default function FeaturedStorefronts() {
           onTouchEnd={() => {
             window.setTimeout(() => { touchPause.current = false; }, 2500);
           }}
-          className={`rail-scroll flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain pb-2 touch-pan-x ${canScroll ? 'cursor-grab' : ''}`}
+          className="rail-scroll flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain pb-2 touch-pan-x"
           role="region"
           aria-label="غرفه‌های منتخب، قابل پیمایش افقی"
         >

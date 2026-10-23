@@ -5,6 +5,7 @@ import { Link } from 'react-router';
 import { ArrowLeft, LayoutGrid } from 'lucide-react';
 
 import { categoriesApi } from '../../api/services';
+import { useDragToScroll } from '../../hooks/useDragToScroll';
 import type { Category } from '@/types/shop';
 
 /** Fallback tiles so the section is still useful before categories exist. */
@@ -35,6 +36,9 @@ const EMOJI: Record<string, string> = {
  */
 export default function CategoryGrid() {
   const [categories, setCategories] = useState<Category[]>([]);
+  // The taxonomy row drags with the mouse like every other rail; on desktop
+  // the row usually fits, and the hook then leaves the cursor alone.
+  const rail = useDragToScroll<HTMLUListElement>();
 
   useEffect(() => {
     let cancelled = false;
@@ -84,6 +88,8 @@ export default function CategoryGrid() {
         to the gutter when it does overflow.
       */}
       <ul
+        ref={rail.ref}
+        {...rail.handlers}
         className="mt-5 grid grid-flow-col auto-cols-fr gap-1.5 overflow-x-auto pb-2 sm:flex sm:justify-between sm:gap-3 [scrollbar-width:none]"
         role="region"
         aria-label="دسته‌بندی‌های محصولات"

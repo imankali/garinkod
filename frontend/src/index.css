@@ -308,6 +308,66 @@ body {
   background: #0a3d2e;
 }
 
+/*
+ * Draggable rails — edge affordance
+ * useDragToScroll marks every rail it drives with data-overflow plus the
+ * physical data-edge-left/right flags. The flags exist so a rail can show
+ * that content is cut off (a soft fade on that side) and only offer the grab
+ * cursor when a drag would actually move something.
+ */
+@property --gk-rail-fade-left {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --gk-rail-fade-right {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+[data-drag-scroll] {
+  --gk-rail-fade-left: 0px;
+  --gk-rail-fade-right: 0px;
+  transition:
+    --gk-rail-fade-left 220ms ease,
+    --gk-rail-fade-right 220ms ease;
+}
+
+[data-drag-scroll][data-overflow='1'] {
+  cursor: grab;
+  -webkit-mask-image: linear-gradient(
+    to left,
+    transparent 0,
+    #000 var(--gk-rail-fade-left),
+    #000 calc(100% - var(--gk-rail-fade-right)),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to left,
+    transparent 0,
+    #000 var(--gk-rail-fade-left),
+    #000 calc(100% - var(--gk-rail-fade-right)),
+    transparent 100%
+  );
+}
+
+[data-drag-scroll][data-edge-left='1'] {
+  --gk-rail-fade-left: 28px;
+}
+
+[data-drag-scroll][data-edge-right='1'] {
+  --gk-rail-fade-right: 28px;
+}
+
+/* A native HTML5 drag on a card image or link would cancel the pointer
+ * stream mid-pan; the rail drag owns that gesture instead. */
+[data-drag-scroll] img,
+[data-drag-scroll] a {
+  -webkit-user-drag: none;
+}
+
 /* ========================================
  * 6. 3D Perspective Helpers
  * ======================================== */
