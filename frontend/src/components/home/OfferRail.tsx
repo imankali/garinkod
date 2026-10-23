@@ -19,10 +19,11 @@ import type { ProductList } from '@/types/shop';
  * and top-rated panels of the home page.
  *
  * Behaviours, each deliberate:
- *  - Cards are laid out in two-row columns: one product on top, one on the
- *    bottom. That makes each card wide (~48% of the rail on a phone, 30% on
- *    desktop — two products per column, four visible on a phone) without
- *    shrinking how much the reader sees.
+ *  - One row of cards, the same shape as every other rail on the site. Products
+ *    used to be paired into two-row columns, which made the four panels on the
+ *    home page twice as tall as the department rails and pushed the second row
+ *    below the fold on a phone. Card widths now match the other rails
+ *    (46% / 30% / 23%), so the panels read as one family.
  *  - Native CSS scroll-snap: momentum scrolling, keyboard friendly, RTL-safe.
  *  - Autoplay every 2s, one column per tick, toward the reading direction; it
  *    loops back to the start at the end. Pointer hover or an active touch
@@ -40,11 +41,16 @@ const AUTOPLAY_MS = 2000;
 export default function OfferRail({
   products,
   label = 'کارت‌های قابل پیمایش افقی',
+  inset = true,
 }: {
   products: ProductList[];
   /** Accessible name of the scroll region — lets each panel (flash deals,
    *  best-sellers, …) be told apart by screen readers and tests. */
   label?: string;
+  /** Home panels that already sit inside `page-shell` turn this off, so the
+   *  cards start on the same line as the section heading instead of a gutter
+   *  further in. */
+  inset?: boolean;
 }) {
   const queryClient = useQueryClient();
   const railRef = useRef<HTMLDivElement>(null);
@@ -60,13 +66,6 @@ export default function OfferRail({
   const railDrag = useDragToScroll<HTMLDivElement>(railRef);
   // WCAG 2.2.2: rotation stops when the visitor says so, not only on hover.
   const [playing, setPlaying] = useState(true);
-
-  // Pair the products into two-row columns: [0,1], [2,3], … The leftover
-  // product of an odd list fills the top row of the last column alone.
-  const columns: ProductList[][] = [];
-  for (let i = 0; i < products.length; i += 2) {
-    columns.push(products.slice(i, i + 2));
-  }
 
   /** rAF tween of the rail's own scrollLeft — the only horizontal scroll
    *  primitive that behaves identically in every engine we tested AND never
@@ -205,7 +204,7 @@ export default function OfferRail({
           staleTime: 5 * 60 * 1000,
         });
       }}
-      className="group flex flex-1 flex-col gap-1 rounded-xl bg-white p-2 text-slate-900 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-lg focus-visible:-translate-y-1 focus-visible:outline-2 focus-visible:outline-emerald-600 motion-reduce:hover:translate-y-0"
+      className="group flex h-full flex-1 flex-col gap-1 rounded-xl bg-white p-2 text-slate-900 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-lg focus-visible:-translate-y-1 focus-visible:outline-2 focus-visible:outline-emerald-600 motion-reduce:hover:translate-y-0"
     >
       <div className="relative">
         <img
@@ -297,16 +296,18 @@ export default function OfferRail({
           // Give momentum scrolling a beat to settle before autoplay resumes.
           window.setTimeout(() => { touchPause.current = false; }, 2500);
         }}
-        className="rail-scroll mt-2 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-4 pb-4 touch-pan-x sm:px-6"
+        className={`rail-scroll mt-2 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-4 touch-pan-x ${
+          inset ? 'px-4 sm:px-6' : ''
+        }`}
         role="region"
         aria-label={label}
       >
-        {columns.map((column, columnIndex) => (
+        {products.map((product) => (
           <div
-            key={column[0]?.id ?? `column-${columnIndex}`}
-            className="flex w-[48%] min-w-0 shrink-0 snap-start flex-col gap-3 sm:w-[30%]"
+            key={product.id}
+            className="flex w-[46%] min-w-0 shrink-0 snap-start sm:w-[30%] lg:w-[23%]"
           >
-            {column.map((product) => renderCard(product))}
+            {renderCard(product)}
           </div>
         ))}
       </div>

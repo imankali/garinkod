@@ -48,11 +48,19 @@ export default function RankedRail({
 
   if (isLoading) {
     return (
-      <div
-        className="h-64 animate-pulse rounded-2xl bg-slate-100"
-        role="status"
-        aria-label={`در حال بارگذاری ${title}`}
-      />
+      <div className="page-shell py-6 sm:py-8">
+        <div role="status" aria-busy="true" aria-label={`در حال بارگذاری ${title}`}>
+          <div className="h-6 w-40 animate-pulse rounded bg-slate-100 dark:bg-emerald-900/50" />
+          <div className="mt-3 flex gap-3 overflow-hidden" aria-hidden="true">
+            {[0, 1, 2, 3].map((item) => (
+              <div
+                key={item}
+                className="h-56 w-[46%] shrink-0 animate-pulse rounded-xl bg-slate-100 dark:bg-emerald-900/50 sm:w-[30%] lg:w-[23%]"
+              />
+            ))}
+          </div>
+        </div>
+      </div>
     );
   }
   if (!products.length) return null;
@@ -60,10 +68,10 @@ export default function RankedRail({
   return (
     <section
       aria-labelledby={`ranked-rail-${railId}`}
-      className="rounded-2xl border border-slate-200 bg-white dark:border-emerald-900 dark:bg-emerald-950"
+      className="scroll-mt-[calc(var(--header-height,72px)+1rem)]"
     >
       <div className="page-shell py-6 sm:py-8">
-        <div className="flex flex-wrap items-center gap-3 px-4 sm:px-6">
+        <div className="flex flex-wrap items-center gap-3">
           <Icon size={22} className="shrink-0 text-emerald-700 dark:text-lime-300" aria-hidden="true" />
           <h2
             id={`ranked-rail-${railId}`}
@@ -80,7 +88,7 @@ export default function RankedRail({
             <ChevronLeft size={16} aria-hidden="true" />
           </Link>
         </div>
-        <OfferRail products={products as ProductList[]} />
+        <OfferRail products={products as ProductList[]} inset={false} />
       </div>
     </section>
   );
