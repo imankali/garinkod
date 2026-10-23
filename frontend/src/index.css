@@ -318,6 +318,36 @@ body {
 }
 
 /*
+ * Rail card width — one definition for every horizontal product rail on the
+ * site (home panels, department rails, storefront listings, similar products).
+ *
+ * These used to be typed per call site (w-[46%] sm:w-[30%] lg:w-[23%] in five
+ * files, and each one could drift). The widths are set here so a card is the
+ * same physical size wherever it appears: ~150px on a phone, ~250px on a
+ * laptop. They are deliberately narrower than the old values so the next card
+ * is always half-visible — the rail says "there is more" without a scrollbar
+ * and without an arrow.
+ */
+.rail-card {
+  flex: 0 0 auto;
+  width: 42%;
+  min-width: 0;
+  scroll-snap-align: start;
+}
+
+@media (min-width: 640px) {
+  .rail-card {
+    width: 27%;
+  }
+}
+
+@media (min-width: 1024px) {
+  .rail-card {
+    width: 20%;
+  }
+}
+
+/*
  * Draggable rails — edge affordance
  * useDragToScroll marks every rail it drives with data-overflow plus the
  * physical data-edge-left/right flags. The flags exist so a rail can show

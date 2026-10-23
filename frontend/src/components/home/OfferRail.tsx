@@ -204,7 +204,7 @@ export default function OfferRail({
           staleTime: 5 * 60 * 1000,
         });
       }}
-      className="group flex h-full flex-1 flex-col gap-1 rounded-xl bg-white p-2 text-slate-900 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-lg focus-visible:-translate-y-1 focus-visible:outline-2 focus-visible:outline-emerald-600 motion-reduce:hover:translate-y-0"
+      className="group flex h-full flex-1 flex-col gap-1 rounded-xl border border-slate-100 bg-white p-2 text-slate-900 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-lg focus-visible:-translate-y-1 focus-visible:outline-2 focus-visible:outline-emerald-600 motion-reduce:hover:translate-y-0 dark:border-emerald-900/40 dark:bg-ink"
     >
       <div className="relative">
         <img
@@ -214,15 +214,15 @@ export default function OfferRail({
           height={224}
           loading="lazy"
           decoding="async"
-          className="h-32 w-full rounded-lg object-cover sm:h-40"
+          className="aspect-square h-auto w-full rounded-lg object-cover"
         />
         {product.discount_percent > 0 && (
-          <span className="absolute right-1.5 top-1.5 rounded-full bg-rose-600 px-1.5 py-0.5 text-[10px] font-extrabold text-white">
+          <span className="absolute end-1.5 top-1.5 rounded-full bg-rose-600 px-1.5 py-0.5 text-[10px] font-extrabold text-white">
             {toPersianDigits(product.discount_percent)}٪
           </span>
         )}
       </div>
-      <p className="mt-1.5 line-clamp-2 text-[13px] leading-5 group-hover:text-emerald-800 sm:text-fluid-sm">
+      <p className="mt-1.5 line-clamp-2 text-fluid-xs leading-5 group-hover:text-emerald-800 dark:text-white">
         {product.title}
       </p>
       {typeof product.avg_rating === 'number' && product.avg_rating > 0 && (
@@ -242,12 +242,12 @@ export default function OfferRail({
             <p className="text-[11px] text-slate-400 line-through">
               {formatPrice(product.price)}
             </p>
-            <p className="text-[13px] font-extrabold text-emerald-800 sm:text-fluid-sm">
+            <p className="text-fluid-xs font-extrabold text-emerald-800 dark:text-lime-300">
               {formatPrice(product.discounted_price)}
             </p>
           </>
         ) : (
-          <p className="text-[13px] font-extrabold text-emerald-800 sm:text-fluid-sm">
+          <p className="text-fluid-xs font-extrabold text-emerald-800 dark:text-lime-300">
             {product.price_on_request ? 'تماس بگیرید' : formatPrice(product.price)}
           </p>
         )}
@@ -260,9 +260,9 @@ export default function OfferRail({
           event.stopPropagation();
           void quickAdd(product);
         }}
-        className="mt-auto flex h-10 w-full shrink-0 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 text-[13px] font-extrabold text-white transition hover:bg-emerald-700 active:scale-[0.97]"
+        className="tap-target mt-auto flex min-h-10 w-full shrink-0 items-center justify-center gap-1 rounded-lg bg-emerald-600 text-fluid-2xs font-extrabold text-white transition hover:bg-emerald-700 active:scale-[0.97]"
       >
-        <ShoppingCart size={14} aria-hidden="true" />
+        <ShoppingCart size={13} aria-hidden="true" />
         افزودن
       </button>
     </Link>
@@ -305,7 +305,7 @@ export default function OfferRail({
         {products.map((product) => (
           <div
             key={product.id}
-            className="flex w-[46%] min-w-0 shrink-0 snap-start sm:w-[30%] lg:w-[23%]"
+            className="rail-card flex"
           >
             {renderCard(product)}
           </div>

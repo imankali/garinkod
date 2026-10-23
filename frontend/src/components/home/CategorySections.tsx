@@ -274,7 +274,7 @@ function CategorySection({
             {visible.map((product, position) => (
               <div
                 key={product.id}
-                className="w-[46%] min-w-0 shrink-0 snap-start sm:w-[30%] lg:w-[23%]"
+                className="rail-card"
               >
                 <ProductCard
                   product={product}
@@ -344,7 +344,7 @@ function RowSkeleton() {
       {Array.from({ length: 4 }).map((_, index) => (
         <div
           key={index}
-          className="w-[46%] shrink-0 animate-pulse overflow-hidden rounded-2xl bg-white shadow-sm dark:bg-emerald-950 sm:w-[30%] lg:w-[23%]"
+          className="rail-card animate-pulse overflow-hidden rounded-xl bg-white shadow-sm dark:bg-emerald-950"
         >
           <div className="aspect-square bg-emerald-50 dark:bg-emerald-900/50" />
           <div className="space-y-2 p-3">

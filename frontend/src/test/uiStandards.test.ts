@@ -31,6 +31,7 @@ function walk(dir: string): string[] {
 }
 
 const sourceFiles = walk(path.join(root, 'src'));
+const rel = (file: string) => path.relative(root, file);
 // Top-level route components only: the folders under src/pages hold panels and
 // overlays that render inside another page, so they must not declare an h1.
 const pageFiles = readdirSync(path.join(root, 'src', 'pages'))
@@ -126,6 +127,35 @@ describe('ui standards — every page', () => {
     const offenders = sourceFiles.flatMap((file) =>
       matches(file, /\b[a-z-]+-\[#[0-9a-fA-F]{3,8}\]/),
     );
+    expect(offenders).toEqual([]);
+  });
+
+  it('gives catalogue cards one scaling media ratio, never a fixed height', () => {
+    // The cards used to pin `aspect-[4/3]` *and* `h-40 md:h-48`: the image was
+    // square on a phone and 4:3 on a laptop, so two cards of the same
+    // component had different proportions. One ratio that scales with the card
+    // is the standard behaviour, and the skeleton must mirror it or the page
+    // jumps when the data lands.
+    for (const file of ['ProductCard.tsx', 'MarketplaceListingCard.tsx']) {
+      const source = readFileSync(path.join(root, 'src', 'components', file), 'utf8');
+      expect(source, file).toMatch(/aspect-square/);
+      expect(source, file).not.toMatch(/\bh-4[08]\b/);
+      expect(source, file).not.toMatch(/aspect-\[4\/3\]/);
+    }
+    const skeleton = readFileSync(path.join(root, 'src', 'components', 'ui', 'SkeletonCard.tsx'), 'utf8');
+    expect((skeleton.match(/aspect-square/g) ?? []).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('takes rail card widths from one shared class', () => {
+    // Five files each typed their own w-[46%] sm:w-[30%] lg:w-[23%]; one drift
+    // and the rails stop lining up. The widths live in `.rail-card` now.
+    const css = readFileSync(path.join(root, 'src', 'index.css'), 'utf8');
+    expect(css).toMatch(/\.rail-card\s*\{[^}]*width:/);
+    const offenders = sourceFiles
+      // `max-w-[45%]` is a different concern (a truncating label), so only an
+      // owned width counts.
+      .filter((file) => /(?<!max-)w-\[\d+%\]/.test(readFileSync(file, 'utf8')))
+      .map(rel);
     expect(offenders).toEqual([]);
   });
 

@@ -55,7 +55,7 @@ export default function RankedRail({
             {[0, 1, 2, 3].map((item) => (
               <div
                 key={item}
-                className="h-56 w-[46%] shrink-0 animate-pulse rounded-xl bg-slate-100 dark:bg-emerald-900/50 sm:w-[30%] lg:w-[23%]"
+                className="rail-card h-52 animate-pulse rounded-xl bg-slate-100 dark:bg-emerald-900/50"
               />
             ))}
           </div>

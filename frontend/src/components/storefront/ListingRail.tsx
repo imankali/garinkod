@@ -218,7 +218,7 @@ export default function ListingRail({
           {items.map((listing) => (
             <article
               key={listing.id}
-              className="flex w-[46%] min-w-0 shrink-0 snap-start flex-col rounded-2xl border border-slate-100 bg-white shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-md dark:border-emerald-900 dark:bg-emerald-950/60 sm:w-[30%] lg:w-[23%]"
+              className="rail-card flex flex-col rounded-xl border border-slate-100 bg-white shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-md dark:border-emerald-900 dark:bg-emerald-950/60"
             >
               <button
                 type="button"
@@ -231,7 +231,7 @@ export default function ListingRail({
                   alt=""
                   loading="lazy"
                   decoding="async"
-                  className="h-28 w-full rounded-t-2xl object-cover sm:h-32"
+                  className="aspect-[4/3] w-full rounded-t-xl object-cover"
                 />
                 {listing.discount_percent > 0 && (
                   <span className="absolute start-2 top-2 rounded-full bg-brand-orange px-2 py-0.5 text-fluid-2xs font-bold text-white">

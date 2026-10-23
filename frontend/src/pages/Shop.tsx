@@ -529,7 +529,7 @@ export default function Shop({ compareItems, onToggleCompare }: ShopProps) {
           {loading ? (
             // Geometry-exact shimmers instead of a centered spinner: the grid
             // takes its final shape immediately and nothing jumps on swap-in.
-            <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5">
               {Array.from({ length: 8 }).map((_, index) => (
                 <SkeletonCard key={index} variant={source === 'marketplace' ? 'listing' : 'product'} />
               ))}
@@ -552,7 +552,7 @@ export default function Shop({ compareItems, onToggleCompare }: ShopProps) {
               }
             />
           ) : (
-            <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5">
               {source === 'products'
                 ? products.map((product, index) => (
                   <ProductCard
