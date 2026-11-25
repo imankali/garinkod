@@ -97,4 +97,25 @@ describe('App', () => {
     // A failed section removes itself rather than printing an error box.
     expect(screen.queryByText('این صفحه باز نشد')).not.toBeInTheDocument();
   });
+
+  it('banks an affiliate code from the URL before anything else runs', async () => {
+    // `captureReferral` is once per module load by design (the code is noted on
+    // first sight and never overwritten), so this test needs a fresh module.
+    vi.resetModules();
+    localStorage.clear();
+    window.history.replaceState({}, '', '/products?ref=FARMER2026');
+
+    const { default: FreshApp } = await import('./App');
+    const { Providers: FreshProviders, createQueryClient: freshClient } = await import('./providers');
+
+    render(
+      <FreshProviders client={freshClient()}>
+        <FreshApp />
+      </FreshProviders>,
+    );
+
+    // The code is read synchronously on mount, not after the session request
+    // resolves — a shared link must survive being opened at all.
+    await waitFor(() => expect(localStorage.getItem('affiliate_referral_code')).toBe('FARMER2026'));
+  });
 });

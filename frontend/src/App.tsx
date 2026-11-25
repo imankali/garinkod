@@ -77,6 +77,22 @@ function ScrollToTop() {
  * «حساب من» or «ورود», and the cart is fetched after that answer, because a
  * signed-out cart belongs to the session cookie rather than to an account.
  */
+/**
+ * Banks `?ref=` on the first frame, before anyone can navigate away from it.
+ *
+ * It used to live inside `Session`, which also opens the session and fetches the
+ * cart — so an effect that only reads the query string was tied to two requests,
+ * and any ordering change there could silently drop an affiliate code. Reading
+ * the URL is a synchronous side effect with no dependency, so it is its own
+ * effect with none.
+ */
+function ReferralCapture() {
+  useEffect(() => {
+    captureReferral();
+  }, []);
+  return null;
+}
+
 function Session() {
   const isDark = useThemeStore((state) => state.isDark);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -90,7 +106,6 @@ function Session() {
   }, [isDark]);
 
   useEffect(() => {
-    captureReferral();
     void initializeSession();
   }, [initializeSession]);
 
@@ -122,6 +137,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <ScrollToTop />
+      <ReferralCapture />
       <Session />
       <a
         href="#main"
