@@ -51,6 +51,7 @@ export default function Shop() {
    * empty for no reason.
    */
   const brandSlug = params.get('brand_slug') ?? '';
+  const subcategory = params.get('subcategory') ?? '';
   const tag = params.get('tag') ?? '';
   const page = Math.max(1, Number(params.get('page') || 1) || 1);
   const PAGE_SIZE = 24;
@@ -61,11 +62,37 @@ export default function Shop() {
     staleTime: 10 * 60 * 1000,
   });
 
+  /**
+   * The operator's «منتخب» flag, and the category row the visitor clicked.
+   *
+   * `productsApi.getFeatured` and `categoriesApi.getBySlug` were both served and
+   * uncalled. The featured strip is the one thing on this page a buyer did not
+   * ask for — so it appears only on the plain catalogue, with no filter active,
+   * and disappears the moment anyone starts narrowing. The category row is the
+   * fuller version of a record the list already carries: its subcategories.
+   */
+  const featured = useQuery({
+    queryKey: ['products-featured'],
+    queryFn: async () => (await productsApi.getFeatured()).data,
+    enabled: !category && !subcategory && !search && !brandSlug && !tag && page === 1,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const categoryDetail = useQuery({
+    queryKey: ['category', category],
+    queryFn: async () => (await categoriesApi.getBySlug(category)).data,
+    enabled: Boolean(category),
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const featuredRows = useMemo(() => featured.data ?? [], [featured.data]);
+
   const products = useQuery({
-    queryKey: ['products', { category, ordering, search, page, brandSlug, tag }],
+    queryKey: ['products', { category, subcategory, ordering, search, page, brandSlug, tag }],
     queryFn: async () =>
       (await productsApi.getAll({
         ...(category ? { category } : {}),
+        ...(subcategory ? { subcategory } : {}),
         ...(search ? { search } : {}),
         ...(brandSlug ? { brand_slug: brandSlug } : {}),
         ...(tag ? { tag } : {}),
@@ -96,6 +123,13 @@ export default function Shop() {
   const activeCategory = useMemo(
     () => categories.data?.find((item) => item.slug === category),
     [categories.data, category],
+  );
+
+  // A subcategory belongs to one category: switching category must drop it, or
+  // the page would ask for a pair the server cannot match and show nothing.
+  const activeSubcategory = useMemo(
+    () => categoryDetail.data?.subcategories?.find((item) => item.slug === subcategory),
+    [categoryDetail.data, subcategory],
   );
 
   function patch(next: Record<string, string | null>) {
@@ -131,7 +165,9 @@ export default function Shop() {
     <div className="shell flex flex-col gap-5 py-8">
       <PageHead
         title={
-          activeCategory
+          activeSubcategory
+            ? `${activeCategory?.name ?? ''} · ${activeSubcategory.name}`
+            : activeCategory
             ? activeCategory.name
             : search
               ? `نتیجهٔ جستجو: «${search}»`
@@ -152,6 +188,59 @@ export default function Shop() {
         }
       />
 
+      {category && (categoryDetail.data?.subcategories ?? []).length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-2xs font-bold text-ink-mute dark:text-white/45">زیرشاخه:</span>
+          <button
+            type="button"
+            onClick={() => patch({ subcategory: null })}
+            aria-pressed={!subcategory}
+            className={cn(
+              'inline-flex min-h-7 items-center rounded-sm border px-2 text-[11px] font-bold',
+              !subcategory
+                ? 'border-brand-600 bg-brand-700 text-white'
+                : 'border-line text-ink-soft hover:border-brand-400 dark:border-night-line dark:text-white/60',
+            )}
+          >
+            همه
+          </button>
+          {(categoryDetail.data?.subcategories ?? []).map((sub) => (
+            <button
+              key={sub.slug}
+              type="button"
+              onClick={() => patch({ subcategory: sub.slug })}
+              aria-pressed={subcategory === sub.slug}
+              className={cn(
+                'inline-flex min-h-7 items-center rounded-sm border px-2 text-[11px] font-bold',
+                subcategory === sub.slug
+                  ? 'border-brand-600 bg-brand-700 text-white'
+                  : 'border-line text-ink-soft hover:border-brand-400 dark:border-night-line dark:text-white/60',
+              )}
+            >
+              {sub.name}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {featuredRows.length > 0 && (
+        <section aria-labelledby="featured-title">
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 id="featured-title" className="text-xs font-extrabold text-ink dark:text-white">
+              منتخب گرین‌کود
+            </h2>
+            <p className="text-[11px] text-ink-mute dark:text-white/45">
+              کالاهایی که تیم فنی برای فصل جاری توصیه می‌کند.
+            </p>
+          </div>
+          <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {featuredRows.slice(0, 4).map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Filters: one row, wrapped, each control labelled by its own text. */}
       <div className="flex flex-wrap items-center gap-2 border-y border-line py-3 dark:border-night-line">
         <span className="inline-flex items-center gap-1.5 text-2xs font-bold text-ink-mute dark:text-white/45">
@@ -161,7 +250,7 @@ export default function Shop() {
         <div className="flex flex-wrap items-center gap-1.5">
           <button
             type="button"
-            onClick={() => patch({ category: null })}
+            onClick={() => patch({ category: null, subcategory: null })}
             aria-pressed={!category}
             className={cn(
               'min-h-9 rounded-pill border px-3 text-2xs font-bold transition-colors duration-150',
@@ -176,7 +265,7 @@ export default function Shop() {
             <button
               key={item.slug}
               type="button"
-              onClick={() => patch({ category: item.slug })}
+              onClick={() => patch({ category: item.slug, subcategory: null })}
               aria-pressed={category === item.slug}
               className={cn(
                 'min-h-9 rounded-pill border px-3 text-2xs font-bold transition-colors duration-150',

@@ -20,8 +20,8 @@ import Shop from './Shop';
 
 vi.mock('../api/services', () => ({
   catalogApi: { index: vi.fn() },
-  categoriesApi: { getAll: vi.fn() },
-  productsApi: { getAll: vi.fn() },
+  categoriesApi: { getAll: vi.fn(), getBySlug: vi.fn() },
+  productsApi: { getAll: vi.fn(), getFeatured: vi.fn() },
 }));
 
 const card = (id: number) => ({
@@ -63,6 +63,12 @@ const renderShop = (path = '/products') =>
 
 beforeEach(() => {
   vi.mocked(categoriesApi.getAll).mockResolvedValue({ data: { count: 0, results: [] } } as never);
+  vi.mocked(categoriesApi.getBySlug).mockReset();
+  vi.mocked(categoriesApi.getBySlug).mockResolvedValue({
+    data: { id: 1, name: 'کود کشاورزی', slug: 'fertilizer', product_count: 5, subcategories: [] },
+  } as never);
+  vi.mocked(productsApi.getFeatured).mockReset();
+  vi.mocked(productsApi.getFeatured).mockResolvedValue({ data: [] } as never);
   vi.mocked(catalogApi.index).mockResolvedValue({
     data: {
       categories: [],
@@ -150,5 +156,69 @@ describe('Shop pagination', () => {
       expect(last).not.toHaveProperty('brand_slug');
       expect(last).not.toHaveProperty('tag');
     });
+  });
+});
+
+describe('Shop — featured strip and subcategories', () => {
+  it('promotes the operator\'s featured products on the plain catalogue', async () => {
+    // `productsApi.getFeatured` was served and never called: eight rows carry
+    // the flag and no surface asked for them.
+    vi.mocked(productsApi.getFeatured).mockResolvedValue({
+      data: [
+        {
+          id: 501,
+          title: 'کود کامل ۲۰-۲۰-۲۰',
+          slug: 'npk-20-20-20',
+          price: 1200000,
+          discounted_price: 1200000,
+          image_url: '',
+          unit: 'کیسه',
+          stock: 10,
+          rating: 4.5,
+          reviews_count: 3,
+          category: 'کود کشاورزی',
+          is_available: true,
+        },
+      ],
+    } as never);
+    renderShop();
+
+    expect(await screen.findByRole('heading', { name: 'منتخب گرین‌کود' })).toBeDefined();
+    expect(vi.mocked(productsApi.getFeatured)).toHaveBeenCalled();
+  });
+
+  it('offers the subcategories the category record carries, and filters by one', async () => {
+    vi.mocked(categoriesApi.getBySlug).mockResolvedValue({
+      data: {
+        id: 1,
+        name: 'کود کشاورزی',
+        slug: 'fertilizer',
+        product_count: 5,
+        subcategories: [
+          { id: 11, name: 'کود ازته', slug: 'nitrogen', category: 1 },
+          { id: 12, name: 'کود پتاسه', slug: 'potassium', category: 1 },
+        ],
+      },
+    } as never);
+    renderShop('/products?category=fertilizer');
+
+    const chip = await screen.findByRole('button', { name: 'کود ازته' });
+    await userEvent.click(chip);
+
+    // The API honours ?subcategory=; sending it is the whole point of the row.
+    await waitFor(() =>
+      expect(vi.mocked(productsApi.getAll).mock.calls.at(-1)?.[0]).toMatchObject({
+        category: 'fertilizer',
+        subcategory: 'nitrogen',
+      }),
+    );
+  });
+
+  it('does not show a curated strip over a filtered result set', async () => {
+    vi.mocked(productsApi.getFeatured).mockResolvedValue({ data: [] } as never);
+    renderShop('/products?search=اوره');
+
+    await waitFor(() => expect(vi.mocked(productsApi.getAll)).toHaveBeenCalled());
+    expect(screen.queryByRole('heading', { name: 'منتخب گرین‌کود' })).toBeNull();
   });
 });
