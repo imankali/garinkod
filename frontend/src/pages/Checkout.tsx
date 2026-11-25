@@ -2,16 +2,16 @@
 
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ShieldCheck } from 'lucide-react';
 
-import { ordersApi } from '../api/services';
+import { locationsApi, ordersApi } from '../api/services';
 import { useCartStore } from '../store/cartStore';
 import { useAuthStore } from '../store/authStore';
 import { parseApiError } from '../api/errors';
 import { money } from '../lib/price';
 import { readReferral } from '../lib/referral';
-import { TextArea, TextField } from '../components/ui/Field';
+import { SelectField, TextArea, TextField } from '../components/ui/Field';
 import Button from '../components/ui/Button';
 import EmptyState from '../components/ui/EmptyState';
 import PageHead from '../components/shop/PageHead';
@@ -39,6 +39,27 @@ export default function Checkout() {
   const [phone, setPhone] = useState(account?.phone ?? '');
   const [province, setProvince] = useState('');
   const [city, setCity] = useState('');
+
+  /**
+   * The address is picked, not typed. The country's divisions are a closed set
+   * the API already publishes (`/locations/`), and a free-text province means
+   * «تهران», «تهران.» and «استان تهران» are three different answers to the
+   * same question — which is what a shipping quote is built from.
+   *
+   * The city list follows the province; changing the province clears a city
+   * that no longer belongs to it.
+   */
+  const provinces = useQuery({
+    queryKey: ['locations', 'provinces'],
+    queryFn: async () => (await locationsApi.provinces()).data.results ?? [],
+    staleTime: 24 * 60 * 60 * 1000,
+  });
+  const cities = useQuery({
+    queryKey: ['locations', 'cities', province],
+    queryFn: async () => (await locationsApi.cities(province)).data.results ?? [],
+    enabled: Boolean(province),
+    staleTime: 24 * 60 * 60 * 1000,
+  });
   const [address, setAddress] = useState(account?.address ?? '');
   const [postal, setPostal] = useState('');
   const [notes, setNotes] = useState('');
@@ -113,8 +134,39 @@ export default function Checkout() {
                 autoComplete="tel"
                 hint="برای هماهنگی موجودی و ارسال، با همین شماره تماس می‌گیریم."
               />
-              <TextField label="استان" required value={province} onChange={(event) => setProvince(event.target.value)} autoComplete="address-level1" />
-              <TextField label="شهر" required value={city} onChange={(event) => setCity(event.target.value)} autoComplete="address-level2" />
+              <SelectField
+                label="استان"
+                required
+                value={province}
+                autoComplete="address-level1"
+                onChange={(event) => {
+                  setProvince(event.target.value);
+                  setCity('');
+                }}
+              >
+                <option value="">انتخاب کنید…</option>
+                {(provinces.data ?? []).map((entry) => (
+                  <option key={entry.id} value={entry.name}>
+                    {entry.name}
+                  </option>
+                ))}
+              </SelectField>
+              <SelectField
+                label="شهر"
+                required
+                value={city}
+                autoComplete="address-level2"
+                disabled={!province}
+                hint={province && cities.isSuccess && cities.data.length === 0 ? 'برای این استان شهری ثبت نشده است.' : undefined}
+                onChange={(event) => setCity(event.target.value)}
+              >
+                <option value="">{province ? 'انتخاب کنید…' : 'اول استان را انتخاب کنید'}</option>
+                {(cities.data ?? []).map((entry) => (
+                  <option key={entry.id} value={entry.name}>
+                    {entry.name}
+                  </option>
+                ))}
+              </SelectField>
               <TextField label="کد پستی" dir="ltr" inputMode="numeric" value={postal} onChange={(event) => setPostal(event.target.value)} autoComplete="postal-code" />
               <TextField label="کد تخفیف" value={coupon} onChange={(event) => setCoupon(event.target.value)} hint="اختیاری؛ در مجموع اعمال می‌شود." />
             </div>
