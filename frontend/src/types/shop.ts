@@ -345,7 +345,14 @@ export interface FacetRow {
 export interface ProductFacets {
   // `label` is what the API prints where a value is free text (a brand name, a
   // package size); older responses carry only the value, so the UI falls back.
-  brands: Array<{ value: string; label?: string; count: number }>;
+  /**
+   * `value` is the brand as the catalogue filter takes it (by name or slug);
+   * `slug` is what a brand *address* needs — `/catalog/brand/<slug>`. Before
+   * the API published it, a facet chip could not be turned into a link: the
+   * product rows carry `brand_slug`, and slugifying a Persian display name in
+   * the browser is a guess («باغبان‌پرو» → «باغبان-پرو» vs «باغبانپرو»).
+   */
+  brands: Array<{ value: string; label?: string; slug?: string; count: number }>;
   package_weights: Array<{ value: string; label?: string; count: number }>;
   /** Departments and sub-departments, counted over the published catalogue. */
   categories?: FacetRow[];

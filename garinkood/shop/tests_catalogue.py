@@ -416,6 +416,34 @@ class ProductFacetAndLandingTests(TestCase):
         ):
             self.assertIn(needle, body)
 
+    def test_every_brand_facet_can_actually_be_filtered(self):
+        """A facet chip is a promise: «۳ کالا» must return three products.
+
+        The brand facet used to emit only the display name, while the product
+        rows carry `brand_slug` and the storefront links brands to
+        `/catalog/brand/<slug>`. Filtering by the facet's own value therefore
+        either missed (ZWNJ brands: «باغبان‌پرو» vs «باغبان-پرو») or returned
+        nothing at all once the UI had no slug to build the address from.
+        """
+        response = self.client.get('/api/products/facets/')
+        self.assertEqual(response.status_code, 200)
+
+        brands = response.data['brands']
+        self.assertTrue(brands, 'the fixture has brands; the facet list must not be empty')
+
+        for row in brands:
+            self.assertTrue(
+                row.get('slug'),
+                f"brand facet {row['value']!r} has no slug a link could use",
+            )
+            filtered = self.client.get('/api/products/', {'brand_slug': row['slug']})
+            self.assertEqual(
+                filtered.data['count'],
+                row['count'],
+                f"facet {row['value']!r} advertises {row['count']} but "
+                f"brand_slug={row['slug']!r} returns {filtered.data['count']}",
+            )
+
     def test_every_sitemap_path_is_a_route_the_storefront_serves(self):
         """A sitemap is a promise to a crawler; four of these were 404s.
 

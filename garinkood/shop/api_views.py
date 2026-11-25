@@ -553,10 +553,16 @@ class ProductViewSet(viewsets.ReadOnlyModelViewSet):
                     queryset = queryset.filter(query)
             return queryset.distinct()
 
+        # The filter itself takes the brand by name or by slug (see `scoped`),
+        # but the storefront links brands to `/catalog/brand/<slug>` and the
+        # product rows carry `brand_slug`. Emitting the slug beside the name is
+        # what lets a facet chip build that address: grouping by name alone
+        # would force the UI to slugify a display string in the browser, and a
+        # Persian brand name has more than one possible slug.
         brands = [
-            {'value': row['brand'], 'count': row['total']}
+            {'value': row['brand'], 'label': row['brand'], 'slug': row['brand_slug'] or '', 'count': row['total']}
             for row in scoped('brand').exclude(brand='')
-            .values('brand').annotate(total=Count('id')).order_by('-total', 'brand')[:60]
+            .values('brand', 'brand_slug').annotate(total=Count('id')).order_by('-total', 'brand')[:60]
         ]
         packages = [
             {'value': row['package_weight'], 'count': row['total']}
