@@ -143,12 +143,12 @@ python manage.py backfill_image_variants --model listing --limit 50 --force
 گزارش‌ها محلی‌اند و در `frontend/.lighthouseci/` (gitignored) می‌نشینند. دسکتاپ نیز به‌صورت اتختیاری قابل اجراست: `npm run test:perf:desktop` (همان کانفیگ با overrideِ `settings.preset = desktop`).
 
 ### ۳.۲ Playwright — `frontend/e2e/`
-پیکربندی فعلی **۲۱۵ تست در ۸ فایل** را enumerate می‌کند (عدد قابل‌استناد؛ هنگام آغاز کار، یک خطای Syntaxِ قدیمی در `public-routes.spec.ts` کل مجموعه را ۰ نگه داشته بود و اصلاح آن نخستین Fix شد). سه گروه مستقیماً مربوط به این معماری:
+پیکربندی فعلی **۲۴۲ تست در ۷ فایل** را enumerate می‌کند (عدد قابل‌استناد؛ پس از بازسازی کامل فرانت‌اند از نو نوشته شد و هر slug موردنیازش را از API می‌خواند، نه از دادهٔ ثابت). سه گروه مستقیماً مربوط به این معماری:
 
 | فایل | نقش در سپر (نمونه‌های مشخص) |
 |---|---|
-| `performance-and-images.spec.ts` | ۵ تست مسئله‌محور: دست‌کم یک پاسخ `.avif` با HTTP 200 واقعی از شبکه‌ی مرورگر در `/products`؛ CLS با `PerformanceObserver` نصب‌شده **قبل** از hydrate (`addInitScript`) با آستانه ≤ 0.01 (صفرِ دقیق در LHCI باقی است)؛ گرید ۱-ستون در 375px و ≥۲-ستون در 768px با هندسه‌ی `boundingBox`؛ `dir="rtl"` + `lang="fa"` و `computed direction` روی `<main>` |
-| `accessibility.spec.ts` | اسکن axe با برچسب‌های `wcag2a/aa` و `wcag21a/aa` روی صفحات شامل `/products` و `/products/<slug>/` (گالری)، قطعِ جریان روی نقض‌های serious/critical، پیوست JSON خروجی در ریپورت |
+| `performance-and-images.spec.ts` | ۵ تست مسئله‌محور: CLS با `PerformanceObserver` نصب‌شده **قبل** از hydrate (`addInitScript`) روی `/` و `/products` با آستانه < 0.1؛ هر تصویر کارت اعلان `loading` دارد و `width`/`height` می‌دهد؛ فتوگراف هیرو lazy نیست؛ گرید ۲-ستون در 375px و ≥۳-ستون در 1440px |
+| `accessibility.spec.ts` | اسکن axe با برچسب‌های `wcag2a/aa` و `wcag21a/aa` روی `/`, `/products`, `/product/<slug>`, `/login`؛ نقض‌های serious/critical blockerاند و **سقف contrast حذف شد** — پالت بازنویسی شده و contrast اکنون قاعده‌ای مسدودکننده است |
 | `responsive.spec.ts` | چیدمان و ناوبری تعاملی |
 
 دستورهای یکپارچه (`frontend/package.json`):
@@ -191,7 +191,7 @@ backfill + worker واقعاً اجرا شده‌اند.
 ### ۴.۳ پاسگاه ماندگار — `media_layout_check`
 به‌جای امید: یک system check جنگو (`shop.W200`) که هر زمان `upload_to`یی با basenameِ MEDIA_ROOT شروع شود، Warning می‌اندازد — تله‌ی دقیقِ منجر به دوباره‌زایی همین بدهی. مهاجرت اجرا و ریشه پاک می‌شود، اما پاسگاه **دائمی** می‌ماند. تست‌های `shop/tests_media_layout.py` (۷ مورد) سکوت روی پیکربندی سالم و برخاست Warning روی پیکربندی بد را قفل کرده‌اند، و رفتار عدم‌بازنویسیِ مقصد و ایدمپوتنسیِ فرمان را روی یک استوریج موقتی (tempfile) که دقیقاً شرایط حادثه را بازسازی می‌کند، آزموده‌اند.
 
-> **ماتریس تأیید نهایی این ۴ ستون:** بک‌اند 402/402 سبز (۱۵۷s) — frontend `tsc --noEmit` = 0 خطا — `eslint` = Silent-pass — `vite build` ≈ ۶.۴s — Playwright enumerate = 215 تست/۸ فایل — LHCI config = Valid + filesystemReports.
+> **ماتریس تأیید نهایی این ۴ ستون:** بک‌اند 402/402 سبز (۱۵۷s) — frontend `tsc --noEmit` = 0 خطا — `eslint` = Silent-pass — `vite build` ≈ ۶.۴s — Playwright enumerate = 242 تست/۷ فایل — LHCI config = Valid + filesystemReports.
 
 ---
 

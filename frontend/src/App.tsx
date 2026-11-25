@@ -28,6 +28,7 @@ import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
 import BottomNav from './components/layout/BottomNav';
 import CartDrawer from './components/shop/CartDrawer';
+import Toaster from './components/ui/Toaster';
 import { Skeleton } from './components/ui/Skeleton';
 import Home from './pages/Home';
 
@@ -133,7 +134,7 @@ export default function App() {
         <Header />
 
         {/* `tabIndex={-1}` so the skip link can move focus here, not just scroll. */}
-        <main id="main" tabIndex={-1} className="flex-1 pb-20 outline-none lg:pb-0">
+        <main id="main" tabIndex={-1} className="flex-1 outline-none">
           <Suspense fallback={<PageFallback />}>
             <Routes>
               <Route path="/" element={<Home />} />
@@ -182,6 +183,7 @@ export default function App() {
       </div>
 
       <CartDrawer />
+      <Toaster />
       <BottomNav />
     </BrowserRouter>
   );

@@ -20,7 +20,7 @@ export default function Footer() {
   const email = import.meta.env.VITE_CONTACT_EMAIL?.trim();
 
   return (
-    <footer className="mt-16 border-t border-line bg-brand-900 text-brand-50 dark:border-night-line dark:bg-night">
+    <footer className="mt-16 border-t border-line bg-brand-900 pb-20 text-brand-50 lg:pb-0 dark:border-night-line dark:bg-night">
       <div className="shell py-12">
         <div className="grid gap-10 lg:grid-cols-[1.4fr_repeat(3,1fr)]">
           <div className="max-w-sm">

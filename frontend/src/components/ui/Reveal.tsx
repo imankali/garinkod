@@ -29,26 +29,47 @@ export default function Reveal({
   delay?: number;
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
-  const [shown, setShown] = useState(false);
+  // Content is visible by default. A section that starts at `opacity: 0` and waits
+  // for an observer is a section that is blank whenever the browser has no
+  // IntersectionObserver, or when the observer never fires because the element
+  // arrived already in view. The hidden state is opt-in, set only once an observer
+  // exists to reveal it again.
+  const [hidden, setHidden] = useState(false);
 
   useEffect(() => {
     const node = ref.current;
     if (!node) return;
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      setShown(true);
-      return;
-    }
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (typeof IntersectionObserver === 'undefined') return;
+
+    // Start hidden, then reveal on the first intersection. `intersectionRatio`
+    // is checked as well as `isIntersecting`, because a browser that computes
+    // geometry late can report one without the other.
+    setHidden(true);
+    const show = () => setHidden(false);
+
+    // A safety net: if the observer never reports an intersection (an element in a
+    // collapsed container, a browser that hands geometry back late), the section
+    // still appears. A one-off animation is not worth losing a whole block of the
+    // page over.
+    const fallback = window.setTimeout(show, 1200);
+
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0]?.isIntersecting) {
-          setShown(true);
+        if (entries.some((entry) => entry.isIntersecting || entry.intersectionRatio > 0)) {
+          window.clearTimeout(fallback);
+          show();
           observer.disconnect();
         }
       },
       { rootMargin: '0px 0px -10% 0px', threshold: 0.04 },
     );
     observer.observe(node);
-    return () => observer.disconnect();
+
+    return () => {
+      window.clearTimeout(fallback);
+      observer.disconnect();
+    };
   }, []);
 
   return (
@@ -57,7 +78,7 @@ export default function Reveal({
       style={delay ? { transitionDelay: `${delay}ms` } : undefined}
       className={cn(
         'transition-[opacity,transform] duration-[420ms] ease-[var(--ease-out)] motion-reduce:transition-none',
-        shown ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0',
+        hidden ? 'translate-y-4 opacity-0' : 'translate-y-0 opacity-100',
         className,
       )}
     >
