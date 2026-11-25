@@ -252,6 +252,17 @@ export default function Account() {
           </Button>
         </section>
 
+        {/* The inbox is where a conversation goes after you leave the stall. */}
+        <section className="rounded-lg border border-line bg-paper p-4 dark:border-night-line dark:bg-night-soft">
+          <p className="text-xs font-extrabold text-ink dark:text-white">گفتگوها</p>
+          <p className="mt-1 text-2xs leading-6 text-ink-mute dark:text-white/50">
+            پاسخ غرفه‌دار یا پشتیبانی را همین‌جا ببینید و ادامه بدهید.
+          </p>
+          <Button to="/inbox" variant="secondary" size="sm" className="mt-2">
+            صندوق گفتگوها
+          </Button>
+        </section>
+
         <RewardsPanel />
 
         <PushToggle />
