@@ -83,6 +83,28 @@
       }
     </script>
 
+    <script>
+      /*
+        Apply the theme before the first paint.
+
+        The app applies it too (in the shell), but that happens after the bundle
+        has parsed and hydrated — by which point a visitor who chose dark mode has
+        already been shown a cream page. Reading the same localStorage key here,
+        synchronously and inline, is the only way to make the first frame match.
+        Storage can throw in private mode, so the fallback is the system
+        preference, exactly as the store does.
+      */
+      (function () {
+        try {
+          var saved = localStorage.getItem('theme-preference');
+          var dark = saved === 'dark' || (saved !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (dark) document.documentElement.classList.add('dark');
+        } catch (error) {
+          /* Private mode: leave the default light theme. */
+        }
+      })();
+    </script>
+
     <style>
       /*
         The first paint, before any CSS module has loaded: the same cream the app
