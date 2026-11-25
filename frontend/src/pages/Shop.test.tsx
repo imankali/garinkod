@@ -21,7 +21,7 @@ import Shop from './Shop';
 vi.mock('../api/services', () => ({
   catalogApi: { index: vi.fn() },
   categoriesApi: { getAll: vi.fn(), getBySlug: vi.fn() },
-  productsApi: { getAll: vi.fn(), getFeatured: vi.fn() },
+  productsApi: { getAll: vi.fn(), getFeatured: vi.fn(), getFacets: vi.fn() },
 }));
 
 const card = (id: number) => ({
@@ -76,10 +76,55 @@ beforeEach(() => {
       tags: [{ kind: 'tag', title: 'ارگانیک', slug: 'organic', image_url: '', description: '', count: 1, url: '' }],
     },
   } as never);
+  vi.mocked(productsApi.getFacets).mockReset();
+  vi.mocked(productsApi.getFacets).mockResolvedValue({
+    data: {
+      brands: [],
+      package_weights: [],
+      categories: [
+        { value: 'fertilizer', count: 5 },
+        { value: 'irrigation', count: 11 },
+      ],
+      max_price: 1850000000,
+    },
+  } as never);
   vi.mocked(productsApi.getAll).mockReset();
   vi.mocked(productsApi.getAll).mockImplementation((params) =>
     Promise.resolve(results(params?.page ?? 1) as never),
   );
+});
+
+describe('Shop department chips', () => {
+  it('prints the catalogue’s own count on each department', async () => {
+    vi.mocked(categoriesApi.getAll).mockResolvedValue({
+      data: {
+        count: 2,
+        results: [
+          { id: 1, name: 'کود کشاورزی', slug: 'fertilizer' },
+          { id: 2, name: 'آبیاری', slug: 'irrigation' },
+        ],
+      },
+    } as never);
+    renderShop();
+
+    // 5 and 11 come from /products/facets/, tallied over the catalogue — not
+    // from the 24 rows currently on screen.
+    const fertilizer = await screen.findByRole('button', { name: /کود کشاورزی/ });
+    await waitFor(() => expect(fertilizer.textContent).toContain('۵'));
+    expect(screen.getByRole('button', { name: /آبیاری/ }).textContent).toContain('۱۱');
+  });
+
+  it('leaves a department without a count unnumbered rather than showing zero', async () => {
+    vi.mocked(categoriesApi.getAll).mockResolvedValue({
+      data: { count: 1, results: [{ id: 3, name: 'بذر و نهال', slug: 'seed' }] },
+    } as never);
+    renderShop();
+
+    // `seed` is absent from the facet tally; a fabricated «۰» would claim the
+    // shelf is empty when the facets simply did not count it.
+    const chip = await screen.findByRole('button', { name: 'بذر و نهال' });
+    expect(chip.textContent).toBe('بذر و نهال');
+  });
 });
 
 describe('Shop pagination', () => {

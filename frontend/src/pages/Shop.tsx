@@ -63,6 +63,26 @@ export default function Shop() {
   });
 
   /**
+   * How many published products sit behind each department.
+   *
+   * `productsApi.getFacets` had no caller, so the department chips were names
+   * without numbers: «ادوات کشاورزی» looked exactly as promising as a shelf
+   * with nothing on it, and clicking was the only way to find out. The counts
+   * are tallied over the whole catalogue, not over the current result set.
+   */
+  const facets = useQuery({
+    queryKey: ['product-facets'],
+    queryFn: async () => (await productsApi.getFacets()).data,
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const countBySlug = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const row of facets.data?.categories ?? []) map.set(row.value, row.count);
+    return map;
+  }, [facets.data]);
+
+  /**
    * The operator's «منتخب» flag, and the category row the visitor clicked.
    *
    * `productsApi.getFeatured` and `categoriesApi.getBySlug` were both served and
@@ -275,6 +295,9 @@ export default function Shop() {
               )}
             >
               {item.name}
+              {countBySlug.has(item.slug) && (
+                <span className="dateline ms-1 opacity-70">{nums(countBySlug.get(item.slug) ?? 0)}</span>
+              )}
             </button>
           ))}
         </div>
