@@ -182,10 +182,16 @@ interface I18nContextValue {
 const I18nContext = createContext<I18nContextValue | null>(null);
 
 function getInitialLocale(): Locale {
-  // Persian is always the site default; a saved preference is honoured only
-  // when the visitor explicitly chose a language.
-  const saved = localStorage.getItem("garinkood_locale");
-  return saved === "en" || saved === "ar" || saved === "fa" ? saved : "fa";
+  // Persian is always the site default. A saved preference is honoured only when
+  // the visitor explicitly chose a language — and a browser that refuses storage
+  // (private mode, a blocked cookie jar) gets Persian rather than a crash before
+  // the first paint.
+  try {
+    const saved = localStorage.getItem("garinkood_locale");
+    return saved === "en" || saved === "ar" || saved === "fa" ? saved : "fa";
+  } catch {
+    return "fa";
+  }
 }
 
 export function I18nProvider({ children }: { children: ReactNode }) {
@@ -197,8 +203,12 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    localStorage.setItem("garinkood_locale", locale);
-    document.documentElement.lang = locale === "fa" ? "fa" : locale;
+    try {
+      localStorage.setItem("garinkood_locale", locale);
+    } catch {
+      // See getInitialLocale: the choice simply is not remembered.
+    }
+    document.documentElement.lang = locale;
     document.documentElement.dir = dir;
   }, [locale, dir]);
 

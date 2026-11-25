@@ -84,16 +84,21 @@
     </script>
 
     <style>
-      html { background: #f0fdf4; }
-      html.dark { background: #052e22; }
-      #root-loader { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #f0fdf4; z-index: 9999; transition: opacity 0.3s ease; }
-      html.dark #root-loader { background: #052e22; }
-      .loader-spinner { width: 48px; height: 48px; border: 4px solid #22c55e; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
+      /*
+        The first paint, before any CSS module has loaded: the same cream the app
+        uses (--color-cream #f6f8f3), the same night surface in dark mode, and one
+        spinner. The loader is removed by the app once React has mounted, and it is
+        hidden with visibility rather than opacity so a screen reader cannot still
+        land on a status message for a page that finished loading.
+      */
+      html { background: #f6f8f3; }
+      html.dark { background: #0d1f17; }
+      #root-loader { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #f6f8f3; z-index: 9999; transition: opacity 0.3s cubic-bezier(0.23, 1, 0.32, 1); }
+      html.dark #root-loader { background: #0d1f17; }
+      .loader-spinner { width: 40px; height: 40px; border: 3px solid #bbf7d0; border-top-color: #15803d; border-radius: 50%; animation: spin 0.7s linear infinite; }
+      @media (prefers-reduced-motion: reduce) { .loader-spinner { animation-duration: 2s; } }
       @keyframes spin { to { transform: rotate(360deg); } }
-      /* Hidden, not just faded: an element that only lost its opacity is still
-         in the tree, still announced, and still the thing a screen reader lands on
-         after the page it describes is long gone. */
-      .loaded #root-loader { opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.3s ease, visibility 0s linear 0.3s; }
+      .loaded #root-loader { opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.3s cubic-bezier(0.23, 1, 0.32, 1), visibility 0s linear 0.3s; }
     </style>
   </head>
 
@@ -108,7 +113,7 @@
     </script>
     <noscript>
       <div style="padding: 2rem; text-align: center; font-family: Vazirmatn, sans-serif;">
-        <h1 style="color: #15803d;">گرین کود</h1>
+        <h1 style="color: #15803d;">گرین‌کود</h1>
         <p>برای مشاهده محصولات و ثبت سفارش، لطفاً JavaScript را فعال کنید.</p>
       </div>
     </noscript>
