@@ -330,7 +330,14 @@ export interface WalletTransaction {
 export interface Wallet {
   id: number;
   currency: string;
+  /** Real money with its own ledger. Distinct from `loyalty_points`. */
   balance: number;
+  /**
+   * Loyalty ledger, redeemed in units at checkout (100 points = 10,000 toman).
+   * Deliberately not part of `balance`: mixing a gamification ledger into a
+   * money balance would blur accounting.
+   */
+  loyalty_points: number;
   updated_at: string;
   transactions: WalletTransaction[];
 }

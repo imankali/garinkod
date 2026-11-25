@@ -5,7 +5,7 @@ import { useNavigate, Link } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ShieldCheck } from 'lucide-react';
 
-import { locationsApi, ordersApi, paymentsApi } from '../api/services';
+import { locationsApi, ordersApi, paymentsApi, rewardsApi } from '../api/services';
 import type { CheckoutPayload, PaymentProviderOption } from '@/types/commerce';
 import { useCartStore } from '../store/cartStore';
 import { useAuthStore } from '../store/authStore';
@@ -17,6 +17,7 @@ import { SelectField, TextArea, TextField } from '../components/ui/Field';
 import Button from '../components/ui/Button';
 import EmptyState from '../components/ui/EmptyState';
 import PageHead from '../components/shop/PageHead';
+import { pointsValue, POINTS_PER_UNIT } from '../components/shop/RewardsPanel';
 
 /**
  * Checkout: the address, the payment choice, the total, one button.
@@ -69,6 +70,7 @@ export default function Checkout() {
   const [terms, setTerms] = useState(false);
   const [busy, setBusy] = useState(false);
   const [method, setMethod] = useState<CheckoutPayload['payment_method']>('coordination');
+  const [usePoints, setUsePoints] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // The server decides which gateways exist; a provider is offered when it is
@@ -80,6 +82,23 @@ export default function Checkout() {
     staleTime: 5 * 60 * 1000,
   });
 
+  const items = cart?.items ?? [];
+  const total = cart?.total_price ?? 0;
+
+  // Loyalty points are spendable only if the flag is sent: the checkout view
+  // read it from the first commit, but no screen ever offered it, so a buyer
+  // with a points balance could not use a single point.
+  const wallet = useQuery({
+    queryKey: ['wallet'],
+    queryFn: async () => (await rewardsApi.wallet()).data,
+    enabled: Boolean(user),
+    staleTime: 60 * 1000,
+  });
+  const points = wallet.data?.loyalty_points ?? 0;
+  // What the points are worth against this order: whole units only, never more
+  // than what is payable (the server applies the same two limits).
+  const pointsDiscount = Math.min(pointsValue(points), total);
+
   const declared: PaymentProviderOption[] = options.data?.providers ?? [];
   const providers = declared.filter((provider) => provider.enabled && provider.configured);
 
@@ -88,9 +107,6 @@ export default function Checkout() {
   const effectiveMethod = providers.some((provider) => provider.code === method)
     ? method
     : providers[0]?.code ?? 'coordination';
-
-  const items = cart?.items ?? [];
-  const total = cart?.total_price ?? 0;
 
   if (items.length === 0) {
     return (
@@ -125,6 +141,7 @@ export default function Checkout() {
         // ticked, so this is the visitor's own agreement rather than a
         // constant that happens to be true.
         terms_accepted: terms,
+        use_loyalty_points: Boolean(usePoints) && pointsDiscount > 0,
       });
       await queryClient.invalidateQueries({ queryKey: ['cart'] });
       navigate(`/track?code=${result.data.order.code}`, { replace: true });
@@ -289,6 +306,42 @@ export default function Checkout() {
               <span className="dateline text-base font-extrabold text-ink dark:text-white">{money(total)}</span>
             </div>
             <p className="mt-1 text-2xs text-ink-mute dark:text-white/50">هزینهٔ ارسال پس از تأیید موجودی اضافه می‌شود.</p>
+
+            {/* The points were always redeemable — the server has handled
+                `use_loyalty_points` from the first commit — but no screen ever
+                offered the flag, so a balance could only be spent by a client
+                that knew to invent it. Below one whole unit the switch is not
+                shown at all, because it would discount nothing. */}
+            {points >= POINTS_PER_UNIT && (
+              <div className="mt-3 rounded-md border border-line p-3 dark:border-night-line">
+                <label className="flex items-start gap-2 text-2xs leading-6 text-ink-soft dark:text-white/65">
+                  <input
+                    type="checkbox"
+                    checked={usePoints}
+                    onChange={(event) => setUsePoints(event.target.checked)}
+                    className="mt-1 h-4 w-4 accent-brand-700"
+                  />
+                  <span>
+                    <span className="block font-extrabold text-ink dark:text-white">
+                      استفاده از امتیازهای وفاداری
+                    </span>
+                    <span className="dateline block text-ink-mute dark:text-white/50">
+                      {points.toLocaleString('fa-IR')} امتیاز دارید؛ با این تخفیف تا{' '}
+                      {money(pointsDiscount)} از مبلغ کسر می‌شود (هر {POINTS_PER_UNIT.toLocaleString('fa-IR')} امتیاز ={' '}
+                      {money(10_000)}).
+                    </span>
+                  </span>
+                </label>
+                {usePoints && (
+                  <p className="dateline mt-1.5 border-t border-line pt-1.5 text-2xs text-brand-800 dark:border-night-line dark:text-brand-300">
+                    قابل پرداخت پس از تخفیف امتیاز: {money(Math.max(0, total - pointsDiscount))}
+                    <span className="block text-ink-mute dark:text-white/45">
+                      مبلغ نهایی با هزینهٔ ارسال، پس از تأیید موجودی، در سرور محاسبه می‌شود.
+                    </span>
+                  </p>
+                )}
+              </div>
+            )}
 
             <label className="mt-3 flex items-start gap-2 text-2xs leading-6 text-ink-soft dark:text-white/65">
               <input

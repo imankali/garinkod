@@ -13,6 +13,7 @@ import Button from '../components/ui/Button';
 import { TextField } from '../components/ui/Field';
 import { Skeleton } from '../components/ui/Skeleton';
 import EmptyState from '../components/ui/EmptyState';
+import RewardsPanel from '../components/shop/RewardsPanel';
 import PageHead from '../components/shop/PageHead';
 
 /**
@@ -236,6 +237,8 @@ export default function Account() {
             برای تغییر سفارش در حال آماده‌سازی، با پشتیبانی تماس بگیرید.
           </p>
         </section>
+
+        <RewardsPanel />
       </div>
     </div>
   );

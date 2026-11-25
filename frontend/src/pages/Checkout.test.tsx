@@ -17,9 +17,10 @@ vi.mock('../api/services', () => ({
   locationsApi: { provinces: vi.fn(), cities: vi.fn() },
   ordersApi: { checkout: vi.fn() },
   paymentsApi: { options: vi.fn() },
+  rewardsApi: { wallet: vi.fn() },
 }));
 
-import { locationsApi, ordersApi, paymentsApi } from '../api/services';
+import { locationsApi, ordersApi, paymentsApi, rewardsApi } from '../api/services';
 import Checkout from './Checkout';
 import { createQueryClient, Providers } from '../providers';
 import { useAuthStore } from '../store/authStore';
@@ -109,6 +110,9 @@ beforeEach(() => {
         },
       ],
     },
+  } as never);
+  vi.mocked(rewardsApi.wallet).mockResolvedValue({
+    data: { id: 1, currency: 'IRT', balance: 0, loyalty_points: 300, updated_at: '', transactions: [] },
   } as never);
   vi.mocked(locationsApi.cities).mockImplementation((name) =>
     Promise.resolve({
@@ -212,9 +216,9 @@ describe('Checkout payment methods', () => {
     await waitFor(() => expect(screen.getByRole('option', { name: 'شیراز' })).toBeDefined());
     await userEvent.selectOptions(screen.getByLabelText('شهر'), 'شیراز');
     await userEvent.type(screen.getByLabelText('نشانی کامل'), 'خیابان اول، پلاک ۲');
-    // Terms are required before the button unlocks.
-    const terms = screen.getByRole('checkbox');
-    await userEvent.click(terms);
+    // Terms are required before the button unlocks. There are two checkboxes
+    // now (loyalty and terms), so this one is named rather than positional.
+    await userEvent.click(screen.getByRole('checkbox', { name: /خواندم و می‌پذیرم/ }));
 
     await userEvent.click(screen.getByRole('button', { name: 'ثبت سفارش' }));
 
@@ -222,5 +226,72 @@ describe('Checkout payment methods', () => {
     expect(vi.mocked(ordersApi.checkout).mock.calls[0]?.[0]).toMatchObject({
       payment_method: 'zarinpal',
     });
+  });
+});
+
+describe('Checkout loyalty points', () => {
+  const fillAndSubmit = async () => {
+    await waitFor(() => expect(screen.getByRole('option', { name: 'فارس' })).toBeDefined());
+    await userEvent.type(screen.getByLabelText('نام و نام خانوادگی'), 'مریم احمدی');
+    await userEvent.type(screen.getByLabelText('شمارهٔ همراه'), '09120000000');
+    await userEvent.selectOptions(screen.getByLabelText('استان'), 'فارس');
+    await waitFor(() => expect(screen.getByRole('option', { name: 'شیراز' })).toBeDefined());
+    await userEvent.selectOptions(screen.getByLabelText('شهر'), 'شیراز');
+    await userEvent.type(screen.getByLabelText('نشانی کامل'), 'خیابان اول، پلاک ۲');
+    // Two checkboxes now exist: loyalty and the terms. Terms is the last one.
+    const boxes = screen.getAllByRole('checkbox');
+    const termsBox = boxes[boxes.length - 1];
+    if (!termsBox) throw new Error('the terms checkbox should be on the page');
+    await userEvent.click(termsBox);
+    await userEvent.click(screen.getByRole('button', { name: 'ثبت سفارش' }));
+  };
+
+  it('offers the points the buyer holds and gives no flag when they are left alone', async () => {
+    vi.mocked(ordersApi.checkout).mockResolvedValue({
+      data: { order: { id: 1, code: 'GK-TEST-1', status: 'confirmed', payment_status: 'unpaid' } },
+    } as never);
+    renderCheckout();
+
+    expect(await screen.findByText(/استفاده از امتیازهای وفاداری/)).toBeDefined();
+    expect(screen.getByText(/۳۰۰ امتیاز دارید/)).toBeDefined();
+
+    await fillAndSubmit();
+
+    await waitFor(() => expect(ordersApi.checkout).toHaveBeenCalledTimes(1));
+    // Unticked means the server keeps the points; the flag is not a default.
+    expect(vi.mocked(ordersApi.checkout).mock.calls[0]?.[0]).toMatchObject({
+      use_loyalty_points: false,
+    });
+  });
+
+  it('sends the redemption flag once the buyer opts in', async () => {
+    vi.mocked(ordersApi.checkout).mockResolvedValue({
+      data: { order: { id: 1, code: 'GK-TEST-1', status: 'confirmed', payment_status: 'unpaid' } },
+    } as never);
+    renderCheckout();
+
+    // 300 points against a 100,000 order: 30,000 off, and the page says so
+    // before the buyer commits rather than after the server answers.
+    await userEvent.click(await screen.findByRole('checkbox', { name: /استفاده از امتیازهای وفاداری/ }));
+    expect(await screen.findByText(/قابل پرداخت پس از تخفیف امتیاز: ۷۰٬۰۰۰/)).toBeDefined();
+
+    await fillAndSubmit();
+
+    await waitFor(() => expect(ordersApi.checkout).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(ordersApi.checkout).mock.calls[0]?.[0]).toMatchObject({
+      use_loyalty_points: true,
+    });
+  });
+
+  it('hides the switch when the balance cannot buy a whole unit', async () => {
+    vi.mocked(rewardsApi.wallet).mockResolvedValue({
+      data: { id: 1, currency: 'IRT', balance: 0, loyalty_points: 60, updated_at: '', transactions: [] },
+    } as never);
+    renderCheckout();
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'ثبت سفارش' })).toBeDefined());
+    // 60 points would redeem nothing; offering the switch would promise a
+    // discount the checkout path cannot deliver.
+    expect(screen.queryByRole('checkbox', { name: /استفاده از امتیازهای وفاداری/ })).toBeNull();
   });
 });
