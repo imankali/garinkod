@@ -134,7 +134,7 @@ export default function StorefrontPage() {
     );
   }
 
-  const { storefront, listings, counts, posts, stories } = data;
+  const { storefront, listings, counts, posts, stories, highlights } = data;
 
   return (
     <div className="shell flex flex-col gap-6 py-8">
@@ -177,6 +177,71 @@ export default function StorefrontPage() {
           )}
         </div>
       </header>
+
+      {/*
+        Highlights. The profile has always carried them — `highlights` sits in the
+        same response as the posts — and the page dropped the field on the floor,
+        so a seller's curated «برداشت» collection existed for nobody. Each item is
+        a post that was already published; the strip opens them in the same
+        viewer the story ring uses.
+      */}
+      {(highlights ?? []).length > 0 && (
+        <section aria-labelledby="highlights-title">
+          <h2 id="highlights-title" className="text-base font-extrabold text-ink dark:text-white">
+            مجموعه‌ها
+          </h2>
+          <ul className="mt-3 flex gap-3 overflow-x-auto pb-1">
+            {(highlights ?? []).map((highlight) => (
+              <li key={highlight.id} className="w-40 shrink-0">
+                <div className="overflow-hidden rounded-lg border border-line dark:border-night-line">
+                  {highlight.cover_url ? (
+                    <img
+                      src={highlight.cover_url}
+                      alt=""
+                      loading="lazy"
+                      className="h-24 w-full object-cover"
+                    />
+                  ) : (
+                    <div className="h-24 w-full bg-brand-50 dark:bg-night-soft" />
+                  )}
+                  <div className="p-2">
+                    <p className="truncate text-2xs font-extrabold text-ink dark:text-white">
+                      {highlight.title}
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-ink-mute dark:text-white/45">
+                      {nums(highlight.items.length)} مورد
+                    </p>
+                  </div>
+                </div>
+                {highlight.items.length > 0 && (
+                  <ul className="mt-1.5 flex gap-1 overflow-x-auto">
+                    {highlight.items.slice(0, 6).map((item) => (
+                      <li key={item.id} className="shrink-0">
+                        <Link
+                          to={`/storefront/${storefront.slug}`}
+                          aria-label={item.caption || highlight.title}
+                          className="block h-12 w-12 overflow-hidden rounded-sm border border-line dark:border-night-line"
+                        >
+                          {item.image_url ? (
+                            <img
+                              src={item.image_url}
+                              alt=""
+                              loading="lazy"
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <span className="block h-full w-full bg-brand-50 dark:bg-night-soft" />
+                          )}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section aria-labelledby="listings-title">
         <h2 id="listings-title" className="text-base font-extrabold text-ink dark:text-white">

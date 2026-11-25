@@ -264,3 +264,50 @@ describe('StorefrontPage — following a stall', () => {
     expect(screen.queryByRole('button', { name: 'دنبال می‌کنید' })).toBeNull();
   });
 });
+
+describe('StorefrontPage — highlighted collections', () => {
+  it('renders the highlight the profile already carried', async () => {
+    profile.mockResolvedValue(
+      profilePayload({
+        highlights: [
+          {
+            id: 1,
+            title: 'برداشت',
+            cover: null,
+            cover_url: '/images/hero-farm.jpg',
+            position: 0,
+            created_at: '2026-11-25T05:30:41+03:30',
+            items: [
+              {
+                id: 1,
+                post: 2,
+                position: 0,
+                image_url: '/images/hero-farm.jpg',
+                caption: 'برداشت امروز',
+                created_at: '2026-11-25T05:30:41+03:30',
+                is_liked: false,
+                like_count: 0,
+                storefront_slug: 'باغ-سبز-شیراز',
+                storefront_name: 'باغ سبز شیراز',
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    renderPage();
+
+    // `highlights` arrives in the same payload as the posts and the page threw
+    // the field away, so a curated collection existed for nobody.
+    expect(await screen.findByText('برداشت')).toBeDefined();
+    expect(screen.getByText('۱ مورد')).toBeDefined();
+    expect(screen.getByText('مجموعه‌ها')).toBeDefined();
+  });
+
+  it('draws no empty section when the stall has no highlights', async () => {
+    renderPage();
+    await screen.findByText('باغ سبز شیراز');
+
+    expect(screen.queryByText('مجموعه‌ها')).toBeNull();
+  });
+});
