@@ -125,6 +125,11 @@ class ApiPermissionPolicyTests(TestCase):
         "site_contact",
         "site_about",
         "catalog_index",
+        # Home-page hero slides: a curated, read-only list that is meant to be
+        # visible before anyone signs in. Registered here rather than left
+        # implicit so the policy test keeps its meaning: every AllowAny route
+        # has been looked at once.
+        "HeroSlideViewSet",
         "buyer_experiences",
         "site_policies",
         "legal_index",

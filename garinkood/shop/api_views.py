@@ -728,8 +728,11 @@ class CommentViewSet(viewsets.ModelViewSet):
                 comment=comment, user=user,
                 visitor_key=self._visitor_key(request), value=direction,
             )
+        # Recomputed *after* the write, because withdrawal deletes the row: the
+        # old fallback (`direction` whenever a vote had existed) reported
+        # «voted: true» to a reader who had just taken their vote back.
         mine = votes.first()
-        my_value = mine.value if mine else (None if existing is None else direction)
+        my_value = mine.value if mine else None
         # Recompute both tallies from the rows.
         ups = CommentVote.objects.filter(comment=comment, value=1).count()
         downs = CommentVote.objects.filter(comment=comment, value=-1).count()
