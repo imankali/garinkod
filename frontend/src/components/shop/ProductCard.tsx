@@ -101,6 +101,8 @@ export default function ProductCard({
             src={second}
             alt=""
             aria-hidden="true"
+            width={400}
+            height={400}
             loading="lazy"
             decoding="async"
             className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-300 ease-[var(--ease-out)] group-hover:opacity-100 [@media(hover:none)]:hidden"

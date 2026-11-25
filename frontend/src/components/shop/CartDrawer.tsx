@@ -18,10 +18,12 @@ import Button from '../ui/Button';
  * slowly, which is what a panel being thrown in feels like); the scrim fades
  * at 180ms. Exiting is faster (180ms) than entering, as it should be.
  *
- * Accessibility: it is a modal dialog — focus moves in, Escape closes, the
- * page behind is inert to scroll, and focus returns to the cart button on
- * close (the browser does that for free if the button still has focus, so the
- * drawer only has to restore scroll and focus the close button on entry).
+ * Accessibility: it is a modal dialog — focus moves in, Escape closes, Tab
+ * cycles inside it rather than wandering into the page behind, that page is
+ * inert to scroll and to the keyboard while it is closed, and focus returns to
+ * the cart button on close (the browser does that for free if the button still
+ * has focus, so the drawer only has to restore scroll and focus the close
+ * button on entry).
  */
 export default function CartDrawer() {
   const isOpen = useCartStore((state) => state.isOpen);
@@ -31,14 +33,57 @@ export default function CartDrawer() {
   const update = useCartStore((state) => state.updateQuantity);
   const fetchCart = useCartStore((state) => state.fetchCart);
   const closeRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Closed, the panel is still mounted (it has to be, or it could not slide),
+  // so its links and buttons stay in the tab order unless the browser is told
+  // otherwise. `inert` is what tells it; `aria-hidden` alone leaves them
+  // reachable and is itself an accessibility failure.
+  useEffect(() => {
+    const panel = panelRef.current;
+    if (!panel) return;
+    if (isOpen) panel.removeAttribute('inert');
+    else panel.setAttribute('inert', '');
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
     const previous = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     closeRef.current?.focus();
+
+    // Everything the panel would let a keyboard reach. Visibility is not
+    // filtered here on purpose: the drawer is either on screen or inert.
+    const focusable = () =>
+      Array.from(
+        panelRef.current?.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ) ?? [],
+      );
+
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') close();
+      if (event.key === 'Escape') {
+        close();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      // aria-modal promises the rest of the page is unreachable; Tab is the one
+      // way a keyboard user can still reach it, so the ring is closed here.
+      const ring = focusable();
+      if (ring.length === 0) return;
+      const first = ring[0] as HTMLElement;
+      const last = ring[ring.length - 1] as HTMLElement;
+      const active = document.activeElement;
+      if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      } else if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (active && !ring.includes(active as HTMLElement)) {
+        event.preventDefault();
+        first.focus();
+      }
     };
     document.addEventListener('keydown', onKey);
     return () => {
@@ -70,6 +115,7 @@ export default function CartDrawer() {
         )}
       />
       <aside
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-label="سبد خرید"

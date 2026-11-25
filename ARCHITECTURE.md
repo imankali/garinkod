@@ -191,7 +191,7 @@ backfill + worker واقعاً اجرا شده‌اند.
 ### ۴.۳ پاسگاه ماندگار — `media_layout_check`
 به‌جای امید: یک system check جنگو (`shop.W200`) که هر زمان `upload_to`یی با basenameِ MEDIA_ROOT شروع شود، Warning می‌اندازد — تله‌ی دقیقِ منجر به دوباره‌زایی همین بدهی. مهاجرت اجرا و ریشه پاک می‌شود، اما پاسگاه **دائمی** می‌ماند. تست‌های `shop/tests_media_layout.py` (۷ مورد) سکوت روی پیکربندی سالم و برخاست Warning روی پیکربندی بد را قفل کرده‌اند، و رفتار عدم‌بازنویسیِ مقصد و ایدمپوتنسیِ فرمان را روی یک استوریج موقتی (tempfile) که دقیقاً شرایط حادثه را بازسازی می‌کند، آزموده‌اند.
 
-> **ماتریس تأیید نهایی این ۴ ستون:** بک‌اند 402/402 سبز (۱۵۷s) — frontend `tsc --noEmit` = 0 خطا — `eslint` = Silent-pass — `vite build` ≈ ۶.۴s — Playwright enumerate = 242 تست/۷ فایل — LHCI config = Valid + filesystemReports.
+> **ماتریس تأیید نهایی این ۴ ستون:** بک‌اند 402/402 سبز (۱۵۷s) — frontend `tsc --noEmit` = 0 خطا — `eslint` = Silent-pass — `vite build` ≈ ۶.۴s — `vitest` = ۱۱۶ تست/۱۶ فایل سبز — Playwright enumerate = 242 تست/۷ فایل — LHCI config = Valid + filesystemReports.
 
 ---
 
@@ -208,7 +208,7 @@ npm run build && npm run preview        # پورت 4173 با proxy به :8000 �
 
 # گیت‌های کیفیت (همه محلی)
 python manage.py test shop              # 583 backend tests
-npm run test:unit                       # 163 unit/integration tests (بدون مرورگر)
+npm run test:unit                       # 112 تست واحد/یکپارچه در ۱۵ فایل (بدون مرورگر)
 npm run test:all                        # LHCI + playwright
 npm run test:perf:desktop               # نسخه‌ی دسکتاپ LHCI
 ```
@@ -260,9 +260,10 @@ CSRF را خاموش می‌کند، و `APIRequestFactory` اصلاً به لا
    می‌دهد. فرمی که دلیل شکستش را نمی‌گوید هم باگ UX است هم باگ a11y.
 
 پاسگاه‌ها: `shop/tests_security.py::CsrfCookieIssuedTests` (کوکی صادر می‌شود، و
-یک مرورگرِ واردشده با **فقط کوکی‌هایی که سرور خودش داده** می‌تواند غرفه بسازد)
-و `src/pages/StorefrontCreateJourney.test.tsx` (سفر کامل در jsdom). هر دو با
-برداشتنِ درمان قرمز می‌شوند — آزموده شد.
+یک مرورگرِ واردشده با **فقط کوکی‌هایی که سرور خودش داده** می‌تواند غرفه بسازد).
+سمت مرورگر، `src/App.routes.test.tsx` همهٔ مسیرهای هدر و فوتر را با API بدلی
+سوار می‌کند و `src/lib/links.test.ts` هر لینکِ داخلیِ سورس را با جدول
+`<Route>` تطبیق می‌دهد — لینکِ مرده دیگر از این دو رد نمی‌شود.
 
 ---
 
