@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Check } from 'lucide-react';
 
-import { agricultureApi, farmServicesApi } from '../api/services';
+import { agricultureApi, farmServicesApi, locationsApi } from '../api/services';
 import { parseApiError } from '../api/errors';
 import type { ServiceRequestPayload } from '@/types/commerce';
 import PageHead from '../components/shop/PageHead';
@@ -48,6 +48,21 @@ export default function Services() {
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // The same closed set of divisions the checkout uses: a service visit is
+  // dispatched by province, so a typed «تهران» and a typed «استان تهران» must
+  // not become two different answers.
+  const provinces = useQuery({
+    queryKey: ['locations', 'provinces'],
+    queryFn: async () => (await locationsApi.provinces()).data.results ?? [],
+    staleTime: 24 * 60 * 60 * 1000,
+  });
+  const cities = useQuery({
+    queryKey: ['locations', 'cities', province],
+    queryFn: async () => (await locationsApi.cities(province)).data.results ?? [],
+    enabled: Boolean(province),
+    staleTime: 24 * 60 * 60 * 1000,
+  });
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -139,8 +154,30 @@ export default function Services() {
             </SelectField>
             <TextField label="نام و نام خانوادگی" required value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" />
             <TextField label="شمارهٔ همراه" required dir="ltr" inputMode="tel" value={phone} onChange={(event) => setPhone(event.target.value)} autoComplete="tel" />
-            <TextField label="استان" required value={province} onChange={(event) => setProvince(event.target.value)} />
-            <TextField label="شهر / بخش" required value={city} onChange={(event) => setCity(event.target.value)} />
+            <SelectField
+              label="استان"
+              required
+              value={province}
+              onChange={(event) => {
+                setProvince(event.target.value);
+                setCity('');
+              }}
+            >
+              <option value="">انتخاب کنید…</option>
+              {(provinces.data ?? []).map((entry) => (
+                <option key={entry.id} value={entry.name}>
+                  {entry.name}
+                </option>
+              ))}
+            </SelectField>
+            <SelectField label="شهر / بخش" required value={city} disabled={!province} onChange={(event) => setCity(event.target.value)}>
+              <option value="">{province ? 'انتخاب کنید…' : 'اول استان را انتخاب کنید'}</option>
+              {(cities.data ?? []).map((entry) => (
+                <option key={entry.id} value={entry.name}>
+                  {entry.name}
+                </option>
+              ))}
+            </SelectField>
             <TextField label="محصول" value={crop} onChange={(event) => setCrop(event.target.value)} placeholder="مثلاً گوجهٔ گلخانه‌ای" />
             <TextField
               label="مساحت (هکتار)"
