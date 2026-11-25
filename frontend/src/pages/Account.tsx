@@ -239,6 +239,19 @@ export default function Account() {
           </p>
         </section>
 
+        {/* The seller studio is a level-3 promise in /api/levels/. Linking it
+            from the account page is the only way a seller would find it: it is
+            behind a session, so it has no place in the public footer. */}
+        <section className="rounded-lg border border-line bg-paper p-4 dark:border-night-line dark:bg-night-soft">
+          <p className="text-xs font-extrabold text-ink dark:text-white">فروش در گرین‌کود</p>
+          <p className="mt-1 text-2xs leading-6 text-ink-mute dark:text-white/50">
+            غرفه، آگهی محصول و وضعیت بررسی هر آگهی در استودیوی غرفه است.
+          </p>
+          <Button to="/studio" variant="secondary" size="sm" className="mt-2">
+            استودیو غرفه
+          </Button>
+        </section>
+
         <RewardsPanel />
 
         <PushToggle />
