@@ -66,6 +66,16 @@ test.describe('public routes', () => {
     await expect(page.getByRole('heading', { name: 'محصولات این غرفه' })).toBeVisible();
   });
 
+  test('a signed-out storefront page offers login instead of a dead thread', async ({ page, request }) => {
+    const slug = await slugOf(request, '/api/marketplace/storefronts/');
+    await open(page, `/storefront/${slug}`);
+
+    // The chat panel is for signed-in buyers; signed out, the same button is the
+    // way in rather than a thread with nobody to reply to it.
+    await expect(page.getByRole('link', { name: /گفتگو با غرفه/ })).toHaveAttribute('href', '/login');
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+  });
+
   test('an آگهی page states the minimum order and the unit', async ({ page, request }) => {
     const slug = await slugOf(request, '/api/marketplace/listings/');
     await open(page, `/listing/${slug}`);
