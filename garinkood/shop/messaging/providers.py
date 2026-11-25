@@ -343,7 +343,7 @@ def _send_webpush(delivery: Any, text: str) -> ProviderResult:
     payload = delivery.payload if isinstance(delivery.payload, dict) else {}
     data = json.dumps(
         {
-            'title': str(payload.get('push_title') or 'گرین کود')[:120],
+            'title': str(payload.get('push_title') or 'گرین‌کود')[:120],
             'body': text[:500],
             'url': str(payload.get('push_url') or '/orders')[:500],
             'tag': str(payload.get('push_tag') or f'notification-{delivery.id}')[:120],

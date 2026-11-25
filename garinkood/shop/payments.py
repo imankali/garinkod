@@ -176,7 +176,7 @@ class ZarinpalV4Client:
                 "currency": "IRT",
                 "amount": attempt.amount,
                 "callback_url": callback_url,
-                "description": f"پرداخت سفارش {order.code} گرین کود",
+                "description": f"پرداخت سفارش {order.code} گرین‌کود",
                 "metadata": metadata,
             },
         )

@@ -11,6 +11,7 @@ represented-partner record still shows the products filed under it, and the
 picks first, and the most-voted ones as the fallback.
 """
 
+from django.conf import settings
 from django.db.models import Avg, Count, Exists, Max, Min, OuterRef, Q
 from rest_framework import permissions
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
@@ -27,12 +28,18 @@ KINDS = ('category', 'subcategory', 'brand', 'tag')
 
 
 def policy_payload() -> dict:
-    """The return/exchange window and the express option, as configured.
+    """The return/exchange window, the express option and the shipping terms.
 
     ``return_window_days`` is null until someone states it in the admin. The
     footer badge and the legal text both render this value, so the promise is made
     in one place and cannot drift; with nothing configured they fall back to
     wording that makes no numeric claim.
+
+    ``shipping`` is here for the same reason. The storefront used to *tell* the
+    buyer that delivery was free above an amount it had typed into the template —
+    a number the checkout never applied. The threshold and the flat rate are
+    settings, and the only way a page can state them truthfully is to read them
+    from the request that computes them.
     """
     policy = ReturnPolicySettings.load()
     return {
@@ -42,6 +49,14 @@ def policy_payload() -> dict:
         'express_shipping': {
             'enabled': policy.express_shipping_enabled,
             'fee': policy.express_shipping_fee,
+        },
+        'shipping': {
+            'free_threshold': settings.SHIPPING_FREE_THRESHOLD,
+            'flat_rate': settings.SHIPPING_FLAT_RATE,
+            # Whether the shop will actually charge for delivery at all: a zero
+            # flat rate means delivery is free for everyone, and no threshold is
+            # then worth printing.
+            'charges_for_delivery': settings.SHIPPING_FLAT_RATE > 0,
         },
         'updated_at': policy.updated_at.isoformat() if policy.updated_at else '',
     }
@@ -207,7 +222,7 @@ def _landing_for_brand(slug: str) -> dict | None:
         'description': partner.description if partner else '',
         'image_url': partner.logo_url if partner else '',
         'seo_title': f'محصولات {name} | قیمت و موجودی',
-        'seo_description': f'فهرست محصولات {name} در گرین کود، با قیمت، موجودی و مشخصات فنی.',
+        'seo_description': f'فهرست محصولات {name} در گرین‌کود، با قیمت، موجودی و مشخصات فنی.',
         'breadcrumb': _crumbs(('برندها', '/brands'), (name, f'/brand/{slug}')),
         'filters': {'brand_slug': slug},
         'children': [],
@@ -251,7 +266,7 @@ def _landing_for_tag(tag: Tag) -> dict:
         'slug': tag.slug,
         'description': tag.description,
         'image_url': tag.image.url if tag.image else '',
-        'seo_title': tag.seo_title or f'{tag.name} | خرید از گرین کود',
+        'seo_title': tag.seo_title or f'{tag.name} | خرید از گرین‌کود',
         'seo_description': tag.seo_description or (tag.description[:160] if tag.description else ''),
         'breadcrumb': _crumbs(('راهنمای خرید', '/products'), (tag.name, f'/tag/{tag.slug}')),
         'filters': {'tag': tag.slug},
@@ -431,7 +446,7 @@ def buyer_experiences(request):
         'items': [
             {
                 'id': row.id,
-                'name': row.name or (row.user.get_full_name() or 'خریدار گرین کود' if row.user else 'خریدار'),
+                'name': row.name or (row.user.get_full_name() or 'خریدار گرین‌کود' if row.user else 'خریدار'),
                 'body': row.body,
                 'rating': row.rating,
                 'sticker': row.sticker,

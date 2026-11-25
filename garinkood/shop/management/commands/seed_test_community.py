@@ -205,7 +205,7 @@ class Command(BaseCommand):
         if moshaver:
             agent, _ = DeskAgent.objects.get_or_create(
                 user=moshaver, role=DeskAgent.ROLE_CONSULTING,
-                defaults={"display_name": "مهندس مشاور گرین کود", "title": "مشاور ارشد کشاورزی", "is_active": True},
+                defaults={"display_name": "مهندس مشاور گرین‌کود", "title": "مشاور ارشد کشاورزی", "is_active": True},
             )
             self._ensure_photo(agent, "photo", f"desk-consulting-{moshaver.username}", "desk")
         # Both desks look staffed: presence = touched the desk recently.

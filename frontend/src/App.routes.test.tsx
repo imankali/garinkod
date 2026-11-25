@@ -171,6 +171,7 @@ function answer(url: string) {
       return_window_label: '۷ روز ضمانت بازگشت کالا',
       return_conditions: 'کالا باید بازنکرده و سالم باشد.',
       express_shipping: { enabled: false, fee: 0 },
+      shipping: { free_threshold: 2_000_000, flat_rate: 45_000, charges_for_delivery: true },
       updated_at: '',
     };
   }

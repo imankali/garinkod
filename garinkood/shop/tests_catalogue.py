@@ -367,12 +367,12 @@ class ProductFacetAndLandingTests(TestCase):
 
     def test_category_landing_offers_its_subcategories_as_cards(self):
         self.category.description = 'راهنمای خرید کود شیمیایی برای زراعت و باغ'
-        self.category.seo_title = 'کود شیمیایی | گرین کود'
+        self.category.seo_title = 'کود شیمیایی | گرین‌کود'
         self.category.save(update_fields=['description', 'seo_title'])
 
         landing = self.client.get('/api/catalog/landing/category/fertilizer/').data
         self.assertEqual(landing['description'], 'راهنمای خرید کود شیمیایی برای زراعت و باغ')
-        self.assertEqual(landing['seo_title'], 'کود شیمیایی | گرین کود')
+        self.assertEqual(landing['seo_title'], 'کود شیمیایی | گرین‌کود')
         self.assertEqual(landing['filters'], {'category': 'fertilizer'})
         self.assertEqual(landing['count'], 2)
         self.assertEqual([row['slug'] for row in landing['children']], ['سولفوریک'])
@@ -465,6 +465,30 @@ class ShippingAndPolicyTests(TestCase):
         self.assertEqual(data['return_window_days'], 7)
         self.assertIn('۷', data['return_window_label'])
         self.assertIn('فاکتور', policy_payload()['return_conditions'])
+
+    def test_policy_endpoint_publishes_the_shipping_terms_the_checkout_uses(self):
+        """A page may not promise free delivery at a number the checkout ignores.
+
+        The storefront used to print its own threshold; the only source that
+        cannot drift is the same settings the quote is computed from.
+        """
+        from django.conf import settings
+
+        data = self.client.get('/api/site/policies/').data
+
+        self.assertEqual(data['shipping']['free_threshold'], settings.SHIPPING_FREE_THRESHOLD)
+        self.assertEqual(data['shipping']['flat_rate'], settings.SHIPPING_FLAT_RATE)
+        self.assertEqual(
+            data['shipping']['charges_for_delivery'], settings.SHIPPING_FLAT_RATE > 0
+        )
+
+        # …and it matches what the quote endpoint actually charges.
+        self.client.post('/api/cart/add/', {'product_id': self.product.id, 'quantity': 1}, format='json')
+        quoted = self.client.post(
+            '/api/shipping/quote/', {'province': 'فارس', 'city': 'شیراز'}, format='json'
+        ).data
+        standard = [row for row in quoted['quotes'] if row['service'] == 'standard'][0]
+        self.assertEqual(standard['amount'], settings.SHIPPING_FLAT_RATE)
 
     def test_legal_returns_document_carries_the_live_value(self):
         ReturnPolicySettings.objects.create(pk=1, window_days=5)

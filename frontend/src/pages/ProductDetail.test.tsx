@@ -107,6 +107,7 @@ beforeEach(() => {
       return_window_label: '۷ روز ضمانت بازگشت کالا',
       return_conditions: '',
       express_shipping: { enabled: false, fee: 0 },
+      shipping: { free_threshold: 2_000_000, flat_rate: 45_000, charges_for_delivery: true },
       updated_at: '',
     },
   } as never);
@@ -186,8 +187,18 @@ describe('ProductDetail packaging', () => {
         return_window_label: '',
         return_conditions: '',
         express_shipping: { enabled: false, fee: 0 },
+        shipping: { free_threshold: 2_000_000, flat_rate: 45_000, charges_for_delivery: true },
         updated_at: '',
       },
     } as never);
+  });
+
+  it('states the free-delivery threshold the checkout will apply', async () => {
+    renderPage();
+
+    // The number is the API's, not a sentence typed into this file: the page
+    // used to promise a threshold the server did not honour.
+    expect(await screen.findByText(/رایگان برای سفارش‌های بالای/)).toBeDefined();
+    expect(screen.getByText(/۲٬۰۰۰٬۰۰۰/)).toBeDefined();
   });
 });

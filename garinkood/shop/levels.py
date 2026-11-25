@@ -288,7 +288,7 @@ def may_contact_desk(user, channel: str, *, staff_of_desk: bool = False) -> tupl
     if channel == StorefrontConversation.CHANNEL_SUPPORT:
         if is_staff_level(level_for(user)) or getattr(user, 'is_superuser', False):
             return False, (
-                'تیم گرین کود با میز پشتیبانی خودش گفتگو نمی‌کند؛ این صف برای کشاورزهاست. '
+                'تیم گرین‌کود با میز پشتیبانی خودش گفتگو نمی‌کند؛ این صف برای کشاورزهاست. '
                 'برای یک ایراد فنی «گزارش خطا» و برای باقی موارد «بازخورد پلتفرم» را استفاده کنید.'
             )
         return True, ''

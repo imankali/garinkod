@@ -63,13 +63,13 @@ DEFAULT_BODIES: dict[tuple[str, str, str], str] = {
         'سفارش {order_code}: {status_label}؛ پرداخت: {payment_status_label}'
     ),
     ('order_status_changed', 'customer', 'sms'): (
-        'گرین کود: وضعیت سفارش {order_code} به «{status_label}» تغییر کرد.'
+        'گرین‌کود: وضعیت سفارش {order_code} به «{status_label}» تغییر کرد.'
     ),
     ('order_status_changed', 'customer', 'bale'): (
-        'گرین کود: وضعیت سفارش {order_code} به «{status_label}» تغییر کرد.'
+        'گرین‌کود: وضعیت سفارش {order_code} به «{status_label}» تغییر کرد.'
     ),
     ('order_status_changed', 'customer', 'whatsapp'): (
-        'گرین کود: وضعیت سفارش {order_code} به «{status_label}» تغییر کرد.'
+        'گرین‌کود: وضعیت سفارش {order_code} به «{status_label}» تغییر کرد.'
     ),
     ('order_status_changed', 'customer', 'webpush'): (
         'وضعیت سفارش {order_code} به «{status_label}» تغییر کرد.'
@@ -292,7 +292,7 @@ def enqueue_order_event(order: Order, event: str) -> int:
                     'payload': {
                         'order_code': context['order_code'],
                         'provider_options': provider_options,
-                        'push_title': 'به‌روزرسانی سفارش گرین کود',
+                        'push_title': 'به‌روزرسانی سفارش گرین‌کود',
                         'push_url': f'/orders?order={context["order_code"]}',
                         'push_tag': f'order-{context["order_code"]}',
                     },
@@ -316,7 +316,7 @@ def enqueue_test_delivery(recipient: NotificationRecipient) -> NotificationDeliv
     if template and not template.is_active:
         raise ValueError('قالب پیام آزمایشی این کانال غیرفعال است.')
     body = template.body if template else (
-        'پیام آزمایشی گرین کود: اتصال کانال پیام‌رسان با موفقیت در صف بررسی قرار گرفت.'
+        'پیام آزمایشی گرین‌کود: اتصال کانال پیام‌رسان با موفقیت در صف بررسی قرار گرفت.'
     )
     provider_options = {}
     if template and template.provider_template_name:

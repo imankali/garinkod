@@ -379,7 +379,7 @@ def queue_page_html(snapshot: dict, ticket, row) -> str:
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
 <meta http-equiv="refresh" content="{REFRESH_SECONDS}">
-<title>صف انتظار | گرین کود</title>
+<title>صف انتظار | گرین‌کود</title>
 <style>
 :root {{ color-scheme: light dark }}
 * {{ box-sizing: border-box }}
@@ -408,7 +408,7 @@ small {{ color:#94a3b8; font-size:11px; line-height:1.9; display:block; margin-t
 </head>
 <body>
 <main>
-  <span class="badge">گرین کود — این لحظه شلوغ است</span>
+  <span class="badge">گرین‌کود — این لحظه شلوغ است</span>
   <h1>{escape(headline)}</h1>
   <p>{escape(message)}</p>
   <p>{escape(detail)}</p>

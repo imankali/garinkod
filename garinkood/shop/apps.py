@@ -6,7 +6,7 @@ from django.apps import AppConfig
 class ShopConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'shop'
-    verbose_name = 'فروشگاه گرین کود'
+    verbose_name = 'فروشگاه گرین‌کود'
 
     def ready(self):
         # Register database connection tuning without importing models at

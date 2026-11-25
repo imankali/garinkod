@@ -302,6 +302,15 @@ export interface SitePolicies {
   return_window_label: string;
   return_conditions: string;
   express_shipping: { enabled: boolean; fee: number };
+  /**
+   * The delivery terms the checkout actually applies. Published so a page can
+   * state the free-delivery threshold without typing its own copy of it.
+   */
+  shipping?: {
+    free_threshold: number;
+    flat_rate: number;
+    charges_for_delivery: boolean;
+  };
   updated_at: string;
 }
 

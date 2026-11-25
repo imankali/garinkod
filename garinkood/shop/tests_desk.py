@@ -579,7 +579,7 @@ class AgentIdentityTests(TestCase):
         api(self.farmer).post(f'/api/desk/conversations/{self.conversation["id"]}/close/', {}, format='json')
         notice = self._thread()['results'][-1]
         self.assertTrue(notice['is_system'])
-        self.assertEqual(notice['sender_name'], 'گرین کود')
+        self.assertEqual(notice['sender_name'], 'گرین‌کود')
         self.assertFalse(notice['is_mine'])
         self.assertFalse(notice['can_edit'])
 

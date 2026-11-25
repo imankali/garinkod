@@ -294,7 +294,7 @@ class TeamMember(models.Model):
     class Meta:
         ordering = ('order', 'name')
         verbose_name = "عضو تیم"
-        verbose_name_plural = "تیم گرین کود"
+        verbose_name_plural = "تیم گرین‌کود"
 
     def __str__(self):
         return f'{self.name} — {self.role}'

@@ -96,7 +96,7 @@ class Command(BaseCommand):
         # sample data shows what the ladder actually separates.
         consultant, _ = User.objects.get_or_create(
             username='moshaver',
-            defaults={'email': 'moshaver@example.com', 'first_name': 'کارشناس', 'last_name': 'گرین کود'},
+            defaults={'email': 'moshaver@example.com', 'first_name': 'کارشناس', 'last_name': 'گرین‌کود'},
         )
         if not consultant.check_password(self.DEMO_PASSWORD):
             consultant.set_password(self.DEMO_PASSWORD)
@@ -116,7 +116,7 @@ class Command(BaseCommand):
             user=consultant,
             defaults={
                 'role': DeskAgent.ROLE_CONSULTING,
-                'display_name': 'کارشناس گرین کود',
+                'display_name': 'کارشناس گرین‌کود',
                 'title': 'مشاور ارشد کشاورزی',
                 'is_active': True,
             },

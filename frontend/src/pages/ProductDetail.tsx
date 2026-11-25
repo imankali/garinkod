@@ -66,6 +66,9 @@ export default function ProductDetail() {
     staleTime: 30 * 60 * 1000,
   });
 
+  // The delivery terms, from the same payload the checkout reads them from.
+  const shipping = policy.data?.shipping;
+
   const similar = useQuery({
     queryKey: ['product-similar', slug],
     queryFn: async () => (await productsApi.getSimilar(slug)).data,
@@ -382,13 +385,26 @@ export default function ProductDetail() {
               <li className="flex items-start gap-2">
                 <Truck size={14} aria-hidden="true" className="mt-1 shrink-0 text-brand-700 dark:text-brand-300" />
                 <span>
-                  ارسال به سراسر کشور
+                  {shipping?.charges_for_delivery ? (
+                    <>
+                      ارسال به سراسر کشور از {money(shipping.flat_rate)}
+                      {shipping.free_threshold > 0 && (
+                        <span className="block font-bold text-brand-800 dark:text-brand-300">
+                          رایگان برای سفارش‌های بالای {money(shipping.free_threshold)}
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <>ارسال رایگان به سراسر کشور</>
+                  )}
                   {policy.data?.express_shipping.enabled && (
                     <> · ارسال سریع فعال است ({money(policy.data.express_shipping.fee)})</>
                   )}
-                  <span className="block text-ink-mute dark:text-white/40">
-                    هزینهٔ ارسال پیش از پرداخت، پس از تأیید موجودی، اعلام می‌شود.
-                  </span>
+                  {shipping?.charges_for_delivery && (
+                    <span className="block text-ink-mute dark:text-white/40">
+                      مبلغ نهایی پیش از پرداخت، پس از تأیید موجودی، دوباره محاسبه می‌شود.
+                    </span>
+                  )}
                 </span>
               </li>
               <li className="flex items-start gap-2">

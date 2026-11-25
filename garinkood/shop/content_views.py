@@ -273,7 +273,7 @@ def newsletter_subscribe(request):
             'subscribed': True,
             'email': subscriber.email,
             'mobile': subscriber.mobile,
-            'message': 'عضویت شما در خبرنامه گرین کود ثبت شد.',
+            'message': 'عضویت شما در خبرنامه گرین‌کود ثبت شد.',
         },
         status=status.HTTP_201_CREATED,
     )

@@ -154,7 +154,7 @@ def notify_comment_reply(comment) -> StorefrontMessage | None:
 def notify_support(user, body: str, *, sender=None, subject: str = '') -> StorefrontMessage:
     """Send a message to a user from the support desk."""
     conversation = get_or_create_service_thread(
-        user, StorefrontConversation.CHANNEL_SUPPORT, subject=subject or 'پشتیبانی گرین کود'
+        user, StorefrontConversation.CHANNEL_SUPPORT, subject=subject or 'پشتیبانی گرین‌کود'
     )
     return post_system_message(conversation, sender or user, body)
 

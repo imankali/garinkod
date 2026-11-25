@@ -1804,7 +1804,7 @@ class StorefrontMessageSerializer(serializers.ModelSerializer):
         """
         conversation = obj.conversation
         if obj.sender_id is None:
-            return 'گرین کود'
+            return 'گرین‌کود'
         if obj.sender_id != conversation.customer_id:
             if conversation.channel == StorefrontConversation.CHANNEL_STOREFRONT:
                 if conversation.storefront_id:
@@ -2288,7 +2288,7 @@ class SiteArticleListSerializer(serializers.ModelSerializer):
         if obj.author:
             full = f'{obj.author.first_name} {obj.author.last_name}'.strip()
             return full or obj.author.username
-        return 'تیم گرین کود'
+        return 'تیم گرین‌کود'
 
     def get_cover_url(self, obj) -> str:
         return obj.cover_url
@@ -2318,7 +2318,7 @@ class SiteArticleSerializer(serializers.ModelSerializer):
         if obj.author:
             full = f'{obj.author.first_name} {obj.author.last_name}'.strip()
             return full or obj.author.username
-        return 'تیم گرین کود'
+        return 'تیم گرین‌کود'
 
     def get_cover_url(self, obj) -> str:
         return obj.cover_url
@@ -2422,7 +2422,7 @@ class SitePageSerializer(serializers.ModelSerializer):
         return obj.hero_image_url
 
     def get_updated_by(self, obj) -> str:
-        return 'تیم گرین کود'
+        return 'تیم گرین‌کود'
 
     def get_product(self, obj) -> dict | None:
         if not obj.product_id:
