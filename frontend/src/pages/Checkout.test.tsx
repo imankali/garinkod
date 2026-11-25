@@ -16,7 +16,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../api/services', () => ({
   locationsApi: { provinces: vi.fn(), cities: vi.fn() },
   ordersApi: { checkout: vi.fn() },
-  paymentsApi: { options: vi.fn() },
+  paymentsApi: { options: vi.fn(), restartZarinpal: vi.fn() },
   rewardsApi: { wallet: vi.fn() },
   shippingApi: { quote: vi.fn() },
 }));
@@ -360,5 +360,82 @@ describe('Checkout shipping quote', () => {
     // authoritative_at_checkout is false: the page must repeat the server's
     // caveat rather than print a total as if it were settled.
     expect(await screen.findByText(/دوباره محاسبه می‌شود/)).toBeDefined();
+  });
+});
+
+describe('Checkout payment redirect', () => {
+  const submit = async () => {
+    await waitFor(() => expect(screen.getByRole('option', { name: 'فارس' })).toBeDefined());
+    await userEvent.type(screen.getByLabelText('نام و نام خانوادگی'), 'مریم احمدی');
+    // The field is seeded from the signed-in account, so clear it before typing
+    // or the number doubles. (This is why the retry sends `phone.trim()`.)
+    await userEvent.clear(screen.getByLabelText('شمارهٔ همراه'));
+    await userEvent.type(screen.getByLabelText('شمارهٔ همراه'), '09120000000');
+    await userEvent.selectOptions(screen.getByLabelText('استان'), 'فارس');
+    await waitFor(() => expect(screen.getByRole('option', { name: 'شیراز' })).toBeDefined());
+    await userEvent.selectOptions(screen.getByLabelText('شهر'), 'شیراز');
+    await userEvent.type(screen.getByLabelText('نشانی کامل'), 'خیابان اول، پلاک ۲');
+    const boxes = screen.getAllByRole('checkbox');
+    const termsBox = boxes[boxes.length - 1];
+    if (!termsBox) throw new Error('the terms checkbox should be on the page');
+    await userEvent.click(termsBox);
+    await userEvent.click(screen.getByRole('button', { name: 'ثبت سفارش' }));
+  };
+
+  it('sends the buyer to the gateway the server created', async () => {
+    // The server answers with a live attempt whose checkout_url is the whole
+    // point of choosing زرین‌پال. The page used to discard it and navigate to
+    // tracking, where the order reads «پرداخت نشده» with no way to pay.
+    vi.mocked(ordersApi.checkout).mockResolvedValue({
+      data: {
+        order: { code: 'GK-TEST-0009' },
+        payment: { checkout_url: 'https://gateway.example/pay/abc' },
+        payment_error: '',
+        message: '',
+      },
+    } as never);
+    // `window.location.assign` is stubbed before the page mounts: the mobile
+    // field is seeded from `account.phone`, and typing into an input that
+    // already holds a number appends to it.
+    const assign = vi.fn();
+    const original = window.location;
+    Object.defineProperty(window, 'location', { configurable: true, value: { ...original, assign } });
+    renderCheckout();
+
+    await submit();
+
+    await waitFor(() => expect(assign).toHaveBeenCalledWith('https://gateway.example/pay/abc'));
+    Object.defineProperty(window, 'location', { configurable: true, value: original });
+  });
+
+  it('keeps the order and offers a retry when the gateway link fails', async () => {
+    // The backend books the order and reserves stock *before* calling the
+    // provider, and returns payment_error with a valid order. Treating that as
+    // a failed checkout would lose a real order.
+    vi.mocked(ordersApi.checkout).mockResolvedValue({
+      data: {
+        order: { code: 'GK-TEST-0010' },
+        payment: null,
+        payment_error: 'درگاه پرداخت پاسخ نداد.',
+        message: '',
+      },
+    } as never);
+    vi.mocked(paymentsApi.restartZarinpal).mockResolvedValue({
+      data: { payment: { checkout_url: 'https://gateway.example/pay/retry' } },
+    } as never);
+    renderCheckout();
+
+    const assign = vi.fn();
+    const original = window.location;
+    Object.defineProperty(window, 'location', { configurable: true, value: { ...original, assign } });
+
+    await submit();
+
+    expect(await screen.findByText(/سفارش GK-TEST-0010 ثبت شد/)).toBeDefined();
+    expect(screen.getByText(/موجودی رزرو شده/)).toBeDefined();
+
+    await userEvent.click(screen.getByRole('button', { name: 'تلاش دوباره برای پرداخت' }));
+    await waitFor(() => expect(paymentsApi.restartZarinpal).toHaveBeenCalledWith('GK-TEST-0010', '09120000000'));
+    Object.defineProperty(window, 'location', { configurable: true, value: original });
   });
 });

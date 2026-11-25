@@ -72,9 +72,20 @@
   --color-ink-mute: #64776b;
   --color-line: #e2e8dd;
 
+  /* The gold accent is used at warning-panel depth as well as at text depth.
+   * Six of the shades the components already asked for (50, 200, 300, 500,
+   * 800, 900) had no token, so `bg-gold-50`, `border-gold-200` and the rest
+   * quietly compiled to nothing: the panels had borders and text but no fill,
+   * which reads as a rendering accident rather than a design. */
+  --color-gold-50: #fffbeb;
   --color-gold-100: #fef3c7;
+  --color-gold-200: #fde68a;
+  --color-gold-300: #fcd34d;
+  --color-gold-500: #d97706;
   --color-gold-600: #ca8a04;
   --color-gold-700: #a16207;
+  --color-gold-800: #854d0e;
+  --color-gold-900: #713f12;
 
   --color-danger-50: #fef2f2;
   --color-danger-600: #dc2626;

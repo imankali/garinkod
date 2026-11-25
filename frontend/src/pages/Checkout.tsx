@@ -38,6 +38,13 @@ export default function Checkout() {
   const user = useAuthStore((state) => state.user);
   const account = useAuthStore((state) => state.account);
 
+  // Checkout answers with `payment` (a live gateway attempt) and `payment_error`
+  // (the order exists, the gateway link does not). Both were discarded: a buyer
+  // who chose زرین‌پال was sent to a tracking page that says «پرداخت نشده» and
+  // offers no way to pay. An order that skipped payment is useless.
+  const [paymentIssue, setPaymentIssue] = useState<string | null>(null);
+  const [placedCode, setPlacedCode] = useState<string | null>(null);
+  const [retrying, setRetrying] = useState(false);
   const [name, setName] = useState(user ? [user.first_name, user.last_name].filter(Boolean).join(' ') : '');
   const [phone, setPhone] = useState(account?.phone ?? '');
   const [province, setProvince] = useState('');
@@ -138,6 +145,7 @@ export default function Checkout() {
     if (!terms || busy) return;
     setBusy(true);
     setError(null);
+    setPaymentIssue(null);
     try {
       const result = await ordersApi.checkout({
         customer_name: name,
@@ -157,6 +165,19 @@ export default function Checkout() {
         use_loyalty_points: Boolean(usePoints) && pointsDiscount > 0,
       });
       await queryClient.invalidateQueries({ queryKey: ['cart'] });
+      const gateway = result.data.payment?.checkout_url;
+      if (gateway) {
+        window.location.assign(gateway);
+        return;
+      }
+      if (result.data.payment_error) {
+        // The order is booked and stock is reserved — the server says so —
+        // so do not pretend the checkout failed. Say the link did not get
+        // built and keep the buyer here to try again.
+        setPaymentIssue(result.data.payment_error);
+        setPlacedCode(result.data.order.code);
+        return;
+      }
       navigate(`/track?code=${result.data.order.code}`, { replace: true });
     } catch (caught) {
       setError(parseApiError(caught).message);
@@ -407,7 +428,53 @@ export default function Checkout() {
               </span>
             </label>
 
-            {error && (
+            {paymentIssue && placedCode && (
+        <div
+          role="alert"
+          className="mt-4 rounded-md border border-gold-300 bg-gold-50 p-3 text-2xs dark:border-gold-700 dark:bg-gold-900/20"
+        >
+          <p className="font-extrabold text-ink dark:text-white">
+            سفارش {placedCode} ثبت شد، اما لینک پرداخت ساخته نشد.
+          </p>
+          <p className="mt-1 text-ink-soft dark:text-white/70">
+            موجودی رزرو شده و سفارش از بین نرفته است. یک بار دیگر تلاش کنید؛ اگر باز هم نشد، از
+            پیگیری سفارش با کد و شمارهٔ همراه وضعیت را ببینید.
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <Button
+              type="button"
+              size="sm"
+              loading={retrying}
+              onClick={async () => {
+                setRetrying(true);
+                try {
+                  const answer = await paymentsApi.restartZarinpal(placedCode, phone.trim());
+                  const gateway = answer.data.payment.checkout_url;
+                  if (gateway) {
+                    window.location.assign(gateway);
+                    return;
+                  }
+                  setPaymentIssue('درگاه نشانی پرداخت برنگرداند. لطفاً بعداً تلاش کنید.');
+                } catch (caught) {
+                  setPaymentIssue(parseApiError(caught).message);
+                } finally {
+                  setRetrying(false);
+                }
+              }}
+            >
+              تلاش دوباره برای پرداخت
+            </Button>
+            <Link
+              to={`/track?code=${encodeURIComponent(placedCode)}`}
+              className="text-2xs font-bold text-brand-800 underline underline-offset-2 dark:text-brand-300"
+            >
+              پیگیری سفارش
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {error && (
               <p role="alert" className="mt-3 rounded-md border border-danger-600/30 bg-danger-50 px-3 py-2 text-2xs font-medium text-danger-700 dark:bg-danger-700/15">
                 {error}
               </p>
