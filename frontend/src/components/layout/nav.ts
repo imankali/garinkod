@@ -49,6 +49,8 @@ export const FOOTER_NAV: ReadonlyArray<{ title: string; items: ReadonlyArray<Nav
     title: 'خدمات',
     items: [
       { to: '/services', label: 'خدمات مزرعه' },
+      { to: '/farm', label: 'زمین‌ها و تقویم کشت' },
+      { to: '/calculator', label: 'ماشین‌حساب کود و سم' },
       { to: '/farmers', label: 'فروش محصول' },
       { to: '/track', label: 'پیگیری سفارش' },
       { to: '/support', label: 'پشتیبانی' },

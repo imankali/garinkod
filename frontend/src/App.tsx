@@ -49,6 +49,8 @@ const Contact = lazy(() => import('./pages/Contact'));
 const Support = lazy(() => import('./pages/Support'));
 const Legal = lazy(() => import('./pages/Legal'));
 const SitePage = lazy(() => import('./pages/SitePage'));
+const Farm = lazy(() => import('./pages/Farm'));
+const Calculator = lazy(() => import('./pages/Calculator'));
 const Affiliate = lazy(() => import('./pages/Affiliate'));
 const Auth = lazy(() => import('./pages/Auth'));
 const Account = lazy(() => import('./pages/Account'));
@@ -185,6 +187,8 @@ export default function App() {
               <Route path="/legal/:slug" element={<Legal />} />
               {/* The address SitePage.get_absolute_url returns. */}
               <Route path="/page/:slug" element={<SitePage />} />
+              <Route path="/farm" element={<Farm />} />
+              <Route path="/calculator" element={<Calculator />} />
 
               {/* Account and orders */}
               <Route path="/login" element={<Auth />} />
