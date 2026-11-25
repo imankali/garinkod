@@ -191,7 +191,7 @@ backfill + worker واقعاً اجرا شده‌اند.
 ### ۴.۳ پاسگاه ماندگار — `media_layout_check`
 به‌جای امید: یک system check جنگو (`shop.W200`) که هر زمان `upload_to`یی با basenameِ MEDIA_ROOT شروع شود، Warning می‌اندازد — تله‌ی دقیقِ منجر به دوباره‌زایی همین بدهی. مهاجرت اجرا و ریشه پاک می‌شود، اما پاسگاه **دائمی** می‌ماند. تست‌های `shop/tests_media_layout.py` (۷ مورد) سکوت روی پیکربندی سالم و برخاست Warning روی پیکربندی بد را قفل کرده‌اند، و رفتار عدم‌بازنویسیِ مقصد و ایدمپوتنسیِ فرمان را روی یک استوریج موقتی (tempfile) که دقیقاً شرایط حادثه را بازسازی می‌کند، آزموده‌اند.
 
-> **ماتریس تأیید نهایی این ۴ ستون:** بک‌اند 402/402 سبز (۱۵۷s) — frontend `tsc --noEmit` = 0 خطا — `eslint` = Silent-pass — `vite build` ≈ ۶.۴s — `vitest` = ۱۱۶ تست/۱۶ فایل سبز — Playwright enumerate = 242 تست/۷ فایل — LHCI config = Valid + filesystemReports.
+> **ماتریس تأیید نهایی این ۴ ستون:** بک‌اند 402/402 سبز (۱۵۷s) — frontend `tsc --noEmit` = 0 خطا — `eslint` = Silent-pass — `vite build` ≈ ۶.۴s — `vitest` = ۱۱۷ تست/۱۷ فایل سبز — Playwright enumerate = 242 تست/۷ فایل — LHCI config = Valid + filesystemReports.
 
 ---
 

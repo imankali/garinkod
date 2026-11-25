@@ -4,6 +4,7 @@ import { Link } from 'react-router';
 
 import Button from '../components/ui/Button';
 import { NAV } from '../components/layout/nav';
+import { useTitle } from '../lib/useTitle';
 
 /**
  * A 404 that is a map, not an apology.
@@ -12,6 +13,9 @@ import { NAV } from '../components/layout/nav';
  * rather than on an illustration and the words «صفحه یافت نشد» twice.
  */
 export default function NotFound() {
+  // The only page that does not open with <PageHead>, so it names itself.
+  useTitle('این نشانی وجود ندارد');
+
   return (
     <div className="shell flex flex-col gap-6 py-16">
       <div className="max-w-[55ch]">

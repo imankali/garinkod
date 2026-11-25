@@ -31,7 +31,7 @@ const MESSAGES: Record<Locale, CodeMessages> = {
     service_unavailable: 'سرویس ارسال پیام موقتاً در دسترس نیست. کمی بعد تلاش کنید.',
     // The shop is holding its door because it is busy, not because it is broken.
     shop_overloaded: 'سایت در این لحظه شلوغ است. جایتان در صف نگه داشته شده و به ترتیب ورود وارد می‌شوید.',
-    staff_not_a_desk_customer: 'تیم گرین کود با میز خدمات خودش گفتگو نمی‌کند؛ مورد را از همان صف پیگیری کنید.',
+    staff_not_a_desk_customer: 'تیم گرین‌کود با میز خدمات خودش گفتگو نمی‌کند؛ مورد را از همان صف پیگیری کنید.',
     network_error: 'اتصال به سرور برقرار نشد. لطفاً اتصال اینترنت خود را بررسی کنید.',
     timeout: 'زمان اتصال به سرور به پایان رسید. لطفاً اینترنت خود را بررسی کنید.',
     error: 'خطایی رخ داد. لطفاً دوباره تلاش کنید.',

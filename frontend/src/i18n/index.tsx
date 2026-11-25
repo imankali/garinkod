@@ -28,7 +28,7 @@ const dictionaries: Record<Locale, Dictionary> = {
     "home.heroLead": "کود، سم، بذر و ادوات از فروشگاه تخصصی — یا محصول تازه، مستقیم از غرفه کشاورز.",
     "home.heroSubtitle": "از فروشگاه تخصصی خرید کنید یا مستقیم از غرفه کشاورزان و تعاونی‌ها سفارش بگیرید. هر آگهی پیش از انتشار بررسی می‌شود.",
     "home.buyFromShop": "خرید از فروشگاه", "home.farmersMarket": "بازار غرفه‌داران",
-    "shop.title": "فروشگاه گرین کود", "shop.subtitle": "فقط محصولات تخصصی خود سایت؛ با دسته‌بندی و صفحه‌بندی کامل.",
+    "shop.title": "فروشگاه گرین‌کود", "shop.subtitle": "فقط محصولات تخصصی خود سایت؛ با دسته‌بندی و صفحه‌بندی کامل.",
     "shop.all": "همه محصولات", "shop.bestSellers": "پرفروش‌ترین‌ها", "shop.mostDiscounted": "پرتخفیف‌ترین‌ها", "shop.newest": "جدیدترین‌ها",
     "shop.categories": "دسته‌بندی‌ها", "shop.noProducts": "محصولی در این بخش یافت نشد.",
     "shop.allProducts": "همه محصولات فروشگاه", "shop.backToAll": "بازگشت به همه محصولات",
@@ -58,7 +58,7 @@ const dictionaries: Record<Locale, Dictionary> = {
     "direct.channelsHint": "منبع پیام",
     "checkout.title": "اطلاعات تحویل سفارش",
     "footer.shipping": "ایران — ارسال به سراسر کشور",
-    "footer.rights": "© گرین کود — تأمین، فروش و خدمات کشاورزی",
+    "footer.rights": "© گرین‌کود — تأمین، فروش و خدمات کشاورزی",
   },
   en: {
     "nav.home": "Home", "nav.products": "Products", "nav.services": "Farm services", "nav.marketplace": "Farmers market", "nav.offers": "Offers", "nav.storefronts": "Sellers",

@@ -6,7 +6,7 @@ self.addEventListener('push', (event) => {
   } catch (_error) {
     payload = { body: event.data ? event.data.text() : '' };
   }
-  const title = String(payload.title || 'گرین کود').slice(0, 120);
+  const title = String(payload.title || 'گرین‌کود').slice(0, 120);
   let target = '/orders';
   try {
     const candidate = new URL(String(payload.url || '/orders'), self.location.origin);
