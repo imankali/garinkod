@@ -43,6 +43,7 @@ const Guides = lazy(() => import('./pages/Guides'));
 const StorefrontPage = lazy(() => import('./pages/StorefrontPage'));
 const ListingDetail = lazy(() => import('./pages/ListingDetail'));
 const Services = lazy(() => import('./pages/Services'));
+const ServiceDetail = lazy(() => import('./pages/ServiceDetail'));
 const Farmers = lazy(() => import('./pages/Farmers'));
 const Magazine = lazy(() => import('./pages/Magazine'));
 const Article = lazy(() => import('./pages/Article'));
@@ -178,6 +179,7 @@ export default function App() {
 
               {/* Services and selling */}
               <Route path="/services" element={<Services />} />
+              <Route path="/services/:slug" element={<ServiceDetail />} />
               <Route path="/farmers" element={<Farmers />} />
               <Route path="/affiliate" element={<Affiliate />} />
 

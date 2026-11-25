@@ -1,6 +1,7 @@
 // frontend/src/pages/Services.tsx
 
 import { useState } from 'react';
+import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { Check } from 'lucide-react';
 
@@ -106,7 +107,14 @@ export default function Services() {
           <ul className="mt-3 grid gap-3 sm:grid-cols-2">
             {(catalog.data ?? []).map((service) => (
               <li key={service.id} className="rounded-lg border border-line bg-paper p-4 dark:border-night-line dark:bg-night-soft">
-                <h3 className="text-xs font-extrabold text-ink dark:text-white">{service.title}</h3>
+                <h3 className="text-xs font-extrabold text-ink dark:text-white">
+                  <Link
+                    to={`/services/${encodeURIComponent(service.slug)}`}
+                    className="hover:text-brand-800 hover:underline dark:hover:text-brand-300"
+                  >
+                    {service.title}
+                  </Link>
+                </h3>
                 <p className="mt-1 text-2xs leading-6 text-ink-soft dark:text-white/60">{service.summary}</p>
                 {service.highlights.length > 0 && (
                   <ul className="mt-2 space-y-1">
