@@ -53,6 +53,7 @@ const Farm = lazy(() => import('./pages/Farm'));
 const Calculator = lazy(() => import('./pages/Calculator'));
 const Studio = lazy(() => import('./pages/Studio'));
 const Inbox = lazy(() => import('./pages/Inbox'));
+const PhotoCheck = lazy(() => import('./pages/PhotoCheck'));
 const Affiliate = lazy(() => import('./pages/Affiliate'));
 const Auth = lazy(() => import('./pages/Auth'));
 const Account = lazy(() => import('./pages/Account'));
@@ -193,6 +194,7 @@ export default function App() {
               <Route path="/calculator" element={<Calculator />} />
               <Route path="/studio" element={<Studio />} />
               <Route path="/inbox" element={<Inbox />} />
+              <Route path="/photo-check" element={<PhotoCheck />} />
 
               {/* Account and orders */}
               <Route path="/login" element={<Auth />} />
