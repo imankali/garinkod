@@ -24,6 +24,15 @@ export default function Magazine() {
     staleTime: 10 * 60 * 1000,
   });
 
+  // `/articles/crops/` lists the crops that already have a guide, with counts.
+  // It had no caller, so the magazine had no way to answer «راهنمای گندم دارید؟»
+  // other than scrolling the whole list.
+  const crops = useQuery({
+    queryKey: ['article-crops'],
+    queryFn: async () => (await articlesApi.getCrops()).data,
+    staleTime: 30 * 60 * 1000,
+  });
+
   const posts = data ?? [];
   const [lead, ...rest] = posts;
 
@@ -33,6 +42,23 @@ export default function Magazine() {
         title="مجلهٔ کشاورزی"
         lead="راهنمای فصل کشت، مدیریت آفات و انتخاب نهاده — نوشتهٔ کارشناسان گرین‌کود، برای مزرعهٔ واقعی."
       />
+
+      {(crops.data ?? []).length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-[11px] font-bold text-ink-mute dark:text-white/40">محصول:</span>
+          {(crops.data ?? []).map((row) => (
+            <span
+              key={row.crop}
+              className="inline-flex min-h-7 items-center gap-1 rounded-sm border border-line px-2 text-[11px] font-bold text-ink-soft dark:border-night-line dark:text-white/60"
+            >
+              {row.crop}
+              <span className="dateline text-ink-mute dark:text-white/35">
+                {row.article_count.toLocaleString('fa-IR')}
+              </span>
+            </span>
+          ))}
+        </div>
+      )}
 
       {isLoading ? (
         <div className="flex flex-col gap-2">

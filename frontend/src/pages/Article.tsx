@@ -10,6 +10,7 @@ import { ProseSkeleton } from '../components/ui/Skeleton';
 import EmptyState from '../components/ui/EmptyState';
 import Button from '../components/ui/Button';
 import { useTitle } from '../lib/useTitle';
+import { money } from '../lib/price';
 
 /**
  * One article.
@@ -109,6 +110,67 @@ export default function Article() {
               <ProductCard key={product.id} product={product} />
             ))}
           </div>
+        </section>
+      )}
+      {(data.listings ?? []).length > 0 && (
+        <section className="mt-10 border-t border-line pt-6 dark:border-night-line" aria-labelledby="listing-title">
+          <h2 id="listing-title" className="text-base font-extrabold text-ink dark:text-white">
+            از غرفه‌داران
+          </h2>
+          {/* A guide about a crop can point at the farmers who grow it. The
+              detail response has always carried `listings` and the page threw
+              the field away — the same mistake as the storefront's highlights. */}
+          <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+            {(data.listings ?? []).map((listing) => (
+              <li key={listing.id}>
+                <Link
+                  to={`/listing/${listing.slug}`}
+                  className="flex items-center justify-between gap-3 rounded-md border border-line px-3 py-2 text-2xs hover:border-brand-300 dark:border-night-line dark:hover:border-brand-600"
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate font-bold text-ink dark:text-white">{listing.title}</span>
+                    <span className="block text-[11px] text-ink-mute dark:text-white/45">
+                      {listing.storefront_name}
+                    </span>
+                  </span>
+                  <span className="dateline shrink-0 text-ink-mute dark:text-white/50">
+                    {money(listing.price)} / {listing.unit}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {(data.related_articles ?? []).length > 0 && (
+        <section className="mt-10 border-t border-line pt-6 dark:border-night-line" aria-labelledby="related-title">
+          <h2 id="related-title" className="text-base font-extrabold text-ink dark:text-white">
+            بیشتر بخوانید
+          </h2>
+          <ul className="mt-3 divide-y divide-line dark:divide-night-line">
+            {(data.related_articles ?? []).map((post) => (
+              <li key={post.id}>
+                <Link
+                  to={`/magazine/${post.slug}`}
+                  className="group flex flex-wrap items-center justify-between gap-x-6 gap-y-1 py-3"
+                >
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-bold text-ink-mute dark:text-white/40">
+                      {post.kind_label}
+                      {post.crop ? ` · ${post.crop}` : ''}
+                    </p>
+                    <p className="mt-0.5 text-xs font-extrabold text-ink transition-colors duration-150 group-hover:text-brand-800 dark:text-white dark:group-hover:text-brand-300">
+                      {post.title}
+                    </p>
+                  </div>
+                  <span className="dateline shrink-0 text-2xs text-ink-mute dark:text-white/40">
+                    {post.reading_minutes.toLocaleString('fa-IR')} دقیقه
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
     </article>
