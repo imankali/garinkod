@@ -139,7 +139,7 @@ export default function SearchField({ compact = false }: { compact?: boolean }) 
                     onClick={() => {
                       setOpen(false);
                       setTerm('');
-                      navigate(`/p/${item.slug}`);
+                      navigate(`/product/${item.slug}`);
                     }}
                     className="flex w-full items-center gap-3 px-3 py-2 text-start transition-colors duration-150 hover:bg-brand-50 focus-visible:bg-brand-50 dark:hover:bg-night dark:focus-visible:bg-night"
                   >
