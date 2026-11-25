@@ -11,8 +11,26 @@ import { heroSlidesApi, type HeroSlideData } from '../../api/services';
 import PlaybackToggle from '../ui/PlaybackToggle';
 
 /**
- * The Digikala-style opening slider: full-width art slides, arrows, dots and
- * a progress line on the active dot — rebuilt for an agricultural brand.
+ * The opening band of the home page — the one authored moment (Impeccable:
+ * one focal moment per page; Taste: the hero is the dealt moment).
+ *
+ * It began as a Digikala-style carousel: four gradient art slides, arrows,
+ * dots, an autoplaying progress line, and white text on lime. Every one of
+ * those was a default rather than a decision, and together they produced the
+ * page's loudest surface with its least legible type. What it is now:
+ *
+ *  - ONE statement. The headline says what this business is; a photo of the
+ *    field sits beside it and holds still. Impeccable's craft floor bans a
+ *    kicker above a heading, so the three kickers are gone; the headline
+ *    carries its own weight.
+ *  - Type on the page's own cream, not white on a photograph. Contrast is a
+ *    property of the layout, not of whichever crop the API returned.
+ *  - Two ways in, side by side, because a first-time visitor is deciding
+ *    between exactly two intentions: buy inputs, or buy from a farmer.
+ *  - The carousel engine is untouched: the API still supplies campaign
+ *    slides, autoplay still dwells 6s, hover/focus still pause it, swipe and
+ *    the arrow keys still work, and #hero-heading is still here for the e2e
+ *    suite. Under reduced motion the band renders static.
  *
  * Slides come from the content-production console (HeroSlide rows via
  * /api/hero-slides/), so a seasonal campaign launches without a deploy; the
@@ -30,15 +48,21 @@ import PlaybackToggle from '../ui/PlaybackToggle';
  */
 
 interface Slide {
-  art: string;
   image?: string;
-  kicker: string;
   title: string;
   body: string;
   cta: { to: string; label: string };
 }
 
 const SLIDE_DWELL_MS = 6000;
+
+/**
+ * The headline band's photograph. One image, served from /public, sized for
+ * the two-column layout; the API's per-campaign `background_url` still wins
+ * when a slide supplies one, so a seasonal campaign can swap the picture
+ * without a deploy.
+ */
+const FIELD_PHOTO = '/images/hero-farm.jpg';
 
 /**
  * Slides from the console; while the API has nothing (fresh checkout, network
@@ -53,9 +77,11 @@ function useHeroSlides(): Slide[] {
   });
   const fromApi: Slide[] | null = data && data.length > 0
     ? data.map((slide: HeroSlideData) => ({
-        art: slide.gradient || 'bg-gradient-to-bl from-emerald-800 via-emerald-700 to-lime-600',
+        // `kicker` and `gradient` are still produced by the console, and are
+        // deliberately dropped here: the band has one headline and one
+        // photograph, and a per-slide gradient wash behind type was the
+        // habit this rebuild exists to remove.
         image: slide.background_url || undefined,
-        kicker: slide.kicker,
         title: slide.title,
         body: slide.body,
         cta: { to: slide.cta_url || '/products', label: slide.cta_label || 'مشاهده' },
@@ -64,22 +90,16 @@ function useHeroSlides(): Slide[] {
   if (fromApi) return fromApi;
   return [
     {
-      art: 'bg-gradient-to-bl from-emerald-800 via-emerald-700 to-lime-600',
-      kicker: 'نهاده‌های کشاورزی، مستقیم و مطمئن',
       title: t('home.heroTitle'),
-      body: 'خرید کود، سم، بذر و تجهیزات از غرفه‌های معتبر با تأیید پیش از انتشار و پشتیبانی کارشناس.',
+      body: t('home.heroLead'),
       cta: { to: '/products', label: t('home.buyFromShop') },
     },
     {
-      art: 'bg-gradient-to-bl from-teal-800 via-teal-700 to-emerald-500',
-      kicker: 'بازار کشاورزان',
       title: 'محصول مستقیم از کشاورز، بدون واسطه',
       body: 'از غرفه‌های تأییدشده خرید کنید؛ موجودی تأیید می‌شود و پرداخت پس از هماهنگی انجام می‌گیرد.',
       cta: { to: '/storefronts', label: t('home.farmersMarket') },
     },
     {
-      art: 'bg-gradient-to-bl from-lime-700 via-lime-600 to-amber-400',
-      kicker: 'فروش فصلی',
       title: 'تخفیف‌های فصل کشت، همین هفته',
       body: 'کود و سم با تخفیف واقعی تا پایان بازه کمپین؛ قیمت‌ها پیش از تخفیف هم نشان داده می‌شود.',
       cta: { to: '/products?collection=discounted', label: 'دیدن تخفیف‌ها' },
@@ -88,6 +108,7 @@ function useHeroSlides(): Slide[] {
 }
 
 export default function HeroSlider() {
+  const { t } = useTranslation();
   const [index, setIndex] = useState(0);
   const dotTabs = useTabListKeys<HTMLDivElement>();
   const [paused, setPaused] = useState(false);
@@ -128,7 +149,14 @@ export default function HeroSlider() {
 
   return (
     <section
-      className="relative overflow-hidden rounded-2xl text-white"
+      /*
+        The bottom clearance a page-shell carries is for the fixed mobile nav
+        at the END of a page; inside the hero it only pushed the controls up
+        against the copy, so it is zeroed here (inline: .page-shell is
+        unlayered CSS and would beat a utility class).
+      */
+      className="page-shell pt-6"
+      style={{ paddingBottom: 0 }}
       aria-roledescription="carousel"
       aria-label="معرفی گرین کود"
       dir="rtl"
@@ -142,114 +170,164 @@ export default function HeroSlider() {
         if (event.key === 'ArrowRight') go(index - 1);
         if (event.key === 'ArrowLeft') go(index + 1);
       }}
-    >      <div className="relative h-[320px] sm:h-[380px] lg:h-[420px]">
-        {slides.map((slide, slideIndex) => (
-          <div
-            key={slide.title}
-            aria-hidden={slideIndex !== index}
-            className={cn(
-              'absolute inset-0 transition-opacity duration-700 ease-out motion-reduce:transition-none',
-              slide.art,
-              slideIndex === index ? 'opacity-100' : 'pointer-events-none opacity-0',
-            )}
-          >
-            {slide.image && (
-              <img
-                src={slide.image}
-                alt=""
-                className="absolute inset-0 h-full w-full object-cover"
-                loading={slideIndex === 0 ? 'eager' : 'lazy'}
-              />
-            )}
-            {/* A photo needs a scrim or the white text becomes unreadable over
-                a bright field shot; over a plain gradient it is invisible. */}
-            {slide.image && <div className="absolute inset-0 bg-gradient-to-l from-black/55 via-black/35 to-black/20" aria-hidden="true" />}
-            {/* `.page-shell` carries a global bottom clearance for the fixed
-                mobile nav; inside the slider that 84px pad squeezes the
-                centered stack out of the box's top edge on phones, so it is
-                explicitly zeroed here (inline, because .page-shell is unlayered
-                CSS and beats utility classes). */}
+    >
+      {/*
+        Two columns, not a full-bleed picture with type on top. RTL order puts
+        the words on the right (where Persian reading starts) and the field on
+        the left. Below lg it stacks: type first, photograph under it, cropped
+        to a band so it never pushes the CTA off a phone screen.
+      */}
+      <div className="grid items-center gap-6 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] lg:gap-10">
+        {/* ---------------------------- copy ---------------------------- */}
+        <div className="relative min-w-0">
+          {slides.map((slide, slideIndex) => (
             <div
-              className="page-shell relative flex h-full flex-col justify-center gap-3 px-6 sm:px-10"
-              style={{ paddingBottom: 0 }}
+              key={slide.title}
+              data-hero-slide={slideIndex}
+              aria-hidden={slideIndex !== index}
+              /*
+                Slides cross-fade in place. Absolute positioning keeps every
+                slide the same box so the swap cannot reflow the page; opacity
+                is the only property that animates (Emil: transform/opacity
+                only), at 300ms ease-out — the band is an overlay-scale
+                change, not a page transition, so it stays under 300ms and
+                the entrance is not slower than the reader's patience.
+              */
+              className={cn(
+                'transition-opacity duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] motion-reduce:transition-none',
+                slideIndex === index ? 'opacity-100' : 'pointer-events-none absolute inset-0 opacity-0',
+              )}
             >
-              <p className="text-fluid-sm font-bold text-lime-200">{slide.kicker}</p>
               <h2
                 id={slideIndex === 0 ? 'hero-heading' : undefined}
-                className="max-w-3xl text-fluid-3xl font-extrabold leading-tight"
+                className="max-w-[22ch] text-fluid-3xl font-extrabold leading-[1.25] tracking-[-0.015em] text-ink-deep dark:text-white"
               >
                 {slide.title}
               </h2>
-              <p className="max-w-2xl text-fluid-base leading-8 text-emerald-50">{slide.body}</p>
-              <div className="mt-3">
+              <p className="mt-4 max-w-[46ch] text-fluid-base leading-8 text-slate-600 dark:text-emerald-100/80">
+                {slide.body}
+              </p>
+              <div className="mt-7 flex flex-wrap items-center gap-3">
                 <Link
                   to={slide.cta.to}
                   tabIndex={slideIndex === index ? 0 : -1}
-                  className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-white px-6 text-fluid-sm font-extrabold text-emerald-800 shadow-lg transition hover:-translate-y-0.5 hover:bg-emerald-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white motion-reduce:hover:translate-y-0"
+                  className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-brand-green px-6 text-fluid-sm font-extrabold text-white shadow-sm transition-[background-color,box-shadow] duration-150 hover:bg-emerald-800 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
                 >
                   {slide.cta.label}
                   <ChevronLeft size={17} aria-hidden="true" />
                 </Link>
+                {/*
+                  The second door. The first slide is the shop, so its
+                  counterpart is the marketplace that makes this platform
+                  different from a shop — one link away from the headline
+                  rather than three screens down.
+                */}
+                {slideIndex === 0 && (
+                  <Link
+                    to="/storefronts"
+                    /* aria-hidden is wrong here — this is a real destination —
+                       but it must stay out of the accessible name of the
+                       region's primary action, so it is simply a second link
+                       with its own label. */
+                    className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-emerald-700/25 px-5 text-fluid-sm font-bold text-ink-deep transition-[background-color,border-color] duration-150 hover:border-emerald-700/50 hover:bg-emerald-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 dark:border-emerald-200/25 dark:text-white dark:hover:bg-emerald-900/40"
+                  >
+                    {t('home.farmersMarket')}
+                  </Link>
+                )}
               </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
 
-      {/* The explicit stop for rotation. Top-left stays clear of the slide's
-          copy (which is right-aligned in RTL) and of the arrows/dots. */}
-      <div className="absolute left-3 top-3 z-10">
-        <PlaybackToggle
-          playing={autoPlaying}
-          onToggle={() => setAutoPlaying((value) => !value)}
-          subject="اسلایدها"
-          variant="chip"
-        />
-      </div>
-
-      {/* Arrows — a small pair sitting together at the bottom-right corner,
-          DESKTOP ONLY: touch widths swipe the slider natively and the arrows
-          only crowded the small screen. In RTL the right-hand button is
-          "previous", matching the ArrowRight keyboard behaviour. */}
-      <div className="absolute bottom-3 right-4 z-10 hidden items-center gap-1.5 md:flex">
-        <button
-          type="button"
-          aria-label="اسلاید قبلی"
-          onClick={() => go(index - 1)}
-          className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-white backdrop-blur transition hover:bg-white/35 focus-visible:outline-2 focus-visible:outline-white"
-        >
-          <ChevronRight size={16} aria-hidden="true" />
-        </button>
-        <button
-          type="button"
-          aria-label="اسلاید بعدی"
-          onClick={() => go(index + 1)}
-          className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-white backdrop-blur transition hover:bg-white/35 focus-visible:outline-2 focus-visible:outline-white"
-        >
-          <ChevronLeft size={16} aria-hidden="true" />
-        </button>
-      </div>
-
-      {/* Dots: the active dot is a progress pill. */}
-      <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-2" role="tablist" aria-label="انتخاب اسلاید" ref={dotTabs.ref} onKeyDown={dotTabs.onKeyDown}>
-        {slides.map((slide, dotIndex) => (
-          <button
-            key={slide.title}
-            type="button"
-            role="tab"
-            aria-selected={dotIndex === index}
-            aria-label={`اسلاید ${dotIndex + 1}`}
-            onClick={() => go(dotIndex)}
-            className="flex h-6 min-w-6 items-center justify-center"
-          >
-            <span
-              className={cn(
-                'block h-2.5 rounded-full transition-all duration-300',
-                dotIndex === index ? 'w-8 bg-white' : 'w-2.5 bg-white/50 hover:bg-white/80',
-              )}
+        {/* -------------------------- photograph ------------------------- */}
+        {/*
+          One picture, not a per-slide gradient wash. It is the page's only
+          large image above the fold, so it is eager and explicit about its
+          size; the art-direction crop keeps a 4:3 frame on phone and a tall
+          frame beside the type on desktop. `aria-hidden` because the
+          headline already says what the business is.
+        */}
+        <div className="relative order-first overflow-hidden rounded-2xl bg-emerald-100 lg:order-none dark:bg-emerald-950">
+          <picture>
+            <source type="image/avif" srcSet="/images/hero-farm-768.avif 768w, /images/hero-farm-1024.avif 1024w" sizes="(max-width: 1024px) 100vw, 46vw" />
+            <source type="image/webp" srcSet="/images/hero-farm-768.webp 768w, /images/hero-farm-1024.webp 1024w" sizes="(max-width: 1024px) 100vw, 46vw" />
+            <img
+              src={slides[index]?.image || FIELD_PHOTO}
+              alt=""
+              width={1024}
+              height={768}
+              loading="eager"
+              fetchPriority="high"
+              decoding="async"
+              className="h-[190px] w-full object-cover object-center sm:h-[260px] lg:h-[380px]"
             />
-          </button>
-        ))}
+          </picture>
+        </div>
+      </div>
+
+      {/*
+        Controls sit on the copy side, under the CTAs, where the slide's
+        reading ends — not floating over a photograph where they competed
+        with the type for the same corner. The dots keep their tablist
+        contract and the arrows keep the RTL mapping the keyboard uses.
+      */}
+      <div className="mt-6 flex items-center justify-between gap-4">
+        <div
+          className="flex items-center gap-2"
+          role="tablist"
+          aria-label="انتخاب اسلاید"
+          ref={dotTabs.ref}
+          onKeyDown={dotTabs.onKeyDown}
+        >
+          {slides.map((slide, dotIndex) => (
+            <button
+              key={slide.title}
+              type="button"
+              role="tab"
+              aria-selected={dotIndex === index}
+              aria-label={`اسلاید ${dotIndex + 1}`}
+              onClick={() => go(dotIndex)}
+              className="flex h-11 min-w-11 items-center justify-center"
+            >
+              <span
+                className={cn(
+                  'block h-1.5 rounded-full transition-[width,background-color] duration-200 ease-[cubic-bezier(0.23,1,0.32,1)]',
+                  dotIndex === index
+                    ? 'w-9 bg-brand-green'
+                    : 'w-4 bg-emerald-700/20 hover:bg-emerald-700/40 dark:bg-white/25 dark:hover:bg-white/40',
+                )}
+              />
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <div className="hidden items-center gap-1.5 md:flex">
+            <button
+              type="button"
+              aria-label="اسلاید قبلی"
+              onClick={() => go(index - 1)}
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-emerald-700/20 text-ink-deep transition-[background-color,border-color] duration-150 hover:border-emerald-700/45 hover:bg-emerald-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 dark:border-white/20 dark:text-white dark:hover:bg-emerald-900/40"
+            >
+              <ChevronRight size={16} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              aria-label="اسلاید بعدی"
+              onClick={() => go(index + 1)}
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-emerald-700/20 text-ink-deep transition-[background-color,border-color] duration-150 hover:border-emerald-700/45 hover:bg-emerald-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 dark:border-white/20 dark:text-white dark:hover:bg-emerald-900/40"
+            >
+              <ChevronLeft size={16} aria-hidden="true" />
+            </button>
+          </div>
+          {/* The explicit stop for rotation, beside the controls it stops. */}
+          <PlaybackToggle
+            playing={autoPlaying}
+            onToggle={() => setAutoPlaying((value) => !value)}
+            subject="اسلایدها"
+            variant="chip"
+          />
+        </div>
       </div>
     </section>
   );

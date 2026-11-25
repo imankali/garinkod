@@ -90,7 +90,7 @@ function OrderTimelineStepper({ status }: { status: string }) {
         <div className="absolute inset-x-4 top-4 h-1 -translate-y-1/2 bg-slate-200 dark:bg-emerald-800" />
         {/* Active progress fill */}
         <div
-          className="absolute start-4 top-4 h-1 -translate-y-1/2 bg-emerald-600 transition-all duration-500 dark:bg-lime-400"
+          className="absolute start-4 top-4 h-1 -translate-y-1/2 bg-emerald-600 transition-[width] duration-500 dark:bg-lime-400"
           style={{
             width: currentIndex >= 0 ? `${(currentIndex / (ORDER_STEPS.length - 1)) * 90}%` : '0%',
           }}
@@ -104,7 +104,7 @@ function OrderTimelineStepper({ status }: { status: string }) {
           return (
             <div key={step.key} className="relative z-10 flex flex-col items-center">
               <div
-                className={`flex h-8 w-8 items-center justify-center rounded-full border-2 text-xs font-bold transition-all duration-300 ${
+                className={`flex h-8 w-8 items-center justify-center rounded-full border-2 text-xs font-bold transition-colors duration-150 ${
                   isDone
                     ? 'border-emerald-600 bg-emerald-600 text-white shadow-sm'
                     : isCurrent

@@ -1,12 +1,11 @@
 // frontend/src/components/home/RankedRail.tsx
 
 import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft, type LucideIcon } from 'lucide-react';
-import { Link } from 'react-router';
 
 import { productsApi } from '../../api/services';
 import type { ProductList, ProductQueryParams } from '@/types/shop';
 import OfferRail from './OfferRail';
+import SectionHeading from './SectionHeading';
 
 /**
  * The one horizontal product rail of the home page, reused by every ranked
@@ -25,7 +24,6 @@ export default function RankedRail({
   railId,
   title,
   hint,
-  icon: Icon,
   params,
   moreTo,
   moreLabel = 'دیدن همه',
@@ -33,7 +31,6 @@ export default function RankedRail({
   railId: string;
   title: string;
   hint: string;
-  icon: LucideIcon;
   params: ProductQueryParams;
   moreTo: string;
   moreLabel?: string;
@@ -51,7 +48,8 @@ export default function RankedRail({
       <div className="page-shell py-6 sm:py-8">
         <div role="status" aria-busy="true" aria-label={`در حال بارگذاری ${title}`}>
           <div className="h-6 w-40 animate-pulse rounded bg-slate-100 dark:bg-emerald-900/50" />
-          <div className="mt-3 flex gap-3 overflow-hidden" aria-hidden="true">
+          <div className="mt-2 h-4 w-64 animate-pulse rounded bg-slate-100 dark:bg-emerald-900/50" />
+          <div className="mt-4 flex gap-3 overflow-hidden" aria-hidden="true">
             {[0, 1, 2, 3].map((item) => (
               <div
                 key={item}
@@ -71,23 +69,13 @@ export default function RankedRail({
       className="scroll-mt-[calc(var(--header-height,72px)+1rem)]"
     >
       <div className="page-shell py-6 sm:py-8">
-        <div className="flex flex-wrap items-center gap-3">
-          <Icon size={22} className="shrink-0 text-emerald-700 dark:text-lime-300" aria-hidden="true" />
-          <h2
-            id={`ranked-rail-${railId}`}
-            className="text-fluid-xl font-extrabold text-slate-900 dark:text-white"
-          >
-            {title}
-          </h2>
-          <span className="text-fluid-xs text-slate-500 dark:text-emerald-200">{hint}</span>
-          <Link
-            to={moreTo}
-            className="ms-auto inline-flex min-h-6 items-center gap-1 py-1 text-fluid-sm font-bold text-emerald-700 transition hover:text-emerald-900 dark:text-lime-300"
-          >
-            {moreLabel}
-            <ChevronLeft size={16} aria-hidden="true" />
-          </Link>
-        </div>
+        <SectionHeading
+          id={`ranked-rail-${railId}`}
+          title={title}
+          hint={hint}
+          href={moreTo}
+          linkLabel={moreLabel}
+        />
         <OfferRail products={products as ProductList[]} inset={false} />
       </div>
     </section>

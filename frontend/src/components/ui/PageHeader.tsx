@@ -17,6 +17,16 @@
 //     full 1280px;
 //   - actions that wrap under the title on phones and sit beside it on
 //     desktop, with the same 44px minimum height as every other control.
+//
+// The eyebrow slot stays in the API because pages use it to name the section
+// a page belongs to, but it is no longer set as a small capitalised label
+// ABOVE the h1 with a glyph beside it. Impeccable bans that pattern outright
+// ("no kicker or eyebrow above a heading — the heading carries its own
+// weight"), and it was doing real damage here: every page opened with two
+// competing first lines and a 15px icon whose only job was to decorate the
+// first one. It is now the breadcrumb's companion — a quiet category line
+// that sits above the title at body size, reads as a continuation of the
+// trail, and disappears into the heading instead of announcing it.
 
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
@@ -87,13 +97,15 @@ export default function PageHeader({
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
           {eyebrow && (
-            <p className="flex items-center gap-1.5 text-fluid-2xs font-extrabold text-emerald-700 dark:text-lime-300">
-              {Icon && <Icon size={15} aria-hidden="true" />}
+            <p className="text-fluid-2xs font-bold text-slate-500 dark:text-emerald-200/80">
               {eyebrow}
             </p>
           )}
-          <h1 className="mt-1 text-balance text-fluid-2xl font-extrabold leading-tight text-slate-800 dark:text-white">
-            {title}
+          <h1 className="mt-1 flex items-center gap-2 text-balance text-fluid-2xl font-extrabold leading-tight tracking-[-0.02em] text-ink-deep dark:text-white">
+            {/* The glyph belongs to the title it illustrates, if it stays at
+                all — beside the heading, at heading weight, not above it. */}
+            {Icon && <Icon size={22} aria-hidden="true" className="shrink-0 text-emerald-700 dark:text-lime-300" />}
+            <span className="min-w-0">{title}</span>
           </h1>
           {description && (
             <p className="mt-2 max-w-2xl text-pretty text-fluid-sm leading-7 text-slate-600 dark:text-emerald-100">

@@ -1,6 +1,5 @@
 // frontend/src/components/Logo.tsx
 
-import { motion } from "framer-motion";
 import { Sprout } from "lucide-react";
 
 // ========================================
@@ -10,81 +9,51 @@ interface LogoProps {
   compact?: boolean;
 }
 
-// ========================================
-// Logo Component
-// ========================================
+/**
+ * The wordmark and its mark.
+ *
+ * The mark used to be a 3D coin: emerald-to-lime gradient, a white shine
+ * sweep, a lime dot pulsing at 1.5s and a blurred halo breathing at 2s
+ * behind it, flipping 180° on hover. Four infinite animations in a 44px
+ * square, in the sticky header, on every page — the busiest object on the
+ * site and the one the visitor sees most often. Emil's frequency gate is
+ * exactly this case: something seen a hundred times a day gets no
+ * choreography, and the mark is the one element that should be still.
+ *
+ * It is now a flat brand tile: one green, one glyph, no gradient, no loop.
+ * The whole lockup is a link, and the hover state is a 1px border shift on
+ * the tile — a change you can feel without watching an animation.
+ */
 export default function Logo({ compact = false }: LogoProps) {
   return (
-    <motion.a
+    <a
       href="/"
-      className="group flex items-center gap-2.5 select-none"
-      whileHover={{ scale: 1.05 }}
-      whileTap={{ scale: 0.98 }}
+      className="group flex select-none items-center gap-2.5 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-700"
       aria-label="گرین کود - صفحه اصلی"
     >
-      {/* ======================================== */}
-      {/* Logo Icon with 3D Effect */}
-      {/* ======================================== */}
-      <div className="perspective-1000">
-        <motion.div
-          className="preserve-3d relative flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 via-emerald-600 to-lime-500 shadow-lg shadow-emerald-300/50 md:h-12 md:w-12"
-          whileHover={{ rotateY: 180, scale: 1.1 }}
-          initial={{ rotateY: 0 }}
-          transition={{ duration: 0.7, ease: "easeInOut" }}
-        >
-          {/* Glow Effect */}
-          <motion.div
-            animate={{
-              scale: [1, 1.2, 1],
-              opacity: [0.5, 0.8, 0.5],
-            }}
-            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-emerald-400/50 to-lime-400/50 blur-md"
-          />
+      <span
+        className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-green text-white ring-1 ring-emerald-900/10 transition-[background-color,box-shadow] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] group-hover:bg-emerald-800 md:h-12 md:w-12 dark:ring-white/15"
+        aria-hidden="true"
+      >
+        <Sprout size={compact ? 20 : 23} strokeWidth={2} />
+      </span>
 
-          {/* Shine Overlay */}
-          <span className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-white/30 to-transparent backface-hidden" />
-
-          {/* Sprout Icon */}
-          <Sprout
-            size={compact ? 20 : 24}
-            className="relative z-10 text-white drop-shadow backface-hidden"
-          />
-
-          {/* Pulsing Dot */}
-          <motion.span
-            animate={{ scale: [1, 1.3, 1] }}
-            transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute -end-1 -top-1 h-3 w-3 rounded-full bg-lime-400 shadow-lg shadow-lime-400/50"
-          />
-        </motion.div>
-      </div>
-
-      {/* ======================================== */}
-      {/* Logo Text */}
-      {/* ======================================== */}
       {!compact && (
-        <div className="leading-tight">
-          <p className="text-lg font-extrabold tracking-tight text-slate-800 md:text-xl">
-            <span className="text-gradient-green">گرین</span>
-            <span>کود</span>
-          </p>
-          <p className="hidden text-fluid-2xs font-medium text-slate-500 md:block dark:text-slate-400">
+        <span className="leading-tight">
+          {/*
+            Two weights, one colour. «گرین» was set in a clipped green
+            gradient while «کود» sat in slate — a gradient wordmark that
+            changed legibility with every reflow, and a two-tone lockup that
+            read as a typo at small sizes. Weight carries the accent now.
+          */}
+          <span className="block text-lg font-extrabold tracking-[-0.02em] text-ink-deep md:text-xl dark:text-white">
+            گرین‌کود
+          </span>
+          <span className="hidden text-fluid-2xs font-medium text-slate-500 md:block dark:text-emerald-200/70">
             فروشگاه تخصصی نهاده‌های کشاورزی
-          </p>
-        </div>
+          </span>
+        </span>
       )}
-
-      {/* Compact Mode Text */}
-      {compact && (
-        <motion.p
-          initial={{ opacity: 0, x: -10 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="text-base font-extrabold text-slate-800 dark:text-white"
-        >
-          گرین کود
-        </motion.p>
-      )}
-    </motion.a>
+    </a>
   );
 }

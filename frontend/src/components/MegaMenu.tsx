@@ -165,7 +165,7 @@ export default function MegaMenu() {
         aria-haspopup="true"
         aria-expanded={open}
         aria-controls="mega-menu-panel"
-        className={`flex min-h-11 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-300 ${
+        className={`flex min-h-11 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors duration-150 ${
           open
             ? "bg-emerald-600 text-white shadow-lg shadow-emerald-200"
             : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
@@ -278,12 +278,12 @@ export default function MegaMenu() {
                       <a
                         key={sub.slug}
                         href={`/products?category=${activeCategory.slug}&subcategory=${sub.slug}`}
-                        className="group flex items-center justify-between rounded-xl bg-slate-50 px-3.5 py-2.5 text-sm text-slate-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200 dark:hover:bg-emerald-900 dark:hover:text-lime-300"
+                        className="group flex items-center justify-between rounded-xl bg-slate-50 px-3.5 py-2.5 text-sm text-slate-600 transition-colors duration-150 hover:bg-emerald-50 hover:text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200 dark:hover:bg-emerald-900 dark:hover:text-lime-300"
                       >
                         {sub.name}
                         <ArrowLeft
                           size={14}
-                          className="opacity-0 transition-all group-hover:-translate-x-1 group-hover:opacity-100"
+                          className="opacity-0 transition-[opacity,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] group-hover:-translate-x-1 group-hover:opacity-100"
                         />
                       </a>
                     ))

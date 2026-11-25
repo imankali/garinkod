@@ -21,7 +21,10 @@ describe('the home hero slider', () => {
 
   it('advances to the next slide via the next button', async () => {
     await renderAppSettled(<HeroSlider />, { route: '/' });
-    const slides = document.querySelectorAll('[aria-roledescription="carousel"] > div > div');
+    // Slides are addressed by their own hook rather than by DOM depth: the
+    // band's layout (copy column + photograph) is free to change without the
+    // carousel contract silently going untested.
+    const slides = document.querySelectorAll('[data-hero-slide]');
     expect(slides.length).toBeGreaterThanOrEqual(2);
     expect(slides[1]).toHaveAttribute('aria-hidden', 'true');
     fireEvent.click(screen.getByRole('button', { name: 'اسلاید بعدی' }));

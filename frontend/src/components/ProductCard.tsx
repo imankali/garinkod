@@ -7,13 +7,16 @@ import SkeletonCard from "./ui/SkeletonCard";
 import type { MockProduct } from '@/types/shop';
 
 // ========================================
-// Shared tactile feedback (Phase-2 polish)
+// Shared tactile feedback — Emil press physics
 // ========================================
-// One easing/duration for every pressable part of the card: the press reads
-// instantly (0.2s), returns smoothly (easeInOut), and — via the conditional
-// whileHover/whileTap below — never fires on a disabled control. Kept as a
-// module-local constant so react-refresh sees this file as component-only.
-const TACTILE = { duration: 0.2, ease: "easeInOut" } as const;
+// One easing/duration for every pressable part of the card. Emil's table:
+// button press feedback is 100–160ms, ease-out (entering/exiting starts
+// fast; ease-in delays the moment the user is watching most closely, and
+// easeInOut is the same mistake with a softer name). The press scale is
+// 0.97 — the smallest change that makes cause and result unmistakable.
+// Kept as a module-local constant so react-refresh sees this file as
+// component-only.
+const TACTILE = { duration: 0.15, ease: [0.23, 1, 0.32, 1] } as const;
 
 // ========================================
 // ProductCard Props Interface
@@ -59,7 +62,9 @@ export default function ProductCard({
     whileInView: { opacity: 1 },
     viewport: { once: true, amount: 0.1 },
   };
-  const desktopHover = reduceMotion ? undefined : { y: -4 };
+  // Taste house rule 5: a linked card lifts 2px on hover (was 4px — a
+  // 4px lift reads as the card jumping, 2px reads as answering).
+  const desktopHover = reduceMotion ? undefined : { y: -2 };
 
   // Loading contract: identical outer geometry, zero layout shift on swap-in.
   // This component holds no hooks, so an early return is safe.
@@ -82,7 +87,7 @@ export default function ProductCard({
       viewport={{ once: true, margin: "-80px" }}
       transition={reduceMotion ? undefined : { delay: Math.min(index * 0.04, 0.2), duration: 0.35 }}
       whileHover={desktopHover}
-      className="group relative flex flex-col overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm transition-shadow duration-300 hover:shadow-xl hover:shadow-emerald-900/10 dark:border-emerald-900/40 dark:bg-ink"
+      className="group relative flex flex-col overflow-hidden rounded-xl border border-slate-100 bg-white transition-[box-shadow,border-color] duration-200 hover:border-emerald-200 hover:shadow-lg hover:shadow-emerald-900/10 dark:border-emerald-900/40 dark:bg-ink dark:hover:border-emerald-700"
     >
       {/* ======================================== */}
       {/* Badges & Wishlist Button */}
@@ -164,8 +169,8 @@ export default function ProductCard({
               // Grid cards are never the LCP — stay lazy and off the main thread.
               loading="lazy"
               decoding="async"
-              whileHover={reduceMotion ? undefined : { scale: 1.05 }}
-              transition={{ duration: 0.4, ease: "easeOut" }}
+              whileHover={reduceMotion ? undefined : { scale: 1.03 }}
+              transition={{ duration: 0.6, ease: [0.23, 1, 0.32, 1] }}
               className={`h-full w-full object-cover ${!product.inStock ? "grayscale" : ""}`}
               onError={(e) => {
                 // Guard against a fallback that itself fails (loop), and prefer
@@ -215,7 +220,7 @@ export default function ProductCard({
             onQuickView(product);
           }}
           tabIndex={-1}
-          className="pointer-events-none absolute inset-x-2 bottom-2 z-[2] hidden translate-y-2 items-center justify-center gap-1 rounded-lg bg-white/95 py-2 text-[11px] font-bold text-slate-700 opacity-0 shadow-lg backdrop-blur transition-all duration-300 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:translate-y-0 group-focus-within:opacity-100 [@media(hover:hover)]:flex"
+          className="pointer-events-none absolute inset-x-2 bottom-2 z-[2] hidden translate-y-2 items-center justify-center gap-1 rounded-lg bg-white/95 py-2 text-[11px] font-bold text-slate-700 opacity-0 shadow-lg backdrop-blur transition-[transform,opacity] duration-200 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:translate-y-0 group-focus-within:opacity-100 [@media(hover:hover)]:flex"
           aria-label="نمای سریع محصول"
         >
           <Eye size={14} /> نمای سریع
@@ -298,7 +303,7 @@ export default function ProductCard({
       type="button"
             onClick={(e) => onAddToCart(product, e)}
             disabled={!product.inStock}
-            whileHover={!reduceMotion && product.inStock ? { y: -4 } : undefined}
+            whileHover={!reduceMotion && product.inStock ? { y: -2 } : undefined}
             whileTap={!reduceMotion && product.inStock ? { scale: 0.97 } : undefined}
             transition={TACTILE}
             className="tap-target flex min-h-10 min-w-0 flex-1 items-center justify-center gap-1 rounded-lg bg-brand-gradient-accent px-1.5 text-fluid-2xs font-bold text-white shadow-md transition-shadow hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-40 sm:text-fluid-xs"
@@ -323,7 +328,7 @@ export default function ProductCard({
       type="button"
             onClick={() => onToggleCompare(product)}
             disabled={!compareInteractive}
-            whileHover={!reduceMotion && compareInteractive ? { y: -4 } : undefined}
+            whileHover={!reduceMotion && compareInteractive ? { y: -2 } : undefined}
             whileTap={!reduceMotion && compareInteractive ? { scale: 0.97 } : undefined}
             transition={TACTILE}
             title={isComparing ? "حذف از مقایسه" : "افزودن به مقایسه"}

@@ -3,17 +3,14 @@
 import { Phone, Truck } from "lucide-react";
 
 // ========================================
-// Messages Configuration
-// پیام‌های چرخشی در TopBar
+// Shipping promise
 // ========================================
-// Plain sentences only: an emoji prefix here would be read aloud by a screen
-// reader mid-marquee and rendered differently on each platform.
-const messages = [
-  "ارسال رایگان برای خرید بالای ۳ میلیون تومان، مطابق شرایط سفارش",
-  "ثبت سفارش، مشاوره و خدمات مزرعه از یک حساب کاربری",
-  "بازار کشاورزان با بررسی آگهی‌ها پیش از انتشار",
-  "پیش از پرداخت، موجودی و هزینه ارسال سفارش بررسی می‌شود",
-];
+// One sentence, not four rotating ones. A marquee of four claims is four
+// things nobody finishes reading; the single most decision-relevant fact —
+// the free-shipping threshold — earns the line. No emoji prefix: a screen
+// reader would read it aloud and each platform draws it differently.
+const SHIPPING_PROMISE =
+  "ارسال رایگان برای خرید بالای ۳ میلیون تومان، مطابق شرایط سفارش";
 
 // ========================================
 // TopBar Component
@@ -22,8 +19,13 @@ export default function TopBar(_props: { isDark?: boolean; onToggleDark?: () => 
   const phoneNumber = import.meta.env.VITE_PHONE_NUMBER?.trim();
 
   return (
-    <div className="hidden overflow-hidden bg-brand-gradient text-emerald-50 sm:block">
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-1.5 text-xs">
+    /* The utility strip is the page's quietest line, not a second hero. It
+       used to be a brand gradient with a marquee scrolling under it, which
+       put the noisiest motion on the screen directly above the headline.
+       Impeccable: one authored moment per page — the hero owns it. Taste:
+       no ticker. Plain sentences, one at a time, in static type. */
+    <div className="hidden border-b border-emerald-900/10 bg-ink-deep text-emerald-50 sm:block dark:border-emerald-800/40">
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-1 text-xs">
         
         {/* ======================================== */}
         {/* بخش چپ - ویژگی‌های فروشگاه */}
@@ -37,19 +39,11 @@ export default function TopBar(_props: { isDark?: boolean; onToggleDark?: () => 
         </div>
 
         {/* ======================================== */}
-        {/* بخش وسط - پیام‌های چرخشی (Marquee) */}
+        {/* Middle: the shipping promise, standing still. */}
         {/* ======================================== */}
-        {/* min-w-0 lets the flex child actually shrink, so the w-max marquee
-            inside is clipped instead of stretching the whole bar. */}
-        <div className="no-scrollbar relative min-w-0 flex-1 overflow-hidden" aria-hidden="true">
-          <div className="flex w-max animate-marquee gap-16 whitespace-nowrap">
-            {[...messages, ...messages].map((msg, idx) => (
-              <span key={idx} className="opacity-90">
-                {msg}
-              </span>
-            ))}
-          </div>
-        </div>
+        <p className="min-w-0 flex-1 truncate text-center text-fluid-2xs text-emerald-100/85">
+          {SHIPPING_PROMISE}
+        </p>
 
         {/* ======================================== */}
         {/* بخش راست - تماس و شبکه‌های اجتماعی */}

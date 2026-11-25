@@ -71,8 +71,13 @@ const CartButton = memo(function CartButton({
       type="button"
       id={mobile ? "cart-icon-target-mobile" : "cart-icon-target"}
       onClick={onOpen}
-      whileHover={prefersReducedMotion ? undefined : { scale: 1.05, y: -1 }}
-      whileTap={{ scale: 0.93 }}
+      /* Emil: a control pressed a hundred times a day gets feedback, not
+         choreography. The old hover grew the button, the old bump spun the
+         cart icon through five rotations and fired a white glow. What
+         survives is the one thing that carries information: the count
+         ticks up and the badge lands. */
+      whileHover={prefersReducedMotion ? undefined : { scale: 1.02 }}
+      whileTap={{ scale: 0.97 }}
       transition={SPRING}
       className={`group relative flex items-center gap-1.5 overflow-hidden rounded-xl bg-brand-gradient-accent text-white shadow-md shadow-emerald-200 transition-shadow duration-300 hover:shadow-xl hover:shadow-emerald-300/50 dark:shadow-emerald-950/50 ${
         mobile
@@ -83,21 +88,16 @@ const CartButton = memo(function CartButton({
       aria-expanded={isOpen}
       aria-haspopup="dialog"
     >
-      {/* Shimmer روی hover */}
-      <span
-        aria-hidden="true"
-        className="absolute inset-0 -translate-x-full bg-gradient-to-l from-transparent via-white/25 to-transparent transition-transform duration-700 group-hover:translate-x-full"
-      />
 
       {/* Glow pulse وقتی آیتم اضافه می‌شود */}
       <AnimatePresence>
         {bump && !prefersReducedMotion && (
           <motion.span
             aria-hidden="true"
-            initial={{ opacity: 0.6, scale: 1 }}
-            animate={{ opacity: 0, scale: 1.6 }}
+            initial={{ opacity: 0.35 }}
+            animate={{ opacity: 0 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.5 }}
+            transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
             className="absolute inset-0 rounded-xl bg-white/40"
           />
         )}
@@ -106,12 +106,8 @@ const CartButton = memo(function CartButton({
       <span className="relative flex items-center">
         {/* آیکون با انیمیشن bump */}
         <motion.span
-          animate={
-            bump && !prefersReducedMotion
-              ? { rotate: [0, -18, 14, -8, 4, 0], scale: [1, 1.35, 1.1, 1] }
-              : { rotate: 0, scale: 1 }
-          }
-          transition={{ duration: 0.55, ease: "easeOut" }}
+          animate={bump && !prefersReducedMotion ? { scale: [1, 1.12, 1] } : { scale: 1 }}
+          transition={{ duration: 0.28, ease: [0.23, 1, 0.32, 1] }}
           className="flex"
         >
           <ShoppingCart
@@ -125,9 +121,9 @@ const CartButton = memo(function CartButton({
         <AnimatePresence>
           {count > 0 && (
             <motion.span
-              initial={{ scale: 0, opacity: 0 }}
+              initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0, opacity: 0 }}
+              exit={{ scale: 0.9, opacity: 0 }}
               transition={{ ...SPRING_SOFT, damping: 15 }}
               className={`absolute flex items-center justify-center rounded-full bg-white font-bold text-green-700 shadow ring-2 ring-emerald-500/20 ${
                 mobile
@@ -159,25 +155,19 @@ const IconButton = memo(function IconButton({
   label,
   className = "",
   children,
-  rotateOnHover = false,
 }: {
   onClick?: () => void;
   label: string;
   className?: string;
   children: React.ReactNode;
-  rotateOnHover?: boolean;
 }) {
   const prefersReducedMotion = useReducedMotion();
   return (
     <motion.button
       type="button"
       onClick={onClick}
-      whileHover={
-        prefersReducedMotion
-          ? undefined
-          : { scale: 1.08, rotate: rotateOnHover ? 12 : 0, y: -1 }
-      }
-      whileTap={{ scale: 0.9 }}
+      whileHover={prefersReducedMotion ? undefined : { scale: 1.04 }}
+      whileTap={{ scale: 0.96 }}
       transition={SPRING}
       className={`relative flex h-11 w-11 items-center justify-center rounded-xl transition-colors duration-200 ${className}`}
       title={label}
@@ -312,23 +302,16 @@ export default function Header({
         </AnimatePresence>
 
         <div
-          className={`relative border-b border-emerald-100/70 bg-white/90 backdrop-blur-xl transition-shadow duration-300 dark:border-emerald-900/50 dark:bg-ink-deep/90 ${
-            scrolled ? "shadow-lg shadow-emerald-900/8" : ""
+          /* One elevation, declared once (Impeccable): at rest the header is
+             a hairline border on the page's own cream; only once the page
+             has scrolled under it does a shadow appear, which is the moment
+             it is actually floating. */
+          className={`relative border-b bg-white/95 backdrop-blur-xl transition-shadow duration-200 dark:bg-ink-deep/95 ${
+            scrolled
+              ? "border-emerald-100/70 shadow-[0_1px_0_rgba(6,78,59,0.04),0_8px_24px_-12px_rgba(6,78,59,0.18)] dark:border-emerald-900/60"
+              : "border-emerald-100/80 dark:border-emerald-900/50"
           }`}
         >
-          {/* Background Glow — clipped so its blurred box never widens the page. */}
-          <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-            <motion.div
-              animate={
-                prefersReducedMotion
-                  ? undefined
-                  : { x: [0, 20, 0], y: [0, -10, 0], opacity: [0.15, 0.3, 0.15] }
-              }
-              transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
-              className="absolute -start-10 -top-16 h-40 w-40 rounded-full bg-emerald-200/25 blur-3xl dark:bg-emerald-500/10"
-            />
-          </div>
-
           {/* ======================================== */}
           {/* Main Row: منو (راست) | لوگو (وسط) | سبد (چپ) */}
           {/* ======================================== */}
@@ -341,8 +324,8 @@ export default function Header({
             <motion.button
       type="button"
               onClick={() => onMobileOpenChange(!mobileOpen)}
-              whileHover={prefersReducedMotion ? undefined : { scale: 1.05 }}
-              whileTap={{ scale: 0.92 }}
+              whileHover={prefersReducedMotion ? undefined : { scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
               transition={SPRING}
               className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-green-700 transition-colors hover:bg-emerald-100 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300"
               aria-label={mobileOpen ? t("header.closeMenu") : t("header.openMenu")}
@@ -352,10 +335,10 @@ export default function Header({
               <AnimatePresence mode="wait" initial={false}>
                 <motion.span
                   key={mobileOpen ? "close" : "open"}
-                  initial={{ rotate: -90, opacity: 0, scale: 0.6 }}
+                  initial={{ rotate: -90, opacity: 0, scale: 0.9 }}
                   animate={{ rotate: 0, opacity: 1, scale: 1 }}
-                  exit={{ rotate: 90, opacity: 0, scale: 0.6 }}
-                  transition={{ duration: 0.18 }}
+                  exit={{ rotate: 90, opacity: 0, scale: 0.9 }}
+                  transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
                   className="flex"
                 >
                   {mobileOpen ? <X size={18} /> : <Menu size={18} />}
@@ -385,15 +368,15 @@ export default function Header({
               >
                 <Heart
                   size={18}
-                  className="sm:h-5 sm:w-5 transition-transform duration-200 group-hover:scale-110 group-hover:fill-rose-500/20"
+                  className="sm:h-5 sm:w-5 transition-transform duration-200 group-hover:fill-rose-500/20"
                   aria-hidden="true"
                 />
                 <AnimatePresence>
                   {wishlistCount > 0 && (
                     <motion.span
-                      initial={{ scale: 0, y: -8 }}
+                      initial={{ scale: 0.9, y: -6 }}
                       animate={{ scale: 1, y: 0 }}
-                      exit={{ scale: 0 }}
+                      exit={{ scale: 0.9 }}
                       transition={{ ...SPRING_SOFT, damping: 15 }}
                       className="absolute -end-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-orange px-0.5 text-fluid-2xs font-bold text-white shadow-md sm:h-5 sm:min-w-5 sm:text-fluid-2xs"
                     >

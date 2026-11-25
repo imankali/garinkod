@@ -92,7 +92,9 @@ export default function StorefrontCard({ storefront }: { storefront: Storefront 
 
   return (
     <>
-      <article className="flex h-full flex-col rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition hover:border-emerald-300 hover:shadow-md dark:border-emerald-900 dark:bg-emerald-950/40">
+      {/* One elevation: the card sits on a hairline border, and the hover
+          deepens the border rather than stacking a second shadow on it. */}
+      <article className="flex h-full flex-col rounded-xl border border-emerald-100 bg-white p-4 transition-colors duration-150 hover:border-emerald-300 dark:border-emerald-900 dark:bg-emerald-950/40 dark:hover:border-emerald-700">
         <div className="flex items-center gap-3">
           <button
             type="button"
@@ -105,8 +107,10 @@ export default function StorefrontCard({ storefront }: { storefront: Storefront 
             }
             className={cn(
               'shrink-0 rounded-full p-[3px] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-300 disabled:cursor-default',
-              storefront.has_active_stories && !allSeen &&
-                'bg-gradient-to-tr from-amber-400 via-rose-500 to-fuchsia-600',
+              /* An unseen story is marked with the brand's green ring, not a
+                 rose-to-fuchsia Instagram sweep: the ring means "new here",
+                 and it should mean it in this product's palette. */
+              storefront.has_active_stories && !allSeen && 'bg-brand-green',
               storefront.has_active_stories && allSeen && 'bg-slate-300 dark:bg-emerald-700',
               !storefront.has_active_stories && 'bg-transparent p-0',
             )}

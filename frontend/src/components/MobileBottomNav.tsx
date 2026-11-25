@@ -55,9 +55,11 @@ export default function MobileBottomNav({
                 {cartCount > 0 && (
                   <motion.span
                     key={cartCount}
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    exit={{ scale: 0 }}
+                    /* Never scale(0): a badge that appears from nothing pops.
+                       0.9 → 1 with opacity reads as a badge landing. */
+                    initial={{ scale: 0.9, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.9, opacity: 0 }}
                     // bg-orange-500 under white text measured 2.89:1 — under
                     // AA for the one number a buyer must read. The harvest
                     // gold (#a16207) is the palette's accent and clears 4.5:1

@@ -31,7 +31,6 @@ import AmazingOffers from "./components/home/AmazingOffers";
 import BannerGrid from "./components/home/BannerGrid";
 import RankedRail from "./components/home/RankedRail";
 import HomeMagazine from "./components/home/HomeMagazine";
-import { Sparkles, Star, TrendingUp } from "lucide-react";
 import Reveal from "./components/motion/Reveal";
 import ServiceShortcuts from "./components/home/ServiceShortcuts";
 import CategoryGrid from "./components/home/CategoryGrid";
@@ -432,7 +431,6 @@ export default function App() {
                         railId="best_sellers"
                         title="پرفروش‌ترین کالاها"
                         hint="بر اساس تعداد سفارش ثبت‌شده در گرین کود"
-                        icon={TrendingUp}
                         params={{ ordering: "-sales_count" }}
                         moreTo="/products?ordering=-sales_count"
                       />
@@ -467,7 +465,6 @@ export default function App() {
                         railId="newest"
                         title="تازه‌های انبار"
                         hint="نهادهایی که در هفته‌های اخیر به گرین کود اضافه شده‌اند."
-                        icon={Sparkles}
                         params={{ ordering: "-publish" }}
                         moreTo="/products?ordering=-publish"
                       />
@@ -502,7 +499,6 @@ export default function App() {
                           railId="best_rated"
                           title="بیشترین امتیاز خریداران"
                           hint="میانگین ستاره‌ها فقط از دیدگاه تأییدشده کشاورزان محاسبه می‌شود."
-                          icon={Star}
                           params={{ ordering: "-avg_rating" }}
                           moreTo="/products?ordering=-avg_rating"
                         />

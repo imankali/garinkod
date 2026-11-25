@@ -117,10 +117,38 @@
   --text-2xl: clamp(1.5rem, 1.3rem + 1vw, 2rem);
   --text-3xl: clamp(1.75rem, 1.4rem + 1.75vw, 2.75rem);
 
-  /* Transitions */
-  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-base: 300ms cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-slow: 500ms cubic-bezier(0.4, 0, 0.2, 1);
+  /* Motion — Emil Kowalski curves + Taste micro-interaction tokens.
+     *
+     * The old Material curve cubic-bezier(0.4, 0, 0.2, 1) is too weak for UI:
+     * it starts slow, delaying the exact moment the user is watching. Emil's
+     * rule is ease-out for entering/exiting (starts fast, feels responsive),
+     * ease-in-out only for on-screen movement, ease for hover/colour, linear
+     * for constant motion. Never ease-in on UI.
+     *
+     * Taste (design-taste-frontend) adds the hover/press vocabulary the shop
+     * needs: a linked card lifts 2px, a photo zooms 1.02–1.03 inside its
+     * frame, buttons step on hover and press on click. Durations below are
+     * Emil's table: press 100–160ms, tooltips 125–200ms, dropdowns 150–250ms,
+     * modals/drawers 200–500ms, UI under 300ms. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --m-ease-enter: cubic-bezier(0.22, 1, 0.36, 1);
+  --m-ease-io: cubic-bezier(0.65, 0, 0.35, 1);
+  --transition-fast: 150ms var(--ease-out);
+  --transition-base: 250ms var(--ease-out);
+  --transition-slow: 450ms var(--ease-out);
+  /* Taste hover/press layer (house rule 5). */
+  --m-in: 150ms;
+  --m-out: 120ms;
+  --m-press: 90ms;
+  --m-panel: 200ms;
+  --m-close: 120ms;
+  --m-slide: 240ms;
+  --m-image: 600ms;
+  --m-image-out: 400ms;
+  --m-cycle: 3.2s;
 }
 
 /* ========================================
@@ -202,11 +230,16 @@ body {
  * 4. Brand Utility Classes
  * ======================================== */
 .bg-brand-gradient {
-  background: linear-gradient(135deg, var(--brand-green), var(--brand-green-dark));
+  /* A gradient is a drawing, not a brand colour. Impeccable's craft floor:
+     emphasis comes from weight or size; a green-to-lime sweep on every CTA
+     was the house default rather than a decision — and lime-on-white under
+     white type is the least legible end of it. One deep green reads the
+     same on every surface and measures 4.5:1 with white text. */
+  background-color: var(--brand-green);
 }
 
 .bg-brand-gradient-accent {
-  background: linear-gradient(90deg, var(--brand-green), var(--brand-lime));
+  background-color: var(--brand-green);
 }
 
 /*
@@ -247,16 +280,64 @@ body {
  * `animation`: the word "گرین" no longer drifts, and the glyph colour no longer
  * depends on a timer.
  */
-.text-gradient-green {
-  background: linear-gradient(90deg, #22c55e, #84cc16);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
+/*
+ * `.text-gradient-green` removed with the logo rebuild, and it is the last of
+ * the clipped-gradient text on the site.
+ *
+ * Gradient text fails on mechanics before taste: with `color: transparent` the
+ * glyphs have no colour of their own, so contrast depends on where the ramp
+ * happens to sit behind each letter — unmeasurable, and different at every
+ * size. Impeccable's craft floor bans it outright: emphasis comes from weight
+ * or size. `.text-gradient-purple` went earlier for the same reason plus a
+ * violet-to-pink palette that belongs to no product.
+ */
 
-/* `.text-gradient-purple` removed: it had no callers, and a violet-to-pink
-   gradient is the single most recognisable default palette in generated UI.
-   Dead code that also advertises "nobody designed this" is worth deleting. */
+/* ========================================
+ * 4b. Radii
+ * ======================================== */
+/*
+ * Card radii are 12–16px, and a card declares *either* a border or a shadow,
+ * never both (craft floor: a 1px border under a wide soft shadow is the ghost
+ * card). The app shipped `rounded-3xl` (24px) on 190 surfaces — modals,
+ * panels, cards, chips — which is not a rounded rectangle, it is a capsule,
+ * and at that radius the corner eats the content's alignment.
+ *
+ * Corrected at the token, the way the palette was: `rounded-3xl` now renders
+ * 16px, so every existing call site lands in the band without a 190-file
+ * sweep, and the one place that genuinely wants a large radius (a full-bleed
+ * dialog) has `rounded-[20px]` where it needs it.
+ */
+@theme {
+  --radius-3xl: 1rem;
+
+  /*
+   * Brand colours, registered as utilities.
+   *
+   * The redesign started using `bg-brand-green` on the logo tile, the hero's
+   * primary action, the active slide dot and the login mark — none of which
+   * produced any CSS: `--brand-green` lives in plain `:root`, and Tailwind v4
+   * only generates a `bg-*`/`text-*`/`border-*` utility from a colour it knows
+   * about in `@theme`. Four elements silently rendered with no background at
+   * all. Registering the palette here is what makes the brand colours usable
+   * from markup at all; `:root` keeps the same values for hand-written CSS.
+   */
+  /*
+   * The one curve the whole product moves on, registered so the compact
+   * `ease-out` utility can use it instead of Tailwind's default
+   * cubic-bezier(0, 0, 0.2, 1) — a curve that starts *below* linear and
+   * reads as a hesitation. Emil's ease-out is the one that answers.
+   */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+
+  --color-brand-green: #15803d;
+  --color-brand-green-light: #22c55e;
+  --color-brand-lime: #a3e635;
+  --color-brand-cream: #f0fdf4;
+  --color-brand-orange: #f97316;
+  --color-brand-rose: #f43f5e;
+}
 
 /* ========================================
  * 5. Custom Scrollbar
@@ -275,12 +356,15 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #22c55e, #84cc16);
+  background: #86b89a;
   border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #15803d, #65a30d);
+  background: var(--brand-green);
+  background-clip: padding-box;
 }
 
 .no-scrollbar::-webkit-scrollbar {
@@ -473,8 +557,17 @@ body {
 /* ========================================
  * 9. Interactive Element Transitions
  * ======================================== */
+/* Emil: specify exact properties, never `all`. `all` animates layout
+   properties (width/height/margin) that force paint on every frame and
+   makes the press feel sluggish. transform/opacity run on the GPU. */
 button, a, input, select, textarea {
-  transition: all var(--transition-base);
+  transition:
+    transform var(--m-in) var(--ease-out),
+    background-color var(--m-in) var(--ease-out),
+    color var(--m-in) var(--ease-out),
+    border-color var(--m-in) var(--ease-out),
+    box-shadow var(--m-in) var(--ease-out),
+    opacity var(--m-in) var(--ease-out);
 }
 
 /*
@@ -519,6 +612,25 @@ p, li, dd, figcaption {
 .dark ::selection {
   background: #166534;
   color: #f7fee7;
+}
+
+/* Impeccable craft floor — browser surfaces. The parts the design did not
+   draw still carry the design: selection (above), the caret, link
+   underlines and tabular numerals in prices. Without these the page reads
+   as assembled from browser defaults. */
+input, textarea {
+  caret-color: var(--brand-green);
+}
+
+a {
+  text-underline-offset: 0.2em;
+  text-decoration-thickness: 1px;
+}
+
+/* Prices and counts are data: tabular figures stop the digits dancing when
+   a countdown ticks or a quantity changes. */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
 }
 
 /* ========================================
@@ -729,23 +841,32 @@ body {
 }
 
 /* ========================================
- * 11. Hover & Tilt Effects
+ * 11. Hover Effects — Taste house rule 5 + Emil hover gating
  * ======================================== */
+/* Taste: a linked card lifts 2px (not 4px), a photo zooms 1.02–1.03 inside
+   its frame. Emil: hover motion is gated to fine pointers — touch fires
+   false hovers on tap, so the lift only exists where a pointer can hover.
+   Impeccable: the hovered element stays still; a child carries the motion
+   so the element never slides out from under a pointer near its edge. */
 .hover-lift {
-  transition: transform var(--transition-base), box-shadow var(--transition-base);
+  transition:
+    transform var(--m-in) var(--ease-out),
+    box-shadow var(--m-in) var(--ease-out);
 }
 
-.hover-lift:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 24px rgba(34, 197, 94, 0.15);
+@media (hover: hover) and (pointer: fine) {
+  .hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 24px rgba(34, 197, 94, 0.15);
+  }
 }
 
+/* Tilt removed. Taste house rule 5 bans tilt outright ("No tilt, carousels
+   or timed tabs"), and the Logo's 3D flip was the same habit. The class is
+   kept as a no-op so any markup still referencing it degrades to a plain
+   card instead of a broken transform. */
 .tilt-card {
-  transition: transform var(--transition-base);
-}
-
-.tilt-card:hover {
-  transform: perspective(1000px) rotateX(5deg) rotateY(-5deg) scale(1.02);
+  transition: transform var(--m-in) var(--ease-out);
 }
 
 /* ========================================
@@ -775,24 +896,17 @@ body {
 /* ========================================
  * 13. Gradient Border
  * ======================================== */
+/*
+ * `.gradient-border` was an animated gradient stroke drawn with a masked
+ * pseudo-element: a 3s infinite loop on a 2px edge, which is decoration that
+ * never resolves and therefore never stops asking for attention. It is a
+ * plain hairline now; any caller keeps a border, loses the loop.
+ */
 .gradient-border {
   position: relative;
   background: white;
+  border: 1px solid var(--color-emerald-100, #d1fae5);
   border-radius: 16px;
-}
-
-.gradient-border::before {
-  content: "";
-  position: absolute;
-  inset: -2px;
-  padding: 2px;
-  border-radius: 16px;
-  background: linear-gradient(135deg, #22c55e, #84cc16, #22c55e);
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  animation: gradient-shift 3s ease infinite;
-  background-size: 200% 200%;
 }
 
 /* ========================================
@@ -803,8 +917,8 @@ input[type="range"]::-webkit-slider-thumb {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #22c55e, #84cc16);
-  box-shadow: 0 2px 6px rgba(34, 197, 94, 0.5);
+  background: var(--brand-green);
+  box-shadow: 0 1px 3px rgba(6, 78, 59, 0.28);
   cursor: pointer;
 }
 
@@ -812,153 +926,28 @@ input[type="range"]::-moz-range-thumb {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #22c55e, #84cc16);
-  box-shadow: 0 2px 6px rgba(34, 197, 94, 0.5);
+  background: var(--brand-green);
+  box-shadow: 0 1px 3px rgba(6, 78, 59, 0.28);
   cursor: pointer;
   border: none;
 }
 
 /* ========================================
- * 15. Keyframe Animations
- * ======================================== */
-
-/* Gradient Shift */
-@keyframes gradient-shift {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-
-.animate-gradient {
-  background-size: 200% 200%;
-  animation: gradient-shift 8s ease infinite;
-}
-
-/* Float Slow */
-@keyframes float-slow {
-  0%, 100% { transform: translate(0, 0) rotate(0deg) scale(1); }
-  33% { transform: translate(20px, -30px) rotate(8deg) scale(1.05); }
-  66% { transform: translate(-15px, 15px) rotate(-6deg) scale(0.97); }
-}
-
-.animate-float-slow {
-  animation: float-slow 10s ease-in-out infinite;
-}
-
-.animate-float-slower {
-  animation: float-slow 16s ease-in-out infinite;
-}
-
-/* Spin Slow */
-@keyframes spin-slow {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-.animate-spin-slow {
-  animation: spin-slow 12s linear infinite;
-}
-
-/* Shimmer */
-@keyframes shimmer {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
-}
-
-.animate-shimmer {
-  animation: shimmer 2.2s ease-in-out infinite;
-}
-
-/* Marquee (TopBar ticker) */
-@keyframes marquee {
-  0% { transform: translateX(100%); }
-  100% { transform: translateX(-100%); }
-}
-
-.animate-marquee {
-  animation: marquee 22s linear infinite;
-}
-
-/* Ping Soft */
-@keyframes ping-soft {
-  0% { transform: scale(1); opacity: 0.7; }
-  80%, 100% { transform: scale(1.9); opacity: 0; }
-}
-
-.animate-ping-soft {
-  animation: ping-soft 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
-}
-
-/* Wave */
-@keyframes wave {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  50% { transform: translateY(-10px) rotate(5deg); }
-}
-
-.animate-wave {
-  animation: wave 3s ease-in-out infinite;
-}
-
-/*
- * `bounce-soft` removed. It had no callers.
+ * 15. Keyframe Animations — removed
+ * ========================================
  *
- * It was also the wrong motion on its merits: a symmetric up-and-down loop on a
- * 2s timer is an attention grabber that never resolves, which is why OS-level
- * reduced-motion guidance treats indefinite looping motion as a hazard rather
- * than a style. Anything that needs a "look here" pulse should be finite and
- * should stop; `glow-pulse` below is the one that survived, and it is finite in
- * the places it is used.
+ * Ten looping keyframes used to live here (gradient sweep, floating blobs,
+ * ping ring, marquee ticker, wave, glow pulse, particle rise, scale pulse)
+ * and not one of them had a call site. They were an invitation: the next
+ * component to need a little life would reach into this drawer and add the
+ * eleventh loop to a page whose entire motion thesis is "one authored
+ * moment, then still".
+ *
+ * Motion on this site is now a transition on a state change — the cheapest
+ * tool in Emil's decision table — or a framer-motion gesture already scoped
+ * to one component (the skeleton shimmer, the drawer, the reveal). Nothing
+ * loops indefinitely; nothing animates for its own sake.
  */
-
-/* Glow Pulse */
-@keyframes glow-pulse {
-  0%, 100% { box-shadow: 0 0 20px rgba(34, 197, 94, 0.3); }
-  50% { box-shadow: 0 0 40px rgba(34, 197, 94, 0.6); }
-}
-
-.animate-glow-pulse {
-  animation: glow-pulse 2s ease-in-out infinite;
-}
-
-/* Slide In Right */
-@keyframes slide-in-right {
-  from { transform: translateX(100%); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
-}
-
-.animate-slide-in-right {
-  animation: slide-in-right 0.5s ease-out;
-}
-
-/* Scale In */
-@keyframes scale-in {
-  from { transform: scale(0.8); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
-}
-
-.animate-scale-in {
-  animation: scale-in 0.4s ease-out;
-}
-
-/* Particle Float */
-@keyframes particle-float {
-  0%, 100% { transform: translateY(0) translateX(0) rotate(0deg); opacity: 1; }
-  50% { transform: translateY(-100px) translateX(50px) rotate(180deg); opacity: 0; }
-}
-
-.animate-particle {
-  animation: particle-float 4s ease-in-out infinite;
-}
-
-/* Pulse Scale */
-@keyframes pulse-scale {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-}
-
-.animate-pulse-scale {
-  animation: pulse-scale 2s ease-in-out infinite;
-}
 
 /* ========================================
  * 16. Safe Area Padding (Mobile)

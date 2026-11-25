@@ -91,7 +91,11 @@ export default function FlyToCart({ items, onComplete }: FlyToCartProps) {
               rotate: 15,
             }}
             exit={{
-              scale: 0,
+              /* Never animate to scale(0): the element collapses to nothing
+                 before it has finished travelling, and at 600px of distance
+                 the eye reads a pop, not a landing. 0.35 keeps the object
+                 legible as it arrives at the cart. */
+              scale: 0.35,
               opacity: 0,
             }}
             transition={{

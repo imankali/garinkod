@@ -228,9 +228,18 @@ test.describe('home page as the shop window', () => {
   test('the hero states what the site is and offers a way in', async ({ page }) => {
     await page.goto('/');
 
-    const hero = page.getByRole('region', { name: /کود، سم، بذر/ });
+    // The band is addressed by the name it carries, and the assertion that
+    // matters is what a visitor can *do* from it: the two intentions the
+    // platform serves are both one link away from the headline.
+    const hero = page.getByRole('region', { name: 'معرفی گرین کود' });
     await expect(hero).toBeVisible();
-    await expect(hero.getByRole('link', { name: /خرید از فروشگاه/ })).toBeVisible();
+    await expect(hero.getByRole('heading', { level: 2 })).toHaveText(
+      'نهاده‌های کشاورزی، مستقیم سر مزرعه',
+    );
+    await expect(hero.getByRole('link', { name: /خرید از فروشگاه/ })).toHaveAttribute(
+      'href',
+      '/products',
+    );
     await expect(hero.getByRole('link', { name: /بازار غرفه‌داران/ })).toHaveAttribute(
       'href',
       '/storefronts',

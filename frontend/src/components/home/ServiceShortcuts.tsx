@@ -17,7 +17,6 @@ interface Shortcut {
   label: string;
   description: string;
   icon: LucideIcon;
-  tone: string;
 }
 
 /**
@@ -39,84 +38,88 @@ const SHORTCUTS: Shortcut[] = [
     label: 'غرفه‌داران',
     description: 'بازار مستقیم کشاورزان و تعاونی‌ها',
     icon: Store,
-    tone: 'bg-lime-100 text-lime-800 dark:bg-lime-900/40 dark:text-lime-200',
-  },
+      },
   {
     to: '/services',
     label: 'خدمات کشاورزی',
     description: 'مشاوره، آبیاری، آزمون خاک',
     icon: Sprout,
-    tone: 'bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-200',
-  },
+      },
   {
     to: '/farmer-sell',
     label: 'فروش محصول',
     description: 'محصولتان را عرضه کنید',
     icon: Building2,
-    tone: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200',
-  },
+      },
   {
     to: '/orders',
     label: 'پیگیری سفارش',
     description: 'با کد سفارش',
     icon: ClipboardList,
-    tone: 'bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-200',
-  },
+      },
   {
     to: '/rewards',
     label: 'باشگاه مشتریان',
     description: 'کد تخفیف و کیف پول',
     icon: Gift,
-    tone: 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-200',
-  },
+      },
   {
     to: '/affiliate',
     label: 'همکاری در فروش',
     description: 'درآمد از معرفی',
     icon: Handshake,
-    tone: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-200',
-  },
+      },
   {
     to: '/support',
     label: 'پشتیبانی',
     description: 'بازخورد و شکایت',
     icon: LifeBuoy,
-    tone: 'bg-slate-100 text-slate-700 dark:bg-emerald-900 dark:text-emerald-100',
-  },
+      },
 ];
 
 export default function ServiceShortcuts() {
   return (
-    <section className="page-shell py-8" aria-labelledby="services-heading">
+    <section className="page-shell py-8 sm:py-10" aria-labelledby="services-heading">
       <h2
         id="services-heading"
-        className="text-fluid-xl font-extrabold text-slate-800 dark:text-white"
+        className="text-fluid-xl font-extrabold tracking-[-0.01em] text-ink-deep dark:text-white"
       >
         گرین کود چه خدماتی دارد؟
       </h2>
-      <p className="mt-1 text-fluid-sm text-slate-500 dark:text-emerald-200">
+      <p className="mt-1 text-fluid-2xs leading-6 text-slate-500 dark:text-emerald-200/80">
         فروشگاه فقط بخشی از پلتفرم است.
       </p>
 
       {/*
-        Two columns on the narrowest phones so labels stay readable rather than
-        shrinking, widening to four on desktop.
+        Every tile used to have its own hue (lime, sky, amber, violet, rose,
+        indigo, slate) in a 40px rounded square. Seven colours on seven
+        identical cards is a palette with no owner: the colour marked nothing,
+        and Impeccable's floor calls this shape — same-size card, icon,
+        heading, text — the lazy container. One row of plain links instead:
+        glyph and label on one line, description under it, separated by rules
+        rather than boxed seven times, so the section reads as a list of
+        services and takes a third of the height.
       */}
-      <ul className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-        {SHORTCUTS.map(({ to, label, description, icon: Icon, tone }) => (
-          <li key={to}>
+      <ul className="mt-4 grid gap-x-6 border-t border-emerald-100 sm:grid-cols-2 lg:grid-cols-3 dark:border-emerald-900">
+        {SHORTCUTS.map(({ to, label, description, icon: Icon }) => (
+          <li key={to} className="border-b border-emerald-100 dark:border-emerald-900">
             <Link
               to={to}
-              className="flex h-full min-h-11 flex-col gap-2 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md dark:border-emerald-900 dark:bg-emerald-950"
+              className="group flex min-h-11 items-center gap-3 py-3 transition-colors duration-150 hover:text-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 dark:hover:text-lime-200"
             >
-              <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${tone}`}>
-                <Icon size={19} aria-hidden="true" />
-              </span>
-              <span className="text-fluid-sm font-extrabold text-slate-800 dark:text-white">
-                {label}
-              </span>
-              <span className="text-fluid-2xs text-slate-500 dark:text-emerald-300">
-                {description}
+              <Icon
+                size={18}
+                aria-hidden="true"
+                strokeWidth={1.75}
+                className="shrink-0 text-emerald-700 transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] group-hover:-translate-x-0.5 motion-reduce:transition-none dark:text-lime-300"
+              />
+              <span className="min-w-0">
+                <span className="block text-fluid-sm font-bold text-ink-deep dark:text-white">
+                  {label}
+                </span>
+                <span className="block text-fluid-2xs text-slate-500 dark:text-emerald-200/80">
+                  {description}
+                </span>
               </span>
             </Link>
           </li>

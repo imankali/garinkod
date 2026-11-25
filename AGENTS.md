@@ -160,7 +160,7 @@ Read `.agents/skills/sheleg-design/MOTION_DOCTRINE.md` before adding animation
 | Rule | Count | Status |
 |---|---|---|
 | `gray-on-color` | 124 | **All false positives. Do not "fix".** |
-| `gradient-text` | 1 | Accepted exception (logo wordmark) |
+| `gradient-text` | 0 | Fixed by the redesign (see below) |
 
 `gray-on-color` pairs a light-mode `text-slate-*` with a `dark:bg-*` class on
 the *same element*. Verified example, `ShopFilterBar.tsx:370`:
@@ -174,14 +174,64 @@ text-slate-700 ... bg-white ... dark:bg-emerald-950 dark:text-emerald-50
 theme. The rule is unusable on any Tailwind codebase that uses `dark:`
 variants.
 
-The one remaining `gradient-text` is `Logo.tsx`'s wordmark — a fixed brand
-mark on a known background, where the choice is deliberate and documented in
-`index.css`.
+The last `gradient-text` finding (the logo wordmark) is gone with the logo
+rebuild: `«گرین‌کود»` is now one colour at two weights, and
+`.text-gradient-green` was deleted along with the framed exception that
+protected it in `index.css`.
 
-Fixed in this pass: `ai-color-palette` ×4 (Affiliate page had a violet/indigo
+Fixed earlier: `ai-color-palette` ×4 (Affiliate page had a violet/indigo
 ramp on an emerald brand), `bounce-easing` ×2, `overused-font` ×1 (Inter was
 referenced but never loaded), `gradient-text` ×2 (one was on a **price**),
-`side-tab` ×1. Count went 135 → 125.
+`side-tab` ×1.
+
+### The 2026-11 frontend redesign
+
+The visual language was rebuilt on four skills, now vendored under
+`.agents/skills/` and installable with `npx skills add`:
+
+| Skill | Source | What it governed |
+|---|---|---|
+| `ui-ux-pro-max` | `nextlevelbuilder/ui-ux-pro-max-skill` | palette / style / checklist (Organic Biophilic, earth green) |
+| `design-taste-frontend` | `Leonxlnx/taste-skill` | art direction, house rules (no tilt, no ticker, one dealt moment, 2px lift, photo zoom 1.02–1.03) |
+| `animate` + `emil-design-eng` | `emilkowalski/skills` | motion decisions: purpose, cheapest tool, transform/opacity only, never `scale(0)`, easing table, duration table |
+| `impeccable` | `pbakaus/impeccable` | craft floor: no kicker, no gradient text, border *or* shadow, radii 12–16px, browser surfaces, one authored moment |
+
+What that changed, in the order a visitor meets it:
+
+1. **Motion tokens** (`index.css` §2). The Material curve
+   `cubic-bezier(0.4, 0, 0.2, 1)` is replaced with Emil's
+   `--ease-out: cubic-bezier(0.23, 1, 0.32, 1)` plus Taste's
+   `--m-in/--m-out/--m-press/--m-image` scale. `transition: all` (the global
+   element rule and 13 call sites) now names its properties.
+2. **Top bar**: the four-message marquee is gone; one shipping promise stands
+   still on `ink-deep`.
+3. **Header**: no drifting glow, no shimmer sweep, no five-rotation cart bump,
+   no 0.6-scale icon morph; the count still ticks, the badge still lands.
+4. **Hero**: rebuilt as copy + field photograph on the page's own cream —
+   no white-on-gradient type, no kicker, one statement and two doors. The
+   carousel contract (API slides, 6s dwell, hover/focus pause, swipe, arrows,
+   `#hero-heading`) is untouched.
+5. **Section rhythm**: one `SectionHeading` for every home panel; icons as
+   bullets removed, hints moved under the title, "see all" on the baseline.
+6. **Flash deals**: titled like every other section; the rose countdown pill
+   is a line of tabular figures under it.
+7. **Category row**: chips, not gradient discs.
+8. **Promo grid**: one surface + one glyph weight, with the seller call the
+   only dark tile. Service shortcuts are a rule-separated list, not seven
+   differently-tinted cards.
+9. **Cards** (`ProductCard`, `MarketplaceListingCard`, `OfferRail`,
+   `StorefrontCard`): border *or* shadow, 2px hover lift, photo scale capped at
+   1.03, 150ms ease-out press at 0.97. Rails autoplay every 4s instead of 2s.
+10. **Logo**: flat brand tile; the 3D flip, halo and pulsing dot are gone.
+11. **Dead motion deleted**: all ten looping keyframes (and `.animate-*`),
+    `.tilt-card`'s transform, `.gradient-border`'s animated stroke. The ten
+    had zero call sites; they existed as an invitation.
+12. **Tokens**: `--radius-3xl` is 16px (was 24px), brand colours and easing
+    curves are registered in `@theme` so `bg-brand-green` / `ease-out`
+    actually compile.
+
+Verification after the redesign: `npx tsc --noEmit` clean, `CI=true npx
+vitest run` 264/264, `npm run build` clean.
 
 ---
 

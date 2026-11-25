@@ -7,7 +7,6 @@
 
 import { screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { TrendingUp } from 'lucide-react';
 
 import RankedRail from './RankedRail';
 import { renderAppSettled } from '../../test/render';
@@ -39,7 +38,6 @@ const renderRail = () =>
       railId="best_sellers"
       title="پرفروش‌ترین کالاها"
       hint="بر اساس تعداد سفارش ثبت‌شده در گرین کود"
-      icon={TrendingUp}
       params={{ ordering: '-sales_count' }}
       moreTo="/products?ordering=-sales_count"
     />,

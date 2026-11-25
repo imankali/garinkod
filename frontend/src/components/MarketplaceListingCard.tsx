@@ -19,9 +19,9 @@ import SkeletonCard from './ui/SkeletonCard';
 import ListingDetailModal from './storefront/ListingDetailModal';
 import StockBadge from './listing/StockBadge';
 
-// Shared press physics with ProductCard: crisp 0.2s, soft in-out, and only
-// ever on controls that are actually enabled.
-const TACTILE = { duration: 0.2, ease: 'easeInOut' } as const;
+// Shared press physics with ProductCard (Emil): 150ms ease-out, 0.97 press,
+// only ever on controls that are actually enabled.
+const TACTILE = { duration: 0.15, ease: [0.23, 1, 0.32, 1] } as const;
 
 /**
  * `discount` is the row variant used inside «پرتخفیف‌ترین‌ها».
@@ -106,8 +106,8 @@ export default function MarketplaceListingCard({
       whileInView={{ opacity: 1 }}
       viewport={{ once: true, margin: '-60px' }}
       transition={{ delay: (index % 4) * 0.05, duration: 0.35 }}
-      whileHover={{ y: -4 }}
-      className="group flex flex-col overflow-hidden rounded-xl border border-emerald-100 bg-white shadow-sm transition-shadow duration-300 hover:shadow-lg hover:shadow-emerald-900/5 dark:border-emerald-900 dark:bg-ink"
+      whileHover={{ y: -2 }}
+      className="group flex flex-col overflow-hidden rounded-xl border border-emerald-100 bg-white transition-[box-shadow,border-color] duration-200 hover:border-emerald-300 hover:shadow-lg hover:shadow-emerald-900/5 dark:border-emerald-900 dark:bg-ink dark:hover:border-emerald-700"
     >
       <div className="relative aspect-square overflow-hidden bg-emerald-50 dark:bg-emerald-950">
         <Link
@@ -139,7 +139,7 @@ export default function MarketplaceListingCard({
             height={240}
             loading="lazy"
             decoding="async"
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+            className="h-full w-full object-cover transition-transform duration-[600ms] ease-[cubic-bezier(0.23,1,0.32,1)] group-hover:scale-[1.03]"
           />
         </picture>
         </Link>
@@ -200,7 +200,7 @@ export default function MarketplaceListingCard({
           type="button"
           onClick={() => setQuickView(true)}
           tabIndex={-1}
-          className="pointer-events-none absolute inset-x-3 bottom-3 z-[2] hidden translate-y-2 items-center justify-center gap-1.5 rounded-xl bg-white/95 py-2.5 text-xs font-bold text-slate-700 opacity-0 shadow-lg backdrop-blur transition-all duration-300 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:translate-y-0 group-focus-within:opacity-100 [@media(hover:hover)]:flex"
+          className="pointer-events-none absolute inset-x-3 bottom-3 z-[2] hidden translate-y-2 items-center justify-center gap-1.5 rounded-xl bg-white/95 py-2.5 text-xs font-bold text-slate-700 opacity-0 shadow-lg backdrop-blur transition-[transform,opacity] duration-200 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:translate-y-0 group-focus-within:opacity-100 [@media(hover:hover)]:flex"
           aria-label={`نمای سریع ${listing.title}`}
         >
           <Eye size={14} aria-hidden="true" /> نمای سریع
@@ -250,8 +250,8 @@ export default function MarketplaceListingCard({
           <motion.button
             type="button"
             onClick={sendToDirect}
-            whileHover={{ scale: 1.06 }}
-            whileTap={{ scale: 0.94 }}
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
             transition={TACTILE}
             title={t('storefront.sendToDirectHint')}
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-emerald-200 text-emerald-700 transition-colors hover:bg-emerald-50 dark:border-emerald-700 dark:text-lime-300 dark:hover:bg-emerald-900"

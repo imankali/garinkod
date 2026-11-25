@@ -197,13 +197,13 @@ export default function Login() {
         className="mx-auto w-full max-w-md"
         aria-labelledby="auth-title"
       >
-        <div className="rounded-3xl border border-white/70 bg-white p-6 shadow-2xl shadow-emerald-100 sm:p-8 dark:border-emerald-800 dark:bg-emerald-900/70 dark:shadow-none">
+        <div className="rounded-2xl border border-white/70 bg-white p-6 shadow-xl shadow-emerald-900/5 sm:p-8 dark:border-emerald-800 dark:bg-emerald-900/70 dark:shadow-none">
           <header className="mb-6 text-center">
             <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-              className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-lime-500 text-white shadow-lg"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.25, ease: [0.23, 1, 0.32, 1] }}
+              className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-green text-white"
             >
               {authMethod === 'otp' ? <Phone size={28} /> : isRegister ? <UserPlus size={28} /> : <LogIn size={28} />}
             </motion.div>

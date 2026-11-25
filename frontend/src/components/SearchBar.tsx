@@ -506,7 +506,7 @@ export default function SearchBar({ variant = "desktop", onSelectProduct }: Sear
                             setRecent((prev) => [term, ...prev].slice(0, 8));
                           }
                         }}
-                        className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs text-emerald-700 transition-all hover:bg-emerald-100 hover:shadow-sm dark:border-emerald-800 dark:bg-emerald-900/40 dark:text-lime-300"
+                        className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs text-emerald-700 transition-colors duration-150 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-900/40 dark:text-lime-300"
                       >
                         {term}
                       </button>

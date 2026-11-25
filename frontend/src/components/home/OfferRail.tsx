@@ -36,7 +36,16 @@ import type { ProductList } from '@/types/shop';
  *  - A per-card add-to-cart button (quantity 1): browsing and buying are one
  *    gesture, not two pages.
  */
-const AUTOPLAY_MS = 2000;
+/*
+ * 4s, not 2s.
+ *
+ * The rail advanced one card every two seconds — faster than a reader can
+ * finish a two-line Persian title, so every title that arrived was already
+ * leaving. A rail that carries prices and product names is content, not a
+ * ticker: 4s gives the eye time to land on a card and stay there, and the
+ * hover pause still exists for whoever wants to read slowly.
+ */
+const AUTOPLAY_MS = 4000;
 
 export default function OfferRail({
   products,
@@ -148,7 +157,7 @@ export default function OfferRail({
     return () => observer.disconnect();
   }, []);
 
-  // Autoplay: one column per 2s. Pointer hover or an active touch pauses it —
+  // Autoplay: one column per 4s. Pointer hover or an active touch pauses it —
   // the standard carousel contract; moving the pointer away resumes.
   useEffect(() => {
     if (!playing || products.length < 2) return;
@@ -204,9 +213,15 @@ export default function OfferRail({
           staleTime: 5 * 60 * 1000,
         });
       }}
-      className="group flex h-full flex-1 flex-col gap-1 rounded-xl border border-slate-100 bg-white p-2 text-slate-900 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-lg focus-visible:-translate-y-1 focus-visible:outline-2 focus-visible:outline-emerald-600 motion-reduce:hover:translate-y-0 dark:border-emerald-900/40 dark:bg-ink"
+      /*
+        One elevation (border), one hover answer (the border deepens and the
+        card lifts 2px), and the photograph — not the card — carries the
+        scale, clipped by its own frame (Impeccable: hover on the child;
+        Taste: photo zooms 1.02–1.03 inside its frame).
+      */
+      className="group flex h-full flex-1 flex-col gap-1 rounded-xl border border-emerald-100 bg-white p-2 text-slate-900 transition-[border-color,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:-translate-y-0.5 hover:border-emerald-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 motion-reduce:hover:translate-y-0 dark:border-emerald-900/50 dark:bg-ink dark:hover:border-emerald-700"
     >
-      <div className="relative">
+      <div className="relative overflow-hidden rounded-lg bg-emerald-50 dark:bg-emerald-950">
         <img
           src={product.image_url}
           alt={product.title}
@@ -214,10 +229,13 @@ export default function OfferRail({
           height={224}
           loading="lazy"
           decoding="async"
-          className="aspect-square h-auto w-full rounded-lg object-cover"
+          className="aspect-square h-auto w-full object-cover transition-transform duration-[600ms] ease-[cubic-bezier(0.23,1,0.32,1)] group-hover:scale-[1.03]"
         />
         {product.discount_percent > 0 && (
-          <span className="absolute end-1.5 top-1.5 rounded-full bg-rose-600 px-1.5 py-0.5 text-[10px] font-extrabold text-white">
+          /* The discount is a number, not a mood: slate on lime reads as a
+             price tag; the rose pill was a second accent colour competing
+             with the amber rating beside it. */
+          <span className="absolute end-1.5 top-1.5 rounded-md bg-ink-deep/90 px-1.5 py-0.5 text-[10px] font-extrabold tabular-nums text-lime-300">
             {toPersianDigits(product.discount_percent)}٪
           </span>
         )}
@@ -260,7 +278,7 @@ export default function OfferRail({
           event.stopPropagation();
           void quickAdd(product);
         }}
-        className="tap-target mt-auto flex min-h-10 w-full shrink-0 items-center justify-center gap-1 rounded-lg bg-emerald-600 text-fluid-2xs font-extrabold text-white transition hover:bg-emerald-700 active:scale-[0.97]"
+        className="tap-target mt-auto flex min-h-10 w-full shrink-0 items-center justify-center gap-1 rounded-lg bg-emerald-600 text-fluid-2xs font-extrabold text-white transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:bg-emerald-700 active:scale-[0.97]"
       >
         <ShoppingCart size={13} aria-hidden="true" />
         افزودن

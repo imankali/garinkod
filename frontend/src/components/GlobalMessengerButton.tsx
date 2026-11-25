@@ -104,11 +104,11 @@ export default function GlobalMessengerButton({ cartDrawerOpen = false }: { cart
     <>
       <motion.button
       type="button"
-        initial={{ opacity: 0, scale: 0 }}
+        initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: 0.8, type: 'spring' }}
-        whileHover={{ scale: 1.06 }}
-        whileTap={{ scale: 0.94 }}
+        transition={{ delay: 0.8, duration: 0.25, ease: [0.23, 1, 0.32, 1] }}
+        whileHover={{ scale: 1.03 }}
+        whileTap={{ scale: 0.97 }}
         onClick={() => setOpen(true)}
         // Sits clear of the fixed mobile bar (and the iOS home indicator)
         // rather than overlapping it, and keeps a full 44px hit area.

@@ -1,24 +1,32 @@
 // frontend/src/components/home/AmazingOffers.tsx
 
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft, Timer, Zap } from 'lucide-react';
+import { Timer } from 'lucide-react';
 
 import { productsApi } from '../../api/services';
 import { toPersianDigits } from '../../utils/normalizeDigits';
 import type { ProductList } from '@/types/shop';
 import OfferRail from './OfferRail';
+import SectionHeading from './SectionHeading';
 
 /**
- * «پیشنهادهای شگفت‌انگیز» — the Digikala flash-deal panel, rebuilt for farm
- * supplies: a dark emerald slab, a countdown to midnight, and a horizontally
- * scrollable rail of the deepest live discounts (`has_discount=true`, ordered
- * by discount depth on the server).
+ * «تخفیف‌های امروز» — the deepest live discounts, ordered by depth on the
+ * server (`has_discount=true`, `-discount_percent`).
  *
- * The countdown is the only timer on the page; it recomputes each second from
- * the local clock (no server round-trips) and is disabled under reduced
- * motion preferences — the deals themselves stay, only the ticking stops.
+ * What changed and why:
+ *  - The panel no longer shouts. It used to be introduced by a lightning
+ *    bolt, a rose countdown pill glowing against the cream, and a title set
+ *    in the same weight as every other section — three emphasis devices for
+ *    a heading that already says "discounts". Now the section is titled like
+ *    every other section, and the countdown is a quiet line of tabular
+ *    figures under it: information, not alarm. Emil: a constantly animating
+ *    number on a page with autoplaying rails above it is competition, not
+ *    emphasis.
+ *  - The deadline is honest. It counts to local midnight because that is
+ *    when the campaign window closes; the label says so.
+ *  - The countdown still stops under `prefers-reduced-motion`, and the deals
+ *    stay either way.
  */
 
 function secondsUntilMidnight(now: Date): number {
@@ -59,10 +67,10 @@ export default function AmazingOffers() {
   if (isLoading) {
     return (
       <div
-        className="page-shell py-6 sm:py-8"
+        className="page-shell py-8 sm:py-10"
         role="status"
         aria-busy="true"
-        aria-label="در حال بارگذاری پیشنهادهای شگفت‌انگیز"
+        aria-label="در حال بارگذاری تخفیف‌های امروز"
       />
     );
   }
@@ -70,27 +78,25 @@ export default function AmazingOffers() {
 
   return (
     <section aria-labelledby="amazing-offers-title">
-      <div className="page-shell py-6 sm:py-8">
-        <div className="flex flex-wrap items-center gap-3">
-          <Zap size={22} className="text-rose-600 dark:text-rose-400" aria-hidden="true" />
-          <h2 id="amazing-offers-title" className="text-fluid-xl font-extrabold text-slate-900 dark:text-white">
-            پیشنهادهای شگفت‌انگیز
-          </h2>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-500/90 px-3 py-1 text-fluid-xs font-bold tabular-nums">
-            <Timer size={14} aria-hidden="true" />
-            <span aria-label="زمان باقی‌مانده تا پایان تخفیف‌ها">
-              {toPersianDigits(String(hours).padStart(2, '0'))}:{toPersianDigits(String(minutes).padStart(2, '0'))}:
-              {toPersianDigits(String(seconds).padStart(2, '0'))}
-            </span>
+      <div className="page-shell py-8 sm:py-10">
+        <SectionHeading
+          id="amazing-offers-title"
+          title="تخفیف‌های امروز"
+          hint="کالاهایی با بیشترین تخفیف؛ قیمت پیش از تخفیف هم روی هر کارت می‌ماند."
+          href="/products?collection=discounted"
+          linkLabel="همه تخفیف‌ها"
+        />
+
+        {/* The countdown, demoted from a glowing pill to a line of figures. */}
+        <p className="mt-2 inline-flex items-center gap-1.5 text-fluid-2xs font-bold tabular-nums text-amber-700 dark:text-amber-300">
+          <Timer size={13} aria-hidden="true" />
+          <span>پایان تا</span>
+          <span aria-label="زمان باقی‌مانده تا پایان تخفیف‌ها">
+            {toPersianDigits(String(hours).padStart(2, '0'))}:
+            {toPersianDigits(String(minutes).padStart(2, '0'))}:
+            {toPersianDigits(String(seconds).padStart(2, '0'))}
           </span>
-          <Link
-            to="/products?collection=discounted"
-            className="ms-auto inline-flex min-h-6 items-center gap-1 py-1 text-fluid-sm font-bold text-emerald-700 transition hover:text-emerald-900 dark:text-lime-300 dark:hover:text-white"
-          >
-            همه تخفیف‌ها
-            <ChevronLeft size={16} aria-hidden="true" />
-          </Link>
-        </div>
+        </p>
 
         <OfferRail products={products} label="کارت‌های پیشنهادهای شگفت‌انگیز" inset={false} />
       </div>

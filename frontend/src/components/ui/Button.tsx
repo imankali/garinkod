@@ -77,7 +77,9 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   ref,
 ) {
   const classes = cn(
-    'inline-flex items-center justify-center font-bold transition duration-150',
+    /* `transition` (the shorthand class) animates `all`; name the two
+       properties that actually change, on the shared ease-out curve. */
+    'inline-flex items-center justify-center font-bold transition-[background-color,border-color,color,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)]',
     'active:scale-[0.97]',
     'disabled:cursor-not-allowed disabled:opacity-70 disabled:active:scale-100',
     VARIANTS[variant],

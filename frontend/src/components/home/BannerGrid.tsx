@@ -2,20 +2,23 @@
 
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
-import { BookOpen, GraduationCap, Store, TrendingUp } from 'lucide-react';
+import { BookOpen, ChevronLeft, GraduationCap, Store, TrendingUp } from 'lucide-react';
 
 import { agricultureApi } from '../../api/services';
 import { useAuthStore } from '../../store/authStore';
 
 /**
- * The four-column promo grid + wide campaign banner Digikala places between
- * the flash deals and the best-sellers. Each tile promotes a real destination
- * of this platform (services, storefronts, magazine, rewards) — nothing here
- * links to a page that does not exist.
+ * Shortcuts into the four other things this platform does, plus the seller
+ * call.
  *
- * The wide banner at the bottom is the seller-acquisition call ("غرفه بزنید"),
- * mirroring Digikala's full-width campaign strip; on this marketplace the
- * sellers ARE the inventory, so it earns the prime spot.
+ * The tiles used to be four saturated gradient panels (emerald→teal,
+ * lime→emerald, teal→cyan, amber→lime) carrying a white glyph each: four
+ * different hues, four different moods, and no hierarchy — the reader could
+ * not tell that these are secondary destinations, nor which one mattered.
+ * Now they are one surface, one glyph weight, one type scale, and the tint
+ * only marks the hover. The seller banner keeps the deep green because on
+ * this marketplace the sellers *are* the inventory — it is the one tile that
+ * earns the weight.
  */
 const TILES = [
   {
@@ -23,28 +26,24 @@ const TILES = [
     icon: GraduationCap,
     title: 'مشاوره کارشناس',
     text: 'برنامه کود و سم رایگان برای مزرعه شما',
-    art: 'from-emerald-600 to-teal-500',
   },
   {
     to: '/storefronts',
     icon: Store,
     title: 'بازار کشاورزان',
     text: 'خرید مستقیم از غرفه‌های تأییدشده',
-    art: 'from-lime-600 to-emerald-500',
   },
   {
     to: '/blog',
     icon: BookOpen,
     title: 'مجله کشاورزی',
     text: 'راهنمای فصل کشت و مدیریت آفات',
-    art: 'from-teal-600 to-cyan-500',
   },
   {
     to: '/rewards',
     icon: TrendingUp,
     title: 'باشگاه مشتریان',
     text: 'هر خرید، امتیاز و تخفیف بعدی',
-    art: 'from-amber-500 to-lime-500',
   },
 ] as const;
 
@@ -70,45 +69,61 @@ export default function BannerGrid() {
   const bannerTo = hasStorefront && myStallSlug ? `/storefronts/${myStallSlug}` : hasStorefront ? '/profile' : '/farmer-sell';
 
   return (
-    <section className="page-shell py-6 sm:py-8" aria-label="میان‌برهای گرین کود">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {TILES.map(({ to, icon: Icon, title, text, art }, tileIndex) => (
-          <Link
-            key={title}
-            to={to}
-            style={{ transitionDelay: `${tileIndex * 60}ms` }}
-            className={`group relative flex min-h-28 flex-col justify-end overflow-hidden rounded-2xl bg-gradient-to-bl ${art} p-4 text-white shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-emerald-600 motion-reduce:hover:translate-y-0`}
-          >
-            <Icon
-              size={26}
-              aria-hidden="true"
-              className="absolute left-4 top-4 text-white/70 transition duration-300 group-hover:scale-110 group-hover:text-white motion-reduce:group-hover:scale-100"
-            />
-            <span className="text-fluid-sm font-extrabold">{title}</span>
-            <span className="mt-1 text-fluid-2xs leading-5 text-white/85">{text}</span>
-          </Link>
+    <section className="page-shell py-8 sm:py-10" aria-label="میان‌برهای گرین کود">
+      <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {TILES.map(({ to, icon: Icon, title, text }) => (
+          <li key={title} className="min-w-0">
+            <Link
+              to={to}
+              className="group flex h-full flex-col gap-2.5 rounded-xl border border-emerald-100/90 bg-white p-4 transition-[border-color,background-color,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:border-emerald-300 hover:bg-emerald-50/50 active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 motion-reduce:active:scale-100 dark:border-emerald-900 dark:bg-ink dark:hover:border-emerald-700 dark:hover:bg-emerald-900/40"
+            >
+              <Icon
+                size={20}
+                aria-hidden="true"
+                strokeWidth={1.75}
+                className="text-emerald-700 dark:text-lime-300"
+              />
+              <span className="text-fluid-sm font-extrabold text-ink-deep dark:text-white">
+                {title}
+              </span>
+              <span className="text-fluid-2xs leading-6 text-slate-500 dark:text-emerald-200/80">
+                {text}
+              </span>
+            </Link>
+          </li>
         ))}
-      </div>
+      </ul>
 
+      {/*
+        The seller call. One dark surface on a page of light ones, which is
+        how it earns the attention the four gradient tiles used to split
+        between them. The arrow (not a white pill pretending to be a button
+        inside a link) says where it goes; the whole strip is the target.
+      */}
       <Link
         to={bannerTo}
         aria-label={hasStorefront ? 'رفتن به غرفه من' : 'شروع ثبت‌نام غرفه‌داری'}
-        className="mt-4 flex min-h-24 flex-wrap items-center justify-between gap-3 rounded-2xl bg-gradient-to-l from-emerald-900 via-emerald-800 to-lime-700 px-6 py-5 text-white shadow-md transition duration-300 hover:shadow-xl focus-visible:outline-2 focus-visible:outline-emerald-600"
+        className="group mt-3 flex min-h-20 flex-wrap items-center justify-between gap-4 rounded-xl bg-ink-deep px-5 py-4 text-white transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:bg-ink active:scale-[0.995] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 motion-reduce:active:scale-100 dark:border dark:border-emerald-800"
       >
-        <span>
-          <span className="block text-fluid-lg font-extrabold">
+        <span className="min-w-0">
+          <span className="block text-fluid-base font-extrabold">
             {hasStorefront
-              ? 'غرفه شما منتظر شماست — پیشخوان فروشنده'
-              : 'محصولت رو مستقیم بفروش — همین امروز غرفه بزن'}
+              ? 'غرفه شما منتظر شماست'
+              : 'محصولت را مستقیم بفروش — همین امروز غرفه بزن'}
           </span>
-          <span className="mt-1 block text-fluid-xs text-emerald-50">
+          <span className="mt-1 block text-fluid-2xs leading-6 text-emerald-100/80">
             {hasStorefront
               ? 'آگهی‌ها، سفارش‌ها و درآمد شما یک‌جا در پیشخوان غرفه'
               : 'ثبت‌نام غرفه‌داری با تأیید مدارک، دفتر مالی شفاف و تسویه به کارت بانکی'}
           </span>
         </span>
-        <span className="rounded-xl bg-white px-5 py-2.5 text-fluid-sm font-extrabold text-emerald-800 transition group-hover:bg-emerald-50">
+        <span className="inline-flex shrink-0 items-center gap-1.5 text-fluid-xs font-extrabold text-lime-300">
           {hasStorefront ? 'رفتن به غرفه من' : 'شروع غرفه‌داری'}
+          <ChevronLeft
+            size={16}
+            aria-hidden="true"
+            className="transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] group-hover:-translate-x-0.5 motion-reduce:transition-none"
+          />
         </span>
       </Link>
     </section>
