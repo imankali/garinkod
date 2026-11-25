@@ -118,6 +118,26 @@ test.describe('keyboard access', () => {
   });
 });
 
+test.describe('catalogue pagination', () => {
+  test('«بعدی» moves one page at a time and the URL remembers it', async ({ page }) => {
+    await open(page, '/products');
+
+    const next = page.getByRole('button', { name: 'صفحهٔ بعد' });
+    const previous = page.getByRole('button', { name: 'صفحهٔ قبل' });
+
+    // The seed has more than one page of products; if it ever does not, the
+    // assertion below would be vacuous rather than wrong.
+    await expect(previous).toBeDisabled();
+    await next.click();
+
+    await expect(page).toHaveURL(/[?&]page=2/);
+    await expect(previous).toBeEnabled();
+
+    await previous.click();
+    await expect(page).not.toHaveURL(/[?&]page=/);
+  });
+});
+
 test.describe('navigation performance', () => {
   test('a route change scrolls to the top but a filter change does not', async ({ page }) => {
     await open(page, '/products');
