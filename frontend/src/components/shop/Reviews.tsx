@@ -19,7 +19,7 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { BadgeCheck, Star, ThumbsUp } from 'lucide-react';
+import { BadgeCheck, Flag, Star, ThumbsUp } from 'lucide-react';
 import { Link } from 'react-router';
 
 import { commentsApi } from '../../api/services';
@@ -72,6 +72,9 @@ export default function Reviews({ slug, productId }: { slug: string; productId: 
   // lookup the list query does not do; a clicked button that cannot show it was
   // clicked is worse than one that forgets after a reload.
   const [myVotes, setMyVotes] = useState<Record<number, { my_value: 1 | -1 | null; helpful_count: number }>>({});
+  // Locally remembered so the button can say «گزارش شد»; the server accepts a
+  // duplicate but the reader should not be able to send one.
+  const [reported, setReported] = useState<Set<number>>(new Set());
 
   const summary = useQuery({
     queryKey: ['rating-summary', slug],
@@ -95,6 +98,11 @@ export default function Reviews({ slug, productId }: { slug: string; productId: 
         [id]: { my_value: answer.my_value, helpful_count: answer.helpful_count },
       }));
     },
+  });
+
+  const report = useMutation({
+    mutationFn: async (id: number) => (await commentsApi.report(id)).data,
+    onSuccess: (_answer, id) => setReported((current) => new Set(current).add(id)),
   });
 
   const create = useMutation({
@@ -314,6 +322,22 @@ export default function Reviews({ slug, productId }: { slug: string; productId: 
                       ({nums(myVotes[review.id]?.helpful_count ?? review.helpful_count ?? 0)})
                     </span>
                   )}
+                </button>
+
+                {/* Reporting is the only recourse a reader has against a review
+                    that is abusive or is really an advert. `commentsApi.report`
+                    existed and nothing called it, so the button did not exist
+                    either. It stays a quiet text button: the main action on a
+                    review is «مفید بود», not a moderation queue. */}
+                <button
+                  type="button"
+                  disabled={report.isPending}
+                  onClick={() => report.mutate(review.id)}
+                  aria-label={`گزارش دیدگاه ${review.name}`}
+                  className="inline-flex min-h-8 items-center gap-1 rounded-sm px-1.5 text-[11px] font-bold text-ink-mute transition-colors hover:text-danger-700 disabled:opacity-50 dark:text-white/40"
+                >
+                  <Flag size={11} aria-hidden="true" />
+                  {reported.has(review.id) ? 'گزارش شد' : 'گزارش'}
                 </button>
               </div>
 

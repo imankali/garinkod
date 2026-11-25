@@ -9,10 +9,12 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router';
+import { MemoryRouter, Route, Routes } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const profile = vi.fn();
+const follow = vi.fn();
+const unfollow = vi.fn();
 const like = vi.fn();
 const unlike = vi.fn();
 const comments = vi.fn();
@@ -20,7 +22,11 @@ const addComment = vi.fn();
 const markManySeen = vi.fn();
 
 vi.mock('../api/services', () => ({
-  storefrontsApi: { profile: (...args: unknown[]) => profile(...args) },
+  storefrontsApi: {
+    profile: (...args: unknown[]) => profile(...args),
+    follow: (...args: unknown[]) => follow(...args),
+    unfollow: (...args: unknown[]) => unfollow(...args),
+  },
   storefrontPostsApi: {
     like: (...args: unknown[]) => like(...args),
     unlike: (...args: unknown[]) => unlike(...args),
@@ -33,8 +39,8 @@ vi.mock('../api/services', () => ({
 const auth = vi.hoisted(() => ({ signedIn: true }));
 
 vi.mock('../store/authStore', () => ({
-  useAuthStore: (selector: (state: { isAuthenticated: boolean }) => unknown) =>
-    selector({ isAuthenticated: auth.signedIn }),
+  useAuthStore: (selector: (state: { isAuthenticated: boolean; user: unknown }) => unknown) =>
+    selector({ isAuthenticated: auth.signedIn, user: auth.signedIn ? { id: 4 } : null }),
 }));
 
 // The page's chat panel has its own network surface; it is not under test here.
@@ -57,6 +63,8 @@ const storefront = {
   city: 'شیراز',
   is_verified: true,
   is_active: true,
+  is_following: false,
+  is_owner: false,
 };
 
 const post = {
@@ -110,7 +118,9 @@ function renderPage() {
   return render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={['/storefront/باغ-سبز-شیراز']}>
-        <StorefrontPage />
+        <Routes>
+          <Route path="/storefront/:slug" element={<StorefrontPage />} />
+        </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -119,6 +129,8 @@ function renderPage() {
 beforeEach(() => {
   auth.signedIn = true;
   profile.mockReset();
+  follow.mockReset();
+  unfollow.mockReset();
   like.mockReset();
   unlike.mockReset();
   comments.mockReset();
@@ -126,6 +138,8 @@ beforeEach(() => {
   markManySeen.mockReset();
 
   profile.mockResolvedValue(profilePayload());
+  follow.mockResolvedValue({ data: { is_following: true, followers_count: 15 } });
+  unfollow.mockResolvedValue({ data: { is_following: false, followers_count: 14 } });
   like.mockResolvedValue({ data: { is_liked: true, like_count: 5 } });
   unlike.mockResolvedValue({ data: { is_liked: false, like_count: 4 } });
   comments.mockResolvedValue({
@@ -224,5 +238,29 @@ describe('StorefrontPage feed', () => {
     await waitFor(() => expect(screen.getByText('باغ سبز شیراز')).toBeDefined());
     expect(screen.queryByRole('heading', { name: 'از این غرفه' })).toBeNull();
     expect(screen.queryByRole('heading', { name: 'استوری‌ها' })).toBeNull();
+  });
+});
+
+describe('StorefrontPage — following a stall', () => {
+  it('offers the follow button and shows the count the server returns', async () => {
+    renderPage();
+    await screen.findByText('باغ سبز شیراز');
+
+    const button = await screen.findByRole('button', { name: 'دنبال کردن' });
+    await userEvent.click(button);
+
+    await waitFor(() => expect(follow).toHaveBeenCalledWith('باغ-سبز-شیراز'));
+
+    // The label flips because the server said so, not because a local flag did.
+    expect(await screen.findByRole('button', { name: 'دنبال می‌کنید' })).toBeDefined();
+  });
+
+  it('does not show a follow button to the stall’s own owner', async () => {
+    profile.mockResolvedValue(profilePayload({ storefront: { ...storefront, is_owner: true } }));
+    renderPage();
+    await screen.findByText('باغ سبز شیراز');
+
+    expect(screen.queryByRole('button', { name: 'دنبال کردن' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'دنبال می‌کنید' })).toBeNull();
   });
 });

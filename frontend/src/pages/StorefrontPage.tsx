@@ -1,11 +1,14 @@
 // frontend/src/pages/StorefrontPage.tsx
 
+import { useState } from 'react';
 import { useParams, Link } from 'react-router';
-import { useQuery } from '@tanstack/react-query';
-import { BadgeCheck, MapPin, Store } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { BadgeCheck, MapPin, Store, UserPlus, UserMinus } from 'lucide-react';
 
 import { storefrontsApi } from '../api/services';
-import type { MarketplaceListing } from '@/types/storefront';
+import { parseApiError } from '../api/errors';
+import { useAuthStore } from '../store/authStore';
+import type { MarketplaceListing, StorefrontProfile } from '@/types/storefront';
 import { money, nums } from '../lib/price';
 import Button from '../components/ui/Button';
 import { ProseSkeleton } from '../components/ui/Skeleton';
@@ -23,6 +26,82 @@ import { useTitle } from '../lib/useTitle';
  * unsure about a harvest date should not have to hunt for a contact form, so
  * it sits next to the name, not at the bottom.
  */
+/**
+ * «دنبال کردن» — the one social action a marketplace page cannot do without.
+ *
+ * The page printed «۱۴ دنبال‌کننده» with no way to become one of them, and
+ * `storefrontsApi.follow`/`unfollow` had no caller at all; the count was a
+ * number the reader could only watch. Both endpoints return the fresh
+ * `is_following` and `followers_count`, so the button shows the server's answer
+ * rather than incrementing a local counter that the next page load would
+ * contradict.
+ *
+ * A signed-out reader gets the button too, pointing at the login page — the
+ * public profile already says whether this reader follows the stall, so the
+ * only thing missing was a session.
+ */
+function FollowButton({
+  slug,
+  isFollowing,
+}: {
+  slug: string;
+  isFollowing: boolean;
+}) {
+  const user = useAuthStore((state) => state.user);
+  const queryClient = useQueryClient();
+  const [error, setError] = useState<string | null>(null);
+
+  const toggle = useMutation({
+    mutationFn: async () =>
+      (isFollowing ? await storefrontsApi.unfollow(slug) : await storefrontsApi.follow(slug)).data,
+    onSuccess: (answer) => {
+      setError(null);
+      // Write the server's numbers straight into the cached profile. This is
+      // deliberately *not* a refetch: the toggle already returns the new
+      // `is_following` and `followers_count`, and an invalidate here would
+      // immediately overwrite that answer with a second read of the profile.
+      // It would also redraw the whole page for one counter.
+      queryClient.setQueryData<StorefrontProfile>(['storefront', slug], (cached) =>
+        cached
+          ? {
+              ...cached,
+              storefront: { ...cached.storefront, is_following: answer.is_following },
+              counts: { ...cached.counts, followers: answer.followers_count },
+            }
+          : cached,
+      );
+    },
+    onError: (caught) => setError(parseApiError(caught).message),
+  });
+
+  if (!user) {
+    return (
+      <Button to="/login" variant="secondary" size="sm" icon={UserPlus}>
+        دنبال کردن
+      </Button>
+    );
+  }
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <Button
+        variant={isFollowing ? 'quiet' : 'secondary'}
+        size="sm"
+        icon={isFollowing ? UserMinus : UserPlus}
+        loading={toggle.isPending}
+        onClick={() => toggle.mutate()}
+      >
+        {isFollowing ? 'دنبال می‌کنید' : 'دنبال کردن'}
+      </Button>
+      {error && (
+        <p role="alert" className="text-[11px] font-bold text-danger-700">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function StorefrontPage() {
   const { slug = '' } = useParams();
 
@@ -91,7 +170,12 @@ export default function StorefrontPage() {
           {storefront.bio && <p className="mt-2 max-w-[65ch] text-xs leading-7 text-ink-soft dark:text-white/65">{storefront.bio}</p>}
         </div>
 
-        <StorefrontChat slug={storefront.slug} name={storefront.name} />
+        <div className="flex flex-col items-end gap-2">
+          <StorefrontChat slug={storefront.slug} name={storefront.name} />
+          {!storefront.is_owner && (
+            <FollowButton slug={storefront.slug} isFollowing={storefront.is_following} />
+          )}
+        </div>
       </header>
 
       <section aria-labelledby="listings-title">

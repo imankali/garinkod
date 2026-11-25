@@ -24,6 +24,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Heart, MessageCircle, Play } from 'lucide-react';
 
 import { storefrontPostsApi } from '../../api/services';
+import type { StorefrontProfile } from '@/types/storefront';
 import { parseApiError } from '../../api/errors';
 import type { StorefrontPost, StorefrontPostComment } from '@/types/storefront';
 import { date } from '../../lib/date';
@@ -41,7 +42,27 @@ function StoryStrip({ stories }: { stories: StorefrontPost[] }) {
   // whole batch: a ring-by-ring fan-out would fight the page's paint.
   const markSeen = useMutation({
     mutationFn: async (ids: number[]) => storefrontPostsApi.markManySeen(ids),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['storefront'] }),
+    // The ring must stop being «new» without refetching the page. Invalidating
+    // ['storefront', slug] here redrew the entire profile — listings, posts,
+    // and every local answer written into it, including the follow button's —
+    // because one story had been opened. Write the two flags the strip owns.
+    onSuccess: (_answer, ids) => {
+      // Every story carries the slug it belongs to, so the strip does not need
+      // the page to tell it which cache entry to touch.
+      const storefront = stories[0]?.storefront_slug;
+      if (!storefront) return;
+      queryClient.setQueryData<StorefrontProfile>(['storefront', storefront], (cached) => {
+        if (!cached) return cached;
+        const viewed = new Set(ids);
+        return {
+          ...cached,
+          storefront: { ...cached.storefront, has_unseen_stories: false },
+          stories: cached.stories.map((story) =>
+            viewed.has(story.id) ? { ...story, is_seen: true } : story,
+          ),
+        };
+      });
+    },
   });
 
   if (stories.length === 0) return null;

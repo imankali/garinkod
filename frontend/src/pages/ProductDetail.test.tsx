@@ -22,6 +22,7 @@ vi.mock('../store/cartStore', () => ({
 }));
 
 const toggleHelpful = vi.fn();
+const report = vi.fn();
 
 vi.mock('../api/services', () => ({
   policiesApi: { get: vi.fn() },
@@ -30,6 +31,7 @@ vi.mock('../api/services', () => ({
     getRatingSummary: vi.fn(),
     create: vi.fn(),
     toggleHelpful: (...args: unknown[]) => toggleHelpful(...args),
+    report: (...args: unknown[]) => report(...args),
   },
   productsApi: {
     getBySlug: vi.fn(),
@@ -120,6 +122,8 @@ beforeEach(() => {
     },
   } as never);
   vi.mocked(productsApi.getBySlug).mockResolvedValue({ data: product } as never);
+  report.mockReset();
+  report.mockResolvedValue({ data: { reported: true } });
   toggleHelpful.mockReset();
   toggleHelpful.mockResolvedValue({
     data: { voted: true, my_value: 1, helpful_count: 13, up_count: 13, down_count: 0 },
@@ -187,6 +191,22 @@ describe('ProductDetail reviews', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: /مفید بود/ })).toHaveAttribute('aria-pressed', 'true'));
     // The count shown is the server's new tally, not the old row plus one.
     expect(screen.getByRole('button', { name: /مفید بود/ }).textContent).toContain('۱۳');
+  });
+
+  it('sends a report to the server and says so afterwards', async () => {
+    renderPage();
+
+    const report_btn = await screen.findByRole('button', { name: 'گزارش دیدگاه محمد رضایی' });
+    await userEvent.click(report_btn);
+
+    // `commentsApi.report` had no caller at all: a reader had a «مفید بود»
+    // button and no way to flag a review that is abusive or is an advert.
+    await waitFor(() => expect(report).toHaveBeenCalledWith(7));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'گزارش دیدگاه محمد رضایی' }).textContent).toContain(
+        'گزارش شد',
+      ),
+    );
   });
 
   it('offers a guest a sign-in link instead of a form the server would refuse', async () => {
