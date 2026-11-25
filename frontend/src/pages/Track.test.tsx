@@ -86,4 +86,61 @@ describe('Track', () => {
     // The reason is stated under the heading, whichever the server gave.
     expect(screen.getByRole('heading', { name: /سفارشی با این کد و شماره پیدا نشد/ }).nextElementSibling).not.toBeEmptyDOMElement();
   });
+
+  it('shows the carrier\'s own trail with its tracking code and times', async () => {
+    lookup.mockResolvedValue({
+      data: {
+        id: 7,
+        code: 'GK-1001',
+        status: 'shipped',
+        status_label: 'ارسال شده',
+        payment_status_label: 'پرداخت در محل هماهنگی',
+        total_items: 1,
+        total_price: 500000,
+        items: [],
+        city: 'شیراز',
+        address: 'خیابان نمونه',
+        shipments: [
+          {
+            id: 'a1',
+            provider: 'manual',
+            provider_label: 'ثبت دستی',
+            service_name: 'استاندارد',
+            status: 'in_transit',
+            status_label: 'در مسیر',
+            tracking_code: 'TRK-TEST-0001',
+            tracking_url: 'https://example.com/track/TRK-TEST-0001',
+            shipping_cost: 0,
+            shipped_at: null,
+            delivered_at: null,
+            last_event_at: null,
+            created_at: '',
+            updated_at: '',
+            events: [
+              {
+                id: 1,
+                status: 'in_transit',
+                status_label: 'در مسیر',
+                description: 'مرسوله در مسیر شیراز است.',
+                location: 'اصفهان',
+                occurred_at: '2026-11-24T06:18:29+03:30',
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    renderTrack();
+    await userEvent.type(screen.getByLabelText('کد سفارش'), 'GK-1001');
+    await userEvent.type(screen.getByLabelText('شمارهٔ همراه'), '09120000000');
+    await userEvent.click(screen.getByRole('button', { name: /پیدا کردن سفارش/ }));
+
+    expect(await screen.findByText(/کد رهگیری TRK-TEST-0001/)).toBeInTheDocument();
+    expect(screen.getByText('مرسوله در مسیر شیراز است.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /پیگیری روی سایت باربری/ })).toHaveAttribute(
+      'href',
+      'https://example.com/track/TRK-TEST-0001',
+    );
+  });
 });

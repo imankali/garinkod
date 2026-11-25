@@ -152,6 +152,57 @@ export default function Track() {
               تحویل به: {record.city}، {record.address}
             </p>
           </div>
+
+          {/* The carrier's own trail, when there is one. The four steps above
+              say where the order is in the shop's process; these rows say what
+              the carrier actually did, with a time and a place — the two are
+              different questions and a buyer waiting for a delivery asks the
+              second one. */}
+          {(record.shipments ?? []).map((shipment) => (
+            <div key={shipment.id} className="mt-4 border-t border-line pt-3 dark:border-night-line">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <h3 className="text-2xs font-extrabold text-ink dark:text-white">
+                  {shipment.provider_label} · {shipment.status_label}
+                </h3>
+                {shipment.tracking_code && (
+                  <p className="dateline text-2xs text-ink-mute dark:text-white/45">
+                    کد رهگیری {shipment.tracking_code}
+                  </p>
+                )}
+              </div>
+
+              {shipment.events.length > 0 && (
+                <ol className="mt-2 space-y-2">
+                  {shipment.events.map((event) => (
+                    <li key={event.id} className="border-s-2 border-brand-200 ps-3 dark:border-brand-800">
+                      <p className="text-2xs font-bold text-ink dark:text-white">{event.status_label}</p>
+                      {event.description && (
+                        <p className="text-2xs leading-6 text-ink-soft dark:text-white/65">{event.description}</p>
+                      )}
+                      <p className="dateline text-[11px] text-ink-mute dark:text-white/40">
+                        {new Date(event.occurred_at).toLocaleString('fa-IR', {
+                          dateStyle: 'short',
+                          timeStyle: 'short',
+                        })}
+                        {event.location ? ` · ${event.location}` : ''}
+                      </p>
+                    </li>
+                  ))}
+                </ol>
+              )}
+
+              {shipment.tracking_url && (
+                <a
+                  href={shipment.tracking_url}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="mt-2 inline-flex min-h-9 items-center text-2xs font-bold text-brand-700 underline underline-offset-4 dark:text-brand-300"
+                >
+                  پیگیری روی سایت باربری
+                </a>
+              )}
+            </div>
+          ))}
         </section>
       )}
     </div>
