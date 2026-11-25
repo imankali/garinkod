@@ -11,13 +11,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import NewsletterForm from './NewsletterForm';
 
 const subscribe = vi.fn();
+const unsubscribe = vi.fn();
 
 vi.mock('../../api/services', () => ({
-  newsletterApi: { subscribe: (...args: unknown[]) => subscribe(...args) },
+  newsletterApi: {
+    subscribe: (...args: unknown[]) => subscribe(...args),
+    unsubscribe: (...args: unknown[]) => unsubscribe(...args),
+  },
 }));
 
 beforeEach(() => {
   subscribe.mockReset();
+  unsubscribe.mockReset();
 });
 
 describe('NewsletterForm', () => {
@@ -58,5 +63,31 @@ describe('NewsletterForm', () => {
     render(<NewsletterForm />);
     expect(screen.getByRole('button', { name: 'عضویت' })).toBeDisabled();
     expect(subscribe).not.toHaveBeenCalled();
+  });
+
+  it('lets a reader leave the list with the same field', async () => {
+    unsubscribe.mockResolvedValue({ data: { unsubscribed: true, count: 1 } });
+    render(<NewsletterForm />);
+
+    await userEvent.type(screen.getByLabelText('خبرنامهٔ گرین‌کود'), 'farmer@example.com');
+    await userEvent.click(screen.getByRole('button', { name: 'حذف نشانی از خبرنامه' }));
+
+    // Leaving takes the identifier the joining used — email or mobile, decided
+    // the same way, so the button cannot act on a different row.
+    await waitFor(() => expect(unsubscribe).toHaveBeenCalledWith({ email: 'farmer@example.com' }));
+    expect(await screen.findByText(/از خبرنامه حذف شد/)).toBeInTheDocument();
+  });
+
+  it('does not claim it removed an address that was never on the list', async () => {
+    unsubscribe.mockResolvedValue({ data: { unsubscribed: false, count: 0 } });
+    render(<NewsletterForm />);
+
+    await userEvent.type(screen.getByLabelText('خبرنامهٔ گرین‌کود'), '09120000000');
+    await userEvent.click(screen.getByRole('button', { name: 'حذف نشانی از خبرنامه' }));
+
+    await waitFor(() => expect(unsubscribe).toHaveBeenCalledWith({ mobile: '09120000000' }));
+    // «حذف شد» for an address that was not there is a small lie the reader can
+    // catch by subscribing again.
+    expect(await screen.findByText(/در فهرست خبرنامه نبود/)).toBeInTheDocument();
   });
 });

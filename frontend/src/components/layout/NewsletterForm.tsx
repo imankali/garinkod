@@ -15,7 +15,7 @@ import { newsletterApi } from '../../api/services';
  */
 export default function NewsletterForm() {
   const [value, setValue] = useState('');
-  const [state, setState] = useState<'idle' | 'busy' | 'done'>('idle');
+  const [state, setState] = useState<'idle' | 'busy' | 'done' | 'left' | 'absent'>('idle');
   const [error, setError] = useState<string | null>(null);
 
   async function submit(event: React.FormEvent) {
@@ -38,11 +38,56 @@ export default function NewsletterForm() {
     }
   }
 
+  /**
+   * Leaving the list has to be as easy as joining it.
+   *
+   * `newsletterApi.unsubscribe` existed and nothing called it: the form
+   * promised «ماهی یک ایمیل» to anyone who typed an address, and the only way
+   * back out was to find a contact form. It takes the same identifier the
+   * subscription used, so the button sits under the same field.
+   */
+  async function leave() {
+    const entry = value.trim();
+    if (!entry || state === 'busy') return;
+    const isEmail = entry.includes('@');
+    setState('busy');
+    setError(null);
+    try {
+      const answer = (
+        await newsletterApi.unsubscribe(isEmail ? { email: entry } : { mobile: entry })
+      ).data;
+      if (answer.unsubscribed || answer.count === 0) {
+        // `count: 0` means the address was not on the list. Saying «حذف شد»
+        // would be a small lie, and one the reader can catch by subscribing
+        // again — so say what happened.
+        setState(answer.unsubscribed ? 'left' : 'absent');
+        setValue('');
+      } else {
+        setState('idle');
+        setError('حذف نشد. نشانی را بررسی کنید و دوباره بزنید.');
+      }
+    } catch {
+      setState('idle');
+      setError('حذف نشد. نشانی را بررسی کنید و دوباره بزنید.');
+    }
+  }
+
   if (state === 'done') {
     return (
       <p className="flex items-center gap-2 text-xs font-bold text-brand-100">
         <Check size={15} aria-hidden="true" />
         ثبت شد. خبرنامهٔ فصل کشت و تخفیف‌ها به همین نشانی می‌رسد.
+      </p>
+    );
+  }
+
+  if (state === 'left' || state === 'absent') {
+    return (
+      <p className="flex items-center gap-2 text-xs font-bold text-brand-100">
+        <Check size={15} aria-hidden="true" />
+        {state === 'left'
+          ? 'این نشانی از خبرنامه حذف شد.'
+          : 'این نشانی در فهرست خبرنامه نبود؛ چیزی برای حذف نبود.'}
       </p>
     );
   }
@@ -75,6 +120,14 @@ export default function NewsletterForm() {
           {state === 'busy' ? '…' : 'عضویت'}
         </button>
       </div>
+      <button
+        type="button"
+        onClick={leave}
+        disabled={!value.trim() || state === 'busy'}
+        className="mt-2 text-[11px] font-bold text-brand-100/70 underline decoration-brand-100/30 underline-offset-2 hover:text-white disabled:opacity-40 disabled:no-underline"
+      >
+        حذف نشانی از خبرنامه
+      </button>
       {error && (
         <p role="alert" className="mt-2 text-[11px] font-medium text-brand-100">
           {error}
