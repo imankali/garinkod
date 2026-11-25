@@ -32,6 +32,7 @@ const storyArchive = vi.fn();
 const highlights = vi.fn();
 const createHighlight = vi.fn();
 const deleteHighlight = vi.fn();
+const updateHighlight = vi.fn();
 
 vi.mock('../api/services', () => ({
   storefrontsApi: {
@@ -39,6 +40,7 @@ vi.mock('../api/services', () => ({
     highlights: (...a: unknown[]) => highlights(...a),
     createHighlight: (...a: unknown[]) => createHighlight(...a),
     deleteHighlight: (...a: unknown[]) => deleteHighlight(...a),
+    updateHighlight: (...a: unknown[]) => updateHighlight(...a),
   },
   agricultureApi: {
     getStorefront: (...a: unknown[]) => getStorefront(...a),
@@ -393,6 +395,51 @@ describe('Studio — the story archive and highlights', () => {
 
     await screen.findByText('برداشت امروز');
     expect(screen.getByRole('button', { name: 'ساختن مجموعه' }).hasAttribute('disabled')).toBe(true);
+  });
+
+  it('loads an existing collection into the builder and saves it back', async () => {
+    getStorefront.mockResolvedValue({ data: stall });
+    storyArchive.mockResolvedValue({ data: [{ ...archived, highlight_ids: [2] }] });
+    // The seller's one collection, holding the archived story (id 31).
+    highlights.mockResolvedValue({
+      data: {
+        count: 1,
+        results: [
+          {
+            id: 2,
+            title: 'برداشت',
+            cover: null,
+            cover_url: '',
+            position: 0,
+            items: [{ id: 31, image_url: '/images/hero-farm.jpg', caption: 'برداشت امروز', created_at: '' }],
+            created_at: '',
+          },
+        ],
+      },
+    });
+    updateHighlight.mockResolvedValue({
+      data: { id: 2, title: 'برداشت پسته', cover: null, cover_url: '', position: 0, items: [], created_at: '' },
+    });
+    renderStudio();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'ویرایش مجموعهٔ برداشت' }));
+
+    // The builder is seeded: name, and the story the set already holds.
+    const nameBox = screen.getByLabelText('نام مجموعه') as HTMLInputElement;
+    expect(nameBox.value).toBe('برداشت');
+    const storyBox = screen.getByRole('checkbox', { name: 'برداشت امروز' }) as HTMLInputElement;
+    expect(storyBox.checked).toBe(true);
+
+    await userEvent.clear(nameBox);
+    await userEvent.type(nameBox, 'برداشت پسته');
+    await userEvent.click(screen.getByRole('button', { name: 'ذخیرهٔ مجموعه' }));
+
+    await waitFor(() => expect(updateHighlight).toHaveBeenCalled());
+    // updateHighlight(id, …) — not createHighlight: a correction must not leave
+    // the seller with two collections.
+    expect(updateHighlight.mock.calls[0]?.[0]).toBe(2);
+    expect(updateHighlight.mock.calls[0]?.[1]).toMatchObject({ title: 'برداشت پسته', post_ids: [31] });
+    expect(createHighlight).not.toHaveBeenCalled();
   });
 });
 

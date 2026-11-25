@@ -25,7 +25,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Archive, ImagePlus, Layers, PackagePlus, Send, Store, Trash2 } from 'lucide-react';
+import { Archive, ImagePlus, Layers, PackagePlus, Pencil, Send, Store, Trash2 } from 'lucide-react';
 import { Link } from 'react-router';
 
 import { agricultureApi, storefrontPostsApi, storefrontsApi } from '../api/services';
@@ -587,6 +587,11 @@ function ArchivePanel({ highlights }: { highlights: StorefrontHighlight[] }) {
   const queryClient = useQueryClient();
   const [title, setTitle] = useState('');
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  // Which collection the builder is writing to. `null` means "a new one";
+  // `updateHighlight` was served and uncalled, so a collection could be built
+  // and deleted but never corrected — a typo in a name was permanent, and a
+  // story dropped into the wrong set could not be taken back out.
+  const [editing, setEditing] = useState<{ id: number; title: string } | null>(null);
 
   const archive = useQuery({
     queryKey: ['story-archive'],
@@ -604,17 +609,20 @@ function ArchivePanel({ highlights }: { highlights: StorefrontHighlight[] }) {
     });
 
   const createHighlight = useMutation({
-    mutationFn: async () =>
-      (
-        await storefrontsApi.createHighlight({
-          title: title.trim(),
-          // Order matters: the strip shows the first six, in this order.
-          post_ids: [...selected],
-        })
-      ).data,
+    mutationFn: async () => {
+      const payload = {
+        title: title.trim(),
+        // Order matters: the strip shows the first six, in this order.
+        post_ids: [...selected],
+      };
+      return editing
+        ? (await storefrontsApi.updateHighlight(editing.id, payload)).data
+        : (await storefrontsApi.createHighlight(payload)).data;
+    },
     onSuccess: () => {
       setTitle('');
       setSelected(new Set());
+      setEditing(null);
       void queryClient.invalidateQueries({ queryKey: ['story-archive'] });
       void queryClient.invalidateQueries({ queryKey: ['my-highlights'] });
       void queryClient.invalidateQueries({ queryKey: ['storefront'] });
@@ -652,6 +660,21 @@ function ArchivePanel({ highlights }: { highlights: StorefrontHighlight[] }) {
               <span className="dateline text-ink-mute dark:text-white/40">
                 {nums(highlight.items.length)}
               </span>
+              <button
+                type="button"
+                onClick={() => {
+                  // Load the set into the builder: its name, and the stories it
+                  // already holds (their ids come back as `highlight_ids` on
+                  // each archive row).
+                  setEditing({ id: highlight.id, title: highlight.title });
+                  setTitle(highlight.title);
+                  setSelected(new Set(highlight.items.map((item) => item.id)));
+                }}
+                aria-label={`ویرایش مجموعهٔ ${highlight.title}`}
+                className="text-ink-mute hover:text-brand-700 dark:text-white/40 dark:hover:text-brand-300"
+              >
+                <Pencil size={11} aria-hidden="true" />
+              </button>
               <button
                 type="button"
                 onClick={() => removeHighlight.mutate(highlight.id)}
@@ -726,8 +749,22 @@ function ArchivePanel({ highlights }: { highlights: StorefrontHighlight[] }) {
               loading={createHighlight.isPending}
               disabled={!title.trim() || selected.size === 0}
             >
-              ساختن مجموعه
+              {editing ? 'ذخیرهٔ مجموعه' : 'ساختن مجموعه'}
             </Button>
+            {editing && (
+              <Button
+                type="button"
+                variant="quiet"
+                size="sm"
+                onClick={() => {
+                  setEditing(null);
+                  setTitle('');
+                  setSelected(new Set());
+                }}
+              >
+                انصراف از ویرایش
+              </Button>
+            )}
           </div>
 
           {createHighlight.isError && (
