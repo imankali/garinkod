@@ -193,6 +193,33 @@ function Thread({ conversation }: { conversation: StorefrontConversation }) {
     onError: (caught) => setError(parseApiError(caught).message),
   });
 
+  // Editing and deleting one of your own messages. The server publishes
+  // `can_edit`/`can_delete` on every row, so the menu offers only what the API
+  // would accept: a media message can be deleted but not rewritten, and a
+  // deleted message cannot be touched again.
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editDraft, setEditDraft] = useState('');
+
+  const edit = useMutation({
+    mutationFn: async () => (await messagesApi.edit(conversation.id, editingId as number, editDraft.trim())).data,
+    onSuccess: () => {
+      setEditingId(null);
+      setEditDraft('');
+      setError(null);
+      void queryClient.invalidateQueries({ queryKey: ['thread', conversation.id] });
+    },
+    onError: (caught) => setError(parseApiError(caught).message),
+  });
+
+  const remove = useMutation({
+    mutationFn: async (messageId: number) => (await messagesApi.remove(conversation.id, messageId)).data,
+    onSuccess: () => {
+      setError(null);
+      void queryClient.invalidateQueries({ queryKey: ['thread', conversation.id] });
+    },
+    onError: (caught) => setError(parseApiError(caught).message),
+  });
+
   const rows = messages.data?.results ?? [];
 
   return (
@@ -248,9 +275,68 @@ function Thread({ conversation }: { conversation: StorefrontConversation }) {
                     {message.sender_verified && ' · تأییدشده'}
                   </p>
                 )}
-                <p className="whitespace-pre-line">{message.body}</p>
-                <p className="dateline mt-1 text-[10px] text-ink-mute dark:text-white/35">
+                {editingId === message.id ? (
+                  <form
+                    className="flex flex-col gap-1.5"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      if (!editDraft.trim() || edit.isPending) return;
+                      edit.mutate();
+                    }}
+                  >
+                    <textarea
+                      value={editDraft}
+                      onChange={(event) => setEditDraft(event.target.value)}
+                      rows={2}
+                      aria-label="متن تازهٔ پیام"
+                      className="w-full resize-none rounded-md border border-line bg-transparent px-2 py-1 text-2xs text-ink focus:border-brand-500 focus:outline-none dark:border-night-line dark:text-white"
+                    />
+                    <span className="flex gap-2">
+                      <Button type="submit" size="sm" loading={edit.isPending} disabled={!editDraft.trim()}>
+                        ذخیره
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="quiet"
+                        size="sm"
+                        onClick={() => {
+                          setEditingId(null);
+                          setEditDraft('');
+                        }}
+                      >
+                        انصراف
+                      </Button>
+                    </span>
+                  </form>
+                ) : (
+                  <p className="whitespace-pre-line">{message.body}</p>
+                )}
+                <p className="dateline mt-1 flex items-center gap-2 text-[10px] text-ink-mute dark:text-white/35">
                   {dateTime(message.created_at)}
+                  {message.is_edited && <span>· ویرایش‌شده</span>}
+                  {message.is_mine && message.can_edit && editingId !== message.id && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingId(message.id);
+                        setEditDraft(message.body);
+                      }}
+                      className="font-bold text-brand-700 hover:underline dark:text-brand-300"
+                    >
+                      ویرایش
+                    </button>
+                  )}
+                  {message.is_mine && message.can_delete && (
+                    <button
+                      type="button"
+                      onClick={() => remove.mutate(message.id)}
+                      disabled={remove.isPending}
+                      aria-label="حذف پیام"
+                      className="font-bold text-ink-mute hover:text-danger-700 disabled:opacity-50 dark:text-white/40"
+                    >
+                      حذف
+                    </button>
+                  )}
                 </p>
               </li>
             ))}

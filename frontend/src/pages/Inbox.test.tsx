@@ -24,6 +24,8 @@ const send = vi.fn();
 const openServiceConversation = vi.fn();
 const close = vi.fn();
 const rate = vi.fn();
+const edit = vi.fn();
+const remove = vi.fn();
 
 vi.mock('../api/services', () => ({
   messagesApi: {
@@ -33,6 +35,8 @@ vi.mock('../api/services', () => ({
     openServiceConversation: (...a: unknown[]) => openServiceConversation(...a),
     close: (...a: unknown[]) => close(...a),
     rate: (...a: unknown[]) => rate(...a),
+    edit: (...a: unknown[]) => edit(...a),
+    remove: (...a: unknown[]) => remove(...a),
   },
 }));
 
@@ -152,6 +156,10 @@ beforeEach(() => {
           is_system: false,
           is_mine: true,
           body: 'پرتقال تامسون موجود است؟',
+          is_edited: false,
+          is_deleted: false,
+          can_edit: true,
+          can_delete: true,
           created_at: '2026-11-25T05:40:00+03:30',
         },
         {
@@ -347,4 +355,74 @@ describe('Inbox — ending a thread and the survey', () => {
     expect(await screen.findByText(/نظر شما ثبت شده است/)).toBeDefined();
     expect(screen.queryByText('این گفتگو چطور بود؟')).toBeNull();
   });
+});
+
+describe('Inbox — editing your own message', () => {
+  it('rewrites a message the server says can be edited', async () => {
+    edit.mockResolvedValue({ data: { id: 10, body: 'پرتقال تامسون دارید؟' } });
+    renderInbox();
+
+    // Wait for the opened thread, not the list preview — the preview carries the
+    // same text and has no actions on it.
+    await screen.findByText('بله، هر کیلو ۳۵ هزار تومان.');
+    await userEvent.click(screen.getAllByRole('button', { name: 'ویرایش' })[0] as HTMLElement);
+
+    const box = screen.getByLabelText('متن تازهٔ پیام') as HTMLTextAreaElement;
+    expect(box.value).toBe('پرتقال تامسون موجود است؟');
+    await userEvent.clear(box);
+    await userEvent.type(box, 'پرتقال تامسون دارید؟');
+    await userEvent.click(screen.getByRole('button', { name: 'ذخیره' }));
+
+    await waitFor(() => expect(edit).toHaveBeenCalledWith(3, 10, 'پرتقال تامسون دارید؟'));
+  });
+
+  it('offers neither action on a row the server marked uneditable', async () => {
+    messages.mockResolvedValue({
+      data: {
+        count: 1,
+        has_more: false,
+        next_before_id: null,
+        results: [
+          {
+            id: 12,
+            conversation: 3,
+            sender: 8,
+            sender_name: 'خریدار تستی',
+            sender_avatar_url: '',
+            sender_role_label: '',
+            sender_verified: false,
+            is_system: false,
+            is_mine: true,
+            body: 'عکس فاکتور',
+            attachment: 'https://example.com/x.jpg',
+            attachment_url: 'https://example.com/x.jpg',
+            attachment_type: 'image',
+            is_edited: false,
+            is_deleted: false,
+            // Media can be deleted but not rewritten — the API says so, and the
+            // page must not offer the edit it would refuse.
+            can_edit: false,
+            can_delete: true,
+            created_at: '2026-11-25T05:41:00+03:30',
+          },
+        ],
+      },
+    });
+    renderInbox();
+
+    await screen.findByText('عکس فاکتور');
+    expect(screen.queryByRole('button', { name: 'ویرایش' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'حذف پیام' })).toBeDefined();
+  });
+
+  it('soft-deletes through the real endpoint', async () => {
+    remove.mockResolvedValue({ data: { id: 10, is_deleted: true, body: '' } });
+    renderInbox();
+
+    await screen.findByText('بله، هر کیلو ۳۵ هزار تومان.');
+    await userEvent.click(screen.getAllByRole('button', { name: 'حذف پیام' })[0] as HTMLElement);
+
+    await waitFor(() => expect(remove).toHaveBeenCalledWith(3, 10));
+  });
+
 });
