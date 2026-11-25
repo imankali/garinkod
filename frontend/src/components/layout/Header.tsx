@@ -143,15 +143,27 @@ export default function Header() {
           it scrolls sideways rather than hiding five of them behind "more". */}
       <nav aria-label="ناوبری اصلی" className="hidden border-t border-line/70 lg:block dark:border-night-line">
         <div className="shell flex h-11 items-center gap-1">
-          {NAV.map((item) => (
-            <Link
-              key={item.to}
-              to={item.to}
-              className="flex h-full items-center rounded-sm px-3 text-xs font-bold text-ink-soft transition-colors duration-150 hover:bg-brand-50 hover:text-brand-800 dark:text-white/70 dark:hover:bg-night-soft dark:hover:text-white"
-            >
-              {item.label}
-            </Link>
-          ))}
+          {NAV.map((item) => {
+            // `aria-current` is the difference between "a row of links" and
+            // "a row of links that says where you are" — the colour alone is
+            // not something a screen reader can report.
+            const current = location.pathname === item.to;
+            return (
+              <Link
+                key={item.to}
+                to={item.to}
+                aria-current={current ? 'page' : undefined}
+                className={cn(
+                  'flex h-full items-center rounded-sm px-3 text-xs font-bold transition-colors duration-150 hover:bg-brand-50 hover:text-brand-800 dark:hover:bg-night-soft dark:hover:text-white',
+                  current
+                    ? 'text-brand-800 dark:text-white'
+                    : 'text-ink-soft dark:text-white/70',
+                )}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
         </div>
       </nav>
 
@@ -185,6 +197,7 @@ export default function Header() {
               <Link
                 key={item.to}
                 to={item.to}
+                aria-current={location.pathname === item.to ? 'page' : undefined}
                 className="flex min-h-11 items-center rounded-md px-3 text-sm font-bold text-ink transition-colors duration-150 hover:bg-brand-50 dark:text-white dark:hover:bg-night-soft"
               >
                 {item.label}
