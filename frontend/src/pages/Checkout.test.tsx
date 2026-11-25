@@ -16,9 +16,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../api/services', () => ({
   locationsApi: { provinces: vi.fn(), cities: vi.fn() },
   ordersApi: { checkout: vi.fn() },
+  paymentsApi: { options: vi.fn() },
 }));
 
-import { locationsApi } from '../api/services';
+import { locationsApi, ordersApi, paymentsApi } from '../api/services';
 import Checkout from './Checkout';
 import { createQueryClient, Providers } from '../providers';
 import { useAuthStore } from '../store/authStore';
@@ -86,6 +87,29 @@ beforeEach(() => {
   vi.mocked(locationsApi.provinces).mockResolvedValue({
     data: { count: 2, results: [province(1, 'خراسان رضوی'), province(2, 'فارس')] },
   } as never);
+  // The server's registry, default shape: one usable provider.
+  vi.mocked(paymentsApi.options).mockResolvedValue({
+    data: {
+      providers: [
+        {
+          code: 'coordination',
+          label: 'هماهنگی با کارشناس',
+          currency: 'IRT',
+          enabled: true,
+          configured: true,
+          reason: 'ثبت سفارش انجام می‌شود و پرداخت پس از تأیید هماهنگ خواهد شد.',
+        },
+        {
+          code: 'zarinpal',
+          label: 'زرین‌پال',
+          currency: 'IRT',
+          enabled: false,
+          configured: false,
+          reason: 'درگاه تا زمان فعال‌سازی و تنظیم Merchant ID غیرفعال است.',
+        },
+      ],
+    },
+  } as never);
   vi.mocked(locationsApi.cities).mockImplementation((name) =>
     Promise.resolve({
       data: {
@@ -135,5 +159,68 @@ describe('Checkout address', () => {
     await userEvent.selectOptions(screen.getByLabelText('استان'), 'فارس');
 
     await waitFor(() => expect(screen.getByLabelText('شهر')).toHaveValue(''));
+  });
+});
+
+describe('Checkout payment methods', () => {
+  it('offers only the providers the server has enabled and configured', async () => {
+    renderCheckout();
+
+    // «زرین‌پال» is declared but switched off: it must not be selectable.
+    await waitFor(() => expect(screen.getByRole('radio', { name: /هماهنگی با کارشناس/ })).toBeDefined());
+    expect(screen.queryByRole('radio', { name: /زرین‌پال/ })).toBeNull();
+  });
+
+  it('offers a gateway the operator turns on, and submits the chosen one', async () => {
+    vi.mocked(paymentsApi.options).mockResolvedValue({
+      data: {
+        providers: [
+          {
+            code: 'coordination',
+            label: 'هماهنگی با کارشناس',
+            currency: 'IRT',
+            enabled: true,
+            configured: true,
+            reason: '',
+          },
+          {
+            code: 'zarinpal',
+            label: 'زرین‌پال',
+            currency: 'IRT',
+            enabled: true,
+            configured: true,
+            reason: 'پرداخت آنلاین از طریق درگاه زرین‌پال.',
+          },
+        ],
+      },
+    } as never);
+    vi.mocked(ordersApi.checkout).mockResolvedValue({
+      data: { order: { id: 1, code: 'GK-TEST-1', status: 'confirmed', payment_status: 'unpaid' } },
+    } as never);
+    renderCheckout();
+
+    const zarinpal = await screen.findByRole('radio', { name: /زرین‌پال/ });
+    await userEvent.click(zarinpal);
+    expect(zarinpal).toBeChecked();
+
+    // What matters is what leaves the page, not what the radio looks like: the
+    // payload used to hardcode 'coordination' whatever the visitor picked.
+    await waitFor(() => expect(screen.getByRole('option', { name: 'فارس' })).toBeDefined());
+    await userEvent.type(screen.getByLabelText('نام و نام خانوادگی'), 'مریم احمدی');
+    await userEvent.type(screen.getByLabelText('شمارهٔ همراه'), '09120000000');
+    await userEvent.selectOptions(screen.getByLabelText('استان'), 'فارس');
+    await waitFor(() => expect(screen.getByRole('option', { name: 'شیراز' })).toBeDefined());
+    await userEvent.selectOptions(screen.getByLabelText('شهر'), 'شیراز');
+    await userEvent.type(screen.getByLabelText('نشانی کامل'), 'خیابان اول، پلاک ۲');
+    // Terms are required before the button unlocks.
+    const terms = screen.getByRole('checkbox');
+    await userEvent.click(terms);
+
+    await userEvent.click(screen.getByRole('button', { name: 'ثبت سفارش' }));
+
+    await waitFor(() => expect(ordersApi.checkout).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(ordersApi.checkout).mock.calls[0]?.[0]).toMatchObject({
+      payment_method: 'zarinpal',
+    });
   });
 });

@@ -5,11 +5,13 @@ import { useNavigate, Link } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ShieldCheck } from 'lucide-react';
 
-import { locationsApi, ordersApi } from '../api/services';
+import { locationsApi, ordersApi, paymentsApi } from '../api/services';
+import type { CheckoutPayload, PaymentProviderOption } from '@/types/commerce';
 import { useCartStore } from '../store/cartStore';
 import { useAuthStore } from '../store/authStore';
 import { parseApiError } from '../api/errors';
 import { money } from '../lib/price';
+import { cn } from '../lib/cn';
 import { readReferral } from '../lib/referral';
 import { SelectField, TextArea, TextField } from '../components/ui/Field';
 import Button from '../components/ui/Button';
@@ -66,7 +68,26 @@ export default function Checkout() {
   const [coupon, setCoupon] = useState('');
   const [terms, setTerms] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [method, setMethod] = useState<CheckoutPayload['payment_method']>('coordination');
   const [error, setError] = useState<string | null>(null);
+
+  // The server decides which gateways exist; a provider is offered when it is
+  // both enabled and configured, and the others are listed with their reason so
+  // the buyer is not left guessing why «زرین‌پال» is missing.
+  const options = useQuery({
+    queryKey: ['payment-options'],
+    queryFn: async () => (await paymentsApi.options()).data,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const declared: PaymentProviderOption[] = options.data?.providers ?? [];
+  const providers = declared.filter((provider) => provider.enabled && provider.configured);
+
+  // A choice that is no longer offered (the operator disabled it while the page
+  // was open) must not be what gets submitted.
+  const effectiveMethod = providers.some((provider) => provider.code === method)
+    ? method
+    : providers[0]?.code ?? 'coordination';
 
   const items = cart?.items ?? [];
   const total = cart?.total_price ?? 0;
@@ -98,7 +119,7 @@ export default function Checkout() {
         postal_code: postal,
         notes,
         coupon_code: coupon || undefined,
-        payment_method: 'coordination',
+        payment_method: effectiveMethod,
         affiliate_code: readReferral(),
         // The submit button cannot be pressed until the terms checkbox is
         // ticked, so this is the visitor's own agreement rather than a
@@ -195,15 +216,57 @@ export default function Checkout() {
 
           <section className="rounded-lg border border-line bg-paper p-4 dark:border-night-line dark:bg-night-soft">
             <h2 className="text-sm font-extrabold text-ink dark:text-white">روش پرداخت</h2>
-            <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-md border border-brand-300 bg-brand-50/60 p-3 dark:border-brand-800 dark:bg-night">
-              <input type="radio" name="payment" value="coordination" checked readOnly className="mt-1" />
-              <span>
-                <span className="block text-xs font-extrabold text-ink dark:text-white">هماهنگی تلفنی</span>
-                <span className="mt-0.5 block text-2xs leading-6 text-ink-mute dark:text-white/55">
-                  موجودی و هزینهٔ ارسال تأیید می‌شود، بعد پرداخت انجام می‌گیرد. برای سفارش‌های عمده و ارسال به شهرستان، این روش پیشنهادی است.
-                </span>
-              </span>
-            </label>
+            {/* The list is the server's, not this file's. It used to be one
+                hardcoded radio — «هماهنگی تلفنی» — so a gateway the operator
+                switched on could never be chosen at checkout, and one they
+                switched off was still advertised. `/payments/options/` already
+                reports each provider with `enabled`, `configured` and the
+                operator's own `reason`; that is what is rendered, and the
+                reason is printed where a provider is unavailable instead of
+                the option silently disappearing. */}
+            {providers.length === 0 && (
+              <p className="mt-3 rounded-md border border-line p-3 text-2xs leading-6 text-ink-mute dark:border-night-line dark:text-white/55">
+                {options.isLoading
+                  ? 'در حال دریافت روش‌های پرداخت…'
+                  : 'روش پرداخت در دسترس نیست؛ سفارش شما ثبت می‌شود و پرداخت تلفنی هماهنگ خواهد شد.'}
+              </p>
+            )}
+            <div className="mt-3 flex flex-col gap-2">
+              {providers.map((provider) => {
+                const selected = effectiveMethod === provider.code;
+                return (
+                  <label
+                    key={provider.code}
+                    className={cn(
+                      'flex cursor-pointer items-start gap-3 rounded-md border p-3',
+                      selected
+                        ? 'border-brand-300 bg-brand-50/60 dark:border-brand-800 dark:bg-night'
+                        : 'border-line hover:border-brand-200 dark:border-night-line',
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="payment"
+                      value={provider.code}
+                      checked={selected}
+                      onChange={() => setMethod(provider.code)}
+                      className="mt-1"
+                    />
+                    <span>
+                      <span className="block text-xs font-extrabold text-ink dark:text-white">
+                        {provider.label}
+                      </span>
+                      <span className="mt-0.5 block text-2xs leading-6 text-ink-mute dark:text-white/55">
+                        {provider.reason ||
+                          (provider.code === 'coordination'
+                            ? 'موجودی و هزینهٔ ارسال تأیید می‌شود، بعد پرداخت انجام می‌گیرد.'
+                            : 'پرداخت آنلاین در درگاه امن.')}
+                      </span>
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
           </section>
         </div>
 
