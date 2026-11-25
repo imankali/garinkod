@@ -12,10 +12,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../api/services', () => ({
   siteInfoApi: { getContact: vi.fn() },
-  newsletterApi: { subscribe: vi.fn() },
+  sitePagesApi: { getAll: vi.fn() },
+  newsletterApi: { subscribe: vi.fn(), unsubscribe: vi.fn() },
 }));
 
-import { siteInfoApi } from '../../api/services';
+import { siteInfoApi, sitePagesApi } from '../../api/services';
 import Footer from './Footer';
 import { createQueryClient, Providers } from '../../providers';
 
@@ -30,6 +31,8 @@ const renderFooter = () =>
 
 beforeEach(() => {
   vi.mocked(siteInfoApi.getContact).mockReset();
+  vi.mocked(sitePagesApi.getAll).mockReset();
+  vi.mocked(sitePagesApi.getAll).mockResolvedValue({ data: [] } as never);
 });
 
 describe('Footer', () => {
@@ -120,5 +123,33 @@ describe('Footer', () => {
 
     await waitFor(() => expect(screen.getByText('تلفن ندارد')).toBeDefined());
     expect(screen.queryByText('not-an-address')).toBeNull();
+  });
+
+  it('links the info pages the CMS publishes, wherever the reader is', async () => {
+    // «شماره حساب‌های گرین‌کود» was reachable only by typing the URL, and the
+    // checkout copy referred to those account numbers by name.
+    vi.mocked(siteInfoApi.getContact).mockResolvedValue({ data: { address: '', phones: [], emails: [] } } as never);
+    vi.mocked(sitePagesApi.getAll).mockResolvedValue({
+      data: [
+        { id: 1, title: 'شماره حساب‌های گرین‌کود', slug: 'shomare-hesabha', kind: 'page' },
+        { id: 2, title: 'محیط زیست و مصرف بهینه نهاده‌ها', slug: 'mohit-zist', kind: 'page' },
+      ],
+    } as never);
+    renderFooter();
+
+    const link = await screen.findByRole('link', { name: 'شماره حساب‌های گرین‌کود' });
+    expect(link).toHaveAttribute('href', '/page/shomare-hesabha');
+    expect(screen.getByRole('link', { name: 'محیط زیست و مصرف بهینه نهاده‌ها' })).toHaveAttribute(
+      'href',
+      '/page/mohit-zist',
+    );
+  });
+
+  it('grows no empty «اطلاعات» column when the server has no pages', async () => {
+    vi.mocked(siteInfoApi.getContact).mockResolvedValue({ data: { address: '', phones: [], emails: [] } } as never);
+    renderFooter();
+
+    await waitFor(() => expect(sitePagesApi.getAll).toHaveBeenCalled());
+    expect(screen.queryByRole('navigation', { name: 'اطلاعات' })).toBeNull();
   });
 });

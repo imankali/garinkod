@@ -1,10 +1,11 @@
 // frontend/src/components/layout/Footer.tsx
 
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import { Mail, MapPin, Phone } from 'lucide-react';
 
-import { siteInfoApi } from '../../api/services';
+import { siteInfoApi, sitePagesApi } from '../../api/services';
 import { mailHref, telHref } from '../../lib/phone';
 import { year } from '../../lib/date';
 import { FOOTER_NAV } from './nav';
@@ -32,6 +33,20 @@ export default function Footer() {
     queryFn: async () => (await siteInfoApi.getContact()).data,
     staleTime: 30 * 60 * 1000,
   });
+
+  /**
+   * The info pages the admin publishes — the account numbers an order gets paid
+   * to, and the input-use policy. Both were reachable only by typing
+   * `/page/shomare-hesabha`; the checkout copy pointed at «شماره حساب‌های رسمی»
+   * with no link to the page that lists them. The list is the server's, so a
+   * new page appears in the footer without a deploy.
+   */
+  const pages = useQuery({
+    queryKey: ['site-pages'],
+    queryFn: async () => (await sitePagesApi.getAll({ kind: 'page' })).data,
+    staleTime: 30 * 60 * 1000,
+  });
+  const infoPages = useMemo(() => pages.data ?? [], [pages.data]);
 
   const phone = contact.data?.phones?.[0] || import.meta.env.VITE_PHONE_NUMBER?.trim();
   const email = contact.data?.emails?.[0] || import.meta.env.VITE_CONTACT_EMAIL?.trim();
@@ -86,6 +101,24 @@ export default function Footer() {
               </li>
             </ul>
           </div>
+
+          {infoPages.length > 0 && (
+            <nav aria-label="اطلاعات">
+              <h2 className="text-xs font-extrabold text-white">اطلاعات</h2>
+              <ul className="mt-3 space-y-1">
+                {infoPages.map((page) => (
+                  <li key={page.id}>
+                    <Link
+                      to={`/page/${page.slug}`}
+                      className="inline-flex min-h-9 items-center text-xs text-brand-100/80 transition-colors hover:text-white"
+                    >
+                      {page.title}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          )}
 
           {FOOTER_NAV.map((group) => (
             <nav key={group.title} aria-label={group.title}>
