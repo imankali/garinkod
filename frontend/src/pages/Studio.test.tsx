@@ -24,6 +24,9 @@ const createListing = vi.fn();
 const deleteListing = vi.fn();
 const checkAvailability = vi.fn();
 const createStorefront = vi.fn();
+const myPosts = vi.fn();
+const createPost = vi.fn();
+const removePost = vi.fn();
 
 vi.mock('../api/services', () => ({
   agricultureApi: {
@@ -33,6 +36,11 @@ vi.mock('../api/services', () => ({
     deleteListing: (...a: unknown[]) => deleteListing(...a),
     checkStorefrontAvailability: (...a: unknown[]) => checkAvailability(...a),
     createStorefront: (...a: unknown[]) => createStorefront(...a),
+  },
+  storefrontPostsApi: {
+    mine: (...a: unknown[]) => myPosts(...a),
+    create: (...a: unknown[]) => createPost(...a),
+    remove: (...a: unknown[]) => removePost(...a),
   },
 }));
 
@@ -113,7 +121,11 @@ beforeEach(() => {
   deleteListing.mockReset();
   checkAvailability.mockReset();
   createStorefront.mockReset();
+  myPosts.mockReset();
+  createPost.mockReset();
+  removePost.mockReset();
   myListings.mockResolvedValue({ data: [] });
+  myPosts.mockResolvedValue({ data: [] });
 });
 
 describe('Studio — a seller with a stall', () => {
@@ -218,5 +230,85 @@ describe('Studio — a seller without a stall', () => {
 
     expect(await screen.findByText('برای استودیو غرفه وارد شوید')).toBeDefined();
     await waitFor(() => expect(getStorefront).not.toHaveBeenCalled());
+  });
+});
+
+describe('Studio — the stall’s own feed', () => {
+  const post = (over: Record<string, unknown> = {}) => ({
+    id: 12,
+    storefront: 3,
+    storefront_name: 'پسته رفسنجان',
+    storefront_slug: 'پسته-رفسنجان',
+    storefront_avatar_url: '',
+    storefront_is_verified: false,
+    listing: null,
+    post_type: 'post',
+    post_type_label: 'پست',
+    caption: 'برداشت امسال شروع شد.',
+    image: null,
+    image_url: '',
+    status: 'published',
+    status_label: 'منتشر شده',
+    expires_at: null,
+    created_at: '2026-11-25T06:00:00+03:30',
+    updated_at: '2026-11-25T06:00:00+03:30',
+    ...over,
+  });
+
+  it('publishes a post with the caption and type the seller chose', async () => {
+    getStorefront.mockResolvedValue({ data: stall });
+    createPost.mockResolvedValue({ data: post() });
+    renderStudio();
+
+    await screen.findByText('پسته رفسنجان');
+    await userEvent.click(screen.getByRole('button', { name: 'پست تازه' }));
+
+    await userEvent.type(screen.getByLabelText('متن'), 'برداشت امسال شروع شد.');
+    await userEvent.click(screen.getByRole('button', { name: 'انتشار' }));
+
+    await waitFor(() => expect(createPost).toHaveBeenCalled());
+    const payload = createPost.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(payload.post_type).toBe('post');
+    expect(payload.caption).toBe('برداشت امسال شروع شد.');
+  });
+
+  it('switches to a story and warns that it will archive itself', async () => {
+    getStorefront.mockResolvedValue({ data: stall });
+    renderStudio();
+
+    await screen.findByText('پسته رفسنجان');
+    await userEvent.click(screen.getByRole('button', { name: 'پست تازه' }));
+    await userEvent.click(screen.getByRole('button', { name: 'استوری' }));
+
+    // A story expires on the server; saying so is the difference between a
+    // feature and a surprise.
+    expect(screen.getByText(/استوری پس از مدتی خودش بایگانی می‌شود/)).toBeDefined();
+  });
+
+  it('lists what the seller already published, with its moderation status', async () => {
+    getStorefront.mockResolvedValue({ data: stall });
+    myPosts.mockResolvedValue({
+      // A post's pending label is «در انتظار بررسی»; a listing's is «در انتظار
+      // تأیید». Two models, two labels, and the page prints whichever it got.
+      data: [post(), post({ id: 13, post_type: 'story', post_type_label: 'استوری', status: 'pending_review', status_label: 'در انتظار بررسی' })],
+    });
+    renderStudio();
+
+    // Both rows carry the same caption in this fixture; the statuses differ.
+    expect((await screen.findAllByText(/برداشت امسال شروع شد/)).length).toBe(2);
+    // The type and status share one text node: «استوری · در انتظار بررسی».
+    expect(screen.getByText('استوری · در انتظار بررسی')).toBeDefined();
+  });
+
+  it('deletes one of the seller’s own posts', async () => {
+    getStorefront.mockResolvedValue({ data: stall });
+    myPosts.mockResolvedValue({ data: [post()] });
+    removePost.mockResolvedValue({ data: { message: 'حذف شد' } });
+    renderStudio();
+
+    await screen.findByText(/برداشت امسال شروع شد/);
+    await userEvent.click(screen.getByRole('button', { name: 'حذف پست' }));
+
+    await waitFor(() => expect(removePost).toHaveBeenCalledWith(12));
   });
 });

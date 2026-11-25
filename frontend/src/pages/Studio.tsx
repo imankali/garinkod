@@ -25,14 +25,15 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { PackagePlus, Store, Trash2 } from 'lucide-react';
+import { ImagePlus, PackagePlus, Send, Store, Trash2 } from 'lucide-react';
 import { Link } from 'react-router';
 
-import { agricultureApi } from '../api/services';
-import type { MarketplaceListing, Storefront } from '@/types/storefront';
+import { agricultureApi, storefrontPostsApi } from '../api/services';
+import type { MarketplaceListing, Storefront, StorefrontPost } from '@/types/storefront';
 import { parseApiError } from '../api/errors';
 import { cn } from '../lib/cn';
 import { money, nums } from '../lib/price';
+import { date } from '../lib/date';
 import { useDebouncedValue } from '../lib/useDebouncedValue';
 import { useTitle } from '../lib/useTitle';
 import { useAuthStore } from '../store/authStore';
@@ -347,11 +348,125 @@ function ListingForm({ onDone }: { onDone: () => void }) {
   );
 }
 
+/**
+ * The composer for the stall's own feed.
+ *
+ * `storefrontPostsApi.create`, `mine`, `update` and `remove` were the last four
+ * methods without a caller: the storefront page could *render* posts and
+ * stories, and the seller had no way to make one. That is half a feature — a
+ * farmer could be read and not speak.
+ *
+ * A post and a story go through the same endpoint and differ in `post_type`,
+ * which is also what decides the lifetime on the server (a story expires). The
+ * page says that out loud instead of leaving the seller to discover it.
+ */
+function PostComposer({ onDone }: { onDone: () => void }) {
+  const queryClient = useQueryClient();
+  const [kind, setKind] = useState<'post' | 'story'>('post');
+  const [caption, setCaption] = useState('');
+  const [image, setImage] = useState<File | null>(null);
+
+  const create = useMutation({
+    mutationFn: async () =>
+      (
+        await storefrontPostsApi.create({
+          post_type: kind,
+          caption: caption.trim(),
+          image,
+        })
+      ).data,
+    onSuccess: () => {
+      // Both lists change: the seller's own and the stall page the buyer reads.
+      void queryClient.invalidateQueries({ queryKey: ['my-posts'] });
+      void queryClient.invalidateQueries({ queryKey: ['storefront'] });
+      onDone();
+    },
+  });
+
+  return (
+    <form
+      noValidate
+      className="mt-3 flex flex-col gap-3 rounded-lg border border-line p-4 dark:border-night-line"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!caption.trim() || create.isPending) return;
+        create.mutate();
+      }}
+    >
+      <div className="flex flex-wrap gap-1.5" role="group" aria-label="نوع">
+        {(
+          [
+            { value: 'post', label: 'پست' },
+            { value: 'story', label: 'استوری' },
+          ] as const
+        ).map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            aria-pressed={kind === option.value}
+            onClick={() => setKind(option.value)}
+            className={cn(
+              'inline-flex min-h-8 items-center rounded-sm px-2 text-2xs font-bold transition-colors',
+              kind === option.value
+                ? 'bg-brand-700 text-white'
+                : 'border border-line text-ink-soft dark:border-night-line dark:text-white/65',
+            )}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+
+      <TextArea
+        label="متن"
+        required
+        rows={3}
+        value={caption}
+        onChange={(event) => setCaption(event.target.value)}
+        hint={
+          kind === 'story'
+            ? 'استوری پس از مدتی خودش بایگانی می‌شود؛ برای خبر ماندگار، پست بگذارید.'
+            : 'از برداشت، بسته‌بندی یا کارگاه خود بنویسید.'
+        }
+      />
+
+      <label className="flex flex-col gap-1 text-2xs font-bold text-ink-soft dark:text-white/65">
+        <span className="flex items-center gap-1">
+          <ImagePlus size={13} aria-hidden="true" />
+          تصویر (اختیاری)
+        </span>
+        <input
+          type="file"
+          accept="image/*"
+          onChange={(event) => setImage(event.target.files?.[0] ?? null)}
+          className="text-[11px] font-normal text-ink-mute file:me-2 file:rounded-sm file:border-0 file:bg-brand-50 file:px-2 file:py-1 file:text-2xs file:font-bold file:text-brand-800 dark:text-white/45 dark:file:bg-night dark:file:text-brand-300"
+        />
+      </label>
+
+      {create.isError && (
+        <p role="alert" className="text-2xs font-bold text-danger-700">
+          {parseApiError(create.error).message}
+        </p>
+      )}
+
+      <div className="flex items-center gap-2">
+        <Button type="submit" loading={create.isPending} disabled={!caption.trim()} icon={Send}>
+          انتشار
+        </Button>
+        <Button type="button" variant="quiet" onClick={onDone}>
+          انصراف
+        </Button>
+      </div>
+    </form>
+  );
+}
+
 export default function Studio() {
   useTitle('استودیو غرفه');
   const user = useAuthStore((state) => state.user);
   const queryClient = useQueryClient();
   const [adding, setAdding] = useState(false);
+  const [composing, setComposing] = useState(false);
 
   const stall = useQuery({
     queryKey: ['my-storefront'],
@@ -368,6 +483,20 @@ export default function Studio() {
   const remove = useMutation({
     mutationFn: async (slug: string) => agricultureApi.deleteListing(slug),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['my-listings'] }),
+  });
+
+  const myPosts = useQuery({
+    queryKey: ['my-posts'],
+    queryFn: async () => (await storefrontPostsApi.mine()).data,
+    enabled: Boolean(user) && Boolean(stall.data),
+  });
+
+  const removePost = useMutation({
+    mutationFn: async (id: number) => storefrontPostsApi.remove(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['my-posts'] });
+      void queryClient.invalidateQueries({ queryKey: ['storefront'] });
+    },
   });
 
   // Checking availability and posting an application is a level-0/1 action, so
@@ -509,6 +638,55 @@ export default function Studio() {
                         حذف
                       </button>
                     </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+          <section aria-labelledby="my-posts-title">
+            <div className="flex items-center justify-between">
+              <h2 id="my-posts-title" className="text-sm font-extrabold text-ink dark:text-white">
+                پست‌ها و استوری‌ها
+              </h2>
+              <Button variant="secondary" size="sm" icon={ImagePlus} onClick={() => setComposing(true)}>
+                پست تازه
+              </Button>
+            </div>
+
+            {composing && <PostComposer onDone={() => setComposing(false)} />}
+
+            {(myPosts.data ?? []).length === 0 ? (
+              <p className="mt-3 rounded-lg border border-line p-4 text-2xs leading-6 text-ink-mute dark:border-night-line dark:text-white/50">
+                هنوز چیزی منتشر نکرده‌اید. یک عکس از برداشت یا بسته‌بندی، بیشتر از هر توضیحی
+                خریدار می‌آورد.
+              </p>
+            ) : (
+              <ul className="mt-3 divide-y divide-line dark:divide-night-line">
+                {(myPosts.data ?? []).map((post: StorefrontPost) => (
+                  <li key={post.id} className="flex flex-wrap items-start justify-between gap-2 py-3">
+                    <div className="min-w-0">
+                      <p className="flex flex-wrap items-center gap-2 text-xs font-bold text-ink dark:text-white">
+                        {post.post_type_label} · {post.status_label}
+                        {post.expires_at && (
+                          <span className="text-[11px] font-normal text-ink-mute dark:text-white/40">
+                            تا {date(post.expires_at)}
+                          </span>
+                        )}
+                      </p>
+                      <p className="mt-0.5 truncate text-2xs text-ink-soft dark:text-white/60">
+                        {post.caption}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removePost.mutate(post.id)}
+                      disabled={removePost.isPending}
+                      aria-label={`حذف ${post.post_type_label}`}
+                      className="inline-flex min-h-8 items-center gap-1 rounded-sm px-1.5 text-[11px] font-bold text-ink-mute hover:text-danger-700 disabled:opacity-50 dark:text-white/40"
+                    >
+                      <Trash2 size={12} aria-hidden="true" />
+                      حذف
+                    </button>
                   </li>
                 ))}
               </ul>
