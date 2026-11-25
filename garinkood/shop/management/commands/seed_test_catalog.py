@@ -44,6 +44,7 @@ from shop.data.test_images import make_placeholder_image
 from shop.models import (
     Category,
     Comment,
+    CommentVote,
     Coupon,
     EquipmentDetail,
     FertilizerDetail,
@@ -259,7 +260,7 @@ class Command(BaseCommand):
 
         # Reviews: matched on (product, name, body) so re-seeds never duplicate.
         for review in entry.get("reviews", []):
-            Comment.objects.update_or_create(
+            comment, _ = Comment.objects.update_or_create(
                 product=product,
                 name=review["name"],
                 body=review["body"],
@@ -270,12 +271,40 @@ class Command(BaseCommand):
                     "active": True,
                 },
             )
+            self._seed_votes(comment, review.get("helpful_count", 0))
 
         # Cover + gallery placeholders (only when missing — never churn files).
         if with_images:
             self._ensure_images(product, entry)
 
         return created
+
+    @staticmethod
+    def _seed_votes(comment: Comment, helpful_count: int) -> None:
+        """Give a seeded tally the rows that justify it.
+
+        ``helpful_count`` is derived from ``CommentVote`` rows — the endpoint
+        recomputes the sum after every vote instead of trusting the stored
+        number — so a review seeded with a count and no rows was a lie waiting
+        for its first reader: one click rebuilt the sum from an empty table and
+        «۳۴ نفر این را مفید دانستند» became «۱».
+
+        The stand-in rows are clearly synthetic (``seed:`` prefix, no user), and
+        can never collide with a real voter because a real key is a hash of the
+        session and the address.
+        """
+        wanted = max(0, int(helpful_count or 0))
+        existing = comment.votes.count()
+        if existing == wanted:
+            return
+        # Reseeding with a different number must move the tally to that number,
+        # not leave the old rows plus some new ones.
+        comment.votes.all().delete()
+        CommentVote.objects.bulk_create([
+            CommentVote(comment=comment, visitor_key=f"seed:{comment.pk}:{index}", value=1)
+            for index in range(wanted)
+        ])
+        Comment.objects.filter(pk=comment.pk).update(helpful_count=wanted)
 
     @staticmethod
     def _ensure_images(product: Product, entry: dict) -> None:

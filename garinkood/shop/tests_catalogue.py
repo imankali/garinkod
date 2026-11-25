@@ -595,6 +595,40 @@ class ReviewTrustTests(TestCase):
         note = PlatformFeedback.objects.get()
         self.assertIn('توهین به سایر خریداران', note.message)
         self.assertIn(self.product.title, note.subject)
+    def test_a_seeded_tally_does_not_collapse_when_the_first_reader_votes(self):
+        """A count with no rows behind it is a promise the next click breaks.
+
+        ``helpful_count`` is recomputed from ``CommentVote`` rows, and the seed
+        data carried counts without rows. The first real vote therefore rebuilt
+        the sum from an empty table and a review that said «۳۴ نفر» dropped to
+        «۱» in front of the reader who had just clicked «مفید بود».
+        """
+        from django.core.management import call_command
+
+        call_command('seed_test_catalog', '--skip-images', verbosity=0)
+
+        seeded = (
+            Comment.objects.filter(active=True, helpful_count__gt=0)
+            .order_by('-helpful_count')
+            .first()
+        )
+        self.assertIsNotNone(seeded, 'the seed catalogue is supposed to carry reviews')
+        published = seeded.helpful_count
+        self.assertEqual(
+            seeded.votes.count(), published,
+            'the tally must rest on real rows, not on a bare number',
+        )
+
+        # Re-seeding moves the tally to the number it states; it never stacks.
+        call_command('seed_test_catalog', '--skip-images', verbosity=0)
+        self.assertEqual(Comment.objects.get(pk=seeded.pk).votes.count(), published)
+
+        # A reader's vote is now an addition to a real tally, not a reset of it.
+        response = self.client.post(
+            f'/api/comments/{seeded.pk}/helpful/', REMOTE_ADDR='10.9.9.9'
+        )
+        self.assertEqual(response.data['helpful_count'], published + 1)
+        self.assertTrue(response.data['voted'])
 
 
 @override_settings(SECURE_SSL_REDIRECT=False)
