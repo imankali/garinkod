@@ -1,8 +1,10 @@
 // frontend/src/components/layout/Footer.tsx
 
+import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import { Mail, MapPin, Phone } from 'lucide-react';
 
+import { siteInfoApi } from '../../api/services';
 import { FOOTER_NAV } from './nav';
 import Logo from './Logo';
 import NewsletterForm from './NewsletterForm';
@@ -16,8 +18,22 @@ import NewsletterForm from './NewsletterForm';
  * make a sitemap look like a feature list.
  */
 export default function Footer() {
-  const phone = import.meta.env.VITE_PHONE_NUMBER?.trim();
-  const email = import.meta.env.VITE_CONTACT_EMAIL?.trim();
+  /**
+   * The contact channels come from the server, which is the only place they are
+   * maintained. They used to be two build-time environment variables, so a
+   * number that changed in the admin changed on /contact and nowhere else — the
+   * footer of every page kept publishing the old one. The variables remain as a
+   * fallback for a deployment whose API has not answered yet.
+   */
+  const contact = useQuery({
+    queryKey: ['site-contact'],
+    queryFn: async () => (await siteInfoApi.getContact()).data,
+    staleTime: 30 * 60 * 1000,
+  });
+
+  const phone = contact.data?.phones?.[0] || import.meta.env.VITE_PHONE_NUMBER?.trim();
+  const email = contact.data?.emails?.[0] || import.meta.env.VITE_CONTACT_EMAIL?.trim();
+  const address = contact.data?.address || 'تهران، ایران';
 
   return (
     <footer className="mt-16 border-t border-line bg-brand-900 pb-20 text-brand-50 lg:pb-0 dark:border-night-line dark:bg-night">
@@ -53,9 +69,9 @@ export default function Footer() {
                   </a>
                 </li>
               )}
-              <li className="inline-flex items-center gap-2">
-                <MapPin size={14} aria-hidden="true" />
-                تهران، ایران
+              <li className="flex items-start gap-2">
+                <MapPin size={14} aria-hidden="true" className="mt-1.5 shrink-0" />
+                <span className="leading-6">{address}</span>
               </li>
             </ul>
           </div>
