@@ -24,7 +24,7 @@ import { useTitle } from '../lib/useTitle';
  * Order is an argument, not a template:
  *   1. hero — what this is, and the two ways in.
  *   2. departments — "where is the fertiliser" answered in one row.
- *   3. deals — the only time-sensitive panel, smallest possible countdown.
+ *   3. deals — the deepest live discounts, with no invented deadline.
  *   4. best sellers — proof that other people buy here.
  *   5. the market — the platform's actual differentiator, above the fold-line
  *      it used to sit under.
