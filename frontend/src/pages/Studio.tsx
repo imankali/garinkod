@@ -345,6 +345,129 @@ function ApplyForm({ onApplied }: { onApplied: () => void }) {
   );
 }
 
+/**
+ * Editing the stall itself.
+ *
+ * `agricultureApi.updateStorefront` had no caller, so once a stall existed its
+ * name, address, province and bio were fixed forever: a seller who moved, or
+ * who typed «رفسنجان» where the city picker wanted «رفسنجان», had no way back —
+ * the only path was asking a human to change it.
+ *
+ * PATCH is multipart because the same request can carry the avatar and cover.
+ * Name and slug are not repeated here: the live-availability check that guards
+ * them belongs to the apply form, and a PATCH that grabs a taken name would
+ * fail with a raw field error. Province and city come from the server's own
+ * list, exactly as on the apply form — buyers filter by those exact values.
+ */
+function StallSettings({ stall, onDone }: { stall: Storefront; onDone: () => void }) {
+  const queryClient = useQueryClient();
+  const [name, setName] = useState(stall.name);
+  const [slug, setSlug] = useState(stall.slug);
+  const [sellerType, setSellerType] = useState<Storefront['seller_type']>(stall.seller_type);
+  const [bio, setBio] = useState(stall.bio ?? '');
+  const [province, setProvince] = useState(stall.province ?? '');
+  const [city, setCity] = useState(stall.city ?? '');
+
+  const save = useMutation({
+    mutationFn: async () =>
+      (
+        await agricultureApi.updateStorefront({
+          name: name.trim(),
+          slug: slug.trim() || undefined,
+          seller_type: sellerType,
+          bio: bio.trim(),
+          province: province.trim(),
+          city: city.trim(),
+        } as Partial<Storefront>)
+      ).data,
+    onSuccess: () => {
+      // The page renders from ['my-storefront']; the public directory and the
+      // stall page read the other two keys.
+      void queryClient.invalidateQueries({ queryKey: ['my-storefront'] });
+      void queryClient.invalidateQueries({ queryKey: ['storefront'] });
+      void queryClient.invalidateQueries({ queryKey: ['storefronts'] });
+      onDone();
+    },
+  });
+
+  return (
+    <form
+      noValidate
+      className="flex max-w-3xl flex-col gap-4 border-t border-line pt-4 dark:border-night-line"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!name.trim() || !province || !city || save.isPending) return;
+        save.mutate();
+      }}
+    >
+      <h2 className="text-sm font-extrabold text-ink dark:text-white">اطلاعات غرفه</h2>
+
+      <fieldset className="grid gap-3 sm:grid-cols-2">
+        <TextField
+          label="نام غرفه"
+          required
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+        />
+        <TextField
+          label="آدرس غرفه"
+          dir="ltr"
+          value={slug}
+          onChange={(event) => setSlug(event.target.value)}
+          hint="پیوند صفحهٔ غرفه از این آدرس ساخته می‌شود."
+        />
+        <SelectField
+          label="نوع فروشنده"
+          value={sellerType}
+          onChange={(event) => setSellerType(event.target.value as Storefront['seller_type'])}
+        >
+          {SELLER_TYPES.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </SelectField>
+        <LocationFields
+          province={province}
+          city={city}
+          onChange={({ province: next, city: nextCity }) => {
+            setProvince(next);
+            setCity(nextCity);
+          }}
+        />
+      </fieldset>
+
+      <TextArea
+        label="معرفی"
+        rows={3}
+        value={bio}
+        onChange={(event) => setBio(event.target.value)}
+        hint="چه می‌فروشید، از کجا، و فصل برداشت چه وقت است."
+      />
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="submit"
+          size="sm"
+          loading={save.isPending}
+          disabled={!name.trim() || !province || !city}
+        >
+          ذخیرهٔ اطلاعات غرفه
+        </Button>
+        <Button type="button" variant="quiet" size="sm" onClick={onDone}>
+          انصراف
+        </Button>
+      </div>
+
+      {save.isError && (
+        <p role="alert" className="text-[11px] font-bold text-danger-700">
+          {parseApiError(save.error).message}
+        </p>
+      )}
+    </form>
+  );
+}
+
 function ListingForm({ onDone }: { onDone: () => void }) {
   const queryClient = useQueryClient();
   const [title, setTitle] = useState('');
@@ -783,6 +906,7 @@ export default function Studio() {
   const user = useAuthStore((state) => state.user);
   const queryClient = useQueryClient();
   const [adding, setAdding] = useState(false);
+  const [editingStall, setEditingStall] = useState(false);
   const [composing, setComposing] = useState(false);
 
   const stall = useQuery({
@@ -920,14 +1044,29 @@ export default function Studio() {
                 </p>
               )}
             </div>
-            <Button
-              to={`/storefront/${stall.data?.slug}`}
-              variant="secondary"
-              size="sm"
-            >
-              دیدن غرفه
-            </Button>
+            <span className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="quiet"
+                size="sm"
+                icon={Pencil}
+                onClick={() => setEditingStall((current) => !current)}
+              >
+                ویرایش اطلاعات
+              </Button>
+              <Button
+                to={`/storefront/${stall.data?.slug}`}
+                variant="secondary"
+                size="sm"
+              >
+                دیدن غرفه
+              </Button>
+            </span>
           </div>
+
+          {editingStall && stall.data && (
+            <StallSettings stall={stall.data} onDone={() => setEditingStall(false)} />
+          )}
 
           {adding && <ListingForm onDone={() => setAdding(false)} />}
 

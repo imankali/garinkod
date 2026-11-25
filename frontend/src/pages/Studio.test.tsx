@@ -29,6 +29,7 @@ const myPosts = vi.fn();
 const createPost = vi.fn();
 const removePost = vi.fn();
 const updatePost = vi.fn();
+const updateStorefront = vi.fn();
 const storyArchive = vi.fn();
 const highlights = vi.fn();
 const createHighlight = vi.fn();
@@ -51,6 +52,7 @@ vi.mock('../api/services', () => ({
     updateListing: (...a: unknown[]) => updateListing(...a),
     checkStorefrontAvailability: (...a: unknown[]) => checkAvailability(...a),
     createStorefront: (...a: unknown[]) => createStorefront(...a),
+    updateStorefront: (...a: unknown[]) => updateStorefront(...a),
   },
   storefrontPostsApi: {
     mine: (...a: unknown[]) => myPosts(...a),
@@ -142,6 +144,7 @@ beforeEach(() => {
   createPost.mockReset();
   removePost.mockReset();
   updatePost.mockReset();
+  updateStorefront.mockReset();
   myListings.mockResolvedValue({ data: [] });
   myPosts.mockResolvedValue({ data: [] });
 });
@@ -367,6 +370,58 @@ describe('Studio — correcting a post', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'ویرایش پست' }));
     // A PATCH on a published post really does return pending_review.
     expect(screen.getByText(/برای بازبینی برمی‌گرداند/)).toBeDefined();
+  });
+});
+
+describe('Studio — the stall’s own details', () => {
+  it('edits the stall instead of leaving its details fixed forever', async () => {
+    getStorefront.mockResolvedValue({ data: stall });
+    updateStorefront.mockResolvedValue({ data: { ...stall, bio: 'پسته و بادام، از رفسنجان.' } });
+    renderStudio();
+
+    await userEvent.click(await screen.findByRole('button', { name: /ویرایش اطلاعات/ }));
+    const bio = screen.getByLabelText('معرفی') as HTMLInputElement;
+    await userEvent.clear(bio);
+    await userEvent.type(bio, 'پسته و بادام، از رفسنجان.');
+    await userEvent.click(screen.getByRole('button', { name: 'ذخیرهٔ اطلاعات غرفه' }));
+
+    await waitFor(() => expect(updateStorefront).toHaveBeenCalled());
+    expect(updateStorefront.mock.calls[0]?.[0]).toMatchObject({
+      name: 'پسته رفسنجان',
+      province: 'کرمان',
+      city: 'رفسنجان',
+      bio: 'پسته و بادام، از رفسنجان.',
+    });
+  });
+
+  it('sends the seller’s own province and city, not a typed guess', async () => {
+    getStorefront.mockResolvedValue({ data: stall });
+    updateStorefront.mockResolvedValue({ data: stall });
+    renderStudio();
+
+    await userEvent.click(await screen.findByRole('button', { name: /ویرایش اطلاعات/ }));
+    // The picker is seeded from the server's values, so an untouched save does
+    // not blank a field that buyers filter by.
+    await userEvent.click(screen.getByRole('button', { name: 'ذخیرهٔ اطلاعات غرفه' }));
+
+    await waitFor(() => expect(updateStorefront).toHaveBeenCalled());
+    expect(updateStorefront.mock.calls[0]?.[0]).toMatchObject({ province: 'کرمان', city: 'رفسنجان' });
+  });
+
+  it('does not claim the save worked when the server refuses it', async () => {
+    getStorefront.mockResolvedValue({ data: stall });
+    updateStorefront.mockRejectedValue({
+      response: { data: { slug: ['این آدرس قبلاً استفاده شده است.'] }, status: 400 },
+    });
+    renderStudio();
+
+    await userEvent.click(await screen.findByRole('button', { name: /ویرایش اطلاعات/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'ذخیرهٔ اطلاعات غرفه' }));
+
+    expect(await screen.findByRole('alert')).toBeDefined();
+    // The form stays open with the seller's values intact — a silent close
+    // would look like a successful save.
+    expect(screen.getByRole('button', { name: 'ذخیرهٔ اطلاعات غرفه' })).toBeDefined();
   });
 });
 
