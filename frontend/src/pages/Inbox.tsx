@@ -10,14 +10,21 @@
 // a stall could not find that conversation again, and the support desk had no
 // door at all because `openServiceConversation` was unused too.
 //
-// Two operations, both on the real endpoints:
+// Four operations, all on the real endpoints:
 //   • open a thread and reply inside it;
 //   • «گفتگو با پشتیبانی» — get-or-create the support thread (the server
-//     returns the existing one if there is one, so this cannot spam a queue).
+//     returns the existing one if there is one, so this cannot spam a queue);
+//   • «اتمام مکالمه» — close a thread, which is what unlocks the survey;
+//   • the survey itself, once per closed thread.
+//
+// Closing and rating were served and unreachable: `messagesApi.close` and
+// `messagesApi.rate` had no caller, so a question that got answered stayed
+// "open" forever and the satisfaction card could never appear. The desk's own
+// copy promises it — «گفتگو پایان یافت» — with no button behind it.
 
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, Headset, Mail, MessageCircle } from 'lucide-react';
+import { ArrowRight, Headset, Mail, MessageCircle, Star } from 'lucide-react';
 import { Link } from 'react-router';
 
 import { messagesApi } from '../api/services';
@@ -40,6 +47,106 @@ const CHANNEL_FILTERS: Array<{ value: MessageChannel | 'all'; label: string }> =
   { value: 'comment', label: 'دیدگاه‌ها' },
   { value: 'procurement', label: 'خرید محصول' },
 ];
+
+/**
+ * The satisfaction survey — 1 to 5, «حل شد؟», and one line of comment.
+ *
+ * A star row rather than a slider: five radios read correctly to a screen
+ * reader and are answerable with a thumb. The comment is optional because the
+ * server treats it that way; `solved` is tri-state because «نمی‌دانم» is a real
+ * answer and both «بله» and «خیر» would be putting words in the farmer's mouth.
+ */
+function Survey({
+  onRate,
+  pending,
+}: {
+  onRate: (payload: { score: number; solved: boolean | null; comment: string }) => void;
+  pending: boolean;
+}) {
+  const [score, setScore] = useState(0);
+  const [solved, setSolved] = useState<boolean | null>(null);
+  const [comment, setComment] = useState('');
+
+  return (
+    <form
+      className="border-t border-line p-3 dark:border-night-line"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!score) return;
+        onRate({ score, solved, comment: comment.trim() });
+      }}
+    >
+      <p className="text-2xs font-extrabold text-ink dark:text-white">
+        این گفتگو چطور بود؟
+      </p>
+      <fieldset className="mt-2">
+        <legend className="sr-only">امتیاز از ۱ تا ۵</legend>
+        <div className="flex flex-row-reverse justify-end gap-1">
+          {[1, 2, 3, 4, 5].map((value) => (
+            <label key={value} className="cursor-pointer">
+              <input
+                type="radio"
+                name="score"
+                value={value}
+                checked={score === value}
+                onChange={() => setScore(value)}
+                className="peer sr-only"
+                aria-label={`${value} از ۵`}
+              />
+              <Star
+                size={20}
+                aria-hidden="true"
+                className={cn(
+                  'transition-colors duration-150',
+                  value <= score ? 'text-gold-600' : 'text-line dark:text-night-line',
+                  'peer-focus-visible:ring-2 peer-focus-visible:ring-brand-500',
+                )}
+              />
+            </label>
+          ))}
+        </div>
+      </fieldset>
+
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {[
+          { value: true, label: 'حل شد' },
+          { value: false, label: 'حل نشد' },
+        ].map((option) => (
+          <button
+            key={option.label}
+            type="button"
+            aria-pressed={solved === option.value}
+            onClick={() => setSolved(solved === option.value ? null : option.value)}
+            className={cn(
+              'rounded-sm border px-2 py-1 text-[11px] font-bold transition-colors duration-150',
+              solved === option.value
+                ? 'border-brand-500 bg-brand-50 text-brand-900 dark:border-brand-600 dark:bg-night dark:text-brand-100'
+                : 'border-line text-ink-mute dark:border-night-line dark:text-white/50',
+            )}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+
+      <label className="mt-2 block">
+        <span className="sr-only">توضیح (اختیاری)</span>
+        <input
+          type="text"
+          value={comment}
+          onChange={(event) => setComment(event.target.value)}
+          maxLength={1000}
+          placeholder="توضیح (اختیاری)"
+          className="h-9 w-full rounded-md border border-line bg-transparent px-2 text-2xs text-ink placeholder:text-ink-mute focus:border-brand-500 focus:outline-none dark:border-night-line dark:text-white"
+        />
+      </label>
+
+      <Button type="submit" size="sm" className="mt-2" loading={pending} disabled={!score}>
+        ثبت نظر
+      </Button>
+    </form>
+  );
+}
 
 function Thread({ conversation }: { conversation: StorefrontConversation }) {
   const queryClient = useQueryClient();
@@ -65,6 +172,27 @@ function Thread({ conversation }: { conversation: StorefrontConversation }) {
     onError: (caught) => setError(parseApiError(caught).message),
   });
 
+  const close = useMutation({
+    mutationFn: async () => (await messagesApi.close(conversation.id)).data,
+    onSuccess: () => {
+      setError(null);
+      void queryClient.invalidateQueries({ queryKey: ['inbox'] });
+      void queryClient.invalidateQueries({ queryKey: ['thread', conversation.id] });
+    },
+    onError: (caught) => setError(parseApiError(caught).message),
+  });
+
+  const rate = useMutation({
+    mutationFn: async (payload: { score: number; solved: boolean | null; comment: string }) =>
+      messagesApi.rate(conversation.id, payload),
+    onSuccess: () => {
+      setError(null);
+      void queryClient.invalidateQueries({ queryKey: ['inbox'] });
+      void queryClient.invalidateQueries({ queryKey: ['thread', conversation.id] });
+    },
+    onError: (caught) => setError(parseApiError(caught).message),
+  });
+
   const rows = messages.data?.results ?? [];
 
   return (
@@ -80,9 +208,21 @@ function Thread({ conversation }: { conversation: StorefrontConversation }) {
             {conversation.status === 'closed' && ' · بسته شده'}
           </p>
         </div>
-        <span className="dateline shrink-0 text-[11px] text-ink-mute dark:text-white/40">
-          {dateTime(conversation.updated_at)}
-        </span>
+        <div className="flex shrink-0 items-center gap-3">
+          {conversation.status === 'open' && (
+            <button
+              type="button"
+              onClick={() => close.mutate()}
+              disabled={close.isPending}
+              className="text-[11px] font-bold text-ink-mute underline decoration-line underline-offset-2 hover:text-ink disabled:opacity-50 dark:text-white/45 dark:hover:text-white"
+            >
+              اتمام مکالمه
+            </button>
+          )}
+          <span className="dateline text-[11px] text-ink-mute dark:text-white/40">
+            {dateTime(conversation.updated_at)}
+          </span>
+        </div>
       </div>
 
       <div className="max-h-[22rem] overflow-y-auto p-3">
@@ -142,8 +282,26 @@ function Thread({ conversation }: { conversation: StorefrontConversation }) {
           </Button>
         </form>
       ) : (
-        <p className="border-t border-line p-3 text-[11px] text-ink-mute dark:border-night-line dark:text-white/45">
-          این گفتگو بسته شده است. برای پیگیری تازه، گفتگوی تازه‌ای با پشتیبانی باز کنید.
+        <>
+          {/* Closing is not a lock — the server reopens a thread on the next
+              message — so the footer says that instead of sending the buyer off
+              to open a duplicate thread. */}
+          <button
+            type="button"
+            onClick={() => close.mutate()}
+            className="w-full border-t border-line p-3 text-start text-[11px] text-ink-mute hover:text-ink dark:border-night-line dark:text-white/45 dark:hover:text-white"
+          >
+            این گفتگو بسته شده است. برای ادامه، پیام تازه‌ای بنویسید یا برای باز کردن دوباره بزنید.
+          </button>
+        </>
+      )}
+
+      {conversation.survey?.can_rate && (
+        <Survey onRate={(payload: { score: number; solved: boolean | null; comment: string }) => rate.mutate(payload)} pending={rate.isPending} />
+      )}
+      {conversation.survey?.has_rating && !conversation.survey.can_rate && (
+        <p className="border-t border-line px-3 py-2 text-[11px] text-ink-mute dark:border-night-line dark:text-white/45">
+          سپاس — نظر شما ثبت شده است.
         </p>
       )}
 

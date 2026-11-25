@@ -22,6 +22,8 @@ const conversations = vi.fn();
 const messages = vi.fn();
 const send = vi.fn();
 const openServiceConversation = vi.fn();
+const close = vi.fn();
+const rate = vi.fn();
 
 vi.mock('../api/services', () => ({
   messagesApi: {
@@ -29,6 +31,8 @@ vi.mock('../api/services', () => ({
     messages: (...a: unknown[]) => messages(...a),
     send: (...a: unknown[]) => send(...a),
     openServiceConversation: (...a: unknown[]) => openServiceConversation(...a),
+    close: (...a: unknown[]) => close(...a),
+    rate: (...a: unknown[]) => rate(...a),
   },
 }));
 
@@ -63,6 +67,7 @@ const thread = (over: Record<string, unknown> = {}) => ({
     created_at: '2026-11-25T05:40:00+03:30',
   },
   unread_count: 0,
+  survey: { closed: false, closed_at: null, has_rating: false, can_rate: false },
   status: 'open',
   status_label: 'باز',
   closed_at: null,
@@ -245,5 +250,101 @@ describe('Inbox', () => {
 
     expect(await screen.findByText('برای دیدن گفتگوها وارد شوید')).toBeDefined();
     await waitFor(() => expect(conversations).not.toHaveBeenCalled());
+  });
+});
+
+describe('Inbox — ending a thread and the survey', () => {
+  it('offers «اتمام مکالمه» on an open thread and closes it', async () => {
+    close.mockResolvedValue({ data: {} });
+    renderInbox();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'اتمام مکالمه' }));
+
+    await waitFor(() => expect(close).toHaveBeenCalledWith(3));
+  });
+
+  it('shows the survey only when the server says can_rate', async () => {
+    conversations.mockResolvedValue({
+      data: {
+        ...inbox().data,
+        results: [
+          thread({
+            status: 'closed',
+            status_label: 'بسته شده',
+            survey: { closed: true, closed_at: '2026-11-25T06:00:00+03:30', has_rating: false, can_rate: true },
+          }),
+        ],
+      },
+    });
+    renderInbox();
+
+    expect(await screen.findByText('این گفتگو چطور بود؟')).toBeDefined();
+    // A closed thread is not writable, so the composer is gone.
+    expect(screen.queryByRole('button', { name: 'ارسال' })).toBeNull();
+  });
+
+  it('sends the score, the solved answer and the comment', async () => {
+    conversations.mockResolvedValue({
+      data: {
+        ...inbox().data,
+        results: [
+          thread({
+            status: 'closed',
+            status_label: 'بسته شده',
+            survey: { closed: true, closed_at: '2026-11-25T06:00:00+03:30', has_rating: false, can_rate: true },
+          }),
+        ],
+      },
+    });
+    rate.mockResolvedValue({ data: {} });
+    renderInbox();
+
+    await screen.findByText('این گفتگو چطور بود؟');
+    await userEvent.click(screen.getByRole('radio', { name: '4 از ۵' }));
+    await userEvent.click(screen.getByRole('button', { name: 'حل شد' }));
+    await userEvent.type(screen.getByPlaceholderText('توضیح (اختیاری)'), 'پاسخ سریع بود');
+    await userEvent.click(screen.getByRole('button', { name: 'ثبت نظر' }));
+
+    // Tri-state: «حل شد» is a real answer, not the default — leaving it alone
+    // sends null rather than a guess.
+    await waitFor(() => expect(rate).toHaveBeenCalledWith(3, { score: 4, solved: true, comment: 'پاسخ سریع بود' }));
+  });
+
+  it('cannot submit a survey with no score', async () => {
+    conversations.mockResolvedValue({
+      data: {
+        ...inbox().data,
+        results: [
+          thread({
+            status: 'closed',
+            status_label: 'بسته شده',
+            survey: { closed: true, closed_at: '2026-11-25T06:00:00+03:30', has_rating: false, can_rate: true },
+          }),
+        ],
+      },
+    });
+    renderInbox();
+
+    await screen.findByText('این گفتگو چطور بود؟');
+    expect(screen.getByRole('button', { name: 'ثبت نظر' })).toBeDisabled();
+  });
+
+  it('does not ask twice once the thread is rated', async () => {
+    conversations.mockResolvedValue({
+      data: {
+        ...inbox().data,
+        results: [
+          thread({
+            status: 'closed',
+            status_label: 'بسته شده',
+            survey: { closed: true, closed_at: '2026-11-25T06:00:00+03:30', has_rating: true, can_rate: false },
+          }),
+        ],
+      },
+    });
+    renderInbox();
+
+    expect(await screen.findByText(/نظر شما ثبت شده است/)).toBeDefined();
+    expect(screen.queryByText('این گفتگو چطور بود؟')).toBeNull();
   });
 });
