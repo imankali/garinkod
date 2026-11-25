@@ -17,6 +17,8 @@ const lands = vi.fn();
 const calendar = vi.fn();
 const consultations = vi.fn();
 const createConsultation = vi.fn();
+const updateLand = vi.fn();
+const deleteLand = vi.fn();
 
 vi.mock('../api/services', () => ({
   farmApi: {
@@ -27,6 +29,8 @@ vi.mock('../api/services', () => ({
     addEvent: vi.fn(),
     updateEvent: vi.fn(),
     createConsultation: (...a: unknown[]) => createConsultation(...a),
+    updateLand: (...a: unknown[]) => updateLand(...a),
+    deleteLand: (...a: unknown[]) => deleteLand(...a),
   },
 }));
 
@@ -96,6 +100,8 @@ beforeEach(() => {
   calendar.mockReset();
   consultations.mockReset();
   createConsultation.mockReset();
+  updateLand.mockReset();
+  deleteLand.mockReset();
   lands.mockResolvedValue({ data: [land()] });
   calendar.mockResolvedValue({ data: [] });
   consultations.mockResolvedValue({ data: [] });
@@ -249,5 +255,55 @@ describe('Farm — filing a consultation', () => {
     // The backend requires land_id; a form without a land could only fail.
     expect(await screen.findByText(/برای درخواست مشاوره اول یک زمین ثبت کنید/)).toBeDefined();
     expect(screen.queryByRole('button', { name: 'درخواست مشاوره' })).toBeNull();
+  });
+});
+
+describe('Farm — correcting a land', () => {
+  it('edits an existing land instead of creating a second one', async () => {
+    updateLand.mockResolvedValue({ data: land({ area: '3.00', area_label: '۳ هکتار' }) });
+    renderFarm();
+
+    await screen.findByText('گلخانه خیار ورامین');
+    await userEvent.click(screen.getByRole('button', { name: 'ویرایش' }));
+
+    // The form is seeded with the land, so correcting one field does not mean
+    // retyping the rest.
+    const nameBox = screen.getByLabelText('نام زمین') as HTMLInputElement;
+    expect(nameBox.value).toBe('گلخانه خیار ورامین');
+
+    await userEvent.clear(screen.getByLabelText('مساحت'));
+    await userEvent.type(screen.getByLabelText('مساحت'), '3');
+    await userEvent.click(screen.getByRole('button', { name: 'ذخیرهٔ تغییرات' }));
+
+    await waitFor(() => expect(updateLand).toHaveBeenCalled());
+    expect(updateLand.mock.calls[0]?.[0]).toBe(2);
+    expect((updateLand.mock.calls[0]?.[1] as { area: string }).area).toBe('3');
+  });
+
+  it('offers «جریب» as an area unit, because the server does', async () => {
+    renderFarm();
+    await screen.findByText('گلخانه خیار ورامین');
+    await userEvent.click(screen.getByRole('button', { name: 'ثبت زمین' }));
+
+    expect(screen.getByRole('option', { name: 'جریب' })).toBeDefined();
+  });
+
+  it('does not offer to delete a land that still has operations behind it', async () => {
+    renderFarm();
+    await screen.findByText('گلخانه خیار ورامین');
+
+    // event_count is 3 in the fixture: the calendar is the reason to keep it.
+    expect(screen.queryByRole('button', { name: 'حذف گلخانه خیار ورامین' })).toBeNull();
+  });
+
+  it('deletes a land with no operations', async () => {
+    lands.mockResolvedValue({ data: [land({ event_count: 0 })] });
+    deleteLand.mockResolvedValue({ data: { message: 'حذف شد' } });
+    renderFarm();
+
+    await screen.findByText('گلخانه خیار ورامین');
+    await userEvent.click(screen.getByRole('button', { name: 'حذف گلخانه خیار ورامین' }));
+
+    await waitFor(() => expect(deleteLand).toHaveBeenCalledWith(2));
   });
 });

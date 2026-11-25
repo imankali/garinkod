@@ -21,7 +21,7 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CalendarDays, MapPin, MessageSquare, Sprout } from 'lucide-react';
+import { CalendarDays, MapPin, MessageSquare, Sprout, Trash2 } from 'lucide-react';
 
 import { farmApi } from '../api/services';
 import type { FarmLandPayload, FarmEventPayload } from '../api/services';
@@ -59,20 +59,23 @@ const SUBJECTS = [
   { value: 'pest', label: 'آفت و بیماری' },
 ];
 
+// Mirrors FarmLand.AREA_UNIT_CHOICES — «جریب» was missing, and a land
+// registered in jarib could not be edited without silently changing its unit.
 const AREA_UNITS = [
   { value: 'hectare', label: 'هکتار' },
+  { value: 'jarib', label: 'جریب' },
   { value: 'square_meter', label: 'مترمربع' },
 ];
 
-function LandForm({ onDone }: { onDone: () => void }) {
+function LandForm({ land, onDone }: { land?: FarmLand; onDone: () => void }) {
   const queryClient = useQueryClient();
-  const [name, setName] = useState('');
-  const [landType, setLandType] = useState<FarmLand['land_type']>('farmland');
-  const [area, setArea] = useState('');
-  const [areaUnit, setAreaUnit] = useState('hectare');
-  const [crop, setCrop] = useState('');
-  const [province, setProvince] = useState('');
-  const [city, setCity] = useState('');
+  const [name, setName] = useState(land?.name ?? '');
+  const [landType, setLandType] = useState<FarmLand['land_type']>(land?.land_type ?? 'farmland');
+  const [area, setArea] = useState(land?.area ?? '');
+  const [areaUnit, setAreaUnit] = useState(land?.area_unit ?? 'hectare');
+  const [crop, setCrop] = useState(land?.crop_type ?? '');
+  const [province, setProvince] = useState(land?.province ?? '');
+  const [city, setCity] = useState(land?.city ?? '');
 
   const create = useMutation({
     mutationFn: async () => {
@@ -85,10 +88,16 @@ function LandForm({ onDone }: { onDone: () => void }) {
         province: province.trim(),
         city: city.trim(),
       };
-      return (await farmApi.createLand(payload)).data;
+      // A land with a typo in its area stayed wrong forever: the page could
+      // create one and never correct or remove it, though `updateLand` and
+      // `deleteLand` were both served.
+      return land
+        ? (await farmApi.updateLand(land.id, payload)).data
+        : (await farmApi.createLand(payload)).data;
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['farm-lands'] });
+      void queryClient.invalidateQueries({ queryKey: ['farm-calendar'] });
       onDone();
     },
   });
@@ -158,7 +167,7 @@ function LandForm({ onDone }: { onDone: () => void }) {
 
       <div className="flex items-center gap-2">
         <Button type="submit" loading={create.isPending}>
-          ثبت زمین
+          {land ? 'ذخیرهٔ تغییرات' : 'ثبت زمین'}
         </Button>
         <Button type="button" variant="quiet" onClick={onDone}>
           انصراف
@@ -350,6 +359,7 @@ export default function Farm() {
   const user = useAuthStore((state) => state.user);
   const queryClient = useQueryClient();
   const [addingLand, setAddingLand] = useState(false);
+  const [editingLand, setEditingLand] = useState<FarmLand | null>(null);
   const [addingEvent, setAddingEvent] = useState(false);
   const [askingConsult, setAskingConsult] = useState(false);
 
@@ -369,6 +379,15 @@ export default function Farm() {
     queryKey: ['farm-consultations'],
     queryFn: async () => (await farmApi.consultations()).data,
     enabled: Boolean(user),
+  });
+
+  const removeLand = useMutation({
+    mutationFn: async (landId: number) => (await farmApi.deleteLand(landId)).data,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['farm-lands'] });
+      void queryClient.invalidateQueries({ queryKey: ['farm-calendar'] });
+      void queryClient.invalidateQueries({ queryKey: ['farm-consultations'] });
+    },
   });
 
   const complete = useMutation({
@@ -430,6 +449,7 @@ export default function Farm() {
         </div>
 
         {addingLand && <LandForm onDone={() => setAddingLand(false)} />}
+        {editingLand && <LandForm land={editingLand} onDone={() => setEditingLand(null)} />}
 
         {lands.isLoading ? (
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -460,12 +480,37 @@ export default function Farm() {
                     {nums(land.event_count)} عملیات
                   </span>
                 </div>
-                {(land.province || land.city) && (
-                  <p className="mt-2 flex items-center gap-1 text-[11px] text-ink-mute dark:text-white/40">
-                    <MapPin size={11} aria-hidden="true" />
-                    {[land.province, land.city].filter(Boolean).join('، ')}
-                  </p>
-                )}
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  {(land.province || land.city) && (
+                    <p className="flex items-center gap-1 text-[11px] text-ink-mute dark:text-white/40">
+                      <MapPin size={11} aria-hidden="true" />
+                      {[land.province, land.city].filter(Boolean).join('، ')}
+                    </p>
+                  )}
+                  <span className="ms-auto flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setEditingLand(land)}
+                      className="text-[11px] font-bold text-brand-700 hover:underline dark:text-brand-300"
+                    >
+                      ویرایش
+                    </button>
+                    {/* Deleting a land is not offered while it still has
+                        operations or consultations behind it in the list — the
+                        calendar is the reason to keep the record. */}
+                    {land.event_count === 0 && (
+                      <button
+                        type="button"
+                        onClick={() => removeLand.mutate(land.id)}
+                        disabled={removeLand.isPending}
+                        aria-label={`حذف ${land.name}`}
+                        className="text-ink-mute hover:text-danger-700 disabled:opacity-50 dark:text-white/40"
+                      >
+                        <Trash2 size={12} aria-hidden="true" />
+                      </button>
+                    )}
+                  </span>
+                </div>
               </li>
             ))}
           </ul>
