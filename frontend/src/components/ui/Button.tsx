@@ -4,161 +4,98 @@ import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { Loader2, type LucideIcon } from 'lucide-react';
 
-import { cn } from '../../utils/cn';
+import { cn } from '../../lib/cn';
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'subtle';
+type Variant = 'primary' | 'secondary' | 'quiet' | 'danger';
 type Size = 'sm' | 'md' | 'lg';
 
-const VARIANTS: Record<Variant, string> = {
-  primary:
-    'bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 active:bg-emerald-800 disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-emerald-900 dark:disabled:text-emerald-600',
-  secondary:
-    'border border-emerald-200 bg-white text-emerald-800 hover:bg-emerald-50 active:bg-emerald-100 dark:border-emerald-700 dark:bg-emerald-950 dark:text-lime-200 dark:hover:bg-emerald-900',
-  ghost:
-    'text-slate-600 hover:bg-slate-100 active:bg-slate-200 dark:text-emerald-100 dark:hover:bg-emerald-900',
-  danger:
-    'bg-rose-600 text-white hover:bg-rose-700 active:bg-rose-800 disabled:bg-slate-300',
-  subtle:
-    'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-emerald-900 dark:text-emerald-100 dark:hover:bg-emerald-800',
-};
-
 /**
- * Sizes keep a minimum height of 44px at `md` and above, which is the smallest
- * comfortable touch target in the Apple, Material and WCAG 2.5.5 guidance.
- * `sm` is intentionally still 36px tall but pairs with `.tap-target`, which
- * expands the *hit* area without enlarging the visual control.
+ * The three surfaces a control can sit on, and nothing else.
+ *
+ * `primary` is the one green action on a screen. `secondary` is a hairline
+ * outline for the second option. `quiet` is text-only for tertiary actions
+ * (a "see all" link, a cancel). `danger` exists only inside destructive
+ * confirmations.
+ *
+ * No gradient, no shadow-on-hover, no scale-up on hover: Emil's gate says a
+ * control pressed dozens of times a day gets *feedback* (a colour shift and a
+ * 0.98 press), not choreography. The hover colour is darker, never lighter —
+ * a lighter green under white text loses contrast exactly when the pointer is
+ * on it.
  */
-const SIZES: Record<Size, string> = {
-  sm: 'min-h-9 gap-1.5 rounded-lg px-3 text-fluid-xs',
-  md: 'min-h-11 gap-2 rounded-xl px-4 text-fluid-sm',
-  lg: 'min-h-12 gap-2 rounded-xl px-6 text-fluid-base',
+const VARIANT: Record<Variant, string> = {
+  primary:
+    'bg-brand-700 text-white hover:bg-brand-800 active:bg-brand-900 disabled:bg-brand-200 disabled:text-brand-700',
+  secondary:
+    'border border-line bg-paper text-ink hover:border-brand-300 hover:bg-brand-50 disabled:opacity-50 dark:border-night-line dark:bg-night-soft dark:text-white dark:hover:border-brand-700 dark:hover:bg-night',
+  quiet:
+    'text-brand-700 hover:bg-brand-50 active:bg-brand-100 dark:text-brand-300 dark:hover:bg-night-soft disabled:opacity-50',
+  danger:
+    'bg-danger-600 text-white hover:bg-danger-700 active:bg-danger-700 disabled:opacity-50',
 };
 
-interface BaseProps {
+/** 44px at md and up; sm is 36px but always pairs with `.tap`. */
+const SIZE: Record<Size, string> = {
+  sm: 'min-h-9 gap-1.5 rounded-sm px-3 text-2xs',
+  md: 'min-h-11 gap-2 rounded-md px-4 text-sm',
+  lg: 'min-h-12 gap-2 rounded-md px-6 text-base',
+};
+
+interface Props {
   variant?: Variant;
   size?: Size;
   icon?: LucideIcon;
-  iconPosition?: 'start' | 'end';
+  iconEnd?: LucideIcon;
   loading?: boolean;
-  fullWidth?: boolean;
+  full?: boolean;
   children?: ReactNode;
   className?: string;
-}
-
-export interface ButtonProps
-  extends BaseProps,
-    Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children' | 'className'> {
-  /** Render as a router link while keeping the button's appearance. */
+  /** Renders a router link wearing the button's surface. */
   to?: string;
 }
 
-/**
- * The single button used across the app.
- *
- * It guarantees three things that were previously inconsistent: a large enough
- * touch target, a visible focus ring, and a loading state that keeps the
- * control's width stable so the layout does not jump.
- */
+type NativeProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children' | 'className'>;
+
+export type ButtonProps = Props & NativeProps;
+
+const BASE = cn(
+  'inline-flex select-none items-center justify-center font-bold',
+  'transition-[background-color,border-color,color,box-shadow] duration-[var(--dur-state)] ease-[var(--ease-out)]',
+  'active:scale-[0.98] disabled:active:scale-100 motion-reduce:active:scale-100',
+  'disabled:cursor-not-allowed',
+);
+
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
-  {
-    variant = 'primary',
-    size = 'md',
-    icon: Icon,
-    iconPosition = 'start',
-    loading = false,
-    fullWidth = false,
-    children,
-    className,
-    disabled,
-    to,
-    type = 'button',
-    ...rest
-  },
+  { variant = 'primary', size = 'md', icon: Icon, iconEnd: IconEnd, loading, full, children, className, to, type = 'button', disabled, ...rest },
   ref,
 ) {
-  const classes = cn(
-    /* `transition` (the shorthand class) animates `all`; name the two
-       properties that actually change, on the shared ease-out curve. */
-    'inline-flex items-center justify-center font-bold transition-[background-color,border-color,color,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)]',
-    'active:scale-[0.97]',
-    'disabled:cursor-not-allowed disabled:opacity-70 disabled:active:scale-100',
-    VARIANTS[variant],
-    SIZES[size],
-    fullWidth && 'w-full',
-    className,
-  );
-
-  const iconSize = size === 'lg' ? 18 : 15;
-  const content = (
+  const classes = cn(BASE, VARIANT[variant], SIZE[size], full && 'w-full', className);
+  const glyph = size === 'lg' ? 18 : 15;
+  const body = (
     <>
       {loading ? (
-        <Loader2 size={iconSize} className="animate-spin" aria-hidden="true" />
+        <Loader2 size={glyph} aria-hidden="true" className="animate-spin" />
       ) : (
-        Icon && iconPosition === 'start' && <Icon size={iconSize} aria-hidden="true" />
+        Icon && <Icon size={glyph} aria-hidden="true" />
       )}
       {children}
-      {!loading && Icon && iconPosition === 'end' && <Icon size={iconSize} aria-hidden="true" />}
+      {IconEnd && !loading && <IconEnd size={glyph} aria-hidden="true" />}
     </>
   );
 
-  if (to && !disabled && !loading) {
+  if (to) {
     return (
-      <Link to={to} className={classes}>
-        {content}
+      <Link to={to} className={classes} aria-busy={loading || undefined}>
+        {body}
       </Link>
     );
   }
 
   return (
-    <button
-      ref={ref}
-      type={type}
-      disabled={disabled || loading}
-      // Screen readers should hear that work is in progress, not just see a spinner.
-      aria-busy={loading || undefined}
-      className={classes}
-      {...rest}
-    >
-      {content}
+    <button ref={ref} type={type} disabled={disabled || loading} className={classes} aria-busy={loading || undefined} {...rest}>
+      {body}
     </button>
   );
 });
 
 export default Button;
-
-export interface IconButtonProps
-  extends Omit<ButtonProps, 'children' | 'icon' | 'iconPosition'> {
-  icon: LucideIcon;
-  /** Required: an icon alone conveys nothing to a screen reader. */
-  label: string;
-}
-
-/**
- * An icon-only control. The visible box may be small, but `.tap-target`
- * guarantees the touch area is at least 44x44.
- */
-export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton(
-  { icon: Icon, label, variant = 'ghost', size = 'md', className, ...rest },
-  ref,
-) {
-  const box = size === 'sm' ? 'h-9 w-9' : size === 'lg' ? 'h-12 w-12' : 'h-11 w-11';
-  return (
-    <button
-      ref={ref}
-      type="button"
-      aria-label={label}
-      title={label}
-      className={cn(
-        'tap-target inline-flex shrink-0 items-center justify-center rounded-xl transition duration-150',
-        'active:scale-95',
-        'disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100',
-        VARIANTS[variant],
-        box,
-        className,
-      )}
-      {...rest}
-    >
-      <Icon size={size === 'sm' ? 16 : 18} aria-hidden="true" />
-    </button>
-  );
-});

@@ -1,203 +1,146 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Copy, Gift, Link2, Megaphone, WalletCards } from 'lucide-react';
-import toast from 'react-hot-toast';
+// frontend/src/pages/Affiliate.tsx
+
+import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Copy, Check, Share2 } from 'lucide-react';
 
 import { affiliateApi } from '../api/services';
 import { useAuthStore } from '../store/authStore';
-import type { AffiliateConversion, AffiliateProfile, FinancialLedgerEntry } from '@/types/commerce';
-import { formatPrice } from '../utils/formatPrice';
-import EmptyState from '../components/ui/EmptyState';
-import { copyText } from '../utils/copyText';
+import PageHead from '../components/shop/PageHead';
+import Button from '../components/ui/Button';
+import { Skeleton } from '../components/ui/Skeleton';
+import { money } from '../lib/price';
 
+/**
+ * «همکاری در فروش».
+ *
+ * Signed out → the offer, and a link to log in (nothing here can be done
+ * without an account). Signed in without a code → one button that creates the
+ * profile. Signed in with a code → the code, the link, and the conversions the
+ * API actually reports; no placeholder earnings.
+ */
 export default function Affiliate() {
-  const { isAuthenticated } = useAuthStore();
-  const [profile, setProfile] = useState<AffiliateProfile | null>(null);
-  const [conversions, setConversions] = useState<AffiliateConversion[]>([]);
-  const [ledger, setLedger] = useState<FinancialLedgerEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [joining, setJoining] = useState(false);
+  const user = useAuthStore((state) => state.user);
+  const queryClient = useQueryClient();
+  const [copied, setCopied] = useState(false);
 
-  const load = useCallback(async () => {
-    if (!isAuthenticated) return;
-    setLoading(true);
+  const { data, isLoading } = useQuery({
+    queryKey: ['affiliate', 'me'],
+    queryFn: async () => (await affiliateApi.me()).data,
+    enabled: Boolean(user),
+  });
+
+  const join = useMutation({
+    mutationFn: async () => affiliateApi.join(),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['affiliate', 'me'] }),
+  });
+
+  const profile = data?.profile ?? null;
+  const conversions = data?.conversions ?? [];
+  const referralLink = profile ? `${window.location.origin}/products?ref=${profile.code}` : '';
+
+  const copy = async () => {
     try {
-      const response = await affiliateApi.me();
-      setProfile(response.data.profile);
-      setConversions(response.data.conversions);
-      setLedger(response.data.ledger);
-    } finally {
-      setLoading(false);
-    }
-  }, [isAuthenticated]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  async function join() {
-    if (!isAuthenticated) {
-      toast.error('برای همکاری در فروش ابتدا وارد حساب کاربری شوید.');
-      return;
-    }
-    setJoining(true);
-    try {
-      const response = await affiliateApi.join();
-      setProfile(response.data.profile);
-      toast.success(response.data.message);
+      await navigator.clipboard.writeText(referralLink);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
     } catch {
-      // API client handles the message.
-    } finally {
-      setJoining(false);
+      setCopied(false);
     }
-  }
-
-  const referralUrl = useMemo(
-    () => (profile ? `${window.location.origin}/?ref=${profile.code}` : ''),
-    [profile],
-  );
-  async function copyReferral() {
-    try {
-      await copyText(referralUrl);
-      toast.success('لینک کپی شد.');
-    } catch {
-      toast.error('کپی لینک در این مرورگر ممکن نشد.');
-    }
-  }
-  const pending = ledger
-    .filter((entry) => entry.status === 'pending')
-    .reduce((sum, entry) => sum + entry.amount, 0);
-  const available = ledger
-    .filter((entry) => entry.status === 'available')
-    .reduce((sum, entry) => sum + entry.amount, 0);
+  };
 
   return (
-    <div className="mx-auto max-w-6xl px-[var(--page-gutter)] py-9">
-      <section className="rounded-3xl bg-gradient-to-l from-emerald-900 via-emerald-700 to-lime-600 p-8 text-white">
-        <p className="text-sm font-bold text-lime-200">همکاری در فروش شفاف</p>
-        <h1 className="mt-2 text-fluid-3xl font-extrabold">
-          لینک معرفی، تبدیل تأییدشده و کمیسیون قابل پیگیری
-        </h1>
-        <p className="mt-3 max-w-3xl leading-7 text-emerald-50">
-          کمیسیون فقط پس از پرداخت تأییدشده و طبق سیاست مصوب قابل تسویه می‌شود. کلیک یا سفارش لغوشده
-          سود قطعی ایجاد نمی‌کند.
-        </p>
+    <div className="shell flex flex-col gap-6 py-8">
+      <PageHead
+        title="همکاری در فروش"
+        lead="لینک اختصاصی محصولات را با کشاورزانی که می‌شناسی به اشتراک بگذار. هر خرید انجام‌شده از لینک تو، سهم کمیسیون دارد و در پیشخوان ثبت می‌شود."
+      />
+
+      <section className="rounded-lg border border-line bg-paper p-5 dark:border-night-line dark:bg-night-soft" aria-labelledby="how-it-works">
+        <h2 id="how-it-works" className="text-base font-extrabold text-ink dark:text-white">چطور کار می‌کند</h2>
+        <ol className="mt-3 grid gap-3 sm:grid-cols-3">
+          {[
+            ['لینک بساز', 'پس از عضویت، یک کد اختصاصی می‌گیری که به انتهای آدرس محصولات می‌چسبد.'],
+            ['اشتراک بگذار', 'لینک را در گروه کشاورزان، کانال یا پیام مستقیم بفرست.'],
+            ['کمیسیون بگیر', 'هر سفارش تکمیل‌شده در پیشخوان همین صفحه با مبلغ کمیسیون ثبت می‌شود.'],
+          ].map(([title, body], index) => (
+            <li key={title} className="rounded-md bg-brand-50/70 p-3 dark:bg-night">
+              <p className="text-2xs font-extrabold text-brand-800 dark:text-brand-300">{index + 1}. {title}</p>
+              <p className="mt-1 text-2xs leading-6 text-ink-soft dark:text-white/60">{body}</p>
+            </li>
+          ))}
+        </ol>
       </section>
-      {!isAuthenticated ? (
-        <section className="mt-7 rounded-3xl border border-amber-200 bg-amber-50 p-6 text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
-          برای ساخت لینک همکاری در فروش وارد حساب کاربری شوید.
-        </section>
-      ) : loading ? (
-        <p role="status" aria-busy="true" className="mt-7 text-slate-500">
-          در حال دریافت داشبورد همکاری...
-        </p>
+
+      {!user ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-paper px-5 py-4 dark:border-night-line dark:bg-night-soft">
+          <p className="text-xs font-bold text-ink dark:text-white">برای ساخت کد معرف، ابتدا وارد شوید.</p>
+          <Button to="/login" size="sm" variant="secondary">
+            ورود یا ثبت‌نام
+          </Button>
+        </div>
+      ) : isLoading ? (
+        <Skeleton className="h-32 rounded-lg" />
       ) : !profile ? (
-        <section className="mt-7 rounded-3xl border border-slate-100 bg-white p-7 shadow-sm dark:border-emerald-900 dark:bg-emerald-950">
-          <Gift className="text-emerald-600" size={30} />
-          <h2 className="mt-4 text-xl font-extrabold text-slate-800 dark:text-white">
-            شروع همکاری در فروش
-          </h2>
-          <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-500 dark:text-emerald-200">
-            پس از درخواست، حساب همکاری توسط تیم عملیات بررسی می‌شود. نرخ کمیسیون و شرایط تسویه در
-            پنل و قرارداد مشخص خواهد بود.
-          </p>
-          <button
-            type="button"
-            onClick={join}
-            disabled={joining}
-            className="mt-5 rounded-xl bg-emerald-700 px-5 py-3 text-sm font-bold text-white disabled:opacity-50"
-          >
-            {joining ? 'در حال ثبت...' : 'ثبت درخواست همکاری'}
-          </button>
-        </section>
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-paper px-5 py-4 dark:border-night-line dark:bg-night-soft">
+          <div>
+            <p className="text-xs font-extrabold text-ink dark:text-white">هنوز کد معرف نداری</p>
+            <p className="mt-0.5 text-2xs text-ink-mute dark:text-white/50">عضویت یک‌مرحله‌ای است؛ کد بلافاصله صادر می‌شود.</p>
+          </div>
+          <Button size="sm" onClick={() => join.mutate()} loading={join.isPending}>
+            ساخت کد معرف
+          </Button>
+        </div>
       ) : (
         <>
-          <section className="mt-7 grid gap-4 md:grid-cols-3">
-            <Stat icon={Link2} label="کد معرفی" value={profile.code} />
-            <Stat icon={WalletCards} label="در انتظار تأیید" value={formatPrice(pending)} />
-            <Stat icon={Gift} label="قابل تسویه" value={formatPrice(available)} />
-          </section>
-          <section className="mt-6 rounded-3xl border border-slate-100 bg-white p-6 shadow-sm dark:border-emerald-900 dark:bg-emerald-950">
-            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-              <div>
-                <h2 className="text-xl font-extrabold text-slate-800 dark:text-white">
-                  لینک همکاری شما
-                </h2>
-                <p className="mt-1 text-sm text-slate-500 dark:text-emerald-200">
-                  وضعیت حساب: {profile.status_label} · نرخ فعلی: {profile.commission_rate}٪
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={copyReferral}
-                className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 px-4 py-2.5 text-sm font-bold text-emerald-700 dark:border-emerald-800 dark:text-lime-300"
+          <section className="rounded-lg border border-brand-200 bg-brand-50 p-5 dark:border-brand-800 dark:bg-night-soft" aria-labelledby="your-code">
+            <h2 id="your-code" className="text-xs font-extrabold text-brand-900 dark:text-brand-100">کد معرف شما</h2>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <code
+                dir="ltr"
+                className="dateline rounded-md border border-brand-300 bg-paper px-3 py-2 text-sm font-extrabold tracking-wider text-ink dark:border-brand-700 dark:bg-night dark:text-white"
               >
-                <Copy size={16} />
-                کپی لینک
-              </button>
+                {profile.code}
+              </code>
+              <Button size="sm" variant="secondary" onClick={copy} icon={copied ? Check : Copy}>
+                {copied ? 'کپی شد' : 'کپی لینک'}
+              </Button>
+              <span className="text-2xs text-ink-mute dark:text-white/50">
+                کمیسیون {profile.commission_rate}٪ · وضعیت {profile.status_label}
+              </span>
             </div>
-            <code
-              className="mt-4 block overflow-x-auto rounded-xl bg-slate-50 p-3 text-xs text-slate-700 dark:bg-emerald-900/40 dark:text-emerald-100"
-              dir="ltr"
-            >
-              {referralUrl}
-            </code>
-            {profile.status !== 'active' && (
-              <p className="mt-4 rounded-xl bg-amber-50 p-3 text-xs leading-6 text-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
-                کد ایجاد شده است اما تا تأیید تیم عملیات، تبدیل جدید برای پرداخت کمیسیون پذیرفته
-                نمی‌شود.
-              </p>
-            )}
+            <p dir="ltr" className="mt-2 truncate text-2xs text-ink-soft dark:text-white/55">
+              {referralLink}
+            </p>
           </section>
-          <section className="mt-6 rounded-3xl border border-slate-100 bg-white p-6 shadow-sm dark:border-emerald-900 dark:bg-emerald-950">
-            <div className="flex items-center gap-2">
-              <Megaphone className="text-emerald-600" />
-              <h2 className="text-xl font-extrabold text-slate-800 dark:text-white">
-                تبدیل‌ها و کمیسیون
-              </h2>
-            </div>
-            {conversions.length ? (
-              <div className="mt-4 space-y-3">
-                {conversions.map((conversion) => (
-                  <div
-                    key={conversion.id}
-                    className="flex flex-wrap justify-between gap-3 rounded-2xl bg-slate-50 p-4 text-sm dark:bg-emerald-900/40"
-                  >
-                    <span dir="ltr" className="font-bold">
-                      {conversion.order_code}
-                    </span>
-                    <span>{conversion.status_label}</span>
-                    <strong className="text-emerald-700 dark:text-lime-300">
-                      {formatPrice(conversion.commission_amount)}
-                    </strong>
-                  </div>
-                ))}
-              </div>
+
+          <section aria-labelledby="conversions">
+            <h2 id="conversions" className="text-base font-extrabold text-ink dark:text-white">سفارش‌های معرفی‌شده</h2>
+            {conversions.length === 0 ? (
+              <p className="mt-2 flex items-center gap-2 rounded-lg border border-dashed border-line px-4 py-6 text-xs text-ink-mute dark:border-night-line dark:text-white/50">
+                <Share2 size={15} aria-hidden="true" />
+                هنوز سفارشی از لینک تو ثبت نشده. لینک را جایی بفرست که کشاورز واقعی می‌خواند.
+              </p>
             ) : (
-              <EmptyState
-                compact
-                icon={Megaphone}
-                title="هنوز تبدیل تأییدشده‌ای ندارید"
-                description="هر بازدید از لینک شما ثبت می‌شود، اما کمیسیون فقط پس از پرداخت تأییدشدهٔ سفارش قابل تسویه است."
-                className="mt-4 border-0 bg-slate-50 dark:bg-emerald-900/40"
-              />
+              <ul className="mt-2 divide-y divide-line border-y border-line dark:divide-night-line dark:border-night-line">
+                {conversions.map((conversion) => (
+                  <li key={conversion.id} className="flex items-center justify-between gap-3 py-3 text-xs">
+                    <span className="dateline font-extrabold text-ink dark:text-white">{conversion.order_code}</span>
+                    <span className="text-ink-mute dark:text-white/50">{conversion.status_label}</span>
+                    <span className="dateline font-extrabold text-brand-700 dark:text-brand-300">{money(conversion.commission_amount)}</span>
+                  </li>
+                ))}
+              </ul>
             )}
           </section>
         </>
       )}
+
+      {join.isError && (
+        <p role="alert" className="text-2xs font-bold text-danger-700">
+          ساخت کد انجام نشد. دوباره تلاش کنید.
+        </p>
+      )}
     </div>
-  );
-}
-function Stat({ icon: Icon, label, value }: { icon: typeof Gift; label: string; value: string }) {
-  return (
-    <article className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm dark:border-emerald-900 dark:bg-emerald-950">
-      <Icon size={21} className="text-emerald-600" />
-      <p
-        className="mt-4 text-lg font-extrabold text-slate-800 dark:text-white"
-        dir={label === 'کد معرفی' ? 'ltr' : undefined}
-      >
-        {value}
-      </p>
-      <p className="mt-1 text-xs text-slate-500 dark:text-emerald-200">{label}</p>
-    </article>
   );
 }

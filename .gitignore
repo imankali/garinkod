@@ -103,6 +103,7 @@ celerybeat.pid
 .env.test.local
 .env.production.local
 .venv
+.venv-backend/
 env/
 venv/
 ENV/

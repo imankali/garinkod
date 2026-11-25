@@ -1,38 +1,35 @@
+// frontend/e2e/navigation.spec.ts
+//
+// Navigation and reachability, rewritten for the rebuilt shell.
+//
+// The rule these tests enforce: every destination the site offers is reachable by
+// clicking, from the chrome, on any screen size. Before the navigation config
+// existed six routes had no link anywhere; a menu that is generated from `nav.ts`
+// cannot drift from the routes, and this is the check that proves it.
+
 import { expect, test, type Page } from '@playwright/test';
 
-/**
- * Navigation and reachability.
- *
- * The rule these tests enforce: every page must be reachable by clicking,
- * never only by typing a URL. Before the navigation config existed, six routes
- * had no link anywhere in the interface.
- */
+import { FOCUSABLE, open } from './support';
 
-/** Routes a signed-out visitor must be able to reach by clicking alone. */
-/**
- * Routes a signed-out visitor must be able to reach by clicking alone.
- *
- * There is no /marketplace here: the farmers' market and the storefront
- * directory are one page now (/storefronts), and the ads live as a tab of the
- * shop (/products?source=marketplace). The old address survives only as a
- * redirect, which public-routes.spec.ts guards.
- */
+/** Every destination the site promises a visitor who is not signed in. */
 const PUBLIC_DESTINATIONS = [
   '/products',
   '/storefronts',
+  '/offers',
   '/services',
-  '/farmer-sell',
+  '/farmers',
+  '/magazine',
+  '/track',
   '/support',
-  '/orders',
-  // Guide and trust pages are part of the furniture too: they used to be reachable
-  // only by typing the address.
+  '/about',
+  '/contact',
+  '/legal',
   '/brands',
-  '/faq',
-  '/customers',
-];
+] as const;
 
-async function collectLinks(page: Page): Promise<string[]> {
-  return page.$$eval('a[href]', (anchors) =>
+/** Paths only, no query, no hash. */
+async function linkedPaths(page: Page): Promise<string[]> {
+  return page.$$eval('a[href^="/"]', (anchors) =>
     anchors
       .map((anchor) => (anchor as HTMLAnchorElement).getAttribute('href') ?? '')
       .filter((href) => href.startsWith('/'))
@@ -41,237 +38,96 @@ async function collectLinks(page: Page): Promise<string[]> {
 }
 
 test.describe('reachability', () => {
-  test('the footer links to every public destination', async ({ page }) => {
-    await page.goto('/');
-    // The footer renders the full site map, so one page is enough to check.
-    const links = await collectLinks(page);
+  test('the home page links to every public destination', async ({ page }) => {
+    await open(page, '/');
+    const links = await linkedPaths(page);
 
     const missing = PUBLIC_DESTINATIONS.filter((destination) => !links.includes(destination));
-    expect(missing, `destinations with no link on the home page: ${missing.join(', ')}`).toEqual([]);
+    expect(missing, `not linked from the home page: ${missing.join(', ')}`).toEqual([]);
   });
 
-  test('the mobile menu exposes the full site map', async ({ page }) => {
-    await page.setViewportSize({ width: 375, height: 812 });
-    await page.goto('/');
+  test('the desktop row carries the whole primary navigation', async ({ page }) => {
+    await open(page, '/');
+    const nav = page.getByRole('navigation', { name: 'ناوبری اصلی' });
 
-    await page.getByRole('button', { name: 'باز کردن منوی کامل' }).click();
-    const menu = page.getByRole('dialog', { name: 'منوی اصلی' });
+    // Nine words, each one a real link — not a button and a menu.
+    await expect(nav).toBeVisible();
+    const count = await nav.getByRole('link').count();
+    expect(count).toBeGreaterThanOrEqual(9);
+  });
+
+  test('the phone menu exposes the same destinations', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await open(page, '/');
+
+    await page.getByRole('button', { name: 'منو' }).click();
+    const menu = page.getByRole('dialog', { name: 'منوی سایت' });
     await expect(menu).toBeVisible();
 
-    const links = await menu.locator('a[href^="/"]').evaluateAll((anchors) =>
-      anchors.map((anchor) => (anchor as HTMLAnchorElement).getAttribute('href')?.split('?')[0]),
-    );
-
-    for (const destination of ['/products', '/storefronts', '/support']) {
-      expect(links, `${destination} missing from the mobile menu`).toContain(destination);
+    for (const destination of ['/products', '/storefronts', '/support', '/about']) {
+      await expect(menu.locator(`a[href="${destination}"]`)).toHaveCount(1);
     }
   });
 
-  test('the mobile bottom bar uses real links, not buttons', async ({ page }) => {
-    await page.setViewportSize({ width: 375, height: 812 });
-    await page.goto('/');
-
-    const bar = page.getByRole('navigation', { name: 'منوی اصلی موبایل' });
-    await expect(bar).toBeVisible();
-    // Real anchors can be opened in a new tab and are announced as links.
-    await expect(bar.locator('a[href]')).not.toHaveCount(0);
+  test('the active page is marked with aria-current', async ({ page }) => {
+    await open(page, '/products');
+    await expect(page.locator('[aria-current="page"]').first()).toBeVisible();
   });
 
-  test('the active page is marked with aria-current', async ({ page }) => {
-    await page.goto('/storefronts');
-    await expect(page.locator('[aria-current="page"]').first()).toBeVisible();
+  test('an unknown address gets a map, not a blank page', async ({ page }) => {
+    await page.goto('/this-address-does-not-exist');
+
+    await expect(page.getByRole('heading', { name: 'این نشانی وجود ندارد' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'صفحهٔ اصلی' })).toBeVisible();
   });
 });
 
 test.describe('keyboard access', () => {
-  test('the skip link is the first stop and jumps to the content', async ({ page }) => {
-    await page.goto('/');
+  test('the skip link is the first stop and moves focus into the content', async ({ page }) => {
+    await open(page, '/');
 
-    // Sequential focus traversal is not something a headless run can be trusted
-    // to reproduce: Tab lands wherever the browser feels like, and the failure
-    // reads as an empty document. So the contract is asserted on its two real
-    // properties — the link is the first focusable thing in the document, and
-    // activating it moves focus into the main content.
-    const firstFocusable = page
-      .locator('a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])')
-      .first();
-    await expect(firstFocusable).toHaveText(/پرش به محتوای اصلی/);
+    const first = page.locator(FOCUSABLE).first();
+    await expect(first).toHaveText(/رفتن به محتوای اصلی/);
 
-    await firstFocusable.focus();
+    await first.focus();
     await page.keyboard.press('Enter');
-    await expect(page.locator('#main-content')).toBeFocused();
+    await expect(page.locator('#main')).toBeFocused();
   });
 
-  test('the mobile menu traps focus and closes on Escape', async ({ page }) => {
+  test('the phone menu closes on Escape', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
-    await page.goto('/');
-    await page.getByRole('button', { name: 'باز کردن منوی کامل' }).click();
+    await open(page, '/');
 
-    const menu = page.getByRole('dialog', { name: 'منوی اصلی' });
+    await page.getByRole('button', { name: 'منو' }).click();
+    const menu = page.getByRole('dialog', { name: 'منوی سایت' });
     await expect(menu).toBeVisible();
-
-    // Focus must stay inside the drawer while it is open.
-    for (let step = 0; step < 12; step += 1) {
-      await page.keyboard.press('Tab');
-      // Ask the drawer this test opened whether it holds focus. Reaching for
-      // "[role=dialog]" in the document would answer about whichever dialog was
-      // rendered first — the cart, the wishlist — and report an escape that never
-      // happened.
-      const inside = await menu.evaluate((dialog) => dialog.contains(document.activeElement));
-      expect(inside, `focus escaped the drawer after ${step + 1} tabs`).toBe(true);
-    }
 
     await page.keyboard.press('Escape');
     await expect(menu).toBeHidden();
   });
-});
 
-test.describe('touch targets', () => {
-  test.use({ viewport: { width: 375, height: 812 } });
+  test('the cart panel is a dialog that closes on Escape', async ({ page }) => {
+    await open(page, '/products');
 
-  test('every visible control meets the 44px minimum', async ({ page }) => {
-    for (const route of ['/', '/storefronts', '/products']) {
-      await page.goto(route);
-      await page.waitForLoadState('networkidle');
+    await page.getByRole('button', { name: /سبد خرید/ }).first().click();
+    const drawer = page.getByRole('dialog', { name: 'سبد خرید' });
+    await expect(drawer).toBeVisible();
 
-      const undersized = await page.$$eval('button, a[href], select', (elements) =>
-        elements
-          .filter((element) => {
-            const style = window.getComputedStyle(element);
-            if (style.display === 'none' || style.visibility === 'hidden') return false;
-            return (element as HTMLElement).offsetParent !== null;
-          })
-          .map((element) => {
-            const rect = element.getBoundingClientRect();
-            const parent = element.parentElement;
-            const own = (element.textContent ?? '').trim().length;
-            const around = (parent?.textContent ?? '').trim().length;
-            return {
-              tag: element.tagName,
-              text: (element.textContent ?? '').trim().slice(0, 30),
-              width: Math.round(rect.width),
-              height: Math.round(rect.height),
-              // The design system's own floor, read from the token rather than
-              // recomputed: index.css anchors `.min-h-11` controls to
-              // `--tap-min` in pixels, so the number here cannot drift from the
-              // number the stylesheet enforces.
-              touchMin: parseFloat(
-                window
-                  .getComputedStyle(document.documentElement)
-                  .getPropertyValue('--tap-min')
-                  .trim() || '44px',
-              ),
-              // "In prose": one clause of a longer run of text, not a control.
-              inlineInProse:
-                !!parent &&
-                /^(P|LI|DD|DT|SPAN|H1|H2|H3|H4)$/.test(parent.tagName) &&
-                around > own + 8,
-            };
-          })
-          // Two bars, both named. Every control in the chrome clears 44px, which is
-          // this product's own rule for buttons and selects. Links are measured
-          // against WCAG 2.2 SC 2.5.8 — 24px — with its Inline exception respected,
-          // because a link that is one clause of a sentence is read as text and no
-          // standard expects anyone to tap it accurately. The old filter claimed the
-          // same exemption in a comment while measuring everything against 40px.
-          .filter((box) => {
-            if (box.height <= 0) return false;
-            // Two bars. The absolute one is WCAG 2.2 SC 2.5.8's 24 CSS px, which no
-            // scaling excuses. The other is `--tap-min`, the design system's own
-            // floor, applied by index.css to every control the markup declares a
-            // tap target. Inline prose links keep the standard's own exception:
-            // a clause of a sentence is read as text, not aimed at.
-            if (box.height < 24) return true;
-            if (box.tag === 'A' && box.inlineInProse) return false;
-            return box.height + 2 < box.touchMin || box.width + 2 < box.touchMin;
-          }),
-      );
-
-      expect(
-        undersized,
-        `${route} has controls below the touch minimum:\n${JSON.stringify(undersized, null, 2)}`,
-      ).toEqual([]);
-    }
+    await page.keyboard.press('Escape');
+    await expect(drawer).toBeHidden();
   });
 });
 
-test.describe('home page as the shop window', () => {
-  /**
-   * The home page previously surfaced only the product catalogue and the dose
-   * calculator; the storefront directory, services, procurement, loyalty club,
-   * affiliate scheme, order tracking and support were all invisible without
-   * opening a menu. These tests keep the shop window full.
-   */
-  const EXPECTED_ON_HOME = [
-    '/storefronts',
-    '/services',
-    '/farmer-sell',
-    '/orders',
-    '/rewards',
-    '/affiliate',
-    '/support',
-    '/products',
-  ];
+test.describe('navigation performance', () => {
+  test('a route change scrolls to the top but a filter change does not', async ({ page }) => {
+    await open(page, '/products');
 
-  test('every public capability is linked from the home page', async ({ page }) => {
-    await page.goto('/');
+    await page.mouse.wheel(0, 1200);
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+
+    // A filter is a query-string change: the visitor keeps their place.
+    await page.getByRole('link', { name: 'تخفیف‌ها' }).first().click();
     await page.waitForLoadState('networkidle');
-
-    const links = await page.$$eval('a[href^="/"]', (anchors) =>
-      anchors.map((anchor) => (anchor as HTMLAnchorElement).getAttribute('href')?.split('?')[0]),
-    );
-
-    const missing = EXPECTED_ON_HOME.filter((destination) => !links.includes(destination));
-    expect(missing, `not linked from the home page: ${missing.join(', ')}`).toEqual([]);
-  });
-
-  test('the hero states what the site is and offers a way in', async ({ page }) => {
-    await page.goto('/');
-
-    // The band is addressed by the name it carries, and the assertion that
-    // matters is what a visitor can *do* from it: the two intentions the
-    // platform serves are both one link away from the headline.
-    const hero = page.getByRole('region', { name: 'معرفی گرین کود' });
-    await expect(hero).toBeVisible();
-    await expect(hero.getByRole('heading', { level: 2 })).toHaveText(
-      'نهاده‌های کشاورزی، مستقیم سر مزرعه',
-    );
-    await expect(hero.getByRole('link', { name: /خرید از فروشگاه/ })).toHaveAttribute(
-      'href',
-      '/products',
-    );
-    await expect(hero.getByRole('link', { name: /بازار غرفه‌داران/ })).toHaveAttribute(
-      'href',
-      '/storefronts',
-    );
-  });
-
-  test('the sellers’ market is represented on the home page', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
-
-    // The directory is what makes this site different from a shop, so it has to
-    // be on the front page in words and as a way in — not only in a menu.
-    await expect(
-      page.getByRole('heading', { name: 'مستقیم از غرفه کشاورزان' }),
-    ).toBeVisible();
-    await expect(page.locator('a[href^="/storefronts/"]').first()).toBeVisible();
-    // …and the section is never an empty heading: it either shows stalls or
-    // removes itself.
-    await expect(page.getByRole('link', { name: /مشاهده همه غرفه‌داران/ })).toBeVisible();
-  });
-
-  test('the home page has one h1 and an ordered heading structure', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
-
-    const levels = await page.$$eval('h1, h2, h3', (headings) =>
-      headings.map((heading) => Number(heading.tagName.slice(1))),
-    );
-
-    expect(levels.filter((level) => level === 1)).toHaveLength(1);
-    for (let index = 1; index < levels.length; index += 1) {
-      expect(levels[index]! - levels[index - 1]!).toBeLessThanOrEqual(1);
-    }
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
   });
 });

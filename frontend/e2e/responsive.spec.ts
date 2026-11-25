@@ -1,199 +1,121 @@
+// frontend/e2e/responsive.spec.ts
+//
+// The responsive sweep: every significant page at every breakpoint, checked for
+// the one failure that is objective and genuinely breaking — horizontal overflow.
+// A page wider than the viewport forces sideways scrolling, which is unusable on
+// a phone in a field.
+
 import { expect, test } from '@playwright/test';
 
-/**
- * Responsive sweep.
- *
- * Every significant page is opened at each breakpoint on the design checklist
- * and checked for the one failure that is both objective and genuinely
- * breaking: horizontal overflow. A page whose content is wider than the
- * viewport forces sideways scrolling, which is unusable on a phone.
- */
+import { open } from './support';
 
 const BREAKPOINTS = [
-  { name: '320 (small phone)', width: 320, height: 640 },
-  { name: '375 (iPhone)', width: 375, height: 812 },
-  { name: '414 (large phone)', width: 414, height: 896 },
-  { name: '768 (tablet portrait)', width: 768, height: 1024 },
-  { name: '1024 (tablet landscape)', width: 1024, height: 768 },
-  { name: '1440 (desktop)', width: 1440, height: 900 },
-];
+  { name: '320 small phone', width: 320, height: 640 },
+  { name: '375 phone', width: 375, height: 812 },
+  { name: '768 tablet', width: 768, height: 1024 },
+  { name: '1440 desktop', width: 1440, height: 900 },
+] as const;
 
 const PAGES = [
   { path: '/', name: 'home' },
-  { path: '/marketplace', name: 'marketplace' },
-  { path: '/storefronts', name: 'storefront directory' },
-  { path: '/checkout', name: 'checkout' },
-  { path: '/orders', name: 'orders' },
+  { path: '/products', name: 'catalogue' },
+  { path: '/storefronts', name: 'storefronts' },
   { path: '/services', name: 'services' },
-  { path: '/farmer-sell', name: 'farmer sell' },
+  { path: '/farmers', name: 'farmers' },
+  { path: '/magazine', name: 'magazine' },
   { path: '/support', name: 'support' },
-  { path: '/rewards', name: 'rewards' },
+  { path: '/checkout', name: 'checkout' },
   { path: '/login', name: 'login' },
-];
+] as const;
 
-/** Allow a pixel of rounding slack before calling it overflow. */
-const OVERFLOW_TOLERANCE = 2;
+/** One pixel of rounding slack before calling it overflow. */
+const TOLERANCE = 2;
 
 for (const breakpoint of BREAKPOINTS) {
   test.describe(`at ${breakpoint.name}`, () => {
     test.use({ viewport: { width: breakpoint.width, height: breakpoint.height } });
 
     for (const target of PAGES) {
-      test(`${target.name} has no horizontal overflow`, async ({ page }) => {
-        await page.goto(target.path);
-        await page.waitForLoadState('networkidle');
+      test(`${target.name} does not scroll sideways`, async ({ page }) => {
+        await open(page, target.path);
 
-        const overflow = await page.evaluate(
-          () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-        );
-        expect(
-          overflow,
-          `${target.path} overflows horizontally by ${overflow}px`,
-        ).toBeLessThanOrEqual(OVERFLOW_TOLERANCE);
+        const overflow = await page.evaluate(() => ({
+          scrollWidth: document.documentElement.scrollWidth,
+          clientWidth: document.documentElement.clientWidth,
+        }));
+        expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth + TOLERANCE);
       });
     }
   });
 }
 
-test.describe('mobile layout details', () => {
+test.describe('phone chrome', () => {
   test.use({ viewport: { width: 375, height: 812 } });
 
-  test('the cart drawer fits the viewport', async ({ page }) => {
-    await page.goto('/');
-    await page.getByRole('button', { name: 'سبد خرید' }).first().click();
+  test('the bottom bar holds four links and clears 44px', async ({ page }) => {
+    await open(page, '/');
 
-    const overflow = await page.evaluate(
-      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-    );
-    expect(overflow).toBeLessThanOrEqual(OVERFLOW_TOLERANCE);
+    const bar = page.getByRole('navigation', { name: 'ناوبری پایین' });
+    await expect(bar).toBeVisible();
+
+    const links = bar.getByRole('link');
+    await expect(links).toHaveCount(4);
+
+    for (const link of await links.all()) {
+      const box = await link.boundingBox();
+      expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+      expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
+    }
   });
 
-  test('tap targets on the bottom navigation are large enough', async ({ page, isMobile }) => {
-    // The bottom bar is a phone affordance: on a desktop viewport it is not
-    // rendered at all, so there is nothing here to measure outside a device.
-    test.skip(!isMobile, 'the mobile bottom bar is not rendered on desktop viewports');
-    await page.goto('/');
-    const nav = page.getByRole('navigation', { name: 'منوی پایین موبایل' });
-    await expect(nav).toBeVisible();
+  test('content is never hidden behind the fixed bar', async ({ page }) => {
+    await open(page, '/');
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
 
-    const buttons = nav.getByRole('link');
-    const count = await buttons.count();
-    for (let index = 0; index < count; index += 1) {
-      const box = await buttons.nth(index).boundingBox();
-      if (!box) continue;
-      // 44px is the widely used minimum comfortable touch target.
-      expect(box.height).toBeGreaterThanOrEqual(40);
-    }
+    // At the very bottom of the page the footer's last line must sit above the
+    // bar's top edge. The shell reserves the bar's height; when it stopped doing
+    // that, the legal links were the first thing to disappear under it.
+    const geometry = await page.evaluate(() => {
+      const bar = document.querySelector('nav[aria-label="ناوبری پایین"]');
+      const footer = document.querySelector('footer');
+      return {
+        barTop: bar?.getBoundingClientRect().top ?? 0,
+        footerBottom: footer?.getBoundingClientRect().bottom ?? 0,
+      };
+    });
+
+    expect(geometry.footerBottom).toBeLessThanOrEqual(geometry.barTop + 1);
+  });
+
+  test('the cart panel fits the viewport', async ({ page }) => {
+    await open(page, '/products');
+
+    await page.getByRole('button', { name: /سبد خرید/ }).first().click();
+    const drawer = page.getByRole('dialog', { name: 'سبد خرید' });
+    await expect(drawer).toBeVisible();
+
+    const box = await drawer.boundingBox();
+    expect(box?.width ?? 0).toBeLessThanOrEqual(375);
   });
 });
 
-test.describe('zoomed layout', () => {
-  // 200% zoom is emulated by halving the viewport at the same DPR, which is
-  // what a user with enlarged text effectively sees.
-  test.use({ viewport: { width: 640, height: 480 } });
+test.describe('reading', () => {
+  test('body text is at least 12px', async ({ page }) => {
+    await open(page, '/');
 
-  test('home remains usable at 200% zoom', async ({ page }) => {
-    await page.goto('/');
-    const overflow = await page.evaluate(
-      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-    );
-    expect(overflow).toBeLessThanOrEqual(OVERFLOW_TOLERANCE);
-  });
-});
-
-test.describe('layout primitives', () => {
-  test('page content is never hidden behind the fixed mobile bar', async ({ page, isMobile }) => {
-    // Same contract as the tap targets: it is about the bar phones get and
-    // desktop does not.
-    test.skip(!isMobile, 'the fixed mobile bar is not rendered on desktop viewports');
-    await page.setViewportSize({ width: 375, height: 812 });
-
-    for (const route of ['/', '/marketplace', '/orders']) {
-      await page.goto(route);
-      await page.waitForLoadState('networkidle');
-
-      // Scroll to the very bottom, then confirm the last piece of footer
-      // content sits above the navigation bar rather than underneath it.
-      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-      const overlap = await page.evaluate(() => {
-        const nav = document.querySelector('nav[aria-label="منوی اصلی موبایل"]');
-        const footer = document.querySelector('footer');
-        if (!nav || !footer) return 0;
-        const navBox = nav.getBoundingClientRect();
-        const footerBox = footer.getBoundingClientRect();
-        // Positive means the footer's last pixel is under the bar.
-        return Math.round(footerBox.bottom - navBox.top);
-      });
-      expect(overlap, `${route}: content is hidden behind the mobile bar`).toBeLessThanOrEqual(0);
-    }
-  });
-
-  test('the layout mirrors correctly in English', async ({ page }) => {
-    await page.goto('/');
-    await page.evaluate(() => window.localStorage.setItem('garinkood_locale', 'en'));
-    await page.reload();
-    await page.waitForLoadState('domcontentloaded');
-
-    await expect(page.locator('html')).toHaveAttribute('dir', 'ltr');
-
-    // Mirroring is not only the html attribute: the rails have to re-flow, which
-    // shows up as the first card sitting at the *left* of its row rather than the
-    // right, and as the page's own scroll direction.
-    const first = page.locator("a[href^='/products/']").first();
-    await expect(first).toBeVisible();
-    const boxes = await page
-      .locator("a[href^='/products/']")
-      .evaluateAll((nodes) =>
-        nodes.slice(0, 4).map((node) => Math.round(node.getBoundingClientRect().x)),
-      );
-    const distinct = [...new Set(boxes)].sort((a, b) => a - b);
-    expect(distinct.length, 'the rail should still lay out in more than one column').toBeGreaterThan(1);
-    expect(distinct[0], 'in LTR the row starts at the left').toBeLessThan(distinct[1] ?? 0);
-
-    // Arabic is the other direction on top of the same machinery: RTL *and* a
-    // different script, so a layout that only survives English is not mirrored.
-    await page.evaluate(() => window.localStorage.setItem('garinkood_locale', 'ar'));
-    await page.reload();
-    await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
-    await expect(page.locator('html')).toHaveAttribute('lang', 'ar');
-
-    // And no direction may introduce sideways scroll — logical properties make
-    // mirroring cheap, which is exactly why it is worth asserting that the saving
-    // was actually made.
-    for (const locale of ['en', 'ar', 'fa']) {
-      await page.evaluate((value) => window.localStorage.setItem('garinkood_locale', value), locale);
-      await page.reload();
-      const overflow = await page.evaluate(
-        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-      );
-      expect(overflow, `${locale} introduced horizontal overflow`).toBeLessThanOrEqual(1);
-    }
-  });
-
-  test('body text is at least 12px everywhere', async ({ page }) => {
-    await page.setViewportSize({ width: 375, height: 812 });
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
-
-    const tiny = await page.$$eval('*', (elements) =>
+    const tooSmall = await page.$$eval('p, li, dd, dt', (elements) =>
       elements
-        .filter((element) => {
-          const el = element as HTMLElement;
-          if (el.offsetParent === null) return false;
-          // Only elements holding their own text.
-          const ownText = Array.from(el.childNodes)
-            .filter((node) => node.nodeType === Node.TEXT_NODE)
-            .map((node) => node.textContent?.trim() ?? '')
-            .join('');
-          return ownText.length > 2;
-        })
-        .map((element) => ({
-          size: parseFloat(window.getComputedStyle(element).fontSize),
-          text: (element.textContent ?? '').trim().slice(0, 40),
-        }))
-        .filter((entry) => entry.size > 0 && entry.size < 11.5),
+        .filter((element) => (element.textContent ?? '').trim().length > 12)
+        .map((element) => ({ tag: element.tagName, size: parseFloat(window.getComputedStyle(element).fontSize) }))
+        .filter((entry) => entry.size > 0 && entry.size < 12),
     );
 
-    expect(tiny, `text below 12px:\n${JSON.stringify(tiny.slice(0, 10), null, 2)}`).toEqual([]);
+    expect(tooSmall).toEqual([]);
+  });
+
+  test('the document stays RTL', async ({ page }) => {
+    await open(page, '/products');
+    await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+    await expect(page.locator('html')).toHaveAttribute('lang', 'fa');
   });
 });

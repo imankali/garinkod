@@ -7,23 +7,16 @@
     <meta name="author" content="گرین کود" />
 
     <!--
-      Everything below this point that describes *this route* — description,
-      robots, canonical, the og:/twitter: title/description/url — is owned by
-      `src/components/RouteSeo.tsx` and must not be repeated here.
-
-      react-helmet-async only de-duplicates tags it added itself, so a hardcoded
-      tag survives alongside the one the app appends. That is what produced two
-      `<meta name="robots">` on every page, and the pair disagreed: this file
-      said `index,follow` while RouteSeo said `noindex,nofollow` for /orders,
-      /profile, /checkout and the rest of the account routes. A crawler that
-      reads both is being told to index a page the site means to keep private,
-      and Playwright's strict mode caught the duplication before a crawler did.
+      Everything that describes *this route* — its title, its description, its
+      robots directive — is owned by the app: `useTitle` sets the document title
+      and the API serves each page's own copy. Do not add per-route meta tags
+      here.
 
       The tags that stay are the ones no route ever varies: the charset, the
       viewport, the theme colour, the author, the locale and site name, and the
-      two share images. `<title>` stays too — Helmet rewrites `document.title`
-      in place rather than appending a second element, and it is what a
-      JavaScript-less scraper sees.
+      two share images. `<title>` stays too — it is what a JavaScript-less
+      scraper sees, and React rewrites the element in place rather than
+      appending a second one.
     -->
 
     <meta property="og:locale" content="fa_IR" />

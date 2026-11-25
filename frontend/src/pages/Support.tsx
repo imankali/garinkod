@@ -1,64 +1,114 @@
-import { FormEvent, useMemo, useState } from "react";
-import { Link, useSearchParams } from 'react-router';
-import { AlertTriangle, MessageSquareHeart, Send, ShieldCheck } from "lucide-react";
-import toast from "react-hot-toast";
+// frontend/src/pages/Support.tsx
 
-import { trustApi } from "../api/services";
-import { useAuthStore, useIsStaffMember } from "../store/authStore";
+import { useQuery } from '@tanstack/react-query';
+import { Mail, MessageSquare, Phone } from 'lucide-react';
 
+import { siteInfoApi } from '../api/services';
+import PageHead from '../components/shop/PageHead';
+import { Skeleton } from '../components/ui/Skeleton';
+
+/**
+ * Support: how to reach a human, in the order most people need it.
+ *
+ * Phone first (the buyer with a delivery problem), then the message form link,
+ * then email (the buyer with a receipt question). The API's contact block is
+ * the only source of the numbers — a hardcoded phone on a support page is how
+ * a site ends up publishing a number nobody answers.
+ */
 export default function Support() {
-  const { isAuthenticated, user } = useAuthStore();
-  // The chat window is closed to staff (they staff it), so on this page the
-  // feedback form is their internal line — saying so avoids a dead end.
-  const isStaffMember = useIsStaffMember();
-  const [params] = useSearchParams();
-  const storefrontId = useMemo(() => Number(params.get("storefront") || 0), [params]);
-  const listingId = useMemo(() => Number(params.get("listing") || 0), [params]);
-  const [feedback, setFeedback] = useState({ kind: "suggestion" as "suggestion" | "criticism" | "consultation" | "other", subject: "", message: "", name: user?.first_name || "", email: user?.email || "" });
-  const [complaint, setComplaint] = useState({ subject: "", description: "" });
-  const [sendingFeedback, setSendingFeedback] = useState(false);
-  const [sendingComplaint, setSendingComplaint] = useState(false);
+  const { data, isLoading } = useQuery({
+    queryKey: ['site-contact'],
+    queryFn: async () => (await siteInfoApi.getContact()).data,
+    staleTime: 30 * 60 * 1000,
+  });
 
-  async function sendFeedback(event: FormEvent) {
-    event.preventDefault();
-    setSendingFeedback(true);
-    try {
-      await trustApi.feedback(feedback);
-      setFeedback({ ...feedback, subject: "", message: "" });
-      toast.success("بازخورد شما ثبت شد. سپاس از کمک به بهترشدن گرین کود.");
-    } catch {
-      // API client displays the error.
-    } finally { setSendingFeedback(false); }
-  }
+  return (
+    <div className="shell flex flex-col gap-6 py-8">
+      <PageHead
+        title="پشتیبانی"
+        lead="سفارش، موجودی، مرجوعی یا شکایت از یک غرفه — از هر کدام شروع کنید. پاسخ‌گویی در ساعات کاری، و هر پیام یک شمارهٔ پیگیری می‌گیرد."
+      />
 
-  async function sendComplaint(event: FormEvent) {
-    event.preventDefault();
-    if (!isAuthenticated) {
-      toast.error("برای ثبت شکایت از غرفه، ابتدا وارد حساب کاربری شوید.");
-      return;
-    }
-    if (!storefrontId) {
-      toast.error("لطفاً شکایت را از صفحه آگهی یا غرفه مربوطه آغاز کنید.");
-      return;
-    }
-    setSendingComplaint(true);
-    try {
-      await trustApi.complaint({ storefront: storefrontId, listing: listingId || undefined, ...complaint });
-      setComplaint({ subject: "", description: "" });
-      toast.success("شکایت ثبت شد و در صف رسیدگی قرار گرفت.");
-    } catch {
-      // API client displays the error.
-    } finally { setSendingComplaint(false); }
-  }
+      {isLoading ? (
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Skeleton className="h-32 rounded-lg" />
+          <Skeleton className="h-32 rounded-lg" />
+          <Skeleton className="h-32 rounded-lg" />
+        </div>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-3">
+          {[
+            {
+              icon: Phone,
+              title: 'تماس تلفنی',
+              body: 'برای مشکل فوری در تحویل یا تأیید موجودی.',
+              rows: (data?.phones ?? []).map((phone) => ({
+                label: 'تلفن',
+                value: phone,
+                href: `tel:${phone.replace(/[^\d+]/g, '')}`,
+              })),
+            },
+            {
+              icon: MessageSquare,
+              title: 'پیام و گفتگو',
+              body: 'برای شکایت از غرفه یا سؤال دربارهٔ یک آگهی، از صفحهٔ همان غرفه پیام بدهید.',
+              rows: [{ label: 'گفتگو با غرفه', value: 'از صفحهٔ غرفه', href: '/storefronts' }],
+            },
+            {
+              icon: Mail,
+              title: 'ایمیل',
+              body: 'برای اسناد، فاکتور رسمی و موضوع‌های غیرفوری.',
+              rows: (data?.emails ?? []).map((email) => ({
+                label: 'ایمیل',
+                value: email,
+                href: `mailto:${email}`,
+              })),
+            },
+          ].map(({ icon: Icon, title, body, rows }) => (
+            <section
+              key={title}
+              className="flex flex-col gap-2 rounded-lg border border-line bg-paper p-4 dark:border-night-line dark:bg-night-soft"
+              aria-label={title}
+            >
+              <Icon size={18} aria-hidden="true" className="text-brand-700 dark:text-brand-300" />
+              <h2 className="text-xs font-extrabold text-ink dark:text-white">{title}</h2>
+              <p className="text-2xs leading-6 text-ink-mute dark:text-white/50">{body}</p>
+              <ul className="mt-auto space-y-1 border-t border-line pt-2 dark:border-night-line">
+                {rows.length === 0 && <li className="text-2xs text-ink-mute dark:text-white/40">در حال به‌روزرسانی</li>}
+                {rows.map((row) => (
+                  <li key={`${row.label}-${row.value}`}>
+                    <a
+                      href={row.href}
+                      className="dateline inline-flex min-h-8 items-center gap-1.5 text-2xs font-bold text-brand-700 transition-colors hover:text-brand-900 dark:text-brand-300"
+                      dir={row.href.startsWith('tel:') || row.href.startsWith('mailto:') ? 'ltr' : undefined}
+                    >
+                      <span className="text-ink-mute dark:text-white/40">{row.label}:</span>
+                      {row.value}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
+      )}
 
-  return <div className="mx-auto max-w-5xl px-[var(--page-gutter)] py-9"><div className="rounded-3xl bg-gradient-to-l from-emerald-800 to-emerald-600 p-7 text-white"><p className="text-sm font-bold text-lime-200">صدای شما برای ما مهم است</p><h1 className="mt-2 text-fluid-3xl font-extrabold">پیشنهاد، انتقاد و رسیدگی منصفانه</h1>{isStaffMember && (
-          <p className="mt-3 flex items-start gap-2 rounded-2xl bg-white/15 p-3 text-fluid-xs leading-6 text-lime-100">
-            <ShieldCheck size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
-            <span>
-              شما عضو تیم گرین کود هستید؛ گفتگوی «پشتیبانی سایت» برای کشاورزها باز است و صف میز خودتان را در
-              پیام‌ها دارید. همین‌جا می‌توانید بازخورد یا ایراد داخلی را ثبت کنید تا در همان صف پیگیری شود.
-            </span>
-          </p>
-        )}
-        <p className="mt-3 max-w-2xl leading-7 text-emerald-50">بازخورد عمومی و شکایت از غرفه از هم جدا نگه‌داری می‌شوند تا هر مورد به تیم درست ارجاع و قابل پیگیری باشد. <Link to="/legal/complaints" className="font-bold text-lime-200 underline">رویه رسیدگی و مهلت‌ها</Link> را هم می‌توانید پیش از ثبت بخوانید.</p></div><div className="mt-7 grid gap-6 lg:grid-cols-2"><section className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm dark:border-emerald-900 dark:bg-emerald-950"><div className="flex items-center gap-3"><span className="rounded-xl bg-emerald-100 p-2 text-emerald-700 dark:bg-emerald-900 dark:text-lime-300"><MessageSquareHeart size={22} /></span><div><h2 className="font-extrabold text-slate-800 dark:text-white">بازخورد پلتفرم</h2><p className="text-xs text-slate-500 dark:text-emerald-200">پیشنهاد، انتقاد یا نیاز به راهنمایی</p></div></div><form onSubmit={sendFeedback} className="mt-5 space-y-4"><label className="block text-sm font-bold text-slate-700 dark:text-emerald-50">نوع بازخورد<select value={feedback.kind} onChange={(event) => setFeedback({ ...feedback, kind: event.target.value as typeof feedback.kind })} className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2.5 font-normal dark:border-emerald-700 dark:bg-emerald-900"><option value="suggestion">پیشنهاد</option><option value="criticism">انتقاد</option><option value="consultation">نیاز به راهنمایی</option><option value="other">سایر</option></select></label><label className="block text-sm font-bold text-slate-700 dark:text-emerald-50">موضوع<input required value={feedback.subject} onChange={(event) => setFeedback({ ...feedback, subject: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2.5 font-normal dark:border-emerald-700 dark:bg-emerald-900" /></label><label className="block text-sm font-bold text-slate-700 dark:text-emerald-50">پیام<textarea required value={feedback.message} onChange={(event) => setFeedback({ ...feedback, message: event.target.value })} rows={5} className="mt-2 w-full rounded-xl border border-slate-200 p-3 font-normal dark:border-emerald-700 dark:bg-emerald-900" /></label><button type="submit" disabled={sendingFeedback} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white disabled:opacity-50"><Send size={16} />{sendingFeedback ? "در حال ارسال..." : "ارسال بازخورد"}</button></form></section><section className="rounded-3xl border border-amber-200 bg-amber-50/60 p-6 shadow-sm dark:border-amber-900 dark:bg-amber-950/30"><div className="flex items-center gap-3"><span className="rounded-xl bg-amber-100 p-2 text-amber-700 dark:bg-amber-900 dark:text-amber-200"><AlertTriangle size={22} /></span><div><h2 className="font-extrabold text-amber-900 dark:text-amber-100">شکایت از غرفه</h2><p className="text-xs text-amber-800 dark:text-amber-200">برای رسیدگی منصفانه به معامله و فروشنده</p></div></div>{storefrontId ? <form onSubmit={sendComplaint} className="mt-5 space-y-4"><p className="rounded-xl bg-white/80 p-3 text-xs text-amber-800 dark:bg-amber-950/50 dark:text-amber-100"><ShieldCheck size={15} className="me-1 inline" />شکایت شما با شناسه غرفه {storefrontId} ثبت و فقط برای تیم رسیدگی قابل مشاهده است.</p><label className="block text-sm font-bold text-amber-900 dark:text-amber-100">موضوع<input required value={complaint.subject} onChange={(event) => setComplaint({ ...complaint, subject: event.target.value })} className="mt-2 w-full rounded-xl border border-amber-200 bg-white px-3 py-2.5 font-normal dark:border-amber-800 dark:bg-emerald-950" /></label><label className="block text-sm font-bold text-amber-900 dark:text-amber-100">شرح موضوع<textarea required value={complaint.description} onChange={(event) => setComplaint({ ...complaint, description: event.target.value })} rows={5} className="mt-2 w-full rounded-xl border border-amber-200 bg-white p-3 font-normal dark:border-amber-800 dark:bg-emerald-950" /></label><button type="submit" disabled={sendingComplaint} className="inline-flex items-center gap-2 rounded-xl bg-amber-600 px-5 py-3 text-sm font-bold text-white disabled:opacity-50">{sendingComplaint ? "در حال ثبت..." : "ثبت شکایت"}</button></form> : <div className="mt-5 rounded-2xl bg-white/80 p-5 text-sm leading-7 text-amber-800 dark:bg-amber-950/50 dark:text-amber-100">برای جلوگیری از شکایت‌های مبهم، ثبت شکایت باید از آگهی یا غرفهٔ مشخص آغاز شود. <Link to="/storefronts" className="inline-flex min-h-11 items-center font-bold underline">مشاهده بازار غرفه‌داران</Link></div>}</section></div></div>;
+      <section className="rounded-lg border border-line bg-paper p-5 dark:border-night-line dark:bg-night-soft" aria-labelledby="returns-title">
+        <h2 id="returns-title" className="text-base font-extrabold text-ink dark:text-white">پیش از تماس، این‌ها را بدانید</h2>
+        <dl className="mt-3 divide-y divide-line text-xs dark:divide-night-line">
+          {[
+            ['پیگیری سفارش', 'با کد سفارش و شمارهٔ همراه، در صفحهٔ پیگیری، وضعیت و اقلام را ببینید.'],
+            ['موجودی کالا', 'موجودی پیش از پرداخت تأیید می‌شود؛ اگر کالایی ناموجود باشد، سفارش اصلاح یا لغو می‌شود.'],
+            ['شکایت از غرفه', 'از صفحهٔ همان غرفه پیام ثبت کنید تا در صف رسیدگی قرار بگیرد و شمارهٔ پیگیری بگیرد.'],
+            ['مرجوعی', 'شرایط و مهلت بازگشت در صفحهٔ شرایط بازگشت کالا آمده است.'],
+          ].map(([term, value]) => (
+            <div key={term} className="grid gap-1 py-2.5 sm:grid-cols-[10rem_1fr]">
+              <dt className="font-extrabold text-ink dark:text-white">{term}</dt>
+              <dd className="leading-7 text-ink-soft dark:text-white/60">{value}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+    </div>
+  );
 }

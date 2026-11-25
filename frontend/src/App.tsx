@@ -1,764 +1,188 @@
 // frontend/src/App.tsx
-// فایل اصلی اپلیکیشن - نقطه اتصال همه کامپوننت‌ها
+//
+// The site map, in one file.
+//
+// Everything that paints the first screen is eager: the header, the footer,
+// the phone bar, the cart panel, and the home page. Routed pages below the fold
+// are lazy — a visitor who came for one product should not download the
+// checkout flow to look at it.
+//
+// Two structural decisions worth keeping:
+//   • `/checkout` is its own page even though the cart is a drawer. The cart
+//     panel is for editing a basket in place; checkout is a form with a
+//     back button, and it needs an address you can return to after a refresh.
+//   • `/legal/:slug` and `/magazine/:slug` are single routes with an optional
+//     parameter rather than two routes per section: the hub and the document
+//     share their header and their query, and splitting them would duplicate
+//     both.
 
-import { useEffect, useMemo, useRef, useState, lazy, Suspense } from "react";
-import { BrowserRouter, Navigate, Routes, Route } from 'react-router';
-import RequireLevel from "./components/RequireLevel";
-import { USER_LEVEL } from "./types";
-import { Toaster } from "react-hot-toast";
+import { lazy, Suspense, useEffect } from 'react';
+import { BrowserRouter, Route, Routes, useLocation } from 'react-router';
 
-// ========================================
-// Components
-// ========================================
-import Header from "./components/Header";
-import MobileBottomNav from "./components/MobileBottomNav";
-import SiteFooter from "./components/SiteFooter";
+import { useAuthStore } from './store/authStore';
+import { useCartStore } from './store/cartStore';
+import { applyThemeClass, useThemeStore } from './store/themeStore';
+import { captureReferral } from './lib/referral';
 
+import Header from './components/layout/Header';
+import Footer from './components/layout/Footer';
+import BottomNav from './components/layout/BottomNav';
+import CartDrawer from './components/shop/CartDrawer';
+import { Skeleton } from './components/ui/Skeleton';
+import Home from './pages/Home';
 
+const Shop = lazy(() => import('./pages/Shop'));
+const ProductDetail = lazy(() => import('./pages/ProductDetail'));
+const Landing = lazy(() => import('./pages/Landing'));
+const Brands = lazy(() => import('./pages/Brands'));
+const Offers = lazy(() => import('./pages/Offers'));
+const Storefronts = lazy(() => import('./pages/Storefronts'));
+const StorefrontPage = lazy(() => import('./pages/StorefrontPage'));
+const ListingDetail = lazy(() => import('./pages/ListingDetail'));
+const Services = lazy(() => import('./pages/Services'));
+const Farmers = lazy(() => import('./pages/Farmers'));
+const Magazine = lazy(() => import('./pages/Magazine'));
+const Article = lazy(() => import('./pages/Article'));
+const About = lazy(() => import('./pages/About'));
+const Contact = lazy(() => import('./pages/Contact'));
+const Support = lazy(() => import('./pages/Support'));
+const Legal = lazy(() => import('./pages/Legal'));
+const Affiliate = lazy(() => import('./pages/Affiliate'));
+const Auth = lazy(() => import('./pages/Auth'));
+const Account = lazy(() => import('./pages/Account'));
+const Orders = lazy(() => import('./pages/Orders'));
+const Checkout = lazy(() => import('./pages/Checkout'));
+const Track = lazy(() => import('./pages/Track'));
+const NotFound = lazy(() => import('./pages/NotFound'));
 
-import CompareBar from "./components/CompareBar";
-
-import CategorySections from "./components/home/CategorySections";
-import WeatherWidget from "./components/WeatherWidget";
-import InstallmentBanner from "./components/InstallmentBanner";
-import FlyToCart, { type FlyingItem } from "./components/FlyToCart";
-import GlobalMessengerButton from "./components/GlobalMessengerButton";
-import CropSelector from "./components/CropSelector";
-import AgriCalculator from "./components/AgriCalculator";
-import HeroSlider from "./components/home/HeroSlider";
-import StoryStrip from "./components/home/StoryStrip";
-import AmazingOffers from "./components/home/AmazingOffers";
-import BannerGrid from "./components/home/BannerGrid";
-import RankedRail from "./components/home/RankedRail";
-import HomeMagazine from "./components/home/HomeMagazine";
-import Reveal from "./components/motion/Reveal";
-import ServiceShortcuts from "./components/home/ServiceShortcuts";
-import CategoryGrid from "./components/home/CategoryGrid";
-import FeaturedStorefronts from "./components/home/FeaturedStorefronts";
-import StorefrontAds from "./components/home/StorefrontAds";
-
-import RouteSeo from "./components/RouteSeo";
-
-
-import PrivacyAnalytics from "./components/PrivacyAnalytics";
-import ScrollToTop from "./components/ScrollToTop";
-import BackToTopButton from "./components/BackToTopButton";
-import BackButton from "./components/BackButton";
-
-// ========================================
-// Pages (Lazy Loaded)
-// ========================================
-
-/*
- * The global overlays, loaded on their own.
- *
- * These seven are mounted on every page but invisible on first paint — a cart
- * drawer, a compare sheet, a sign-in dialog. They were eagerly imported, which
- * put all of their code in the entry chunk: a visitor who never opens the cart
- * still downloaded and parsed it, on a phone, before first paint.
- *
- * They stay MOUNTED rather than being gated behind their open flag, and that
- * choice is deliberate. Six of the seven render through AnimatePresence and own
- * their exit animation internally, so unmounting on close would cut the close
- * animation off mid-flight. The win here is a smaller entry chunk, not fewer
- * components; taking the second win means moving the exit animations into the
- * parent, which is a larger change than it is worth for the difference.
- *
- * `fallback={null}` is safe precisely because these are overlays: nothing is on
- * screen for the fallback to shift. The same treatment applied to an inline
- * content section — AgriCalculator, CropSelector — would move the page as the
- * chunk landed, which is why those two are left eager.
+/**
+ * Resets the scroll position on a route change — but not when only the query
+ * string changed, because that is a filter being applied and yanking the page
+ * back to the top would lose the visitor's place in the grid.
  */
-const CartDrawer = lazy(() => import("./components/CartDrawer"));
-const ProductDetailModal = lazy(() => import("./components/ProductDetailModal"));
-const WishlistModal = lazy(() => import("./components/WishlistModal"));
-const CompareModal = lazy(() => import("./components/CompareModal"));
-const LoginModal = lazy(() => import("./components/LoginModal"));
-const CookieJarNotice = lazy(() => import("./components/CookieJarNotice"));
-const DirectMessagesDrawer = lazy(() => import("./components/direct/DirectMessagesDrawer"));
-
-const Login = lazy(() => import("./pages/Login"));
-const Profile = lazy(() => import("./pages/Profile"));
-const ProductPage = lazy(() => import("./pages/ProductPage"));
-const ListingDetailPage = lazy(() => import("./pages/ListingDetailPage"));
-const Checkout = lazy(() => import("./pages/Checkout"));
-const Orders = lazy(() => import("./pages/Orders"));
-const OrderTrackingPage = lazy(() => import("./pages/OrderTrackingPage"));
-const ExportDashboard = lazy(() => import("./pages/ExportDashboard"));
-const Services = lazy(() => import("./pages/Services"));
-const FarmerSell = lazy(() => import("./pages/FarmerSell"));
-const StorefrontExplore = lazy(() => import("./pages/StorefrontExplore"));
-const Support = lazy(() => import("./pages/Support"));
-const Affiliate = lazy(() => import("./pages/Affiliate"));
-const Finance = lazy(() => import("./pages/Finance"));
-const Studio = lazy(() => import("./pages/Studio"));
-const Rewards = lazy(() => import("./pages/Rewards"));
-const Management = lazy(() => import("./pages/Management"));
-const Storefronts = lazy(() => import("./pages/Storefronts"));
-const StorefrontPage = lazy(() => import("./pages/StorefrontPage"));
-const Shop = lazy(() => import("./pages/Shop"));
-const Messages = lazy(() => import("./pages/Messages"));
-const Farmers = lazy(() => import("./pages/Farmers"));
-const Legal = lazy(() => import("./pages/Legal"));
-const LegalHub = lazy(() => import("./pages/LegalHub"));
-const CatalogLanding = lazy(() => import("./pages/CatalogLanding"));
-const Brands = lazy(() => import("./pages/Brands"));
-const Faq = lazy(() => import("./pages/Faq"));
-const Customers = lazy(() => import("./pages/Customers"));
-const Blog = lazy(() => import("./pages/Blog"));
-const ArticlePage = lazy(() => import("./pages/ArticlePage"));
-const About = lazy(() => import("./pages/About"));
-const Contact = lazy(() => import("./pages/Contact"));
-const Newsletter = lazy(() => import("./pages/Newsletter"));
-const ServiceDetail = lazy(() => import("./pages/ServiceDetail"));
-const SitePageView = lazy(() => import("./pages/SitePageView"));
-
-// ========================================
-// Stores
-// ========================================
-import { useCartStore } from "./store/cartStore";
-import { useAuthStore } from "./store/authStore";
-import { useWishlistStore } from "./store/wishlistStore";
-
-// ========================================
-// API Services
-// ========================================
-
-// ========================================
-// Hooks
-// ========================================
-import { useThemeStore, applyThemeClass } from "./store/themeStore";
-import { useTranslation } from "./i18n";
-import PageLoader from "./components/ui/PageLoader";
-
-// ========================================
-// Types
-// ========================================
-import type { MockProduct } from "./types";
-
-// Crop tags are not yet part of the product API (convertToMockProduct always
-// yields an empty list), so the crop selector stays hidden until they are.
-const HAS_CROP_TAGS = false;
-
-// ========================================
-// Loading Spinner Component
-// ========================================
-function LoadingSpinner() {
-  // Route-level suspense fallback: named for screen readers instead of an
-  // anonymous ring, and the same shape as ui/PageLoader.
-  return <PageLoader label="در حال آماده‌سازی صفحه…" className="py-12" />;
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+  }, [pathname]);
+  return null;
 }
 
-// ========================================
-// App Component
-// ========================================
-export default function App() {
-  // ========================================
-  // Dark Mode (shared store so the profile settings stay in sync)
-  // ========================================
+/**
+ * Opens the session the browser already holds.
+ *
+ * The access token lives in an HttpOnly cookie, so the app cannot *know* who is
+ * signed in until it asks: one request on mount decides whether the header shows
+ * «حساب من» or «ورود», and the cart is fetched after that answer, because a
+ * signed-out cart belongs to the session cookie rather than to an account.
+ */
+function Session() {
   const isDark = useThemeStore((state) => state.isDark);
-  const toggleDark = useThemeStore((state) => state.toggle);
-  const { dir } = useTranslation();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const isSessionChecked = useAuthStore((state) => state.isSessionChecked);
+  const initializeSession = useAuthStore((state) => state.initializeSession);
+  const fetchCart = useCartStore((state) => state.fetchCart);
+  const resetCart = useCartStore((state) => state.reset);
 
   useEffect(() => {
     applyThemeClass(isDark);
   }, [isDark]);
 
-  // ========================================
-  // UI State
-  // ========================================
-  const [cartOpen, setCartOpen] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [wishlistOpen, setWishlistOpen] = useState(false);
-  const [compareOpen, setCompareOpen] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<MockProduct | null>(null);
-  const [activeCrop, setActiveCrop] = useState<string | null>(null);
-  const [featuredOnly] = useState(() => new URLSearchParams(window.location.search).get("featured") === "true");
-
-  // ========================================
-  // Wishlist (shared store) & Compare
-  // ========================================
-  const wishlist = useWishlistStore((state) => state.wishlist);
-  const toggleWishlist = useWishlistStore((state) => state.toggle);
-  const removeFromWishlist = useWishlistStore((state) => state.remove);
-
-  const [compareItems, setCompareItems] = useState<MockProduct[]>([]);
-  const wishlistIds = useMemo(() => new Set(wishlist.map((p) => p.id)), [wishlist]);
-  const compareIds = useMemo(() => new Set(compareItems.map((p) => p.id)), [compareItems]);
-
-  // ========================================
-  // FlyToCart Animation
-  // ========================================
-  const [flyingItems, setFlyingItems] = useState<FlyingItem[]>([]);
-
-  // ========================================
-  // Stores
-  // ========================================
-  const { cart, fetchCart, addToCart: addToCartStore, reset: resetCart } = useCartStore();
-  const { isAuthenticated, isSessionChecked, fetchProfile, initializeSession } = useAuthStore();
-  const previousAuthenticated = useRef(isAuthenticated);
-
-  // Preserve a valid affiliate referral before navigation removes query parameters.
   useEffect(() => {
-    const referral = new URLSearchParams(window.location.search).get('ref')?.trim().toUpperCase();
-    if (referral && /^[A-Z0-9_-]{4,32}$/.test(referral)) {
-      localStorage.setItem('affiliate_referral_code', referral);
-    }
-  }, []);
-
-  // ========================================
-  // Establish browser session from the HttpOnly cookie once on app start.
-  // ========================================
-  useEffect(() => {
-    initializeSession();
+    captureReferral();
+    void initializeSession();
   }, [initializeSession]);
-
-  // ========================================
-  // Prefetch the heavy lazy routes during idle time after first paint.
-  // ========================================
-  // First navigation to /storefronts used to download the whole page chunk
-  // *after* the click, so the first visit stalled on the network while later
-  // visits were instant (the chunk was already cached). Prefetching at idle
-  // keeps the small entry chunk that code-splitting buys and still makes the
-  // first click feel like the second.
-  useEffect(() => {
-    const prefetch = () => {
-      void import("./pages/Storefronts");
-      void import("./pages/StorefrontPage");
-      void import("./pages/Shop");
-    };
-    const idleWindow = window as Window & {
-      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
-      cancelIdleCallback?: (handle: number) => void;
-    };
-    const id: number = idleWindow.requestIdleCallback
-      ? idleWindow.requestIdleCallback(prefetch, { timeout: 4000 })
-      : window.setTimeout(prefetch, 2500);
-    return () => {
-      if (idleWindow.cancelIdleCallback) idleWindow.cancelIdleCallback(id);
-      else window.clearTimeout(id);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (isSessionChecked && previousAuthenticated.current && !isAuthenticated) {
-      resetCart();
-    }
-    previousAuthenticated.current = isAuthenticated;
-  }, [isAuthenticated, isSessionChecked, resetCart]);
 
   useEffect(() => {
     if (!isSessionChecked) return;
-    fetchCart();
-    if (isAuthenticated) fetchProfile();
-  }, [fetchCart, isAuthenticated, isSessionChecked, fetchProfile]);
+    void fetchCart();
+  }, [isSessionChecked, isAuthenticated, fetchCart]);
 
-  // ========================================
-  // Handlers
-  // ========================================
-  function handleToggleWishlist(product: MockProduct) {
-    toggleWishlist(product);
-  }
+  // Signing out must not leave the previous account's basket on the screen.
+  useEffect(() => {
+    if (isSessionChecked && !isAuthenticated) resetCart();
+  }, [isAuthenticated, isSessionChecked, resetCart]);
 
-  function handleToggleCompare(product: MockProduct) {
-    setCompareItems((prev) => {
-      const exists = prev.find((p) => p.id === product.id);
-      if (exists) {
-        return prev.filter((p) => p.id !== product.id);
-      }
-      if (prev.length >= 3) {
-        return prev;
-      }
-      return [...prev, product];
-    });
-  }
+  return null;
+}
 
-  async function handleAddToCart(product: MockProduct, qty: number = 1, e?: React.MouseEvent) {
-    // FlyToCart Animation
-    if (e) {
-      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-      const newFlyingItem: FlyingItem = {
-        key: Date.now(),
-        image: product.image,
-        startX: rect.left + rect.width / 2,
-        startY: rect.top + rect.height / 2,
-      };
-      setFlyingItems((prev) => [...prev, newFlyingItem]);
-    }
+/** The page skeleton: a heading bar and a block of content, which is what most pages are. */
+function PageFallback() {
+  return (
+    <div className="shell flex flex-col gap-4 py-8" aria-busy="true" aria-live="polite">
+      <Skeleton className="h-7 w-56" />
+      <Skeleton className="h-4 w-full max-w-2xl" />
+      <Skeleton className="mt-2 h-64 w-full rounded-lg" />
+    </div>
+  );
+}
 
-    // Add to cart store
-    try {
-      await addToCartStore(product.id, qty);
-    } catch (error) {
-      console.error('Failed to add to cart:', error);
-    }
-  }
-
-  function handleRemoveFromCompare(id: number) {
-    setCompareItems((prev) => prev.filter((p) => p.id !== id));
-  }
-
-  function handleClearCompare() {
-    setCompareItems([]);
-  }
-
-  function handleFlyingComplete(key: number) {
-    setFlyingItems((prev) => prev.filter((item) => item.key !== key));
-  }
-
-  // ========================================
-  // Render
-  // ========================================
+export default function App() {
   return (
     <BrowserRouter>
       <ScrollToTop />
-      <RouteSeo />
-      <PrivacyAnalytics />
-      {/* ریشهٔ برنامه: بدون `overflow-x` — همان یک کلاس، کل هدر و پنل‌های sticky
-          را بی‌اثر می‌کرد، چون یک ظرف اسکرول جدید می‌ساخت. سرریز افقی را
-          `overflow-x: clip` روی html/body نگه می‌دارد (index.css). */}
-      <div
-        className={`min-h-dvh w-full ${isDark ? 'dark' : ''}`}
-        dir={dir}
+      <Session />
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:z-[60] focus:rounded-md focus:bg-brand-800 focus:px-4 focus:py-2 focus:text-sm focus:font-bold focus:text-white focus:outline-none"
       >
-        {/* ======================================== */}
-        {/* Toast Notifications */}
-        {/* ======================================== */}
-        <Toaster
-          position="top-center"
-          toastOptions={{
-            duration: 3000,
-            style: {
-              background: isDark ? '#052e22' : '#fff',
-              color: isDark ? '#fff' : '#1f2937',
-              borderRadius: '12px',
-              padding: '12px 16px',
-              fontSize: '14px',
-            },
-          }}
-        />
+        رفتن به محتوای اصلی
+      </a>
 
-        {/* ======================================== */}
-        {/* FlyToCart Animation */}
-        {/* ======================================== */}
-        <FlyToCart items={flyingItems} onComplete={handleFlyingComplete} />
+      <div className="flex min-h-dvh flex-col">
+        <Header />
 
-        {/* ======================================== */}
-        {/* Header */}
-        {/* ======================================== */}
-        {/*
-          Skip link: the first thing a keyboard or screen-reader user reaches,
-          letting them jump past the header and navigation straight to content.
-          It sits ahead of <Header> for exactly that reason — after the header it
-          would only be reachable by tabbing through everything it replaces.
-          (WCAG 2.4.1 Bypass Blocks.)
-        */}
-        <a href="#main-content" className="skip-link">
-          پرش به محتوای اصلی
-        </a>
-
-        <Header
-          cartOpen={cartOpen}
-          onCartOpenChange={setCartOpen}
-          mobileOpen={mobileOpen}
-          onMobileOpenChange={setMobileOpen}
-          isDark={isDark}
-          onToggleDark={toggleDark}
-          wishlistCount={wishlist.length}
-          onOpenWishlist={() => setWishlistOpen(true)}
-        />
-
-        {/* ======================================== */}
-        {/* Main Content */}
-        {/* pb-24 برای MobileBottomNav در موبایل */}
-        {/* lg:pb-8 برای دسکتاپ */}
-        {/* ======================================== */}
-        <main
-          id="main-content"
-          tabIndex={-1}
-          className="outline-none"
-          style={{ paddingBottom: 'var(--mobile-nav-clearance)' }}
-        >
-          <div className="mx-auto w-full max-w-7xl px-[var(--page-gutter)] pt-3">
-            <BackButton />
-          </div>
-          <Suspense fallback={<LoadingSpinner />}>
+        {/* `tabIndex={-1}` so the skip link can move focus here, not just scroll. */}
+        <main id="main" tabIndex={-1} className="flex-1 pb-20 outline-none lg:pb-0">
+          <Suspense fallback={<PageFallback />}>
             <Routes>
-              {/* ======================================== */}
-              {/* Home Page */}
-              {/* ======================================== */}
-              <Route
-                path="/"
-                element={
-                  <>
-                    <h1 className="sr-only">گرین کود، فروشگاه تخصصی نهاده‌های کشاورزی</h1>
+              <Route path="/" element={<Home />} />
 
-                    {/*
-                      Digikala-style shop-window order, rebuilt for this
-                      marketplace (each section scrolls into view via Reveal):
-                      1. Story rings — live storefront activity, the very
-                         first strip under the header.
-                      2. Hero slider — autoplaying brand slides with arrows,
-                         dots, swipe and pause-on-hover.
-                      3. خرید بر اساس دسته‌بندی — the circle row.
-                      4. پیشنهادهای شگفت‌انگیز — flash deals + countdown.
-                      5. Banner grid + seller campaign strip.
-                      6. پرفروش‌ترین کالاها — the best-seller rail.
-                      7. Storefronts — the marketplace, our differentiator.
-                      8. Services, weather/crop/installments — context.
-                      9. Catalogue rails + magazine + calculator.
-                    */}
-                    <StoryStrip />
+              {/* Catalogue */}
+              <Route path="/products" element={<Shop />} />
+              <Route path="/product/:slug" element={<ProductDetail />} />
+              <Route path="/catalog/:kind/:slug" element={<Landing />} />
+              <Route path="/brands" element={<Brands />} />
+              <Route path="/offers" element={<Offers />} />
 
-                    <div className="page-shell pt-4">
-                      <HeroSlider />
-                    </div>
+              {/* Marketplace */}
+              <Route path="/storefronts" element={<Storefronts />} />
+              <Route path="/storefront/:slug" element={<StorefrontPage />} />
+              <Route path="/listing/:slug" element={<ListingDetail />} />
 
-                    <Reveal>
-                      <CategoryGrid />
-                    </Reveal>
-
-                    <Reveal>
-                      <AmazingOffers />
-                    </Reveal>
-
-                    <Reveal>
-                      <BannerGrid />
-                    </Reveal>
-
-                    <Reveal>
-                      <RankedRail
-                        railId="best_sellers"
-                        title="پرفروش‌ترین کالاها"
-                        hint="بر اساس تعداد سفارش ثبت‌شده در گرین کود"
-                        params={{ ordering: "-sales_count" }}
-                        moreTo="/products?ordering=-sales_count"
-                      />
-                    </Reveal>
-
-                    <Reveal>
-                      <FeaturedStorefronts />
-                    </Reveal>
-
-                    <Reveal>
-                      <ServiceShortcuts />
-                    </Reveal>
-
-                    {/* Weather Widget */}
-                    <WeatherWidget />
-
-                    {/* Crop selector is shown only when the catalogue has verified crop tags. */}
-                    {HAS_CROP_TAGS && (
-                      <CropSelector activeCrop={activeCrop} onSelectCrop={setActiveCrop} />
-                    )}
-
-                    {/* Installment Banner */}
-                    <InstallmentBanner />
-
-                    {/* Exact merchandising order: fresh stock first (the
-                        discounted rail now lives in the flash-deal panel),
-                        four core departments, then the specialist ranges
-                        (آبیاری و گلخانه), then the magazine with the sellers'
-                        ads under it. */}
-                    <Reveal>
-                      <RankedRail
-                        railId="newest"
-                        title="تازه‌های انبار"
-                        hint="نهادهایی که در هفته‌های اخیر به گرین کود اضافه شده‌اند."
-                        params={{ ordering: "-publish" }}
-                        moreTo="/products?ordering=-publish"
-                      />
-                    </Reveal>
-                    <CategorySections
-                      group="primary"
-                      featuredOnly={featuredOnly}
-                      activeCrop={activeCrop}
-                      wishlistIds={wishlistIds}
-                      compareIds={compareIds}
-                      compareDisabled={compareItems.length >= 3}
-                      onToggleWishlist={handleToggleWishlist}
-                      onAddToCart={(product, event) => handleAddToCart(product, 1, event)}
-                      onQuickView={setSelectedProduct}
-                      onToggleCompare={handleToggleCompare}
-                    />
-                    <CategorySections
-                      group="secondary"
-                      featuredOnly={featuredOnly}
-                      activeCrop={activeCrop}
-                      wishlistIds={wishlistIds}
-                      compareIds={compareIds}
-                      compareDisabled={compareItems.length >= 3}
-                      onToggleWishlist={handleToggleWishlist}
-                      onAddToCart={(product, event) => handleAddToCart(product, 1, event)}
-                      onQuickView={setSelectedProduct}
-                      onToggleCompare={handleToggleCompare}
-                    />
-                    <Reveal>
-                      <div className="page-shell space-y-4 py-4">
-                        <RankedRail
-                          railId="best_rated"
-                          title="بیشترین امتیاز خریداران"
-                          hint="میانگین ستاره‌ها فقط از دیدگاه تأییدشده کشاورزان محاسبه می‌شود."
-                          params={{ ordering: "-avg_rating" }}
-                          moreTo="/products?ordering=-avg_rating"
-                        />
-                        <HomeMagazine />
-                      </div>
-                    </Reveal>
-
-                    {/* آگهی‌های غرفه‌داران — the sellers' own products, right
-                        after the magazine and before the calculator. */}
-                    <StorefrontAds />
-
-                    {/* AgriCalculator */}
-                    <AgriCalculator onAddToCart={handleAddToCart} />
-                  </>
-                }
-              />
-
-              {/* The standalone shop: only the site's own products, with
-                  categories, pagination and curated sections. */}
-              <Route
-                path="/products"
-                element={<Shop compareItems={compareItems} onToggleCompare={handleToggleCompare} />}
-              />
-
-              {/* ======================================== */}
-              {/* Platform routes */}
-              {/* ======================================== */}
-              <Route path="/checkout" element={<Checkout />} />
-              <Route path="/orders" element={<Orders />} />
-              {/* Shareable parcel tracking (logistics module): one buyer, one code. */}
-              <Route path="/tracking/:trackingCode" element={<OrderTrackingPage />} />
-              {/* The buyer's export desk (export module): own trade files + papers. */}
-              <Route path="/export" element={<ExportDashboard />} />
+              {/* Services and selling */}
               <Route path="/services" element={<Services />} />
-              <Route path="/services/:slug" element={<ServiceDetail />} />
+              <Route path="/farmers" element={<Farmers />} />
+              <Route path="/affiliate" element={<Affiliate />} />
 
-              {/* ======================================== */}
-              {/* Content marketing: blog, per-crop guides, editable pages */}
-              {/* ======================================== */}
-              <Route path="/blog" element={<Blog />} />
-              <Route path="/blog/:slug" element={<ArticlePage />} />
-              <Route path="/guides" element={<Blog />} />
-              <Route path="/guides/:slug" element={<ArticlePage />} />
+              {/* Reading */}
+              <Route path="/magazine" element={<Magazine />} />
+              <Route path="/magazine/:slug" element={<Article />} />
+
+              {/* Company */}
               <Route path="/about" element={<About />} />
               <Route path="/contact" element={<Contact />} />
-              <Route path="/newsletter" element={<Newsletter />} />
-              {/* Pages and campaign landings the team builds in the admin. */}
-              <Route path="/page/:slug" element={<SitePageView kind="page" />} />
-              <Route path="/offer/:slug" element={<SitePageView kind="landing" />} />
-              <Route path="/farmer-sell" element={<FarmerSell />} />
-              {/*
-                بازار کشاورزان and غرفه‌داران were two pages over the same
-                marketplace; only غرفه‌داران exists now, and the old address
-                redirects instead of 404-ing.
-              */}
-              <Route path="/marketplace" element={<Navigate to="/storefronts" replace />} />
-              {/* کاوش: every published stall post, Instagram-style. */}
-              <Route path="/explore" element={<StorefrontExplore />} />
               <Route path="/support" element={<Support />} />
-              {/* Legal documents. /legal is the hub and /legal/<slug> the canonical
-                  address of each document; the three older routes stay alive
-                  because they are printed in e-mails and saved in bookmarks, and
-                  render the same component (which declares the canonical URL). */}
-              {/* Catalogue landing pages: one component for the four kinds of
-                  addressable group, so a category, a subcategory, a brand and a
-                  tag all behave the same and all take their product grid from the
-                  filters the server returned for that page. */}
-              <Route path="/c/:slug" element={<CatalogLanding kind="category" />} />
-              <Route path="/sc/:slug" element={<CatalogLanding kind="subcategory" />} />
-              <Route path="/brand/:slug" element={<CatalogLanding kind="brand" />} />
-              <Route path="/brands" element={<Brands />} />
-              <Route path="/tag/:slug" element={<CatalogLanding kind="tag" />} />
-              <Route path="/faq" element={<Faq />} />
-              <Route path="/customers" element={<Customers />} />
-              <Route path="/legal" element={<LegalHub />} />
+              <Route path="/legal" element={<Legal />} />
               <Route path="/legal/:slug" element={<Legal />} />
-              <Route path="/privacy" element={<Legal />} />
-              <Route path="/terms" element={<Legal />} />
-              <Route path="/returns" element={<Legal />} />
-              <Route path="/affiliate" element={<Affiliate />} />
-              <Route path="/finance" element={<Finance />} />
-              <Route path="/rewards" element={<Rewards />} />
 
-              {/* Public storefront directory and profiles */}
-              <Route path="/storefronts" element={<Storefronts />} />
-              <Route path="/storefronts/:slug" element={<StorefrontPage />} />
+              {/* Account and orders */}
+              <Route path="/login" element={<Auth />} />
+              <Route path="/account" element={<Account />} />
+              <Route path="/orders" element={<Orders />} />
+              <Route path="/checkout" element={<Checkout />} />
+              <Route path="/track" element={<Track />} />
 
-              {/* Direct messages centre (buyers and storefront owners) */}
-              <Route path="/messages" element={<Messages />} />
-
-              {/* Consultant workbench: farmer dossiers, calendars and requests */}
-              <Route
-                path="/farmers"
-                element={
-                  <RequireLevel level={USER_LEVEL.MODERATOR}>
-                    <Farmers />
-                  </RequireLevel>
-                }
-              />
-
-              {/*
-                استودیو غرفه is a gate, not a level check. Someone who already
-                owns a stall belongs on their own غرفه page — that is where posts
-                and stories are published — and someone who does not gets the
-                ساخت غرفه form. Gating on level 2 would simply hide the way in for
-                the people the form is for.
-              */}
-              <Route path="/studio" element={<Studio />} />
-
-              {/*
-                The management console lives at /poshtiban and is restricted to
-                level 3 and above; /management is kept as an alias so existing
-                links and bookmarks keep working.
-              */}
-              <Route
-                path="/poshtiban"
-                element={
-                  <RequireLevel level={USER_LEVEL.MODERATOR}>
-                    <Management />
-                  </RequireLevel>
-                }
-              />
-              <Route path="/management" element={<Navigate to="/poshtiban" replace />} />
-
-              {/* ======================================== */}
-              {/* Crawlable product detail route */}
-              {/* ======================================== */}
-              <Route path="/products/:slug" element={<ProductPage />} />
-
-              {/* Full-page آگهی detail: the grid card click lands here, while
-                  «نمای سریع» stays an in-place dialog on the grid. */}
-              <Route path="/listing/:slug" element={<ListingDetailPage />} />
-
-              {/* ======================================== */}
-              {/* Login Page */}
-              {/* ======================================== */}
-              <Route path="/login" element={<Login />} />
-
-              {/* ======================================== */}
-              {/* Profile Page */}
-              {/* ======================================== */}
-              <Route path="/profile" element={<Profile />} />
-
-              {/* ======================================== */}
-              {/* 404 Page */}
-              {/* ======================================== */}
-              <Route
-                path="*"
-                element={
-                  <div className="flex min-h-[70dvh] items-center justify-center px-4">
-                    <div className="text-center">
-                      <div className="text-6xl mb-4">404</div>
-                      <p className="text-lg font-bold text-slate-700 dark:text-white">
-                        صفحه مورد نظر یافت نشد
-                      </p>
-                      <a
-                        href="/"
-                        className="mt-4 inline-block rounded-xl bg-emerald-600 px-6 py-3 text-sm font-bold text-white hover:bg-emerald-700 transition-colors"
-                      >
-                        بازگشت به صفحه اصلی
-                      </a>
-                    </div>
-                  </div>
-                }
-              />
+              <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
         </main>
 
-        {/* Site map footer — the fallback route to every destination. */}
-        <SiteFooter />
-
-        {/* ======================================== */}
-        {/* Mobile Bottom Nav */}
-        {/* ======================================== */}
-        <MobileBottomNav
-          cartCount={cart?.total_items || 0}
-          onOpenCart={() => setCartOpen(true)}
-        />
-
-        {/* ======================================== */}
-        {/* Direct Messages Drawer */}
-        {/* ======================================== */}
-        <Suspense fallback={null}><DirectMessagesDrawer /></Suspense>
-
-        {/* ======================================== */}
-        {/* Cart Drawer */}
-        {/* ======================================== */}
-        <Suspense fallback={null}>
-          <CartDrawer isOpen={cartOpen} onClose={() => setCartOpen(false)} />
-        </Suspense>
-
-        {/* ======================================== */}
-        {/* Product Detail Modal */}
-        {/* ======================================== */}
-        <Suspense fallback={null}>
-          <ProductDetailModal
-            product={selectedProduct}
-            onClose={() => setSelectedProduct(null)}
-            onAddToCart={handleAddToCart}
-            isWishlisted={selectedProduct ? wishlist.some((p) => p.id === selectedProduct.id) : false}
-            onToggleWishlist={handleToggleWishlist}
-          />
-        </Suspense>
-
-        {/* ======================================== */}
-        {/* Wishlist Modal */}
-        {/* فقط وقتی wishlistOpen true است render می‌شود */}
-        {/* ======================================== */}
-        {wishlistOpen && (
-          <Suspense fallback={null}>
-            <WishlistModal
-              wishlist={wishlist}
-              onClose={() => setWishlistOpen(false)}
-              onRemove={removeFromWishlist}
-              onAddToCart={handleAddToCart}
-            />
-          </Suspense>
-        )}
-
-        {/* ======================================== */}
-        {/* Compare Bar */}
-        {/* ======================================== */}
-        <CompareBar
-          items={compareItems}
-          onRemove={handleRemoveFromCompare}
-          onOpenCompare={() => setCompareOpen(true)}
-          onClear={handleClearCompare}
-        />
-
-        {/* ======================================== */}
-        {/* Compare Modal */}
-        {/* ======================================== */}
-        <Suspense fallback={null}>
-          <CompareModal
-            isOpen={compareOpen}
-            items={compareItems}
-            onClose={() => setCompareOpen(false)}
-            onAddToCart={(product) => handleAddToCart(product, 1)}
-          />
-        </Suspense>
-
-        {/* Global return-to-top control; it must yield to the cart sheet. */}
-        <BackToTopButton cartDrawerOpen={cartOpen} />
-
-        {/* ======================================== */}
-        {/* Consultation Button */}
-        {/* ======================================== */}
-        <GlobalMessengerButton cartDrawerOpen={cartOpen} />
-
-        {/* ======================================== */}
-        {/* Sign-in dialog used by every gated action (reviews, consult) */}
-        {/* ======================================== */}
-        <Suspense fallback={null}><LoginModal /></Suspense>
-
-        {/* ======================================== */}
-        {/* A sign-in the browser cannot keep is explained, never looped */}
-        {/* ======================================== */}
-        <Suspense fallback={null}><CookieJarNotice /></Suspense>
+        <Footer />
       </div>
+
+      <CartDrawer />
+      <BottomNav />
     </BrowserRouter>
   );
 }

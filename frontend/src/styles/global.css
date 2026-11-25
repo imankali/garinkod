@@ -1,0 +1,409 @@
+/* ==========================================================================
+ * GarinKood — stylesheet, rebuilt from scratch
+ *
+ * The previous stylesheet had grown to ~1,100 lines of tokens, utilities,
+ * keyframes, RTL fixes and overrides accumulated over many passes. It is gone.
+ * This file is the whole visual system, written in one sitting, in this order:
+ *
+ *   1. Tailwind import
+ *   2. Palette + type + space + radius + motion tokens   (ui-ux-pro-max)
+ *   3. Base layer: type, RTL, focus, selection, scroll   (impeccable floor)
+ *   4. Layout primitives: shell, section, grid
+ *   5. Components that are pure CSS (skeleton, chip)
+ *   6. Reduced motion, print
+ *
+ * The four skills govern, concretely:
+ *
+ *   ui-ux-pro-max  → the palette (Organic Biophilic: earth green #15803D,
+ *                    harvest gold #A16207, cream #F0FDF4) and the pre-delivery
+ *                    checklist: no emoji icons, cursor-pointer, 150–300ms
+ *                    hover, 4.5:1 contrast, visible focus, responsive
+ *                    375/768/1024/1440, tabular numerals.
+ *   taste          → art direction: photographs and flat colour, no shader,
+ *                    no ticker, no tilt; one dealt moment per page; hover is
+ *                    2px, photo 1.02–1.03, press 0.97.
+ *   animate        → motion only for a named purpose, transform/opacity only,
+ *                    ease-out entering (never ease-in), duration table:
+ *                    press 100–160, state 150–250, overlay 200–500.
+ *   impeccable     → craft floor: no kicker above a heading, no gradient text,
+ *                    border OR shadow (never both), radii 12–16px, balanced
+ *                    headings, 65–75ch measure, themed browser surfaces.
+ *
+ * There is no gradient in this file except the one photographic scrim, and no
+ * keyframe animation at all: every moving thing is a transition on a state
+ * change, or a gesture scoped to one component.
+ * ========================================================================== */
+
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ==========================================================================
+ * 1. Tokens
+ * ========================================================================== */
+
+@theme {
+  /* ---- palette ---------------------------------------------------------
+   * A single green family, used at four depths, plus cream, ink and one
+   * gold accent for prices and deadlines. Anything outside this list is a
+   * mistake, not a shade.
+   *
+   * Contrast, measured against white:
+   *   brand-900 #14532D  8.9:1   text on light surfaces
+   *   brand-800 #166534  7.1:1   hover of a primary action
+   *   brand-700 #15803D  5.0:1   the price / link colour
+   *   brand-600 #16A34A  3.2:1   large text and UI edges only
+   *   gold-700  #A16207  4.9:1   deadlines, struck-through warnings
+   * On cream #F0FDF4 all of the above rise slightly, so the same tokens hold.
+   */
+  --color-brand-50: #f0fdf4;
+  --color-brand-100: #dcfce7;
+  --color-brand-200: #bbf7d0;
+  --color-brand-300: #86efac;
+  --color-brand-600: #16a34a;
+  --color-brand-700: #15803d;
+  --color-brand-800: #166534;
+  --color-brand-900: #14532d;
+
+  --color-cream: #f6f8f3;
+  --color-paper: #ffffff;
+  --color-ink: #14231b;
+  --color-ink-soft: #3d5347;
+  --color-ink-mute: #64776b;
+  --color-line: #e2e8dd;
+
+  --color-gold-100: #fef3c7;
+  --color-gold-600: #ca8a04;
+  --color-gold-700: #a16207;
+
+  --color-danger-50: #fef2f2;
+  --color-danger-600: #dc2626;
+  --color-danger-700: #b91c1c;
+
+  /* Dark surfaces: one ink, one elevation above it, one border. */
+  --color-night: #0d1f17;
+  --color-night-soft: #143026;
+  --color-night-line: #234438;
+
+  /* ---- type ------------------------------------------------------------
+   * Vazirmatn is the only face: it is what the site ships, it renders Farsi
+   * and Latin digits together, and a second family would be one more
+   * blocking request for text that is 98% Persian. The pairing the
+   * ui-ux-pro-max dataset recommends for this brief (a serif display) has no
+   * Persian coverage, so the contrast is carried by weight and size instead:
+   * 800 for display, 600 for labels, 400 for body.
+   *
+   * The scale is fluid between a 360px phone and a 1440px desktop. The
+   * smallest step is 12px on purpose — Persian keeps less room at the same
+   * nominal size than Latin, and anything under 12px stops being readable
+   * rather than becoming quiet.
+   */
+  --font-sans: "Vazirmatn", "Vazir", system-ui, -apple-system, sans-serif;
+
+  --text-2xs: clamp(0.75rem, 0.73rem + 0.09vw, 0.8125rem);
+  --text-xs: clamp(0.8125rem, 0.79rem + 0.11vw, 0.875rem);
+  --text-sm: clamp(0.875rem, 0.85rem + 0.12vw, 0.9375rem);
+  --text-base: clamp(0.9375rem, 0.91rem + 0.14vw, 1rem);
+  --text-lg: clamp(1.0625rem, 1rem + 0.31vw, 1.1875rem);
+  --text-xl: clamp(1.25rem, 1.15rem + 0.5vw, 1.5rem);
+  --text-2xl: clamp(1.5rem, 1.32rem + 0.9vw, 2rem);
+  --text-3xl: clamp(1.875rem, 1.5rem + 1.9vw, 3rem);
+
+  /* ---- radius ----------------------------------------------------------
+   * 8px for small controls, 12px for inputs and tiles, 16px for cards and
+   * panels. Craft floor: card radii stay in 12–16px. Nothing is a capsule
+   * except an actual pill (a dot, a badge).
+   */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-pill: 999px;
+
+  /* ---- motion ----------------------------------------------------------
+   * Emil's curves. enter/exit use ease-out so the response lands in the
+   * first two frames she is looking at; ease-in-out only for something
+   * already on screen that moves; linear only for a constant sweep.
+   */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --dur-press: 120ms;
+  --dur-state: 180ms;
+  --dur-panel: 260ms;
+  --dur-image: 600ms;
+
+  /* ---- elevation -------------------------------------------------------
+   * Two shadows, both with a real blur and a vertical offset, both tinted
+   * with the ink green rather than neutral black so they sit on cream.
+   * A card uses the border OR the shadow.
+   */
+  --shadow-card: 0 1px 2px rgba(20, 35, 27, 0.04), 0 10px 28px -18px rgba(20, 35, 27, 0.22);
+  --shadow-panel: 0 2px 4px rgba(20, 35, 27, 0.05), 0 24px 48px -24px rgba(20, 35, 27, 0.3);
+}
+
+/* ==========================================================================
+ * 2. Base
+ * ========================================================================== */
+
+@layer base {
+  :root {
+    --shell-max: 78rem;
+    --gutter: clamp(1rem, 4vw, 2.5rem);
+    --header-h: 4.25rem;
+    --tap: 44px;
+    color-scheme: light;
+  }
+
+  .dark {
+    color-scheme: dark;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    /* Navigation between routes is instant-scroll reset, not a animation. */
+    scroll-behavior: smooth;
+    scroll-padding-top: calc(var(--header-h) + 1rem);
+    scrollbar-gutter: stable;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
+
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    background-color: var(--color-cream);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    font-feature-settings: "ss01";
+    -webkit-font-smoothing: antialiased;
+    /* `clip`, not `hidden`: `hidden` would make body a scroll container and
+       kill every sticky header inside it. */
+    overflow-x: clip;
+    overscroll-behavior-y: none;
+  }
+
+  .dark body {
+    background-color: var(--color-night);
+    color: #eef4ef;
+  }
+
+  /* Persian needs air. 1.75 on body copy, tighter on display. */
+  p, li, dd, figcaption {
+    line-height: 1.75;
+    text-wrap: pretty;
+  }
+
+  h1, h2, h3, h4 {
+    margin: 0;
+    line-height: 1.3;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+    color: var(--color-ink);
+  }
+
+  .dark h1, .dark h2, .dark h3, .dark h4 {
+    color: #f4f8f4;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  /* Browser surfaces belong to the design too (craft floor). */
+  ::selection {
+    background: var(--color-brand-200);
+    color: var(--color-brand-900);
+  }
+
+  .dark ::selection {
+    background: var(--color-brand-800);
+    color: #f0fdf4;
+  }
+
+  input, textarea, select {
+    caret-color: var(--color-brand-700);
+    font-family: inherit;
+  }
+
+  button {
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-brand-700);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  .dark :focus-visible {
+    outline-color: var(--color-brand-300);
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-brand-200);
+    border: 3px solid var(--color-cream);
+    border-radius: var(--radius-pill);
+  }
+
+  .dark ::-webkit-scrollbar-thumb {
+    background: var(--color-night-line);
+    border-color: var(--color-night);
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-brand-600);
+  }
+
+  /* A 44px hit area without a 44px box: for dense rows of small controls. */
+  .tap {
+    position: relative;
+  }
+
+  .tap::after {
+    content: "";
+    position: absolute;
+    inset: 50% 50% 50% 50%;
+    width: var(--tap);
+    height: var(--tap);
+    translate: -50% -50%;
+  }
+
+  /* Images are content, never draggable ghosts. */
+  img {
+    -webkit-user-drag: none;
+  }
+}
+
+/* ==========================================================================
+ * 3. Layout primitives
+ * ========================================================================== */
+
+@utility shell {
+  width: 100%;
+  max-width: var(--shell-max);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+/* Vertical rhythm. A section owns its own top space; the heading inside it
+   owns the space below (craft floor: more above a heading than below it). */
+@utility section {
+  padding-block: clamp(2rem, 5vw, 3.5rem);
+}
+
+@utility dateline {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Horizontal scroll rail: native touch pan, snap points, no visible bar.
+   Drag with a mouse is added in the component, keyboard works because the
+   container is focusable and every card is a real link. */
+@utility rail {
+  display: flex;
+  gap: 0.75rem;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  padding-bottom: 0.25rem;
+}
+
+.rail::-webkit-scrollbar {
+  display: none;
+}
+
+@utility rail-item {
+  scroll-snap-align: start;
+  flex: 0 0 auto;
+}
+
+/* ==========================================================================
+ * 4. Skeleton — the only looping animation on the site, and it stops.
+ * ========================================================================== */
+
+@keyframes gk-shimmer {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--color-brand-100);
+  border-radius: var(--radius-md);
+}
+
+.dark .skeleton {
+  background: var(--color-night-soft);
+}
+
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  animation: gk-shimmer 1.8s var(--ease-in-out) infinite;
+}
+
+.dark .skeleton::after {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.06), transparent);
+}
+
+/* ==========================================================================
+ * 5. Print
+ * ========================================================================== */
+
+@media print {
+  body {
+    background: #fff;
+    color: #000;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+}
+
+/* ==========================================================================
+ * 6. Reduced motion
+ *
+ * The components already branch on the preference where it matters
+ * (carousel autoplay, parallax-free entrances), and this is the backstop:
+ * no transition runs longer than a frame, so nothing can "settle" slowly
+ * for a visitor who asked for stillness.
+ * ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

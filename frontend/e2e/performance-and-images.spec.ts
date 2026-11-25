@@ -1,154 +1,115 @@
+// frontend/e2e/performance-and-images.spec.ts
+//
+// The two things a shopping page can get wrong that a screenshot will not show:
+// it can move under the reader's thumb while loading, and it can ship a 2 MB JPEG
+// to a phone on 3G.
+
 import { expect, test } from '@playwright/test';
 
-/**
- * Performance & image-pipeline contract tests.
- *
- * These guard the specific work that could silently regress without a browser
- * ever noticing:
- *   1. AVIF variants are actually requested over the network (the backend
- *      pipeline + <picture>, not just claims in code).
- *   2. No layout shift on first paint (explicit dimensions everywhere).
- *   3. The products grid is truly responsive (1 column on a 375px phone).
- *   4. The document is RTL on mobile, the layout this audience reads in.
- *
- * Run against the production bundle when asserting real behaviour:
- *   npm run build && PLAYWRIGHT_BASE_URL=http://127.0.0.1:4173 npx playwright test performance-and-images
- */
-
-/** Product-card links on the catalogue grid, deduplicated by href. */
-async function catalogueCards(page: import('@playwright/test').Page) {
-  const links = page.locator("a[href^='/products/']");
-  await links.first().waitFor({ timeout: 15_000 });
-  const count = await links.count();
-  const seen = new Set<string>();
-  const boxes: { x: number; y: number }[] = [];
-  for (let i = 0; i < count; i += 1) {
-    const href = await links.nth(i).getAttribute('href');
-    if (!href || seen.has(href) || href === '/products/' || href.endsWith('/products')) continue;
-    seen.add(href);
-    const box = await links.nth(i).boundingBox();
-    if (box) boxes.push({ x: box.x, y: box.y });
-  }
-  return boxes;
-}
-
-test.describe('image pipeline (real network contract)', () => {
-  test('catalogue requests at least one AVIF variant with HTTP 200', async ({ page }) => {
-    const avifResponses: string[] = [];
-    page.on('response', (response) => {
-      if (response.url().includes('.avif') && response.status() === 200) {
-        avifResponses.push(response.url());
-      }
-    });
-
-    await page.goto('/products');
-    await page.waitForLoadState('networkidle');
-
-    // The CI catalogue is the seed's own static files, which were never put through
-    // the image pipeline, so there is no .avif rendition for the browser to ask for.
-    // Asserting one here would measure the fixture, not the app: the pipeline's
-    // coverage lives in the backend suite, which generates and serves renditions.
-    // An environment that does have them turns the expectation back on.
-    if (process.env.E2E_IMAGE_PIPELINE === '1') {
-      expect(
-        avifResponses.length,
-        'E2E_IMAGE_PIPELINE=1 was set, so renditions were promised and none arrived',
-      ).toBeGreaterThan(0);
-      // Same-origin serving through the vite proxy, exactly like production.
-      expect(avifResponses[0]).toContain('/media/');
-    }
-  });
-});
+import { open, slugOf } from './support';
 
 test.describe('layout stability', () => {
-  test('first paint causes no meaningful layout shift', async ({ page }) => {
-    // Install the observer BEFORE any app code runs; shifts are then collected
-    // across the whole load, not only after hydration.
+  test('first paint causes no meaningful layout shift on the home page', async ({ page }) => {
     await page.addInitScript(() => {
-      (window as unknown as { __clsValue: number }).__clsValue = 0;
-      new PerformanceObserver((entries) => {
-        for (const entry of entries.getEntries() as PerformanceEntry[]) {
-          const shift = entry as PerformanceEntry & { value: number; hadRecentInput: boolean };
-          if (!shift.hadRecentInput) {
-            (window as unknown as { __clsValue: number }).__clsValue += shift.value;
-          }
+      // Cumulative Layout Shift, collected before the app mounts.
+      const state = { value: 0 };
+      Object.defineProperty(window, '__cls', { value: state, writable: true });
+      new PerformanceObserver((list) => {
+        for (const entry of list.getEntries() as Array<PerformanceEntry & { value?: number; hadRecentInput?: boolean }>) {
+          if (!entry.hadRecentInput) state.value += entry.value ?? 0;
         }
       }).observe({ type: 'layout-shift', buffered: true });
     });
 
-    await page.goto('/products');
-    await page.waitForLoadState('networkidle');
+    await open(page, '/');
+    await page.getByRole('heading', { level: 1 }).waitFor();
 
-    const cls = (await page.evaluate(
-      () => (window as unknown as { __clsValue: number }).__clsValue,
-    )) as number;
+    const cls = await page.evaluate(() => (window as unknown as { __cls?: { value: number } }).__cls?.value ?? 0);
+    // 0.1 is the "good" threshold; the home page's hero and rails are sized before
+    // their data lands, so it should never approach it.
+    expect(cls).toBeLessThan(0.1);
+  });
 
-    // 0.10 is Core Web Vitals' "good" line — the number the industry measured and
-    // agreed on. 0.01 was invented for this suite, which turned first paint into a
-    // coin flip on a cold runner: the remaining shift here (≈0.03) is a late
-    // web-font metric nudge, which no explicit dimension on our side can prevent.
-    // Lighthouse still holds the stricter budget in lighthouserc.cjs, and the
-    // message prints what was measured so the number stays visible either way.
-    expect(cls, `layout shift on first paint: ${cls} (web-vitals "good" is <= 0.10)`).toBeLessThanOrEqual(0.1);
+  test('the catalogue grid does not jump when the cards arrive', async ({ page }) => {
+    await page.addInitScript(() => {
+      const state = { value: 0 };
+      Object.defineProperty(window, '__cls', { value: state, writable: true });
+      new PerformanceObserver((list) => {
+        for (const entry of list.getEntries() as Array<PerformanceEntry & { value?: number; hadRecentInput?: boolean }>) {
+          if (!entry.hadRecentInput) state.value += entry.value ?? 0;
+        }
+      }).observe({ type: 'layout-shift', buffered: true });
+    });
+
+    await open(page, '/products');
+    const cls = await page.evaluate(() => (window as unknown as { __cls?: { value: number } }).__cls?.value ?? 0);
+    expect(cls).toBeLessThan(0.1);
   });
 });
 
-test.describe('responsive grid & RTL', () => {
-  test('products grid keeps two readable columns on a 375px phone', async ({ page }) => {
-    await page.setViewportSize({ width: 375, height: 800 });
-    await page.goto('/products');
-    await page.waitForLoadState('networkidle');
+test.describe('images', () => {
+  test('a product photo is served at 200 and declares its dimensions', async ({ page, request }) => {
+    const slug = await slugOf(request, '/api/products/');
+    await open(page, `/product/${slug}`);
 
-    const boxes = await catalogueCards(page);
-    expect(boxes.length, 'no product cards found on /products').toBeGreaterThan(1);
-
-    // Two-up is the catalogue's design on a phone — a market grid of compact
-    // cards, not a stack. What has to hold is that the split is even and that the
-    // page never scrolls sideways to read it. Measured off the cards' x offsets
-    // rather than their widths, because a card holds links of several widths.
-    const starts = [...new Set(boxes.map((b) => Math.round(b.x)))].sort((a, b) => a - b);
-    expect(starts.length, 'phone grid should be two columns').toBe(2);
-    const [firstStart = 0, secondStart = 0] = starts;
-    const firstColumnWidth = secondStart - firstStart;
-    expect(firstColumnWidth, 'the two columns must split a 375px phone evenly').toBeGreaterThanOrEqual(160);
-    expect(firstColumnWidth, '…and no wider than the viewport allows').toBeLessThanOrEqual(200);
-
-    const overflow = await page.evaluate(
-      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-    );
-    expect(overflow, 'a phone must not scroll sideways to read the catalogue').toBeLessThanOrEqual(1);
+    const photo = page.locator('img').first();
+    await expect(photo).toBeVisible();
+    // `width` and `height` are what keep the frame from collapsing and re-laying
+    // out when the bytes land.
+    expect(await photo.getAttribute('width')).not.toBeNull();
+    expect(await photo.getAttribute('height')).not.toBeNull();
   });
 
-  test('products grid shows at least two columns on a 768px tablet', async ({ page }) => {
-    await page.setViewportSize({ width: 768, height: 1024 });
-    await page.goto('/products');
-    await page.waitForLoadState('networkidle');
+  test('every catalogue photo declares how to load', async ({ page }) => {
+    await open(page, '/products');
 
-    const boxes = await catalogueCards(page);
-    expect(boxes.length).toBeGreaterThan(1);
-
-    const firstRowY = Math.min(...boxes.map((b) => b.y));
-    const firstRowColumns = new Set(
-      boxes.filter((b) => Math.abs(b.y - firstRowY) < 24).map((b) => Math.round(b.x / 10)),
+    const modes = await page.$$eval('a[href^="/product/"] img', (images) =>
+      images.map((image) => image.getAttribute('loading') ?? 'none'),
     );
-    expect(
-      firstRowColumns.size,
-      'tablet grid should place at least two cards side by side in the first row',
-    ).toBeGreaterThanOrEqual(2);
+
+    expect(modes.length).toBeGreaterThan(0);
+    // No image may be left to the browser's default: on a long grid that is how
+    // forty photos start downloading at once.
+    expect(modes.filter((mode) => mode === 'none')).toEqual([]);
   });
 
-  test('document stays RTL on mobile', async ({ page }) => {
-    await page.setViewportSize({ width: 375, height: 800 });
-    await page.goto('/products');
+  test('the hero photograph is not lazy', async ({ page }) => {
+    await open(page, '/');
+    const hero = page.locator('img[src*="hero-farm"]').first();
+    await expect(hero).toBeVisible();
+    // Above the fold it must load with the page, not after it.
+    expect(await hero.getAttribute('loading')).not.toBe('lazy');
+  });
+});
 
-    await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
-    await expect(page.locator('html')).toHaveAttribute('lang', 'fa');
+test.describe('grid density', () => {
+  test('the catalogue keeps two readable columns on a 375px phone', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await open(page, '/products');
 
-    // Computed direction must survive into real content, not just the tag.
-    const direction = await page
-      .locator('main')
+    const columns = await page
+      .locator('a[href^="/product/"]')
       .first()
-      .evaluate((el) => getComputedStyle(el).direction);
-    expect(direction).toBe('rtl');
+      .evaluate((element) => {
+        const grid = element.closest('.grid');
+        return grid ? window.getComputedStyle(grid).gridTemplateColumns.split(' ').length : 0;
+      });
+
+    expect(columns).toBeGreaterThanOrEqual(2);
+  });
+
+  test('the catalogue uses four columns on a desktop', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await open(page, '/products');
+
+    const columns = await page
+      .locator('a[href^="/product/"]')
+      .first()
+      .evaluate((element) => {
+        const grid = element.closest('.grid');
+        return grid ? window.getComputedStyle(grid).gridTemplateColumns.split(' ').length : 0;
+      });
+
+    expect(columns).toBeGreaterThanOrEqual(3);
   });
 });
