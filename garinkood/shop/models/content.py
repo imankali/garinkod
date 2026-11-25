@@ -114,8 +114,11 @@ class SiteArticle(models.Model):
         return self.cover.url if self.cover else '/images/hero-farm.jpg'
 
     def get_absolute_url(self):
-        prefix = '/guides' if self.kind == self.KIND_GUIDE else '/blog'
-        return f"{prefix}/{self.slug}"
+        # The storefront serves guides and articles from one route, /magazine/
+        # :slug; /blog and /guides were routes the front end never had. This is
+        # the address the sitemap publishes and the studio shows an editor, so a
+        # wrong prefix here is a wrong URL everywhere at once.
+        return f"/magazine/{self.slug}"
 
 
 class Service(models.Model):
@@ -206,6 +209,8 @@ class SitePage(models.Model):
         return self.hero_image.url if self.hero_image else ''
 
     def get_absolute_url(self):
+        # /page/:slug is the storefront route that renders these blocks, and it
+        # is in the sitemap test's shape list. Landing pages keep their prefix.
         prefix = '/offer' if self.kind == self.KIND_LANDING else '/page'
         return f"{prefix}/{self.slug}"
 
@@ -338,7 +343,9 @@ class BrandPartner(models.Model):
         return self.logo.url if self.logo else ''
 
     def get_absolute_url(self):
-        return f'/brand/{self.slug}'
+        # One landing route for every catalogue facet: /catalog/:kind/:slug.
+        # `lib/landing.ts` builds the identical string in the storefront.
+        return f'/catalog/brand/{self.slug}'
 
     def product_count(self) -> int:
         return Product.objects.filter(status='published', brand_slug=self.slug).count()

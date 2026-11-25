@@ -11,6 +11,7 @@ import CategoryRail from '../components/home/CategoryRail';
 import DealsPanel from '../components/home/DealsPanel';
 import MarketPanel from '../components/home/MarketPanel';
 import ServicePanel from '../components/home/ServicePanel';
+import VoicesPanel from '../components/home/VoicesPanel';
 import SectionHead from '../components/home/SectionHead';
 import Reveal from '../components/ui/Reveal';
 import ProductCard from '../components/shop/ProductCard';
@@ -87,6 +88,10 @@ export default function Home() {
       <Reveal>
         <MarketPanel />
       </Reveal>
+
+      {/* After the products and the market: a first-time visitor needs to know
+          what is sold here before anyone's opinion of it is useful. */}
+      <VoicesPanel />
 
       <ServicePanel />
 

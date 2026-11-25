@@ -10,7 +10,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_GET
 
 from . import legal
-from .models import Category, Product, Service, SiteArticle, SitePage, Storefront, SubCategory, Tag
+from .models import Category, Product, SiteArticle, SitePage, Storefront, SubCategory, Tag
 
 # Only approved, top-level reviews that carry a score are quotable; a question
 # without a rating must not inflate the published aggregate.
@@ -42,17 +42,20 @@ def robots_txt(_request):
 def sitemap_xml(_request):
     """Expose only indexable, published catalogue URLs in the sitemap."""
     today = timezone.now().date().isoformat()
+    # Every path here must exist in the storefront router. The list used to
+    # name /marketplace, /blog, /guides and /farmer-sell — none of which are
+    # routes — while the real ones (/magazine, /farmers) went unlisted, so a
+    # crawler was handed four 404s and missed the two pages that exist.
     entries: list[tuple[str, str, str]] = [
         (_absolute("/"), today, "daily"),
         (_absolute("/products"), today, "daily"),
-        (_absolute("/marketplace"), today, "daily"),
         (_absolute("/storefronts"), today, "daily"),
-        (_absolute("/blog"), today, "weekly"),
-        (_absolute("/guides"), today, "weekly"),
+        (_absolute("/offers"), today, "daily"),
+        (_absolute("/magazine"), today, "weekly"),
         (_absolute("/services"), today, "monthly"),
+        (_absolute("/farmers"), today, "monthly"),
         (_absolute("/about"), today, "monthly"),
         (_absolute("/contact"), today, "monthly"),
-        (_absolute("/farmer-sell"), today, "monthly"),
         (_absolute("/support"), today, "monthly"),
         # The legal hub and its documents, at their canonical addresses. The older
         # /privacy, /terms and /returns routes render the same text and declare
@@ -64,13 +67,13 @@ def sitemap_xml(_request):
     # Category, subcategory, brand and tag pages are indexable addresses of their
     # own now, so the sitemap lists those rather than a filtered query string —
     # and a brand page only appears if products actually carry it.
-    entries.append((_absolute("/faq"), today, "monthly"))
-    entries.append((_absolute("/customers"), today, "weekly"))
-
+    # The storefront routes these with one shape, /catalog/:kind/:slug, and
+    # `lib/landing.ts` builds the same string — so the sitemap cannot drift from
+    # the links on the page.
     for category in Category.objects.all().only("slug"):
-        entries.append((_absolute(f"/c/{category.slug}"), "", "weekly"))
+        entries.append((_absolute(f"/catalog/category/{category.slug}"), "", "weekly"))
     for subcategory in SubCategory.objects.all().only("slug"):
-        entries.append((_absolute(f"/sc/{subcategory.slug}"), "", "weekly"))
+        entries.append((_absolute(f"/catalog/subcategory/{subcategory.slug}"), "", "weekly"))
     for row in (
         Product.objects.filter(status="published")
         .exclude(brand_slug="")
@@ -78,13 +81,13 @@ def sitemap_xml(_request):
         .annotate(total=Count("id"))
         .order_by("-total")[:120]
     ):
-        entries.append((_absolute(f"/brand/{row['brand_slug']}"), "", "weekly"))
+        entries.append((_absolute(f"/catalog/brand/{row['brand_slug']}"), "", "weekly"))
     for tag in Tag.objects.all().only("slug"):
-        entries.append((_absolute(f"/tag/{tag.slug}"), "", "weekly"))
+        entries.append((_absolute(f"/catalog/tag/{tag.slug}"), "", "weekly"))
 
     for product in Product.objects.filter(status="published").only("slug", "updated"):
         entries.append(
-            (_absolute(f"/products/{product.slug}"), product.updated.date().isoformat(), "weekly")
+            (_absolute(f"/product/{product.slug}"), product.updated.date().isoformat(), "weekly")
         )
 
     for article in SiteArticle.objects.filter(is_published=True).only("slug", "updated_at"):
@@ -96,8 +99,9 @@ def sitemap_xml(_request):
             )
         )
 
-    for service in Service.objects.filter(is_active=True).only("slug"):
-        entries.append((_absolute(f"/services/{service.slug}"), "", "monthly"))
+    # Services are not listed individually: the router has /services as a list
+    # page and no per-service route, so a sitemap row per service would publish
+    # addresses that 404.
 
     for page in SitePage.objects.filter(published=True).only("slug", "updated_at"):
         entries.append(
@@ -111,7 +115,7 @@ def sitemap_xml(_request):
     for storefront in Storefront.objects.filter(is_active=True).only("slug", "updated_at"):
         entries.append(
             (
-                _absolute(f"/storefronts/{storefront.slug}"),
+                _absolute(f"/storefront/{storefront.slug}"),
                 storefront.updated_at.date().isoformat(),
                 "weekly",
             )

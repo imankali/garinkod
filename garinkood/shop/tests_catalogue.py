@@ -9,6 +9,7 @@ real rows or it is absent: an unset return window, a product without dates and a
 brand without a supplier record all have to say so rather than fill in a value.
 """
 
+import re
 from datetime import timedelta
 
 from django.contrib.auth.models import User
@@ -21,7 +22,8 @@ from .persian import fa_digits
 from .catalog_views import policy_payload
 from .models import (
     BrandPartner, CartItem, Category, Comment, CommentVote, Order, OrderItem, PlatformFeedback,
-    Product, ProductImage, ProductPackage, ReturnPolicySettings, SitePage, SitePageBlock, SubCategory, Tag,
+    Product, ProductImage, ProductPackage, ReturnPolicySettings, SiteArticle, SitePage, SitePageBlock,
+    Storefront, SubCategory, Tag,
 )
 from .shipping import quote_shipping, shipping_options
 from .tests_content import make_product
@@ -408,8 +410,67 @@ class ProductFacetAndLandingTests(TestCase):
 
     def test_sitemap_publishes_the_group_addresses(self):
         body = self.client.get('/sitemap.xml').content.decode()
-        for needle in ('/brand/دانو', '/tag/مینای-آب', '/c/fertilizer', '/sc/سولفوریک', '/faq', '/customers'):
+        # The one landing route for every facet, matching lib/landing.ts.
+        for needle in (
+            '/catalog/brand/', '/catalog/tag/', '/catalog/category/', '/catalog/subcategory/',
+        ):
             self.assertIn(needle, body)
+
+    def test_every_sitemap_path_is_a_route_the_storefront_serves(self):
+        """A sitemap is a promise to a crawler; four of these were 404s.
+
+        The list named /marketplace, /blog, /guides and /farmer-sell — none of
+        them routes — while the real pages went unlisted. Product, brand, tag,
+        category, article, page and storefront entries had also drifted
+        (/products/<slug> vs /product/<slug>). Rather than pin the strings, this
+        walks the shapes the router actually declares.
+        """
+        from urllib.parse import urlparse
+
+        shapes = {
+            '/': 0, '/products': 0, '/offers': 0, '/storefronts': 0, '/magazine': 0,
+            '/services': 0, '/farmers': 0, '/about': 0, '/contact': 0, '/support': 0,
+            '/legal': 0,
+            # :slug segments, checked by prefix below.
+            '/product/': 1, '/magazine/': 1, '/legal/': 1, '/storefront/': 1, '/page/': 1,
+            '/catalog/category/': 2, '/catalog/subcategory/': 2,
+            '/catalog/brand/': 2, '/catalog/tag/': 2,
+        }
+
+        self._seed_for_sitemap()
+        body = self.client.get('/sitemap.xml').content.decode()
+        paths = [urlparse(loc).path for loc in re.findall(r'<loc>([^<]+)</loc>', body)]
+        self.assertGreater(len(paths), 10)
+
+        for path in paths:
+            matched = False
+            for shape, depth in shapes.items():
+                if path == shape:
+                    matched = True
+                    break
+                if shape.endswith('/') and path.startswith(shape):
+                    # Same number of segments as the router declares.
+                    if len(path.strip('/').split('/')) == depth + 1:
+                        matched = True
+                        break
+            self.assertTrue(matched, f'sitemap publishes an address the router does not serve: {path}')
+
+    def _seed_for_sitemap(self):
+        """One published row of each kind, so every branch produces an entry."""
+        if not self.pricey.brand_slug:
+            self.pricey.brand_slug = 'دانو'
+            self.pricey.save(update_fields=['brand_slug'])
+        SiteArticle.objects.get_or_create(
+            slug='guide-for-sitemap', defaults={'title': 'راهنما', 'kind': 'guide', 'is_published': True},
+        )
+        SitePage.objects.get_or_create(
+            slug='page-for-sitemap', defaults={'title': 'صفحه', 'kind': 'page', 'published': True},
+        )
+        stall_owner, _ = User.objects.get_or_create(username='stall-for-sitemap')
+        Storefront.objects.get_or_create(
+            slug='stall-for-sitemap',
+            defaults={'user': stall_owner, 'name': 'غرفه آزمون', 'is_active': True},
+        )
 
 
 @override_settings(SECURE_SSL_REDIRECT=False)

@@ -441,7 +441,13 @@ class SitemapContentTests(TestCase):
         response = self.client.get('/sitemap.xml')
 
         body = response.content.decode()
-        self.assertIn('/guides/grow-onion', body)
-        self.assertIn('/services/irrigation', body)
+        # The router serves guides and articles from /magazine/:slug and
+        # information pages from /page/:slug. This assertion used to demand
+        # /guides/…, /services/<slug> and /blog — addresses the front end never
+        # had — so it was green while the sitemap was handing crawlers 404s.
+        self.assertIn('/magazine/grow-onion', body)
         self.assertIn('/page/environment', body)
-        self.assertIn('/blog', body)
+        self.assertIn('/magazine', body)
+        self.assertNotIn('/guides/', body)
+        self.assertNotIn('/services/irrigation', body)
+        self.assertNotIn('/blog', body)

@@ -646,7 +646,8 @@ class ContentStudioApiTests(TestCase):
         self.assertTrue(response.data['reading_minutes'])
         self.assertEqual(response.data['products'], [product['id']])
         self.assertEqual([row['title'] for row in response.data['linked_products']], ['بذر گوجه'])
-        self.assertEqual(response.data['url'], f"/guides/{response.data['slug']}")
+        # One route serves guides and articles: /magazine/:slug.
+        self.assertEqual(response.data['url'], f"/magazine/{response.data['slug']}")
 
         listed = self.client.get('/api/management/content/articles/?kind=guide').data['results']
         self.assertEqual(len(listed), 1)

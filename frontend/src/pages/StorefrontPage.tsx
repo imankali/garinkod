@@ -11,6 +11,7 @@ import Button from '../components/ui/Button';
 import { ProseSkeleton } from '../components/ui/Skeleton';
 import EmptyState from '../components/ui/EmptyState';
 import StorefrontChat from '../components/shop/StorefrontChat';
+import StorefrontFeed from '../components/shop/StorefrontFeed';
 import { useTitle } from '../lib/useTitle';
 
 /**
@@ -54,7 +55,7 @@ export default function StorefrontPage() {
     );
   }
 
-  const { storefront, listings, counts } = data;
+  const { storefront, listings, counts, posts, stories } = data;
 
   return (
     <div className="shell flex flex-col gap-6 py-8">
@@ -142,6 +143,8 @@ export default function StorefrontPage() {
           </ul>
         )}
       </section>
+
+      <StorefrontFeed posts={posts ?? []} stories={stories ?? []} />
     </div>
   );
 }
