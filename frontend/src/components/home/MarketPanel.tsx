@@ -17,13 +17,17 @@ import { Skeleton } from '../ui/Skeleton';
  * verified stalls: an empty marketplace should look absent, not broken.
  */
 export default function MarketPanel() {
+  // `/marketplace/storefronts/featured/` is the endpoint built for this band: a
+  // bare array, capped by `limit`, and clamped server-side so it cannot be
+  // turned into a full dump. It is not a curated flag — the view returns the
+  // first N of the directory — so the heading says nothing about selection.
   const { data, isLoading } = useQuery({
     queryKey: ['home-storefronts'],
-    queryFn: async () => (await storefrontsApi.list({ page_size: 6 })).data,
+    queryFn: async () => (await storefrontsApi.featured(6)).data,
     staleTime: 5 * 60 * 1000,
   });
 
-  const storefronts: Storefront[] = data?.results ?? [];
+  const storefronts: Storefront[] = data ?? [];
   if (!isLoading && storefronts.length === 0) return null;
 
   return (
