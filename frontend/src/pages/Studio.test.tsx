@@ -28,6 +28,7 @@ const createStorefront = vi.fn();
 const myPosts = vi.fn();
 const createPost = vi.fn();
 const removePost = vi.fn();
+const updatePost = vi.fn();
 const storyArchive = vi.fn();
 const highlights = vi.fn();
 const createHighlight = vi.fn();
@@ -55,6 +56,7 @@ vi.mock('../api/services', () => ({
     mine: (...a: unknown[]) => myPosts(...a),
     create: (...a: unknown[]) => createPost(...a),
     remove: (...a: unknown[]) => removePost(...a),
+    update: (...a: unknown[]) => updatePost(...a),
   },
 }));
 
@@ -139,6 +141,7 @@ beforeEach(() => {
   myPosts.mockReset();
   createPost.mockReset();
   removePost.mockReset();
+  updatePost.mockReset();
   myListings.mockResolvedValue({ data: [] });
   myPosts.mockResolvedValue({ data: [] });
 });
@@ -248,27 +251,29 @@ describe('Studio — a seller without a stall', () => {
   });
 });
 
+const post = (over: Record<string, unknown> = {}) => ({
+  id: 12,
+  storefront: 3,
+  storefront_name: 'پسته رفسنجان',
+  storefront_slug: 'پسته-رفسنجان',
+  storefront_avatar_url: '',
+  storefront_is_verified: false,
+  listing: null,
+  post_type: 'post',
+  post_type_label: 'پست',
+  caption: 'برداشت امسال شروع شد.',
+  image: null,
+  image_url: '',
+  status: 'published',
+  status_label: 'منتشر شده',
+  expires_at: null,
+  created_at: '2026-11-25T06:00:00+03:30',
+  updated_at: '2026-11-25T06:00:00+03:30',
+  ...over,
+});
+
 describe('Studio — the stall’s own feed', () => {
-  const post = (over: Record<string, unknown> = {}) => ({
-    id: 12,
-    storefront: 3,
-    storefront_name: 'پسته رفسنجان',
-    storefront_slug: 'پسته-رفسنجان',
-    storefront_avatar_url: '',
-    storefront_is_verified: false,
-    listing: null,
-    post_type: 'post',
-    post_type_label: 'پست',
-    caption: 'برداشت امسال شروع شد.',
-    image: null,
-    image_url: '',
-    status: 'published',
-    status_label: 'منتشر شده',
-    expires_at: null,
-    created_at: '2026-11-25T06:00:00+03:30',
-    updated_at: '2026-11-25T06:00:00+03:30',
-    ...over,
-  });
+
 
   it('publishes a post with the caption and type the seller chose', async () => {
     getStorefront.mockResolvedValue({ data: stall });
@@ -325,6 +330,43 @@ describe('Studio — the stall’s own feed', () => {
     await userEvent.click(screen.getByRole('button', { name: 'حذف پست' }));
 
     await waitFor(() => expect(removePost).toHaveBeenCalledWith(12));
+  });
+});
+
+describe('Studio — correcting a post', () => {
+  it('edits a caption instead of deleting the post and starting over', async () => {
+    getStorefront.mockResolvedValue({ data: stall });
+    myPosts.mockResolvedValue({
+      data: [post({ id: 12, caption: 'برداشت امسال شروع شد.' })],
+    });
+    updatePost.mockResolvedValue({
+      data: post({ id: 12, caption: 'برداشت امسال شروع شد. 🍅', status: 'pending_review' }),
+    });
+    renderStudio();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'ویرایش پست' }));
+    const box = screen.getByLabelText('متن تازه') as HTMLInputElement;
+    expect(box.value).toBe('برداشت امسال شروع شد.');
+    await userEvent.clear(box);
+    await userEvent.type(box, 'برداشت امسال شروع شد. 🍅');
+    await userEvent.click(screen.getByRole('button', { name: 'ذخیره' }));
+
+    await waitFor(() => expect(updatePost).toHaveBeenCalled());
+    expect(updatePost.mock.calls[0]?.[0]).toBe(12);
+    expect(updatePost.mock.calls[0]?.[1]).toMatchObject({ caption: 'برداشت امسال شروع شد. 🍅' });
+    // Deleting and reposting would lose the likes, the comments and the place
+    // in the feed — editing is a different action, not a workaround.
+    expect(removePost).not.toHaveBeenCalled();
+  });
+
+  it('says the edit sends the post back to review before it is saved', async () => {
+    getStorefront.mockResolvedValue({ data: stall });
+    myPosts.mockResolvedValue({ data: [post({ id: 12 })] });
+    renderStudio();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'ویرایش پست' }));
+    // A PATCH on a published post really does return pending_review.
+    expect(screen.getByText(/برای بازبینی برمی‌گرداند/)).toBeDefined();
   });
 });
 

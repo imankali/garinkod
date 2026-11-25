@@ -816,6 +816,24 @@ export default function Studio() {
     enabled: Boolean(stall.data?.slug),
   });
 
+  // Editing a caption. `storefrontPostsApi.update` had no caller, so a post that
+  // went out with a typo could only be deleted and posted again — which loses
+  // its likes, its comments and its place in the feed. The server puts a
+  // revision back into review, so the row's status is read from the response.
+  const [editingPost, setEditingPost] = useState<number | null>(null);
+  const [captionDraft, setCaptionDraft] = useState('');
+
+  const updatePost = useMutation({
+    mutationFn: async () =>
+      (await storefrontPostsApi.update(editingPost as number, { caption: captionDraft.trim() })).data,
+    onSuccess: () => {
+      setEditingPost(null);
+      setCaptionDraft('');
+      void queryClient.invalidateQueries({ queryKey: ['my-posts'] });
+      void queryClient.invalidateQueries({ queryKey: ['storefront'] });
+    },
+  });
+
   const removePost = useMutation({
     mutationFn: async (id: number) => storefrontPostsApi.remove(id),
     onSuccess: () => {
@@ -1012,10 +1030,57 @@ export default function Studio() {
                           </span>
                         )}
                       </p>
-                      <p className="mt-0.5 truncate text-2xs text-ink-soft dark:text-white/60">
-                        {post.caption}
-                      </p>
+                      {editingPost === post.id ? (
+                        <form
+                          className="mt-1 flex flex-wrap items-end gap-2"
+                          onSubmit={(event) => {
+                            event.preventDefault();
+                            if (!captionDraft.trim() || updatePost.isPending) return;
+                            updatePost.mutate();
+                          }}
+                        >
+                          <div className="min-w-48 flex-1">
+                            <TextField
+                              label="متن تازه"
+                              value={captionDraft}
+                              onChange={(event) => setCaptionDraft(event.target.value)}
+                              hint="ویرایش، پست را برای بازبینی برمی‌گرداند."
+                            />
+                          </div>
+                          <Button type="submit" size="sm" loading={updatePost.isPending} disabled={!captionDraft.trim()}>
+                            ذخیره
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="quiet"
+                            size="sm"
+                            onClick={() => {
+                              setEditingPost(null);
+                              setCaptionDraft('');
+                            }}
+                          >
+                            انصراف
+                          </Button>
+                        </form>
+                      ) : (
+                        <p className="mt-0.5 truncate text-2xs text-ink-soft dark:text-white/60">
+                          {post.caption}
+                        </p>
+                      )}
                     </div>
+                    {editingPost !== post.id && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingPost(post.id);
+                          setCaptionDraft(post.caption);
+                        }}
+                        aria-label={`ویرایش ${post.post_type_label}`}
+                        className="inline-flex min-h-8 items-center rounded-sm px-1.5 text-[11px] font-bold text-brand-700 hover:underline dark:text-brand-300"
+                      >
+                        ویرایش
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => removePost.mutate(post.id)}
