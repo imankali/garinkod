@@ -106,6 +106,19 @@ test.describe('public routes', () => {
     await expect(page.locator('nav[aria-label="اسناد"]')).toBeVisible();
   });
 
+  test('a brand row in the index reaches the shop with that brand already filtered', async ({ page }) => {
+    await open(page, '/brands');
+
+    const brand = page.locator('a[href^="/products?brand_slug="]').first();
+    await expect(brand).toBeVisible();
+    const href = await brand.getAttribute('href');
+
+    await open(page, href!);
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    // The filter is announced, not silently applied.
+    await expect(page.getByRole('button', { name: /برند: / })).toBeVisible();
+  });
+
   test('a catalogue landing page opens from the brand list', async ({ page }) => {
     await open(page, '/brands');
 

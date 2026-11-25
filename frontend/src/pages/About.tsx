@@ -8,7 +8,7 @@ import { siteInfoApi } from '../api/services';
 import PageHead from '../components/shop/PageHead';
 import { Skeleton } from '../components/ui/Skeleton';
 import { nums } from '../lib/price';
-import { landingPath } from '../lib/landing';
+import { brandShopPath } from '../lib/landing';
 
 /**
  * «دربارهٔ ما».
@@ -114,7 +114,7 @@ export default function About() {
             {(data?.brands ?? []).map((brand) => (
               <li key={brand.id}>
                 <Link
-                  to={landingPath({ kind: 'brand', slug: brand.slug })}
+                  to={brandShopPath(brand.slug)}
                   className="inline-flex min-h-10 items-center gap-2 rounded-md border border-line bg-paper px-3 text-2xs font-bold text-ink transition-colors duration-[var(--dur-state)] hover:border-brand-300 hover:bg-brand-50 dark:border-night-line dark:bg-night-soft dark:text-white dark:hover:border-brand-700"
                 >
                   {brand.logo_url && (
