@@ -122,7 +122,10 @@ export function parseApiError(error: unknown): ParsedApiError {
     delete legacyFields.detail;
 
     const firstFieldMessage = Object.values(legacyFields)[0];
-    const legacyCode: ApiErrorCode = status === 400 ? 'validation_error' : 'error';
+    // A 429 means "too many", not "something went wrong": the message the
+    // reader needs is how long to wait, and the code drives that copy.
+    const legacyCode: ApiErrorCode =
+      status === 429 ? 'throttled' : status === 400 ? 'validation_error' : 'error';
     return {
       message: localiseError(legacyCode, detail ?? firstFieldMessage ?? TRANSPORT_MESSAGES.unknown),
       code: legacyCode,

@@ -414,13 +414,38 @@ export default function ProductDetail() {
               <li className="flex items-start gap-2">
                 <ShieldCheck size={14} aria-hidden="true" className="mt-1 shrink-0 text-brand-700 dark:text-brand-300" />
                 <span>
-                  اصالت کالا تضمین‌شده
-                  {/* A number only when the operator has stated one. */}
-                  {policy.data?.return_window_days != null && (
-                    <> · بازگشت تا {policy.data.return_window_days.toLocaleString('fa-IR')} روز</>
-                  )}
-                  {policy.data?.return_window_days == null && policy.isSuccess && (
-                    <> · شرایط بازگشت در صفحهٔ شرایط بازگشت کالا</>
+                  {/* The line used to open with «اصالت کالا تضمین‌شده». Nothing
+                      behind this page can certify authenticity: a product row
+                      carries a brand name and a GTIN, and the catalogue mixes
+                      shop stock with marketplace sellers whose goods arrive
+                      from wherever they say. A claim the server cannot back is
+                      the same kind of lie as the shipping threshold this block
+                      used to invent. What *is* published is the return window,
+                      so that is what the shield states. */}
+                  {policy.data?.return_window_days != null ? (
+                    <>
+                      بازگشت تا {policy.data.return_window_days.toLocaleString('fa-IR')} روز
+                      {policy.data.return_window_label && (
+                        <span className="block text-ink-mute dark:text-white/40">
+                          {policy.data.return_window_label}
+                        </span>
+                      )}
+                      <Link
+                        to="/legal/returns"
+                        className="ms-1 underline decoration-line underline-offset-2 hover:text-brand-800 dark:hover:text-brand-300"
+                      >
+                        شرایط بازگشت
+                      </Link>
+                    </>
+                  ) : policy.isSuccess ? (
+                    <Link
+                      to="/legal/returns"
+                      className="underline decoration-line underline-offset-2 hover:text-brand-800 dark:hover:text-brand-300"
+                    >
+                      شرایط بازگشت کالا
+                    </Link>
+                  ) : (
+                    'خرید با امکان بازگشت'
                   )}
                 </span>
               </li>

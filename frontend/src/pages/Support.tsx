@@ -5,6 +5,8 @@ import { Mail, MessageSquare, Phone } from 'lucide-react';
 
 import { siteInfoApi } from '../api/services';
 import PageHead from '../components/shop/PageHead';
+import SupportForm from '../components/shop/SupportForm';
+import StorefrontComplaintForm from '../components/shop/StorefrontComplaintForm';
 import { Skeleton } from '../components/ui/Skeleton';
 import { telHref } from '../lib/phone';
 
@@ -27,7 +29,13 @@ export default function Support() {
     <div className="shell flex flex-col gap-6 py-8">
       <PageHead
         title="پشتیبانی"
-        lead="سفارش، موجودی، مرجوعی یا شکایت از یک غرفه — از هر کدام شروع کنید. پاسخ‌گویی در ساعات کاری، و هر پیام یک شمارهٔ پیگیری می‌گیرد."
+        lead={
+          // «هر پیام یک شمارهٔ پیگیری می‌گیرد» was a promise with no form to keep
+          // it; the sentence now describes what the page below actually does.
+          data?.working_hours
+            ? `سفارش، موجودی، مرجوعی یا شکایت از یک غرفه — از هر کدام شروع کنید. پاسخ‌گویی در ساعات کاری: ${data.working_hours}.`
+            : 'سفارش، موجودی، مرجوعی یا شکایت از یک غرفه — از هر کدام شروع کنید. هر پیام در صف رسیدگی ثبت می‌شود و پاسخ به ایمیل شما می‌آید.'
+        }
       />
 
       {isLoading ? (
@@ -100,7 +108,7 @@ export default function Support() {
           {[
             ['پیگیری سفارش', 'با کد سفارش و شمارهٔ همراه، در صفحهٔ پیگیری، وضعیت و اقلام را ببینید.'],
             ['موجودی کالا', 'موجودی پیش از پرداخت تأیید می‌شود؛ اگر کالایی ناموجود باشد، سفارش اصلاح یا لغو می‌شود.'],
-            ['شکایت از غرفه', 'از صفحهٔ همان غرفه پیام ثبت کنید تا در صف رسیدگی قرار بگیرد و شمارهٔ پیگیری بگیرد.'],
+            ['شکایت از غرفه', 'از صفحهٔ همان غرفه پیام ثبت کنید، یا اگر دسترسی ندارید، از فرم همین صفحه با موضوع «انتقاد یا شکایت» بفرستید.'],
             ['مرجوعی', 'شرایط و مهلت بازگشت در صفحهٔ شرایط بازگشت کالا آمده است.'],
           ].map(([term, value]) => (
             <div key={term} className="grid gap-1 py-2.5 sm:grid-cols-[10rem_1fr]">
@@ -110,6 +118,10 @@ export default function Support() {
           ))}
         </dl>
       </section>
+
+      <SupportForm />
+
+      <StorefrontComplaintForm />
     </div>
   );
 }

@@ -288,6 +288,18 @@ describe('ProductDetail packaging', () => {
     } as never);
   });
 
+  it('promises only the return window it can prove, never «اصالت تضمین‌شده»', async () => {
+    renderPage();
+
+    // The shield used to assert the goods were authentic. No field behind this
+    // page can certify that, so the claim is gone and the published window —
+    // which the returns page and the API both back — is what it says instead.
+    expect(await screen.findByText(/بازگشت تا ۷ روز/)).toBeDefined();
+    expect(screen.getByText('۷ روز ضمانت بازگشت کالا')).toBeDefined();
+    expect(screen.queryByText(/اصالت کالا تضمین‌شده/)).toBeNull();
+    expect(screen.getByRole('link', { name: 'شرایط بازگشت' })).toHaveAttribute('href', '/legal/returns');
+  });
+
   it('states the free-delivery threshold the checkout will apply', async () => {
     renderPage();
 
