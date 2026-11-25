@@ -17,7 +17,7 @@
 //   • Writing is a form behind a disclosure. A review box at the top of a page is
 //     a demand, and most visitors came to read a spec sheet.
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { BadgeCheck, Flag, Star, ThumbsUp } from 'lucide-react';
 import { Link } from 'react-router';
@@ -122,6 +122,29 @@ export default function Reviews({ slug, productId }: { slug: string; productId: 
 
   const reviews: Comment[] = list.data ?? [];
   const total = summary.data?.reviews_count ?? reviews.length;
+  /**
+   * Reviews the shop's editors marked as worth reading, across the catalogue.
+   *
+   * `commentsApi.getAll` was served and uncalled. A product page can only show
+   * opinions about the thing on it — the buyer who is still deciding what to
+   * buy had nothing. These are taken from the server with `is_featured` set, so
+   * nothing here is the page's own opinion of itself; they are skipped when the
+   * list is empty rather than padded.
+   */
+  const highlighted = useQuery({
+    queryKey: ['comments-featured'],
+    queryFn: async () => (await commentsApi.getAll()).data.results,
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const featured = useMemo(
+    () =>
+      (highlighted.data ?? [])
+        .filter((item) => item.is_featured && item.body.trim().length > 0)
+        .slice(0, 3),
+    [highlighted.data],
+  );
+
   const distribution = summary.data?.distribution;
   const highest = Math.max(1, ...Object.values(distribution ?? {}).map((count) => count));
 
@@ -186,6 +209,26 @@ export default function Reviews({ slug, productId }: { slug: string; productId: 
                 </li>
               );
             })}
+          </ul>
+        </div>
+      )}
+
+      {featured.length > 0 && (
+        <div className="mt-5 rounded-lg border border-line bg-paper p-4 dark:border-night-line dark:bg-night-soft">
+          <h3 className="text-2xs font-extrabold text-ink dark:text-white">از میان نظرهای دیگر کالاها</h3>
+          <ul className="mt-2 divide-y divide-line dark:divide-night-line">
+            {featured.map((comment) => (
+              <li key={comment.id} className="py-2">
+                {comment.rating !== null && <Stars score={comment.rating} />}
+                <p className="mt-1 whitespace-pre-line text-2xs leading-6 text-ink-soft dark:text-white/65">
+                  {comment.body}
+                </p>
+                <p className="mt-1 text-[11px] text-ink-mute dark:text-white/40">
+                  {comment.name}
+                  {comment.is_verified_purchase && ' · خرید تأییدشده'}
+                </p>
+              </li>
+            ))}
           </ul>
         </div>
       )}
