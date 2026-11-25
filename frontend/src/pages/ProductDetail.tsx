@@ -9,6 +9,7 @@ import { productsApi } from '../api/services';
 import type { Product } from '@/types/shop';
 import { useCartStore } from '../store/cartStore';
 import { money, priceOf } from '../lib/price';
+import { cn } from '../lib/cn';
 import { landingPath } from '../lib/landing';
 import Button from '../components/ui/Button';
 import { ProseSkeleton } from '../components/ui/Skeleton';
@@ -39,6 +40,16 @@ export default function ProductDetail() {
   });
 
   const [activeImage, setActiveImage] = useState(0);
+  /**
+   * Which packaging is being bought. A product that sells in more than one bag
+   * (a ۱ لیتری bottle and a ۵ لیتری canister, priced and stocked separately)
+   * must be buyable in either — sending no package always bought the default,
+   * which quietly hid the larger one.
+   *
+   * `null` means "the product's own default", resolved below, so this stays a
+   * single number rather than a copy of the package list.
+   */
+  const [packageId, setPackageId] = useState<number | null>(null);
   useTitle(product?.title);
 
   const similar = useQuery({
@@ -71,8 +82,35 @@ export default function ProductDetail() {
   }
 
   const item: Product = product;
-  const { off, quote } = priceOf(item);
-  const inStock = item.is_in_stock && item.stock > 0;
+  const packages = (item.packages ?? []).filter((entry) => entry.is_in_stock !== false);
+  const chosen = packages.find((entry) => entry.id === packageId) ?? packages.find((entry) => entry.is_default) ?? packages[0];
+  /**
+   * The chosen bag re-prices the page: price, stock and minimum order all come
+   * from it when there is one, and from the product otherwise. Without this the
+   * price beside the button described a different bag than the one being added.
+   */
+  const listPrice = chosen?.price ?? item.price;
+  const salePrice = chosen ? chosen.discounted_price : item.discounted_price ?? item.price;
+  /**
+   * A quote-only product has no package prices to show (`effective_price` is 0
+   * on a row that only exists to describe the packaging), so it keeps its own
+   * «تماس بگیرید» state instead of being re-priced from that zero.
+   */
+  const selected = chosen && !item.price_on_request ? chosen : null;
+  const priced = selected
+    ? {
+        ...item,
+        price: listPrice,
+        discounted_price: salePrice,
+        // The package states both numbers, so the percentage is derived rather
+        // than read from the product's own field (which describes its default).
+        discount_percent: listPrice > 0 ? Math.round((1 - salePrice / listPrice) * 100) : 0,
+      }
+    : item;
+  const { off, quote } = priceOf(priced);
+  const available = chosen ? chosen.effective_stock : item.stock;
+  const inStock = chosen ? chosen.is_in_stock : item.is_in_stock && item.stock > 0;
+  const minimum = chosen?.min_order_quantity ?? item.min_order_quantity ?? 1;
   const gallery = [item.image_url, ...(item.gallery?.map((shot) => shot.url) ?? [])].filter(Boolean);
   /**
    * Safety notes come from the typed detail rows the API returns, not from a
@@ -95,7 +133,7 @@ export default function ProductDetail() {
     if (busy || !inStock) return;
     setBusy(true);
     try {
-      await addToCart(item.id, quantity);
+      await addToCart(item.id, quantity, chosen?.id ?? null);
       setAdded(true);
       openCart();
       window.setTimeout(() => setAdded(false), 2500);
@@ -216,7 +254,7 @@ export default function ProductDetail() {
           )}
 
           <div className="mt-4 rounded-lg border border-line bg-paper p-4 dark:border-night-line dark:bg-night-soft">
-            <Price product={item} size="lg" />
+            <Price product={priced} size="lg" />
             {off > 0 && (
               <p className="mt-1 text-2xs font-bold text-brand-700 dark:text-brand-300">
                 {off.toLocaleString('fa-IR')}٪ تخفیف نسبت به قیمت پیشین
@@ -228,9 +266,14 @@ export default function ProductDetail() {
                 <>
                   <Check size={14} aria-hidden="true" className="text-brand-700" />
                   <span className="text-brand-800 dark:text-brand-300">موجود در انبار</span>
-                  {item.stock < 10 && (
+                  {available > 0 && available < 10 && (
                     <span className="font-medium text-gold-700 dark:text-gold-600">
-                      (تنها {item.stock.toLocaleString('fa-IR')} عدد)
+                      (تنها {available.toLocaleString('fa-IR')} عدد)
+                    </span>
+                  )}
+                  {minimum > 1 && (
+                    <span className="font-medium text-ink-mute dark:text-white/45">
+                      · حداقل {minimum.toLocaleString('fa-IR')} عدد
                     </span>
                   )}
                 </>
@@ -239,12 +282,50 @@ export default function ProductDetail() {
               )}
             </p>
 
+            {packages.length > 1 && (
+              <fieldset className="mt-4">
+                <legend className="text-2xs font-bold text-ink-mute dark:text-white/45">بسته‌بندی</legend>
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {packages.map((entry) => {
+                    const active = entry.id === chosen?.id;
+                    return (
+                      <button
+                        key={entry.id ?? entry.label}
+                        type="button"
+                        aria-pressed={active}
+                        onClick={() => {
+                          setPackageId(entry.id);
+                          setQuantity(entry.min_order_quantity || 1);
+                        }}
+                        className={cn(
+                          'min-h-10 rounded-sm border px-3 text-2xs font-bold transition-colors duration-150',
+                          active
+                            ? 'border-brand-700 bg-brand-700 text-white'
+                            : 'border-line bg-paper text-ink-soft hover:border-brand-300 dark:border-night-line dark:bg-night dark:text-white/70',
+                        )}
+                      >
+                        {entry.label}
+                        {entry.effective_price > 0 && (
+                          <span className={cn('ms-1.5 font-medium', active ? 'text-white/80' : 'text-ink-mute dark:text-white/50')}>
+                            {money(entry.effective_price)}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                {chosen?.bulk_note && (
+                  <p className="mt-1.5 text-2xs text-ink-mute dark:text-white/45">{chosen.bulk_note}</p>
+                )}
+              </fieldset>
+            )}
+
             {!quote && inStock && (
               <div className="mt-4 flex items-center gap-2">
                 <div className="flex items-center rounded-sm border border-line dark:border-night-line">
                   <button
                     type="button"
-                    onClick={() => setQuantity((value) => Math.max(1, value - 1))}
+                    onClick={() => setQuantity((value) => Math.max(minimum, value - 1))}
                     aria-label="کاهش تعداد"
                     className="flex h-11 w-11 items-center justify-center text-ink-soft transition-colors duration-150 hover:bg-brand-50 dark:text-white/70 dark:hover:bg-night"
                   >
@@ -255,7 +336,7 @@ export default function ProductDetail() {
                   </span>
                   <button
                     type="button"
-                    onClick={() => setQuantity((value) => Math.min(item.stock || 99, value + 1))}
+                    onClick={() => setQuantity((value) => Math.min(available || 99, value + 1))}
                     aria-label="افزایش تعداد"
                     className="flex h-11 w-11 items-center justify-center text-ink-soft transition-colors duration-150 hover:bg-brand-50 dark:text-white/70 dark:hover:bg-night"
                   >
