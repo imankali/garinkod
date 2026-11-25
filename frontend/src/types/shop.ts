@@ -357,6 +357,15 @@ export interface ProductFacets {
   /** Departments and sub-departments, counted over the published catalogue. */
   categories?: FacetRow[];
   subcategories?: FacetRow[];
+  /**
+   * The marketplace's own facets (`/marketplace/listings/facets/`) count crops,
+   * units and packages over the آگهی‌ها rather than over the shop's catalogue.
+   * Optional because the catalogue endpoint does not send them — and there is
+   * deliberately no `provinces` here: the endpoint does not compute one, so the
+   * UI has no list to offer.
+   */
+  crops?: FacetRow[];
+  units?: FacetRow[];
   max_price: number;
 }
 

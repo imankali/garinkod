@@ -54,9 +54,17 @@ export default function Storefronts() {
         title="بازار کشاورزان"
         lead="غرفه‌های کشاورزان، تعاونی‌ها و تولیدکنندگان — هر آگهی پیش از انتشار بررسی می‌شود. می‌توانید مستقیم با غرفه گفتگو کنید و موجودی را پیش از پرداخت تأیید کنید."
         actions={
-          <Button to="/farmers" variant="secondary" size="sm">
-            من هم غرفه می‌خواهم
-          </Button>
+          <span className="flex flex-wrap items-center gap-2">
+            {/* The directory answers "who sells?", which is not the same question
+                as "who has پسته?". The listing browser answers the second, and
+                this is where a buyer is standing when they ask it. */}
+            <Button to="/market" variant="secondary" size="sm">
+              آگهی‌ها
+            </Button>
+            <Button to="/farmers" variant="secondary" size="sm">
+              من هم غرفه می‌خواهم
+            </Button>
+          </span>
         }
       />
 

@@ -38,6 +38,7 @@ const Landing = lazy(() => import('./pages/Landing'));
 const Brands = lazy(() => import('./pages/Brands'));
 const Offers = lazy(() => import('./pages/Offers'));
 const Storefronts = lazy(() => import('./pages/Storefronts'));
+const MarketListings = lazy(() => import('./pages/MarketListings'));
 const StorefrontPage = lazy(() => import('./pages/StorefrontPage'));
 const ListingDetail = lazy(() => import('./pages/ListingDetail'));
 const Services = lazy(() => import('./pages/Services'));
@@ -170,6 +171,7 @@ export default function App() {
 
               {/* Marketplace */}
               <Route path="/storefronts" element={<Storefronts />} />
+              <Route path="/market" element={<MarketListings />} />
               <Route path="/storefront/:slug" element={<StorefrontPage />} />
               <Route path="/listing/:slug" element={<ListingDetail />} />
 
