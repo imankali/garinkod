@@ -6,6 +6,7 @@ import { LogOut, MapPin, Package, Phone, User } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { ordersApi } from '../api/services';
+import { parseApiError } from '../api/errors';
 import { useAuthStore } from '../store/authStore';
 import { money, nums } from '../lib/price';
 import Button from '../components/ui/Button';
@@ -49,6 +50,16 @@ export default function Account() {
     enabled: Boolean(user),
   });
 
+  /**
+   * A rejected field is shown under its own input.
+   *
+   * The store already turns a validation error into `fields`, but the page was
+   * printing one generic «ذخیره نشد» for all of them — so a phone number the
+   * server refused looked like the form was broken rather than like the number
+   * was wrong.
+   */
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
   const save = useMutation({
     mutationFn: () =>
       updateProfile({
@@ -59,7 +70,15 @@ export default function Account() {
         email: user?.email ?? '',
         gender: account?.gender ?? 'male',
       }),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['session'] }),
+    onSuccess: () => {
+      setFieldErrors({});
+      void queryClient.invalidateQueries({ queryKey: ['session'] });
+    },
+    onError: (caught: unknown) => {
+      // The store has already parsed the envelope; parsing it again here is
+      // what turns a field-keyed refusal into a message under the right input.
+      setFieldErrors(parseApiError(caught).fields);
+    },
   });
 
   if (!user) {
@@ -107,8 +126,20 @@ export default function Account() {
             }}
           >
             <div className="grid gap-3 sm:grid-cols-2">
-              <TextField label="نام" value={firstName} onChange={(event) => setFirstName(event.target.value)} autoComplete="given-name" />
-              <TextField label="نام خانوادگی" value={lastName} onChange={(event) => setLastName(event.target.value)} autoComplete="family-name" />
+              <TextField
+                label="نام"
+                value={firstName}
+                onChange={(event) => setFirstName(event.target.value)}
+                autoComplete="given-name"
+                error={fieldErrors.first_name}
+              />
+              <TextField
+                label="نام خانوادگی"
+                value={lastName}
+                onChange={(event) => setLastName(event.target.value)}
+                autoComplete="family-name"
+                error={fieldErrors.last_name}
+              />
             </div>
             <TextField
               label="شمارهٔ همراه"
@@ -117,13 +148,28 @@ export default function Account() {
               autoComplete="tel"
               value={phone}
               onChange={(event) => setPhone(event.target.value)}
+              error={fieldErrors.phone}
               hint="برای هماهنگی ارسال و اطلاع از موجودی استفاده می‌شود."
             />
+            {/* Whether the number is confirmed decides what the shop can promise
+                by SMS, so it is stated rather than implied. */}
+            {account?.phone && (
+              <p className="-mt-2 text-2xs font-bold">
+                {account.phone_verified_at ? (
+                  <span className="text-brand-700 dark:text-brand-300">شماره تأیید شده است.</span>
+                ) : (
+                  <Link to="/login" className="text-gold-700 underline underline-offset-4 dark:text-gold-600">
+                    این شماره هنوز تأیید نشده؛ با یک ورود پیامکی تأییدش کنید.
+                  </Link>
+                )}
+              </p>
+            )}
             <TextField
               label="نشانی تحویل"
               value={address}
               onChange={(event) => setAddress(event.target.value)}
               autoComplete="street-address"
+              error={fieldErrors.address}
               hint="نشانی‌ای که سفارش‌ها به آن می‌رسد."
             />
             <div className="flex items-center gap-3">
@@ -131,7 +177,11 @@ export default function Account() {
                 ذخیرهٔ تغییرات
               </Button>
               {save.isSuccess && <p className="text-2xs font-bold text-brand-700 dark:text-brand-300">ذخیره شد.</p>}
-              {save.isError && <p role="alert" className="text-2xs font-bold text-danger-700">ذخیره نشد؛ دوباره بزنید.</p>}
+              {save.isError && Object.keys(fieldErrors).length === 0 && (
+                <p role="alert" className="text-2xs font-bold text-danger-700">
+                  ذخیره نشد؛ دوباره بزنید.
+                </p>
+              )}
             </div>
           </form>
         </section>
