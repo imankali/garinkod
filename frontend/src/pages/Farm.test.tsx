@@ -20,6 +20,7 @@ const createConsultation = vi.fn();
 const updateLand = vi.fn();
 const deleteLand = vi.fn();
 const deleteEvent = vi.fn();
+const landDetail = vi.fn();
 
 vi.mock('../api/services', () => ({
   farmApi: {
@@ -33,6 +34,7 @@ vi.mock('../api/services', () => ({
     updateLand: (...a: unknown[]) => updateLand(...a),
     deleteLand: (...a: unknown[]) => deleteLand(...a),
     deleteEvent: (...a: unknown[]) => deleteEvent(...a),
+    landDetail: (...a: unknown[]) => landDetail(...a),
   },
 }));
 
@@ -105,6 +107,7 @@ beforeEach(() => {
   updateLand.mockReset();
   deleteLand.mockReset();
   deleteEvent.mockReset();
+  landDetail.mockReset();
   lands.mockResolvedValue({ data: [land()] });
   // A land with two rows on its calendar: one the farmer added (removable) and
   // one the consultant wrote (not the farmer's to close or delete).
@@ -302,6 +305,48 @@ describe('Farm — correcting a land', () => {
     await userEvent.click(screen.getByRole('button', { name: 'ثبت زمین' }));
 
     expect(screen.getByRole('option', { name: 'جریب' })).toBeDefined();
+  });
+
+  it('opens one land’s own timeline instead of filtering the shared calendar', async () => {
+    lands.mockResolvedValue({ data: [land({ id: 1, name: 'باغ پسته', event_count: 2 })] });
+    landDetail.mockResolvedValue({
+      data: {
+        land: land({ id: 1, name: 'باغ پسته' }),
+        events: [
+          event({ id: 3, title: 'سمپاشی کنه‌کش', status: 'done', status_label: 'انجام‌شده' }),
+          event({ id: 4, title: 'کود دهی پایه', status: 'planned', status_label: 'برنامه‌ریزی‌شده' }),
+        ],
+      },
+    });
+    renderFarm();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'تاریخچهٔ باغ پسته' }));
+
+    await waitFor(() => expect(landDetail).toHaveBeenCalledWith(1));
+    expect(await screen.findByText(/۱ انجام‌شده · ۱ در انتظار/)).toBeDefined();
+    expect(screen.getByRole('heading', { name: 'تاریخچهٔ این قطعه' })).toBeDefined();
+  });
+
+  it('admits when the timeline disagrees with the count on the land', async () => {
+    // Both numbers come from the server; a mismatch means one response is older
+    // than the other, which the farmer should hear rather than not see.
+    lands.mockResolvedValue({ data: [land({ id: 1, name: 'باغ پسته', event_count: 3 })] });
+    landDetail.mockResolvedValue({
+      data: { land: land({ id: 1 }), events: [event({ id: 3, title: 'سمپاشی کنه‌کش' })] },
+    });
+    renderFarm();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'تاریخچهٔ باغ پسته' }));
+
+    expect(await screen.findByText(/فهرست ۳ عملیات می‌گفت/)).toBeDefined();
+  });
+
+  it('does not offer a timeline for a land with no operations', async () => {
+    lands.mockResolvedValue({ data: [land({ id: 1, name: 'باغ پسته', event_count: 0 })] });
+    renderFarm();
+
+    await screen.findByText('باغ پسته');
+    expect(screen.queryByRole('button', { name: 'تاریخچهٔ باغ پسته' })).toBeNull();
   });
 
   it('does not offer to delete a land that still has operations behind it', async () => {

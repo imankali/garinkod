@@ -364,6 +364,89 @@ function ConsultationForm({ lands, onDone }: { lands: FarmLand[]; onDone: () => 
   );
 }
 
+/**
+ * One land's own timeline, from `farmApi.landDetail`.
+ *
+ * The calendar above is a single list across every land, sorted by date. That
+ * answers «چه کاری مانده؟» but not «در این قطعه چه کردم؟» — and the detail
+ * endpoint returns exactly `{land, events}` for one land, whole, without the
+ * browser filtering someone else's rows out of a list that may be paginated.
+ *
+ * The count is checked against the row that was clicked. They come from the
+ * same server, so a mismatch means one of the two responses is older than the
+ * other; saying so is better than showing a timeline that silently disagrees
+ * with the number beside the land.
+ */
+function LandTimeline({
+  landId,
+  loading,
+  events,
+  expected,
+}: {
+  landId: number;
+  loading: boolean;
+  events: FarmCalendarEvent[];
+  expected: number | null;
+}) {
+  const done = events.filter((event) => event.status === 'done').length;
+  const planned = events.filter((event) => event.status === 'planned').length;
+
+  return (
+    <section
+      aria-labelledby={`land-${landId}-timeline`}
+      className="mt-3 rounded-lg border border-line bg-paper p-4 dark:border-night-line dark:bg-night-soft"
+    >
+      <h3 id={`land-${landId}-timeline`} className="text-xs font-extrabold text-ink dark:text-white">
+        تاریخچهٔ این قطعه
+      </h3>
+
+      {loading ? (
+        <Skeleton className="mt-3 h-16 rounded-md" />
+      ) : events.length === 0 ? (
+        <p className="mt-2 text-2xs leading-6 text-ink-mute dark:text-white/50">
+          برای این قطعه عملیاتی ثبت نشده است.
+        </p>
+      ) : (
+        <>
+          <p className="mt-1 text-2xs text-ink-mute dark:text-white/45">
+            {nums(done)} انجام‌شده · {nums(planned)} در انتظار
+            {expected !== null && expected !== events.length && (
+              <span className="ms-2 font-bold text-gold-700 dark:text-gold-600">
+                (فهرست {nums(expected)} عملیات می‌گفت؛ تازه‌سازی کنید.)
+              </span>
+            )}
+          </p>
+          <ol className="mt-3 space-y-2">
+            {[...events]
+              .sort((a, b) => (a.date < b.date ? 1 : -1))
+              .map((event) => (
+                <li key={event.id} className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-2xs">
+                  <span className="dateline shrink-0 text-ink-mute dark:text-white/45">
+                    {formatDate(event.date)}
+                  </span>
+                  <span className="font-bold text-ink dark:text-white">{event.title}</span>
+                  <span className="text-ink-mute dark:text-white/45">
+                    {event.kind_label} · {event.status_label}
+                  </span>
+                  {event.is_consultant_note && (
+                    <span className="rounded-sm bg-brand-50 px-1.5 py-0.5 text-[10px] font-bold text-brand-800 dark:bg-night dark:text-brand-300">
+                      از مشاور
+                    </span>
+                  )}
+                  {event.notes && (
+                    <span className="block w-full leading-6 text-ink-soft dark:text-white/60">
+                      {event.notes}
+                    </span>
+                  )}
+                </li>
+              ))}
+          </ol>
+        </>
+      )}
+    </section>
+  );
+}
+
 export default function Farm() {
   useTitle('زمین‌ها و تقویم کشت');
   const user = useAuthStore((state) => state.user);
@@ -372,6 +455,11 @@ export default function Farm() {
   const [editingLand, setEditingLand] = useState<FarmLand | null>(null);
   const [addingEvent, setAddingEvent] = useState(false);
   const [askingConsult, setAskingConsult] = useState(false);
+  // Which land's own timeline is open. The page lists every operation of every
+  // land in one calendar, which answers "what is due next" but not "what
+  // happened on this plot" — and `farmApi.landDetail`, which serves exactly
+  // `{land, events}` for one land, had no caller.
+  const [openLand, setOpenLand] = useState<number | null>(null);
 
   const lands = useQuery({
     queryKey: ['farm-lands'],
@@ -383,6 +471,12 @@ export default function Farm() {
     queryKey: ['farm-calendar'],
     queryFn: async () => (await farmApi.calendar()).data,
     enabled: Boolean(user),
+  });
+
+  const landTimeline = useQuery({
+    queryKey: ['farm-land', openLand],
+    queryFn: async () => (await farmApi.landDetail(openLand as number)).data,
+    enabled: Boolean(user) && openLand !== null,
   });
 
   const consultations = useQuery({
@@ -506,6 +600,17 @@ export default function Farm() {
                     </p>
                   )}
                   <span className="ms-auto flex items-center gap-1.5">
+                    {land.event_count > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setOpenLand((current) => (current === land.id ? null : land.id))}
+                        aria-expanded={openLand === land.id}
+                        aria-label={`تاریخچهٔ ${land.name}`}
+                        className="text-[11px] font-bold text-brand-700 hover:underline dark:text-brand-300"
+                      >
+                        {openLand === land.id ? 'بستن تاریخچه' : 'تاریخچه'}
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => setEditingLand(land)}
@@ -532,6 +637,17 @@ export default function Farm() {
               </li>
             ))}
           </ul>
+        )}
+
+        {openLand !== null && (
+          <LandTimeline
+            landId={openLand}
+            loading={landTimeline.isLoading}
+            events={landTimeline.data?.events ?? []}
+            // The list row already carries the count; the detail is the same
+            // server data, so a disagreement means one of them is stale.
+            expected={(landList.find((land) => land.id === openLand)?.event_count) ?? null}
+          />
         )}
       </section>
 
