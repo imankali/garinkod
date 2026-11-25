@@ -2,7 +2,7 @@
 
 import { useParams, Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import { BadgeCheck, MapPin, MessageCircle, Store } from 'lucide-react';
+import { BadgeCheck, MapPin, Store } from 'lucide-react';
 
 import { storefrontsApi } from '../api/services';
 import type { MarketplaceListing } from '@/types/storefront';
@@ -10,6 +10,7 @@ import { money, nums } from '../lib/price';
 import Button from '../components/ui/Button';
 import { ProseSkeleton } from '../components/ui/Skeleton';
 import EmptyState from '../components/ui/EmptyState';
+import StorefrontChat from '../components/shop/StorefrontChat';
 import { useTitle } from '../lib/useTitle';
 
 /**
@@ -89,9 +90,7 @@ export default function StorefrontPage() {
           {storefront.bio && <p className="mt-2 max-w-[65ch] text-xs leading-7 text-ink-soft dark:text-white/65">{storefront.bio}</p>}
         </div>
 
-        <Button to="/support" variant="secondary" icon={MessageCircle}>
-          گفتگو با غرفه
-        </Button>
+        <StorefrontChat slug={storefront.slug} name={storefront.name} />
       </header>
 
       <section aria-labelledby="listings-title">
