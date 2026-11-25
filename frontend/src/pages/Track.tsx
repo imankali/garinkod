@@ -9,6 +9,7 @@ import { ordersApi } from '../api/services';
 import type { Order } from '@/types/commerce';
 import { parseApiError } from '../api/errors';
 import { money, nums } from '../lib/price';
+import { dateTime } from '../lib/date';
 import PageHead from '../components/shop/PageHead';
 import { TextField } from '../components/ui/Field';
 import Button from '../components/ui/Button';
@@ -180,10 +181,7 @@ export default function Track() {
                         <p className="text-2xs leading-6 text-ink-soft dark:text-white/65">{event.description}</p>
                       )}
                       <p className="dateline text-[11px] text-ink-mute dark:text-white/40">
-                        {new Date(event.occurred_at).toLocaleString('fa-IR', {
-                          dateStyle: 'short',
-                          timeStyle: 'short',
-                        })}
+                        {dateTime(event.occurred_at)}
                         {event.location ? ` · ${event.location}` : ''}
                       </p>
                     </li>

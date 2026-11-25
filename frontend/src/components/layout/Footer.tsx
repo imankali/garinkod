@@ -6,6 +6,7 @@ import { Mail, MapPin, Phone } from 'lucide-react';
 
 import { siteInfoApi } from '../../api/services';
 import { mailHref, telHref } from '../../lib/phone';
+import { year } from '../../lib/date';
 import { FOOTER_NAV } from './nav';
 import Logo from './Logo';
 import NewsletterForm from './NewsletterForm';
@@ -108,7 +109,7 @@ export default function Footer() {
         <div className="mt-10 grid gap-6 border-t border-white/15 pt-8 lg:grid-cols-[1fr_auto] lg:items-end">
           <NewsletterForm />
           <p className="dateline text-[11px] text-brand-100/60">
-            © {new Date().toLocaleDateString('fa-IR', { year: 'numeric' })} گرین‌کود — همهٔ حقوق محفوظ است.
+            © {year()} گرین‌کود — همهٔ حقوق محفوظ است.
           </p>
         </div>
       </div>

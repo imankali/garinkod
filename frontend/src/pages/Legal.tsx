@@ -10,6 +10,7 @@ import { ProseSkeleton, Skeleton } from '../components/ui/Skeleton';
 import EmptyState from '../components/ui/EmptyState';
 import Button from '../components/ui/Button';
 import { nums } from '../lib/price';
+import { date } from '../lib/date';
 
 /**
  * Legal documents — both the hub (`/legal`) and one document (`/legal/:slug`).
@@ -140,7 +141,7 @@ function Document({ slug }: { slug: string }) {
         <h1 className="text-2xl font-extrabold leading-9 tracking-[-0.03em] text-ink dark:text-white">{data.title}</h1>
         <p className="mt-1 text-2xs text-ink-mute dark:text-white/45">
           {data.group_label}
-          {data.updated_at ? ` · آخرین به‌روزرسانی ${new Date(data.updated_at).toLocaleDateString('fa-IR')}` : ''}
+          {data.updated_at ? ` · آخرین به‌روزرسانی ${date(data.updated_at)}` : ''}
         </p>
         {data.summary && <p className="mt-3 text-sm leading-7 text-ink-soft dark:text-white/65">{data.summary}</p>}
 
