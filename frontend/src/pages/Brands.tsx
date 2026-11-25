@@ -8,7 +8,7 @@ import { catalogApi } from '../api/services';
 import PageHead from '../components/shop/PageHead';
 import { CardGridSkeleton } from '../components/ui/Skeleton';
 import { nums } from '../lib/price';
-import { landingPath } from '../lib/landing';
+import { brandShopPath, landingPath } from '../lib/landing';
 
 /**
  * «برندها» — every addressable landing page in the catalogue: brands, then
@@ -48,7 +48,7 @@ export default function Brands() {
               {group.items.map((item) => (
                 <li key={`${group.kind}-${item.slug}`} className="border-b border-line dark:border-night-line">
                   <Link
-                    to={landingPath(item)}
+                    to={item.kind === 'brand' ? brandShopPath(item.slug) : landingPath(item)}
                     className="group flex items-center justify-between gap-3 py-2.5"
                   >
                     <span className="min-w-0">

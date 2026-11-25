@@ -3,9 +3,9 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { PackageSearch, SlidersHorizontal } from 'lucide-react';
+import { PackageSearch, SlidersHorizontal, X } from 'lucide-react';
 
-import { categoriesApi, productsApi } from '../api/services';
+import { catalogApi, categoriesApi, productsApi } from '../api/services';
 import type { ProductList } from '@/types/shop';
 import PageHead from '../components/shop/PageHead';
 import ProductCard from '../components/shop/ProductCard';
@@ -43,6 +43,15 @@ export default function Shop() {
   const category = params.get('category') ?? '';
   const ordering = params.get('ordering') ?? '-created';
   const search = params.get('search') ?? '';
+  /**
+   * Brand and tag arrive from the brand index and from a landing page's own
+   * links. They are filters like any other, so they live in the URL with the
+   * rest and are shown as a removable chip — a catalogue that is silently
+   * filtered by something the visitor cannot see is a catalogue that looks
+   * empty for no reason.
+   */
+  const brandSlug = params.get('brand_slug') ?? '';
+  const tag = params.get('tag') ?? '';
   const page = Math.max(1, Number(params.get('page') || 1) || 1);
   const PAGE_SIZE = 24;
 
@@ -53,11 +62,13 @@ export default function Shop() {
   });
 
   const products = useQuery({
-    queryKey: ['products', { category, ordering, search, page }],
+    queryKey: ['products', { category, ordering, search, page, brandSlug, tag }],
     queryFn: async () =>
       (await productsApi.getAll({
         ...(category ? { category } : {}),
         ...(search ? { search } : {}),
+        ...(brandSlug ? { brand_slug: brandSlug } : {}),
+        ...(tag ? { tag } : {}),
         ordering,
         page,
         page_size: PAGE_SIZE,
@@ -67,6 +78,20 @@ export default function Shop() {
     // still looking at while the next one arrives.
     placeholderData: keepPreviousData,
   });
+
+  /**
+   * The chip names the filter the way the visitor saw it. The URL carries a
+   * slug; the index carries the title; asking for the index only when a brand
+   * or tag is actually applied keeps the plain catalogue to its two requests.
+   */
+  const index = useQuery({
+    queryKey: ['catalog-index'],
+    queryFn: async () => (await catalogApi.index()).data,
+    enabled: Boolean(brandSlug || tag),
+    staleTime: 30 * 60 * 1000,
+  });
+  const brandName = index.data?.brands.find((entry) => entry.slug === brandSlug)?.title ?? brandSlug;
+  const tagName = index.data?.tags.find((entry) => entry.slug === tag)?.title ?? tag;
 
   const activeCategory = useMemo(
     () => categories.data?.find((item) => item.slug === category),
@@ -105,7 +130,17 @@ export default function Shop() {
   return (
     <div className="shell flex flex-col gap-5 py-8">
       <PageHead
-        title={activeCategory ? activeCategory.name : search ? `نتیجهٔ جستجو: «${search}»` : 'فروشگاه گرین‌کود'}
+        title={
+          activeCategory
+            ? activeCategory.name
+            : search
+              ? `نتیجهٔ جستجو: «${search}»`
+              : brandSlug
+                ? brandName
+                : tag
+                  ? `برچسب «${tagName}»`
+                  : 'فروشگاه گرین‌کود'
+        }
         lead={
           activeCategory?.description ||
           'کود، سم، بذر، ادوات و آبیاری — موجودی و قیمت هر کالا پیش از پرداخت بررسی می‌شود.'
@@ -154,6 +189,18 @@ export default function Shop() {
             </button>
           ))}
         </div>
+
+        {(brandSlug || tag) && (
+          <button
+            type="button"
+            onClick={() => patch({ brand_slug: null, tag: null })}
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-pill border border-brand-700 bg-brand-700 px-3 text-2xs font-bold text-white"
+          >
+            {brandSlug ? `برند: ${brandName}` : `برچسب: ${tagName}`}
+            <X size={12} aria-hidden="true" />
+            <span className="sr-only">حذف این فیلتر</span>
+          </button>
+        )}
 
         <label className="ms-auto inline-flex items-center gap-2 text-2xs font-bold text-ink-mute dark:text-white/45">
           ترتیب

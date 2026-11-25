@@ -100,7 +100,10 @@ export default function Checkout() {
         coupon_code: coupon || undefined,
         payment_method: 'coordination',
         affiliate_code: readReferral(),
-        terms_accepted: true,
+        // The submit button cannot be pressed until the terms checkbox is
+        // ticked, so this is the visitor's own agreement rather than a
+        // constant that happens to be true.
+        terms_accepted: terms,
       });
       await queryClient.invalidateQueries({ queryKey: ['cart'] });
       navigate(`/track?code=${result.data.order.code}`, { replace: true });

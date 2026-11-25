@@ -14,11 +14,12 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { productsApi } from '../api/services';
+import { catalogApi, categoriesApi, productsApi } from '../api/services';
 import { createQueryClient, Providers } from '../providers';
 import Shop from './Shop';
 
 vi.mock('../api/services', () => ({
+  catalogApi: { index: vi.fn() },
   categoriesApi: { getAll: vi.fn() },
   productsApi: { getAll: vi.fn() },
 }));
@@ -61,6 +62,14 @@ const renderShop = (path = '/products') =>
   );
 
 beforeEach(() => {
+  vi.mocked(categoriesApi.getAll).mockResolvedValue({ data: { count: 0, results: [] } } as never);
+  vi.mocked(catalogApi.index).mockResolvedValue({
+    data: {
+      categories: [],
+      brands: [{ kind: 'brand', title: 'باغبان‌پرو', slug: 'baghban-pro', image_url: '', description: '', count: 3, url: '' }],
+      tags: [{ kind: 'tag', title: 'ارگانیک', slug: 'organic', image_url: '', description: '', count: 1, url: '' }],
+    },
+  } as never);
   vi.mocked(productsApi.getAll).mockReset();
   vi.mocked(productsApi.getAll).mockImplementation((params) =>
     Promise.resolve(results(params?.page ?? 1) as never),
@@ -115,5 +124,31 @@ describe('Shop pagination', () => {
 
     await waitFor(() => expect(screen.getAllByRole('article').length).toBe(24));
     expect(screen.queryByRole('navigation', { name: 'صفحه‌بندی کالاها' })).toBeNull();
+  });
+
+  it('filters by brand from the URL and names the brand in the chip', async () => {
+    renderShop('/products?brand_slug=baghban-pro');
+
+    await waitFor(() =>
+      expect(vi.mocked(productsApi.getAll).mock.calls[0]?.[0]).toMatchObject({ brand_slug: 'baghban-pro' }),
+    );
+    expect(await screen.findByRole('heading', { level: 1, name: 'باغبان‌پرو' })).toBeDefined();
+    expect(screen.getByRole('button', { name: /برند: باغبان‌پرو/ })).toBeDefined();
+  });
+
+  it('passes a tag through and clears both filters with one chip', async () => {
+    renderShop('/products?brand_slug=baghban-pro&tag=organic');
+
+    await waitFor(() =>
+      expect(vi.mocked(productsApi.getAll).mock.calls[0]?.[0]).toMatchObject({ tag: 'organic' }),
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: /برند:/ }));
+
+    await waitFor(() => {
+      const last = vi.mocked(productsApi.getAll).mock.calls.at(-1)?.[0];
+      expect(last).not.toHaveProperty('brand_slug');
+      expect(last).not.toHaveProperty('tag');
+    });
   });
 });
