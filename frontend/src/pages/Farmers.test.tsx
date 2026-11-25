@@ -19,10 +19,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const requestProcurement = vi.fn();
 const provinces = vi.fn();
+const cities = vi.fn();
+const search = vi.fn();
 
 vi.mock('../api/services', () => ({
   agricultureApi: { requestProcurement: (...a: unknown[]) => requestProcurement(...a) },
-  locationsApi: { provinces: (...a: unknown[]) => provinces(...a) },
+  locationsApi: {
+    provinces: (...a: unknown[]) => provinces(...a),
+    cities: (...a: unknown[]) => cities(...a),
+    search: (...a: unknown[]) => search(...a),
+  },
 }));
 
 import Farmers from './Farmers';
@@ -45,19 +51,29 @@ async function fillOffer(price?: string) {
   await userEvent.type(screen.getByLabelText('مقدار'), '1500');
   await waitFor(() => expect(screen.getByRole('option', { name: 'فارس' })).toBeDefined());
   await userEvent.selectOptions(screen.getByLabelText('استان'), 'فارس');
-  await userEvent.type(screen.getByLabelText('شهر / بخش'), 'شیراز');
+  await waitFor(() => expect(screen.getByRole('option', { name: 'شیراز' })).toBeDefined());
+  await userEvent.selectOptions(screen.getByLabelText('شهر'), 'شیراز');
   if (price) await userEvent.type(screen.getByLabelText('قیمت پیشنهادی هر واحد (تومان)'), price);
 }
 
 beforeEach(() => {
   requestProcurement.mockReset();
   provinces.mockReset();
+  cities.mockReset();
+  search.mockReset();
   provinces.mockResolvedValue({
     data: {
       count: 1,
       results: [{ id: 1, name: 'فارس', slug: 'fars', kind: 'province', parent: null, province_name: 'فارس' }],
     },
   });
+  cities.mockResolvedValue({
+    data: {
+      count: 1,
+      results: [{ id: 327, name: 'شیراز', slug: 'فارس-شیراز', kind: 'city', parent: 326, province_name: 'فارس' }],
+    },
+  });
+  search.mockResolvedValue({ data: { count: 0, results: [] } });
 });
 
 describe('Farmers — the procurement offer', () => {
@@ -130,5 +146,25 @@ describe('Farmers — the procurement offer', () => {
 
     // The button is disabled until the fields the API requires are all there.
     expect(screen.getByRole('button', { name: 'ثبت درخواست فروش' })).toBeDisabled();
+  });
+
+  it('fills province and city from a search, so the pair cannot disagree', async () => {
+    search.mockResolvedValue({
+      data: {
+        count: 1,
+        results: [{ id: 327, name: 'شیراز', slug: 'فارس-شیراز', kind: 'city', parent: 326, province_name: 'فارس' }],
+      },
+    });
+    renderFarmers();
+
+    await userEvent.type(screen.getByLabelText('جست‌وجوی استان یا شهر'), 'شیراز');
+
+    const hit = await screen.findByRole('button', { name: /شیراز/ });
+    await userEvent.click(hit);
+
+    // A city hit sets both selectors at once — the buyer filter and the stored
+    // offer then carry the same province the server knows.
+    expect((screen.getByLabelText('استان') as HTMLSelectElement).value).toBe('فارس');
+    await waitFor(() => expect((screen.getByLabelText('شهر') as HTMLSelectElement).value).toBe('شیراز'));
   });
 });

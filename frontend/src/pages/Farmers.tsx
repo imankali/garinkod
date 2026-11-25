@@ -1,15 +1,15 @@
 // frontend/src/pages/Farmers.tsx
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router';
-import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, BadgeCheck, Banknote, ClipboardCheck, MessageCircle } from 'lucide-react';
 
-import { agricultureApi, locationsApi } from '../api/services';
+import { agricultureApi } from '../api/services';
 import { parseApiError } from '../api/errors';
 import PageHead from '../components/shop/PageHead';
 import Button from '../components/ui/Button';
 import { SelectField, TextArea, TextField } from '../components/ui/Field';
+import { LocationFields } from '../components/shop/LocationFields';
 
 /**
  * «فروش محصول» — the seller page.
@@ -69,14 +69,6 @@ function OfferForm() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filed, setFiled] = useState<{ code: string; message: string } | null>(null);
-
-  const provinces = useQuery({
-    queryKey: ['locations', 'provinces'],
-    queryFn: async () => (await locationsApi.provinces()).data.results,
-    staleTime: 60 * 60 * 1000,
-  });
-  // `?? []` inline in render trips exhaustive-deps; memoise the fallback.
-  const provinceRows = useMemo(() => provinces.data ?? [], [provinces.data]);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -156,23 +148,15 @@ function OfferForm() {
             ))}
           </SelectField>
         </div>
-        <SelectField
-          label="استان"
+        <LocationFields
           required
-          value={province}
-          onChange={(e) => {
-            setProvince(e.target.value);
-            setCity('');
+          province={province}
+          city={city}
+          onChange={({ province: next, city: nextCity }) => {
+            setProvince(next);
+            setCity(nextCity);
           }}
-        >
-          <option value="">انتخاب کنید…</option>
-          {provinceRows.map((entry) => (
-            <option key={entry.id} value={entry.name}>
-              {entry.name}
-            </option>
-          ))}
-        </SelectField>
-        <TextField label="شهر / بخش" required value={city} onChange={(e) => setCity(e.target.value)} />
+        />
         <TextField
           label="قیمت پیشنهادی هر واحد (تومان)"
           dir="ltr"

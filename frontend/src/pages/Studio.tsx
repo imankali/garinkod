@@ -43,6 +43,7 @@ import { useDebouncedValue } from '../lib/useDebouncedValue';
 import { useTitle } from '../lib/useTitle';
 import { useAuthStore } from '../store/authStore';
 import PageHead from '../components/shop/PageHead';
+import { LocationFields } from '../components/shop/LocationFields';
 import Button from '../components/ui/Button';
 import EmptyState from '../components/ui/EmptyState';
 import { SelectField, TextArea, TextField } from '../components/ui/Field';
@@ -180,8 +181,16 @@ function ApplyForm({ onApplied }: { onApplied: () => void }) {
             </option>
           ))}
         </SelectField>
-        <TextField label="استان" value={province} onChange={(event) => setProvince(event.target.value)} />
-        <TextField label="شهر" value={city} onChange={(event) => setCity(event.target.value)} />
+        {/* Buyers filter stalls by an exact province name, so this must be the
+            server's own value rather than whatever was typed. */}
+        <LocationFields
+          province={province}
+          city={city}
+          onChange={({ province: next, city: nextCity }) => {
+            setProvince(next);
+            setCity(nextCity);
+          }}
+        />
       </fieldset>
 
       <TextArea

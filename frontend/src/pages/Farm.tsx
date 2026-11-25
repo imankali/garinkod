@@ -33,6 +33,7 @@ import { date as formatDate, dateTime } from '../lib/date';
 import { useAuthStore } from '../store/authStore';
 import { useTitle } from '../lib/useTitle';
 import PageHead from '../components/shop/PageHead';
+import { LocationFields } from '../components/shop/LocationFields';
 import Button from '../components/ui/Button';
 import EmptyState from '../components/ui/EmptyState';
 import { SelectField, TextArea, TextField } from '../components/ui/Field';
@@ -155,8 +156,17 @@ function LandForm({ land, onDone }: { land?: FarmLand; onDone: () => void }) {
           onChange={(event) => setCrop(event.target.value)}
           hint="مثلاً: گندم، سیب، خیار"
         />
-        <TextField label="استان" value={province} onChange={(event) => setProvince(event.target.value)} />
-        <TextField label="شهر" value={city} onChange={(event) => setCity(event.target.value)} />
+        {/* The province on a land is reported to the consultant and to the
+            service desk, and is copied onto a service request when that form
+            leaves it blank — so it has to be a real one. */}
+        <LocationFields
+          province={province}
+          city={city}
+          onChange={({ province: next, city: nextCity }) => {
+            setProvince(next);
+            setCity(nextCity);
+          }}
+        />
       </div>
 
       {create.isError && (
