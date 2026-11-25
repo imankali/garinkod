@@ -13,6 +13,7 @@ import { MemoryRouter, Route, Routes } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const profile = vi.fn();
+const searchContent = vi.fn();
 const follow = vi.fn();
 const unfollow = vi.fn();
 const like = vi.fn();
@@ -24,6 +25,7 @@ const markManySeen = vi.fn();
 vi.mock('../api/services', () => ({
   storefrontsApi: {
     profile: (...args: unknown[]) => profile(...args),
+    searchContent: (...args: unknown[]) => searchContent(...args),
     follow: (...args: unknown[]) => follow(...args),
     unfollow: (...args: unknown[]) => unfollow(...args),
   },
@@ -309,5 +311,46 @@ describe('StorefrontPage — highlighted collections', () => {
     await screen.findByText('باغ سبز شیراز');
 
     expect(screen.queryByText('مجموعه‌ها')).toBeNull();
+  });
+
+  it('searches the stall itself when a buyer asks for a fruit by name', async () => {
+    searchContent.mockResolvedValue({
+      data: {
+        query: 'پرتقال',
+        posts: [],
+        stories: [],
+        listings: [
+          {
+            id: 77,
+            slug: 'porteghal-tamson',
+            title: 'پرتقال تامسون شمال',
+            crop_name: 'پرتقال',
+            category_label: 'میوه',
+            quantity_available: '120.00',
+            unit: 'کیلوگرم',
+            discounted_price: 48000,
+          },
+        ],
+      },
+    });
+    renderPage();
+
+    await screen.findByText('محصولات این غرفه');
+    await userEvent.type(screen.getByLabelText('جست‌وجو در این غرفه'), 'پرتقال');
+
+    // The item the profile page did not list — the point of a search.
+    const hit = await screen.findByRole('link', { name: /پرتقال تامسون شمال/ });
+    expect(hit).toHaveAttribute('href', '/listing/porteghal-tamson');
+    expect(searchContent).toHaveBeenCalledWith('باغ-سبز-شیراز', 'پرتقال');
+  });
+
+  it('says nothing matched rather than showing an empty grid', async () => {
+    searchContent.mockResolvedValue({ data: { query: 'انار', posts: [], stories: [], listings: [] } });
+    renderPage();
+
+    await screen.findByText('محصولات این غرفه');
+    await userEvent.type(screen.getByLabelText('جست‌وجو در این غرفه'), 'انار');
+
+    expect(await screen.findByText(/چیزی با «انار» در این غرفه پیدا نشد/)).toBeDefined();
   });
 });

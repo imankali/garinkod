@@ -1,6 +1,6 @@
 // frontend/src/pages/StorefrontPage.tsx
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { BadgeCheck, MapPin, Store, UserPlus, UserMinus } from 'lucide-react';
@@ -15,6 +15,8 @@ import { ProseSkeleton } from '../components/ui/Skeleton';
 import EmptyState from '../components/ui/EmptyState';
 import StorefrontChat from '../components/shop/StorefrontChat';
 import StorefrontFeed from '../components/shop/StorefrontFeed';
+import { TextField } from '../components/ui/Field';
+import { useDebouncedValue } from '../lib/useDebouncedValue';
 import { useTitle } from '../lib/useTitle';
 
 /**
@@ -104,6 +106,22 @@ function FollowButton({
 
 export default function StorefrontPage() {
   const { slug = '' } = useParams();
+
+  // A stall with eight listings and a month of posts has no way to answer
+  // «پرتقال دارید؟» other than scrolling. `searchContent` covers the three
+  // things a stall publishes — listings, posts, stories — in one read.
+  const [query, setQuery] = useState('');
+  const debouncedQuery = useDebouncedValue(query.trim(), 350);
+
+  const search = useQuery({
+    queryKey: ['storefront-search', slug, debouncedQuery],
+    queryFn: async () => (await storefrontsApi.searchContent(slug, debouncedQuery)).data,
+    enabled: debouncedQuery.length >= 2,
+    staleTime: 2 * 60 * 1000,
+  });
+
+  const searchRows = useMemo(() => search.data ?? null, [search.data]);
+  const searching = debouncedQuery.length >= 2;
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['storefront', slug],
@@ -244,11 +262,69 @@ export default function StorefrontPage() {
       )}
 
       <section aria-labelledby="listings-title">
-        <h2 id="listings-title" className="text-base font-extrabold text-ink dark:text-white">
-          محصولات این غرفه
-        </h2>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <h2 id="listings-title" className="text-base font-extrabold text-ink dark:text-white">
+            محصولات این غرفه
+          </h2>
+          <div className="w-full sm:w-64">
+            <TextField
+              label="جست‌وجو در این غرفه"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="مثلاً پرتقال"
+            />
+          </div>
+        </div>
 
-        {listings.length === 0 ? (
+        {searching ? (
+          <div className="mt-3" aria-live="polite">
+            {search.isLoading || !searchRows ? (
+              <p className="text-2xs text-ink-mute dark:text-white/45">در حال جست‌وجو…</p>
+            ) : (
+              <>
+                {searchRows.listings.length === 0 && searchRows.posts.length === 0 && searchRows.stories.length === 0 ? (
+                  <p className="text-2xs text-ink-mute dark:text-white/45">
+                    چیزی با «{searchRows.query}» در این غرفه پیدا نشد. می‌توانید با نام دیگری
+                    امتحان کنید یا از غرفه‌دار در گفتگو بپرسید.
+                  </p>
+                ) : (
+                  <>
+                    {searchRows.listings.length > 0 && (
+                      <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        {searchRows.listings.map((listing: MarketplaceListing) => (
+                          <li key={listing.id}>
+                            <Link
+                              to={`/listing/${listing.slug}`}
+                              className="flex h-full items-center justify-between gap-3 rounded-lg border border-line bg-paper p-3 text-2xs hover:border-brand-300 dark:border-night-line dark:bg-night-soft dark:hover:border-brand-600"
+                            >
+                              <span className="min-w-0">
+                                <span className="block truncate text-xs font-extrabold text-ink dark:text-white">
+                                  {listing.title}
+                                </span>
+                                <span className="mt-0.5 block text-ink-mute dark:text-white/45">
+                                  {listing.crop_name || listing.category_label}
+                                </span>
+                              </span>
+                              <span className="dateline shrink-0 font-extrabold text-brand-800 dark:text-brand-300">
+                                {money(listing.discounted_price)}
+                              </span>
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {searchRows.posts.length > 0 && (
+                      <p className="mt-3 text-2xs text-ink-mute dark:text-white/45">
+                        {nums(searchRows.posts.length)} پست و {nums(searchRows.stories.length)} استوری هم
+                        با همین واژه در فید این غرفه هست — پایین‌تر.
+                      </p>
+                    )}
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        ) : listings.length === 0 ? (
           <div className="mt-3">
             <EmptyState
               title="این غرفه الان آگهی فعالی ندارد"
@@ -293,7 +369,10 @@ export default function StorefrontPage() {
         )}
       </section>
 
-      <StorefrontFeed posts={posts ?? []} stories={stories ?? []} />
+      <StorefrontFeed
+        posts={(searching && searchRows ? searchRows.posts : posts) ?? []}
+        stories={(searching && searchRows ? searchRows.stories : stories) ?? []}
+      />
     </div>
   );
 }
