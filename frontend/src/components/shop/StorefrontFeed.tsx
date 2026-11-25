@@ -243,6 +243,25 @@ function PostCard({ post }: { post: StorefrontPost }) {
                     <p className="whitespace-pre-line text-2xs leading-6 text-ink-soft dark:text-white/65">
                       {item.body}
                     </p>
+                    {/* The seller answers a question on their own post. The
+                        response carries those answers under `replies` and the
+                        feed threw the field away, so a buyer's «موجوده؟» sat
+                        next to an answer nobody could see — the reply only
+                        existed in the inbox notification. */}
+                    {(item.replies ?? []).length > 0 && (
+                      <ul className="mt-2 flex flex-col gap-1.5 border-s-2 border-line ps-2.5 dark:border-night-line">
+                        {(item.replies ?? []).map((reply) => (
+                          <li key={reply.id}>
+                            <p className="text-[11px] font-bold text-ink-mute dark:text-white/50">
+                              {reply.author_name}
+                            </p>
+                            <p className="whitespace-pre-line text-2xs leading-6 text-ink-soft dark:text-white/65">
+                              {reply.body}
+                            </p>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </li>
                 ))}
               </ul>
