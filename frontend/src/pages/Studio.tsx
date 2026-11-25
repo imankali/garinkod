@@ -25,11 +25,16 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ImagePlus, PackagePlus, Send, Store, Trash2 } from 'lucide-react';
+import { Archive, ImagePlus, Layers, PackagePlus, Send, Store, Trash2 } from 'lucide-react';
 import { Link } from 'react-router';
 
-import { agricultureApi, storefrontPostsApi } from '../api/services';
-import type { MarketplaceListing, Storefront, StorefrontPost } from '@/types/storefront';
+import { agricultureApi, storefrontPostsApi, storefrontsApi } from '../api/services';
+import type {
+  MarketplaceListing,
+  Storefront,
+  StorefrontHighlight,
+  StorefrontPost,
+} from '@/types/storefront';
 import { parseApiError } from '../api/errors';
 import { cn } from '../lib/cn';
 import { money, nums } from '../lib/price';
@@ -461,6 +466,178 @@ function PostComposer({ onDone }: { onDone: () => void }) {
   );
 }
 
+/**
+ * The story archive, and turning archived stories into highlights.
+ *
+ * `/marketplace/posts/story_archive/` is the whole reason a highlight can be
+ * permanent: a story leaves the 24-hour stage by the clock or by the seller's
+ * own delete, and the archive keeps it so it can join a collection later. It
+ * had no caller, and neither did `createHighlight`/`updateHighlight`/
+ * `deleteHighlight` — so a seller could make a story that vanished in a day and
+ * could never make the «برداشت» collection the storefront page has a slot for.
+ *
+ * Each archived row carries `highlight_ids`: the collections it already belongs
+ * to. That is used for the badge, not recomputed here — a client that guessed
+ * would offer to add a story twice.
+ */
+function ArchivePanel({ highlights }: { highlights: StorefrontHighlight[] }) {
+  const queryClient = useQueryClient();
+  const [title, setTitle] = useState('');
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+
+  const archive = useQuery({
+    queryKey: ['story-archive'],
+    queryFn: async () => (await storefrontsApi.storyArchive()).data,
+  });
+
+  const rows = archive.data ?? [];
+
+  const toggle = (id: number) =>
+    setSelected((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const createHighlight = useMutation({
+    mutationFn: async () =>
+      (
+        await storefrontsApi.createHighlight({
+          title: title.trim(),
+          // Order matters: the strip shows the first six, in this order.
+          post_ids: [...selected],
+        })
+      ).data,
+    onSuccess: () => {
+      setTitle('');
+      setSelected(new Set());
+      void queryClient.invalidateQueries({ queryKey: ['story-archive'] });
+      void queryClient.invalidateQueries({ queryKey: ['my-highlights'] });
+      void queryClient.invalidateQueries({ queryKey: ['storefront'] });
+    },
+  });
+
+  const removeHighlight = useMutation({
+    mutationFn: async (id: number) => storefrontsApi.deleteHighlight(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['my-highlights'] });
+      void queryClient.invalidateQueries({ queryKey: ['storefront'] });
+    },
+  });
+
+  return (
+    <section aria-labelledby="archive-title">
+      <h2 id="archive-title" className="flex items-center gap-1.5 text-sm font-extrabold text-ink dark:text-white">
+        <Archive size={14} aria-hidden="true" />
+        آرشیو استوری‌ها
+      </h2>
+      <p className="mt-1 text-2xs leading-6 text-ink-mute dark:text-white/45">
+        استوری‌ای که از صفحهٔ ۲۴ ساعته خارج شود همین‌جا می‌ماند و می‌تواند به یک مجموعهٔ
+        ماندگار اضافه شود.
+      </p>
+
+      {highlights.length > 0 && (
+        <ul className="mt-3 flex flex-wrap gap-2">
+          {highlights.map((highlight) => (
+            <li
+              key={highlight.id}
+              className="flex items-center gap-2 rounded-sm border border-line px-2 py-1 text-2xs dark:border-night-line"
+            >
+              <Layers size={12} aria-hidden="true" className="text-brand-700 dark:text-brand-300" />
+              <span className="font-bold text-ink dark:text-white">{highlight.title}</span>
+              <span className="dateline text-ink-mute dark:text-white/40">
+                {nums(highlight.items.length)}
+              </span>
+              <button
+                type="button"
+                onClick={() => removeHighlight.mutate(highlight.id)}
+                disabled={removeHighlight.isPending}
+                aria-label={`حذف مجموعهٔ ${highlight.title}`}
+                className="text-ink-mute hover:text-danger-700 disabled:opacity-50 dark:text-white/40"
+              >
+                <Trash2 size={11} aria-hidden="true" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {archive.isLoading ? (
+        <Skeleton className="mt-3 h-20" />
+      ) : rows.length === 0 ? (
+        <p className="mt-3 rounded-lg border border-line p-4 text-2xs leading-6 text-ink-mute dark:border-night-line dark:text-white/50">
+          آرشیو خالی است. استوری‌هایی که منتشر می‌کنید پس از انقضا اینجا جمع می‌شوند.
+        </p>
+      ) : (
+        <form
+          noValidate
+          className="mt-3 flex flex-col gap-3"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!title.trim() || selected.size === 0 || createHighlight.isPending) return;
+            createHighlight.mutate();
+          }}
+        >
+          <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {rows.map((row) => (
+              <li key={row.id}>
+                <label className="flex cursor-pointer flex-col gap-1">
+                  <span className="relative block overflow-hidden rounded-md border border-line dark:border-night-line">
+                    {row.image_url ? (
+                      <img src={row.image_url} alt="" loading="lazy" className="h-20 w-full object-cover" />
+                    ) : (
+                      <span className="block h-20 w-full bg-brand-50 dark:bg-night-soft" />
+                    )}
+                    <input
+                      type="checkbox"
+                      checked={selected.has(row.id)}
+                      onChange={() => toggle(row.id)}
+                      className="absolute end-1 top-1"
+                      aria-label={row.caption || 'استوری'}
+                    />
+                    {(row.highlight_ids ?? []).length > 0 && (
+                      <span className="absolute start-1 top-1 rounded-sm bg-brand-700 px-1 text-[10px] font-bold text-white">
+                        در مجموعه
+                      </span>
+                    )}
+                  </span>
+                  <span className="truncate text-[11px] text-ink-soft dark:text-white/55">
+                    {row.caption || 'بدون متن'}
+                  </span>
+                </label>
+              </li>
+            ))}
+          </ul>
+
+          <div className="flex flex-wrap items-end gap-2">
+            <TextField
+              label="نام مجموعه"
+              required
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              hint="مثلاً: برداشت، بسته‌بندی"
+            />
+            <Button
+              type="submit"
+              loading={createHighlight.isPending}
+              disabled={!title.trim() || selected.size === 0}
+            >
+              ساختن مجموعه
+            </Button>
+          </div>
+
+          {createHighlight.isError && (
+            <p role="alert" className="text-2xs font-bold text-danger-700">
+              {parseApiError(createHighlight.error).message}
+            </p>
+          )}
+        </form>
+      )}
+    </section>
+  );
+}
+
 export default function Studio() {
   useTitle('استودیو غرفه');
   const user = useAuthStore((state) => state.user);
@@ -489,6 +666,14 @@ export default function Studio() {
     queryKey: ['my-posts'],
     queryFn: async () => (await storefrontPostsApi.mine()).data,
     enabled: Boolean(user) && Boolean(stall.data),
+  });
+
+  // The owner's view of their own collections. The profile response carries
+  // them, so this is the same object the public page renders.
+  const myHighlights = useQuery({
+    queryKey: ['my-highlights'],
+    queryFn: async () => (await storefrontsApi.highlights(stall.data?.slug ?? '')).data,
+    enabled: Boolean(stall.data?.slug),
   });
 
   const removePost = useMutation({
@@ -692,6 +877,14 @@ export default function Studio() {
               </ul>
             )}
           </section>
+
+          <ArchivePanel
+            highlights={
+              (Array.isArray(myHighlights.data)
+                ? myHighlights.data
+                : myHighlights.data?.results ?? []) as StorefrontHighlight[]
+            }
+          />
         </>
       )}
     </div>

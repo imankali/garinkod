@@ -27,8 +27,18 @@ const createStorefront = vi.fn();
 const myPosts = vi.fn();
 const createPost = vi.fn();
 const removePost = vi.fn();
+const storyArchive = vi.fn();
+const highlights = vi.fn();
+const createHighlight = vi.fn();
+const deleteHighlight = vi.fn();
 
 vi.mock('../api/services', () => ({
+  storefrontsApi: {
+    storyArchive: (...a: unknown[]) => storyArchive(...a),
+    highlights: (...a: unknown[]) => highlights(...a),
+    createHighlight: (...a: unknown[]) => createHighlight(...a),
+    deleteHighlight: (...a: unknown[]) => deleteHighlight(...a),
+  },
   agricultureApi: {
     getStorefront: (...a: unknown[]) => getStorefront(...a),
     myListings: (...a: unknown[]) => myListings(...a),
@@ -310,5 +320,75 @@ describe('Studio — the stall’s own feed', () => {
     await userEvent.click(screen.getByRole('button', { name: 'حذف پست' }));
 
     await waitFor(() => expect(removePost).toHaveBeenCalledWith(12));
+  });
+});
+
+describe('Studio — the story archive and highlights', () => {
+  const archived = {
+    id: 31,
+    storefront: 3,
+    storefront_name: 'پسته رفسنجان',
+    storefront_slug: 'پسته-رفسنجان',
+    storefront_avatar_url: '',
+    storefront_is_verified: false,
+    listing: null,
+    post_type: 'story',
+    post_type_label: 'استوری',
+    caption: 'برداشت امروز',
+    image: null,
+    image_url: '/images/hero-farm.jpg',
+    status: 'archived',
+    status_label: 'بایگانی',
+    expires_at: '2026-11-24T06:00:00+03:30',
+    created_at: '2026-11-23T06:00:00+03:30',
+    updated_at: '2026-11-24T06:00:00+03:30',
+    highlight_ids: [],
+  };
+
+  it('shows the archived stories the seller can still use', async () => {
+    getStorefront.mockResolvedValue({ data: stall });
+    storyArchive.mockResolvedValue({ data: [archived] });
+    renderStudio();
+
+    // A story past its 24 hours is not gone; the archive is what makes a
+    // highlight permanent.
+    expect(await screen.findByText(/آرشیو استوری‌ها/)).toBeDefined();
+    expect(await screen.findByText('برداشت امروز')).toBeDefined();
+  });
+
+  it('builds a highlight from the stories the seller ticked', async () => {
+    getStorefront.mockResolvedValue({ data: stall });
+    storyArchive.mockResolvedValue({ data: [archived] });
+    createHighlight.mockResolvedValue({
+      data: { id: 2, title: 'برداشت', cover: null, cover_url: '', position: 1, items: [], created_at: '' },
+    });
+    renderStudio();
+
+    await screen.findByText('برداشت امروز');
+    await userEvent.click(screen.getByRole('checkbox', { name: 'برداشت امروز' }));
+    await userEvent.type(screen.getByLabelText('نام مجموعه'), 'برداشت');
+    await userEvent.click(screen.getByRole('button', { name: 'ساختن مجموعه' }));
+
+    await waitFor(() => expect(createHighlight).toHaveBeenCalled());
+    expect(createHighlight.mock.calls[0]?.[0]).toEqual({ title: 'برداشت', post_ids: [31] });
+  });
+
+  it('badges a story that is already in a collection', async () => {
+    getStorefront.mockResolvedValue({ data: stall });
+    storyArchive.mockResolvedValue({ data: [{ ...archived, highlight_ids: [1] }] });
+    renderStudio();
+
+    // The badge comes from `highlight_ids`, which the server computes; guessing
+    // client-side would offer to add the same story twice.
+    expect(await screen.findByText('در مجموعه')).toBeDefined();
+  });
+
+  it('cannot build a collection without a name and at least one story', async () => {
+    getStorefront.mockResolvedValue({ data: stall });
+    storyArchive.mockResolvedValue({ data: [archived] });
+    renderStudio();
+
+    await screen.findByText('برداشت امروز');
+    expect(screen.getByRole('button', { name: 'ساختن مجموعه' }).hasAttribute('disabled')).toBe(true);
   });
 });
