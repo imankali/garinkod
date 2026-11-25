@@ -138,6 +138,23 @@ describe('ProductDetail packaging', () => {
     expect(addToCart).toHaveBeenCalledWith(product.id, 1, 2);
   });
 
+  it('keeps «تماس بگیرید» for a quote-only product even though its package has a number', async () => {
+    vi.mocked(productsApi.getBySlug).mockResolvedValue({
+      data: {
+        ...product,
+        price_on_request: true,
+        packages: [aPackage({ id: null, label: '۲۰ لیتری', price: 1850000, effective_price: 1850000, min_order_quantity: 5 })],
+        bulk_note: 'فروش عمده از ۵ گالن به بالا.',
+      },
+    } as never);
+    renderPage();
+
+    await screen.findByText('تماس بگیرید');
+    expect(screen.getByRole('link', { name: 'درخواست قیمت' })).toBeDefined();
+    // The wholesale note is the reason the price is a quote, so it is on screen.
+    expect(screen.getByText('فروش عمده از ۵ گالن به بالا.')).toBeDefined();
+  });
+
   it('hides the chooser for a product with a single package', async () => {
     vi.mocked(productsApi.getBySlug).mockResolvedValue({
       data: { ...product, packages: [aPackage({ id: 1 })] },

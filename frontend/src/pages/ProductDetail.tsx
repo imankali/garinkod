@@ -122,7 +122,6 @@ export default function ProductDetail() {
     item.pesticide_detail?.active_ingredient ? `مادهٔ مؤثر: ${item.pesticide_detail.active_ingredient}` : '',
     item.pesticide_detail?.concentration ? `غلظت: ${item.pesticide_detail.concentration}` : '',
     item.fertilizer_detail?.fertilizer_type ? `نوع کود: ${item.fertilizer_detail.fertilizer_type}` : '',
-    item.bulk_note ?? '',
     item.is_expiring_soon && item.expiry_days_left != null
       ? `این بچ کمتر از ${item.expiry_days_left.toLocaleString('fa-IR')} روز تا انقضا دارد.`
       : '',
@@ -198,7 +197,7 @@ export default function ProductDetail() {
                 ['برند', item.brand],
                 ['کد کالا', item.sku],
                 ['بسته‌بندی', item.package_weight],
-                ['شرایط نگهداری', item.bulk_note],
+                ['تاریخ انقضا', item.expiry_date],
               ]
                 .filter(([, value]) => Boolean(value))
                 .map(([term, value]) => (
@@ -353,6 +352,16 @@ export default function ProductDetail() {
               <Button to="/support" size="lg" full className="mt-4" variant="secondary">
                 درخواست قیمت
               </Button>
+            )}
+
+            {/* The wholesale note explains a quote-only price and a minimum
+                order, so it sits with the button — once. It used to appear in
+                the specifications as «شرایط نگهداری» and again in the safety
+                list, which are both places it does not belong. */}
+            {item.bulk_note && (
+              <p className="mt-3 rounded-sm bg-brand-50 px-2.5 py-2 text-2xs leading-6 text-ink-soft dark:bg-night dark:text-white/60">
+                {item.bulk_note}
+              </p>
             )}
 
             <ul className="mt-4 space-y-2 border-t border-line pt-3 text-2xs text-ink-mute dark:border-night-line dark:text-white/50">
