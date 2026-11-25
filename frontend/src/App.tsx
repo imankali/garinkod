@@ -39,6 +39,7 @@ const Brands = lazy(() => import('./pages/Brands'));
 const Offers = lazy(() => import('./pages/Offers'));
 const Storefronts = lazy(() => import('./pages/Storefronts'));
 const MarketListings = lazy(() => import('./pages/MarketListings'));
+const Guides = lazy(() => import('./pages/Guides'));
 const StorefrontPage = lazy(() => import('./pages/StorefrontPage'));
 const ListingDetail = lazy(() => import('./pages/ListingDetail'));
 const Services = lazy(() => import('./pages/Services'));
@@ -182,6 +183,7 @@ export default function App() {
 
               {/* Reading */}
               <Route path="/magazine" element={<Magazine />} />
+              <Route path="/guides" element={<Guides />} />
               <Route path="/magazine/:slug" element={<Article />} />
 
               {/* Company */}

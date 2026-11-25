@@ -8,6 +8,7 @@ import { articlesApi } from '../api/services';
 import PageHead from '../components/shop/PageHead';
 import { Skeleton } from '../components/ui/Skeleton';
 import EmptyState from '../components/ui/EmptyState';
+import Button from '../components/ui/Button';
 
 /**
  * The magazine index.
@@ -41,6 +42,13 @@ export default function Magazine() {
       <PageHead
         title="مجلهٔ کشاورزی"
         lead="راهنمای فصل کشت، مدیریت آفات و انتخاب نهاده — نوشتهٔ کارشناسان گرین‌کود، برای مزرعهٔ واقعی."
+        actions={
+          // The magazine mixes news and guides; someone who wants only the
+          // growing guides was scrolling past the news to find them.
+          <Button to="/guides" variant="secondary" size="sm">
+            راهنمای کشت
+          </Button>
+        }
       />
 
       {(crops.data ?? []).length > 0 && (
