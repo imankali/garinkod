@@ -15,6 +15,7 @@ import Button from '../components/ui/Button';
 import { ProseSkeleton } from '../components/ui/Skeleton';
 import Price from '../components/ui/Price';
 import ProductCard from '../components/shop/ProductCard';
+import Reviews from '../components/shop/Reviews';
 import { useTitle } from '../lib/useTitle';
 
 /**
@@ -265,7 +266,10 @@ export default function ProductDetail() {
               <span className="font-bold text-gold-700 dark:text-gold-600">
                 {item.rating_summary.average.toLocaleString('fa-IR', { maximumFractionDigits: 1 })}
               </span>{' '}
-              از ۵ · {item.rating_summary.reviews_count.toLocaleString('fa-IR')} نظر
+              از ۵ ·{' '}
+              <a href="#reviews-title" className="underline decoration-line underline-offset-2 hover:text-brand-800 dark:hover:text-brand-300">
+                {item.rating_summary.reviews_count.toLocaleString('fa-IR')} نظر
+              </a>
             </p>
           )}
 
@@ -428,6 +432,8 @@ export default function ProductDetail() {
           </div>
         </aside>
       </div>
+
+      <Reviews slug={item.slug} productId={item.id} />
 
       {(similar.data ?? []).length > 0 && (
         <section className="mt-12" aria-labelledby="similar-title">

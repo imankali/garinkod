@@ -21,15 +21,23 @@ vi.mock('../store/cartStore', () => ({
   ) => selector({ addToCart, openCart: () => undefined }),
 }));
 
+const toggleHelpful = vi.fn();
+
 vi.mock('../api/services', () => ({
   policiesApi: { get: vi.fn() },
+  commentsApi: {
+    getByProduct: vi.fn(),
+    getRatingSummary: vi.fn(),
+    create: vi.fn(),
+    toggleHelpful: (...args: unknown[]) => toggleHelpful(...args),
+  },
   productsApi: {
     getBySlug: vi.fn(),
     getSimilar: vi.fn(() => Promise.resolve({ data: [] })),
   },
 }));
 
-import { policiesApi, productsApi } from '../api/services';
+import { commentsApi, policiesApi, productsApi } from '../api/services';
 import ProductDetail from './ProductDetail';
 import { createQueryClient, Providers } from '../providers';
 
@@ -112,6 +120,93 @@ beforeEach(() => {
     },
   } as never);
   vi.mocked(productsApi.getBySlug).mockResolvedValue({ data: product } as never);
+  toggleHelpful.mockReset();
+  toggleHelpful.mockResolvedValue({
+    data: { voted: true, my_value: 1, helpful_count: 13, up_count: 13, down_count: 0 },
+  });
+  vi.mocked(commentsApi.getRatingSummary).mockResolvedValue({
+    data: {
+      average: 4.5,
+      reviews_count: 2,
+      distribution: { '1': 0, '2': 0, '3': 0, '4': 1, '5': 1 },
+    },
+  } as never);
+  vi.mocked(commentsApi.getByProduct).mockResolvedValue({
+    data: [
+      {
+        id: 7,
+        product: 1,
+        name: 'محمد رضایی',
+        email: null,
+        body: 'روی علف‌های هرز گندم‌زار عالی جواب داد.',
+        image: null,
+        sticker: '',
+        rating: 5,
+        parent: null,
+        created: '2026-11-25T05:30:39+03:30',
+        updated: '2026-11-25T05:30:39+03:30',
+        active: true,
+        replies: [],
+        is_verified_purchase: true,
+        helpful_count: 12,
+      },
+    ],
+  } as never);
+});
+
+describe('ProductDetail reviews', () => {
+  it('shows the reviews the API serves, with their score and verified badge', async () => {
+    renderPage();
+
+    // The body of the review is on the page: an average alone told a buyer
+    // nothing about whether the product worked.
+    expect(await screen.findByText('روی علف‌های هرز گندم‌زار عالی جواب داد.')).toBeDefined();
+    expect(screen.getByText('محمد رضایی')).toBeDefined();
+    expect(screen.getByText('خرید تأییدشده')).toBeDefined();
+    expect(screen.getByRole('heading', { name: /نظرات خریداران/ })).toBeDefined();
+  });
+
+  it('shows the star distribution behind the average', async () => {
+    renderPage();
+
+    await screen.findByText('محمد رضایی');
+    // Two reviews, one five-star and one four-star: the histogram says so.
+    const rows = screen.getAllByRole('listitem').filter((row) => /^[1-5]$/.test(row.textContent?.trim().charAt(0) ?? ''));
+    expect(rows.length).toBe(5);
+  });
+
+  it('records a helpful vote on the server and marks the button as pressed', async () => {
+    renderPage();
+
+    const helpful = await screen.findByRole('button', { name: /مفید بود/ });
+    expect(helpful).toHaveAttribute('aria-pressed', 'false');
+
+    await userEvent.click(helpful);
+
+    await waitFor(() => expect(toggleHelpful).toHaveBeenCalledWith(7, 1));
+    await waitFor(() => expect(screen.getByRole('button', { name: /مفید بود/ })).toHaveAttribute('aria-pressed', 'true'));
+    // The count shown is the server's new tally, not the old row plus one.
+    expect(screen.getByRole('button', { name: /مفید بود/ }).textContent).toContain('۱۳');
+  });
+
+  it('offers a guest a sign-in link instead of a form the server would refuse', async () => {
+    renderPage();
+
+    const gate = await screen.findByRole('link', { name: 'برای نوشتن نظر وارد شوید' });
+    expect(gate).toHaveAttribute('href', '/login');
+    expect(screen.queryByRole('button', { name: 'نوشتن نظر' })).toBeNull();
+    expect(screen.getByText(/ثبت نظر نیاز به حساب کاربری دارد/)).toBeDefined();
+  });
+
+  it('says so plainly when a product has no reviews yet', async () => {
+    vi.mocked(commentsApi.getByProduct).mockResolvedValue({ data: [] } as never);
+    vi.mocked(commentsApi.getRatingSummary).mockResolvedValue({
+      data: { average: 0, reviews_count: 0, distribution: { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 } },
+    } as never);
+    renderPage();
+
+    expect(await screen.findByText(/هنوز نظری برای این کالا ثبت نشده/)).toBeDefined();
+  });
 });
 
 describe('ProductDetail packaging', () => {
