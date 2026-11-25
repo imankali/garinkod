@@ -620,3 +620,16 @@ CSRF را خاموش می‌کند، و `APIRequestFactory` اصلاً به لا
 `price_note` («از ۲ میلیون تومان، بر اساس تعداد نمونه») همان‌طور که استودیو نوشته چاپ می‌شود و به عدد تبدیل نمی‌شود. فرم درخواست در صفحهٔ فهرست می‌ماند؛ این صفحه دومی نمی‌سازد.
 
 در همین گذر معلوم شد `consultingApi.*` همگی سطح مشاورند (`farmers` با حساب فروشنده ۴۰۳ و بی‌نام ۴۰۱ می‌دهد؛ `openFarmerConversation` در سرور پرچم `view_farmconsultationrequest` می‌خواهد)، و کنار `deskApi`/`managementApi`/`financeApi`/`opsApi` می‌مانند — یادداشت بالای همان بخش در `services.ts` این را صریح می‌گوید.
+
+### ۴.۴۵ باقی‌ماندهٔ بی‌مصرف — و چرا
+
+پس از این گذر، ۳۵ متد در `services.ts` مصرف‌کننده ندارند و همه عمداً:
+
+- **سطح اپراتور** (۲۶ متد): `managementApi` (۱۰)، `deskApi` (۳)، `financeApi` (۳)، `opsApi` (۴)، `consultingApi` (۵)، `messagesApi.handoff` و `messagesApi.openFarmerConversation`. همه پشت `is_staff` یا پرچم سطح ۳+ هستند؛ `deskApi.state` تنها عضو این خانواده است که خریدار می‌خواند و از صندوق پیام خوانده می‌شود. یادداشت بالای همان بخش در `services.ts` این مرز را می‌گوید تا دفعهٔ بعد کسی دوباره سراغشان نرود.
+- **`articlesApi.getRelated`**: پاسخ جزئیات مقاله از قبل `related_articles` دارد و صفحه همان را رندر می‌کند.
+- **`storefrontPostsApi.list`**: فید هر غرفه از `profile()` می‌آید که همان پست‌ها و استوری‌ها را در یک رفت‌وبرگشت با آگهی‌ها و اطلاعات غرفه می‌دهد. یک درخواست دوم برای همان ردیف‌ها فقط دو منبع حقیقت می‌ساخت.
+- **`storefrontPostsApi.markSeen`**: صفحه از `markManySeen` استفاده می‌کند که همان کار را برای کل فید در یک درخواست انجام می‌دهد؛ نسخهٔ تکی برای فید کاربرد ندارد.
+- **`storefrontPostsApi.updateComment`/`deleteComment`**: viewset فقط `Update` و `Destroy` دارد و مسیری برای فهرست‌کردن یا ساختن یک نظر جدا نیست (`GET /api/marketplace/post-comments/` و `/1/` هر دو ۴۰۵). شناسه‌ای برای رسیدن به این دو متد وجود ندارد؛ این یک شکاف بک‌اند است.
+- **`productsApi.getByCategory`**: `GET /products/by_category/` با ۴۰۴ پاسخ می‌دهد؛ فیلتر دسته از `productsApi.getAll({category})` می‌آید که خودِ فروشگاه هم از آن استفاده می‌کند.
+- **`productsApi.getFacets`**: فروشگاه فیلتر برند و بسته‌بندی را ندارد؛ فیلترهای فعلی (دسته، زیردسته، جست‌وجو، ترتیب، برند از مسیر، برچسب) همگی از `catalogApi` و `productsApi.getAll` می‌آیند. تراشه‌های دسته شمارنده ندارند و `facets.categories` می‌توانست همان را بدهد — کار بعدی، نه چیزی که نصفه رها شود.
+- **`featureFlagsApi.get`**: هیچ متنی در رابط به `web_push`، `external_search`، `carrier_quotes` یا `privacy_analytics` وعده نمی‌دهد و هر چهار پرچم روی این نصب خاموش‌اند. `PushToggle` وضعیت واقعی `webPushApi` را می‌خواند، نه پرچم را. خواندن پرچمی که چیزی به آن وصل نیست، فقط یک درخواست اضافه بود.

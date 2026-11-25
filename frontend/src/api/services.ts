@@ -595,6 +595,12 @@ export interface WithdrawalRequest {
 // and building one here would put staff tooling behind the same session cookie
 // as the shop. They stay typed and ready for a separate staff client rather
 // than half-built inside this one.
+//
+// `consultingApi` belongs to the same tier and is easy to mistake for a buyer's
+// surface. It is not: `/farm/consulting/farmers/` answers 403 for a seller
+// account and 401 signed out, and `openFarmerConversation` checks
+// `view_farmconsultationrequest` server-side. `deskApi.state` is the one member
+// of this file a customer reads, and it is read from the inbox.
 // ---------------------------------------------------------------------------
 export const financeApi = {
   storefront: (params?: LedgerQueryParams) =>
