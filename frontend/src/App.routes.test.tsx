@@ -165,6 +165,15 @@ function answer(url: string) {
   if (url.includes('/site/contact/')) {
     return { address: 'تهران', provinces_note: '', phones: ['02100000000'], emails: ['a@b.ir'], working_hours: '۹ تا ۱۷', whatsapp_number: '', telegram_url: '', instagram_url: '', eitaa_url: '', map_lat: null, map_lng: null, map_note: '', expert_name: 'رضا', expert_role: 'کارشناس', expert_photo: null, expert_photo_url: '', expert_note: '', updated_at: '' };
   }
+  if (url.includes('/site/policies/')) {
+    return {
+      return_window_days: 7,
+      return_window_label: '۷ روز ضمانت بازگشت کالا',
+      return_conditions: 'کالا باید بازنکرده و سالم باشد.',
+      express_shipping: { enabled: false, fee: 0 },
+      updated_at: '',
+    };
+  }
   if (url.includes('/site/about/')) {
     return { team: [], brands: [], stats: { products: 32, storefronts: 5, listings: 7, articles: 10, orders: 0, provinces: 6 }, contact: { address: '', provinces_note: '', phones: [], emails: [], working_hours: '', whatsapp_number: '', telegram_url: '', instagram_url: '', eitaa_url: '', map_lat: null, map_lng: null, map_note: '', expert_name: '', expert_role: '', expert_photo: null, expert_photo_url: '', expert_note: '', updated_at: '' } };
   }

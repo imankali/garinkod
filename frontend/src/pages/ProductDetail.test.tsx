@@ -22,13 +22,14 @@ vi.mock('../store/cartStore', () => ({
 }));
 
 vi.mock('../api/services', () => ({
+  policiesApi: { get: vi.fn() },
   productsApi: {
     getBySlug: vi.fn(),
     getSimilar: vi.fn(() => Promise.resolve({ data: [] })),
   },
 }));
 
-import { productsApi } from '../api/services';
+import { policiesApi, productsApi } from '../api/services';
 import ProductDetail from './ProductDetail';
 import { createQueryClient, Providers } from '../providers';
 
@@ -100,6 +101,15 @@ const renderPage = () =>
 
 beforeEach(() => {
   addToCart.mockClear();
+  vi.mocked(policiesApi.get).mockResolvedValue({
+    data: {
+      return_window_days: 7,
+      return_window_label: '۷ روز ضمانت بازگشت کالا',
+      return_conditions: '',
+      express_shipping: { enabled: false, fee: 0 },
+      updated_at: '',
+    },
+  } as never);
   vi.mocked(productsApi.getBySlug).mockResolvedValue({ data: product } as never);
 });
 
@@ -163,5 +173,21 @@ describe('ProductDetail packaging', () => {
 
     await screen.findByRole('button', { name: 'افزودن به سبد' });
     expect(screen.queryByText('بسته‌بندی')).toBeNull();
+  });
+
+  it('states the return window the API configured, and no number when it has none', async () => {
+    renderPage();
+
+    expect(await screen.findByText(/بازگشت تا ۷ روز/)).toBeDefined();
+
+    vi.mocked(policiesApi.get).mockResolvedValue({
+      data: {
+        return_window_days: null,
+        return_window_label: '',
+        return_conditions: '',
+        express_shipping: { enabled: false, fee: 0 },
+        updated_at: '',
+      },
+    } as never);
   });
 });

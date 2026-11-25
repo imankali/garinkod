@@ -86,7 +86,10 @@ export default function Hero() {
 
           <dl className="mt-9 flex flex-wrap gap-x-7 gap-y-3 border-t border-line pt-5 dark:border-night-line">
             {[
-              { icon: Truck, term: 'ارسال رایگان', detail: 'خرید بالای ۳ میلیون' },
+              // No threshold is printed here: the free-shipping amount is a
+              // server setting, and this file guessed a third figure. The
+              // product page states the real terms from /site/policies/.
+              { icon: Truck, term: 'ارسال سراسری', detail: 'شرایط ارسال پیش از پرداخت' },
               { icon: ShieldCheck, term: 'غرفهٔ تأییدشده', detail: 'بررسی پیش از انتشار' },
               { icon: Leaf, term: 'مشاورهٔ کارشناس', detail: 'برنامهٔ کود و سم' },
             ].map(({ icon: Icon, term, detail }) => (

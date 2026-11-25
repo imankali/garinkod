@@ -5,7 +5,7 @@ import { Link, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, Check, ChevronLeft, Minus, Package, Plus, ShieldCheck, Truck } from 'lucide-react';
 
-import { productsApi } from '../api/services';
+import { policiesApi, productsApi } from '../api/services';
 import type { Product } from '@/types/shop';
 import { useCartStore } from '../store/cartStore';
 import { money, priceOf } from '../lib/price';
@@ -51,6 +51,20 @@ export default function ProductDetail() {
    */
   const [packageId, setPackageId] = useState<number | null>(null);
   useTitle(product?.title);
+
+  /**
+   * The two promises under the buy button — delivery and returns — are the
+   * shop's own configured policy, not sentences typed into this file. The page
+   * used to claim «ارسال رایگان برای خرید بالای ۳ میلیون» while the server's
+   * own free-shipping threshold was ۲ میلیون, and «بازگشت تا ۷ روز» while the
+   * return window lived in the admin. Both now read what the checkout will
+   * actually apply.
+   */
+  const policy = useQuery({
+    queryKey: ['site-policies'],
+    queryFn: async () => (await policiesApi.get()).data,
+    staleTime: 30 * 60 * 1000,
+  });
 
   const similar = useQuery({
     queryKey: ['product-similar', slug],
@@ -365,13 +379,30 @@ export default function ProductDetail() {
             )}
 
             <ul className="mt-4 space-y-2 border-t border-line pt-3 text-2xs text-ink-mute dark:border-night-line dark:text-white/50">
-              <li className="flex items-center gap-2">
-                <Truck size={14} aria-hidden="true" className="text-brand-700 dark:text-brand-300" />
-                ارسال رایگان برای خرید بالای {money(3_000_000)}
+              <li className="flex items-start gap-2">
+                <Truck size={14} aria-hidden="true" className="mt-1 shrink-0 text-brand-700 dark:text-brand-300" />
+                <span>
+                  ارسال به سراسر کشور
+                  {policy.data?.express_shipping.enabled && (
+                    <> · ارسال سریع فعال است ({money(policy.data.express_shipping.fee)})</>
+                  )}
+                  <span className="block text-ink-mute dark:text-white/40">
+                    هزینهٔ ارسال پیش از پرداخت، پس از تأیید موجودی، اعلام می‌شود.
+                  </span>
+                </span>
               </li>
-              <li className="flex items-center gap-2">
-                <ShieldCheck size={14} aria-hidden="true" className="text-brand-700 dark:text-brand-300" />
-                اصالت کالا تضمین‌شده؛ بازگشت تا ۷ روز
+              <li className="flex items-start gap-2">
+                <ShieldCheck size={14} aria-hidden="true" className="mt-1 shrink-0 text-brand-700 dark:text-brand-300" />
+                <span>
+                  اصالت کالا تضمین‌شده
+                  {/* A number only when the operator has stated one. */}
+                  {policy.data?.return_window_days != null && (
+                    <> · بازگشت تا {policy.data.return_window_days.toLocaleString('fa-IR')} روز</>
+                  )}
+                  {policy.data?.return_window_days == null && policy.isSuccess && (
+                    <> · شرایط بازگشت در صفحهٔ شرایط بازگشت کالا</>
+                  )}
+                </span>
               </li>
               <li className="flex items-center gap-2">
                 <Package size={14} aria-hidden="true" className="text-brand-700 dark:text-brand-300" />
