@@ -27,10 +27,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowRight, Headset, Mail, MessageCircle, Star } from 'lucide-react';
 import { Link } from 'react-router';
 
-import { messagesApi } from '../api/services';
+import { deskApi, messagesApi } from '../api/services';
 import type { MessageChannel, InboxResponse, StorefrontConversation } from '@/types/messaging';
 import { parseApiError } from '../api/errors';
 import { cn } from '../lib/cn';
+import { nums } from '../lib/price';
 import { dateTime } from '../lib/date';
 import { useTitle } from '../lib/useTitle';
 import { useAuthStore } from '../store/authStore';
@@ -417,6 +418,18 @@ export default function Inbox() {
     enabled: Boolean(user),
   });
 
+  // The desk's own state, not a promise invented by the button. `/desk/state/`
+  // is public for exactly this reason: hours and whether anyone is on duty are
+  // the first things someone checks before writing to support. `deskApi.state`
+  // had no caller, so «گفتگو با پشتیبانی» opened a thread with no indication
+  // that the answer would come in a working hour rather than now.
+  const desk = useQuery({
+    queryKey: ['desk-state', 'support'],
+    queryFn: async () => (await deskApi.state('support')).data,
+    enabled: Boolean(user),
+    staleTime: 60 * 1000,
+  });
+
   const openSupport = useMutation({
     mutationFn: async () => (await messagesApi.openServiceConversation('support')).data,
     onSuccess: (answer) => {
@@ -468,16 +481,57 @@ export default function Inbox() {
             : 'گفتگوهای شما با غرفه‌داران، پشتیبانی و کارشناسان — همه در یک جا.'
         }
         actions={
-          <Button
-            size="sm"
-            icon={Headset}
-            loading={openSupport.isPending}
-            onClick={() => openSupport.mutate()}
-          >
-            گفتگو با پشتیبانی
-          </Button>
+          <span className="flex flex-wrap items-center gap-2">
+            {/* Every number here is the desk's, including the empty ones: when
+                nobody is online it says so and quotes the desk's own note about
+                the next working window, rather than implying an answer is
+                imminent. */}
+            {desk.data?.tracked && (
+              <span
+                className={cn(
+                  'inline-flex min-h-8 items-center gap-1.5 rounded-sm px-2 text-[11px] font-bold',
+                  desk.data.is_open
+                    ? 'bg-brand-50 text-brand-800 dark:bg-night dark:text-brand-300'
+                    : 'bg-gold-50 text-gold-700 dark:bg-night dark:text-gold-600',
+                )}
+              >
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    'inline-block h-1.5 w-1.5 rounded-full',
+                    desk.data.online_count > 0 ? 'bg-brand-600' : 'bg-gold-600',
+                  )}
+                />
+                {desk.data.is_open
+                  ? `${nums(desk.data.online_count)} پشتیبان آنلاین · ${desk.data.hours}`
+                  : `بسته · ${desk.data.hours}`}
+              </span>
+            )}
+            <Button
+              size="sm"
+              icon={Headset}
+              loading={openSupport.isPending}
+              disabled={desk.data ? !desk.data.customer_allowed : false}
+              onClick={() => openSupport.mutate()}
+            >
+              گفتگو با پشتیبانی
+            </Button>
+          </span>
         }
       />
+
+      {desk.data && !desk.data.is_open && desk.data.out_of_hours_note && (
+        <p className="rounded-md border border-line bg-paper p-3 text-2xs leading-6 text-ink-soft dark:border-night-line dark:bg-night-soft dark:text-white/60">
+          {desk.data.out_of_hours_note}
+          {desk.data.opens_at_label && ` (بازگشایی: ${desk.data.opens_at_label})`}
+        </p>
+      )}
+
+      {desk.data && !desk.data.customer_allowed && (
+        <p className="rounded-md border border-line p-3 text-2xs leading-6 text-ink-soft dark:border-night-line dark:text-white/60">
+          {desk.data.customer_denied_reason || 'برای این میز، شما در نقش اپراتور هستید.'}
+        </p>
+      )}
 
       {error && (
         <p role="alert" className="text-2xs font-bold text-danger-700">

@@ -26,6 +26,7 @@ const close = vi.fn();
 const rate = vi.fn();
 const edit = vi.fn();
 const remove = vi.fn();
+const deskState = vi.fn();
 
 vi.mock('../api/services', () => ({
   messagesApi: {
@@ -37,6 +38,9 @@ vi.mock('../api/services', () => ({
     rate: (...a: unknown[]) => rate(...a),
     edit: (...a: unknown[]) => edit(...a),
     remove: (...a: unknown[]) => remove(...a),
+  },
+  deskApi: {
+    state: (...a: unknown[]) => deskState(...a),
   },
 }));
 
@@ -134,11 +138,32 @@ function renderInbox() {
   );
 }
 
+const deskOpen = () => ({
+  channel: 'support',
+  channel_label: 'پشتیبانی',
+  is_open: true,
+  tracked: true,
+  hours: '۰۶:۰۰ تا ۲۲:۰۰',
+  work_days: [],
+  opens_at: null,
+  opens_at_label: '',
+  out_of_hours_note: '',
+  online_count: 2,
+  waiting_expected_minutes: 20,
+  agents: [],
+  viewer_is_staff: false,
+  quick_replies: [],
+  customer_allowed: true,
+  customer_denied_reason: '',
+});
+
 beforeEach(() => {
   auth.signedIn = true;
   conversations.mockReset();
   messages.mockReset();
   send.mockReset();
+  deskState.mockReset();
+  deskState.mockResolvedValue({ data: deskOpen() });
   openServiceConversation.mockReset();
   conversations.mockResolvedValue(inbox());
   messages.mockResolvedValue({
@@ -250,6 +275,49 @@ describe('Inbox', () => {
     // support thread if there is one, and the page must land on it.
     await waitFor(() => expect(openServiceConversation).toHaveBeenCalledWith('support'));
     await waitFor(() => expect(messages).toHaveBeenCalledWith(1, expect.anything()));
+  });
+
+  it('shows the desk’s real opening state beside the support button', async () => {
+    renderInbox();
+
+    // Two agents online, during the hours the desk publishes — all three are
+    // the server's numbers.
+    expect(await screen.findByText(/۲ پشتیبان آنلاین/)).toBeDefined();
+    expect(screen.getByText(/۰۶:۰۰ تا ۲۲:۰۰/)).toBeDefined();
+    await waitFor(() => expect(deskState).toHaveBeenCalledWith('support'));
+  });
+
+  it('says the desk is closed and quotes its own out-of-hours note', async () => {
+    deskState.mockResolvedValue({
+      data: {
+        ...deskOpen(),
+        is_open: false,
+        online_count: 0,
+        out_of_hours_note: 'الان خارج از ساعت کاری هستیم؛ در اولین بازهٔ بعدی پاسخ می‌دهیم.',
+        opens_at_label: 'فردا ۰۶:۰۰',
+      },
+    });
+    renderInbox();
+
+    expect(await screen.findByText(/بسته ·/)).toBeDefined();
+    expect(await screen.findByText(/الان خارج از ساعت کاری هستیم/)).toBeDefined();
+    expect(screen.getByText(/بازگشایی: فردا ۰۶:۰۰/)).toBeDefined();
+    // The thread can still be opened: writing now is the point of the note.
+    expect(screen.getByRole('button', { name: 'گفتگو با پشتیبانی' })).not.toBeDisabled();
+  });
+
+  it('does not offer a chat to the operator of the desk', async () => {
+    deskState.mockResolvedValue({
+      data: {
+        ...deskOpen(),
+        customer_allowed: false,
+        customer_denied_reason: 'شما اپراتور این میز هستید؛ از صف استفاده کنید.',
+      },
+    });
+    renderInbox();
+
+    expect(await screen.findByText(/شما اپراتور این میز هستید/)).toBeDefined();
+    expect(screen.getByRole('button', { name: 'گفتگو با پشتیبانی' })).toBeDisabled();
   });
 
   it('asks a signed-out visitor to sign in and never calls the API', async () => {
