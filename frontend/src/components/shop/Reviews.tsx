@@ -6,8 +6,7 @@
 // scores, a per-star distribution, verified-purchase flags, replies, a helpful
 // vote with a toggle, attachments — and the product page showed a single line,
 // «۴٫۵ از ۵ · ۲ نظر». A buyer could not read a single review on the product they
-// were about to put in a basket, while the «تجربه خرید مشتریان» page was built
-// from the same rows.
+// were about to put in a basket.
 //
 // Decisions:
 //   • The distribution is a bar per star, because «۴٫۵» hides whether a product
