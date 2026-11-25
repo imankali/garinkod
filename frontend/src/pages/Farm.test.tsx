@@ -19,6 +19,7 @@ const consultations = vi.fn();
 const createConsultation = vi.fn();
 const updateLand = vi.fn();
 const deleteLand = vi.fn();
+const deleteEvent = vi.fn();
 
 vi.mock('../api/services', () => ({
   farmApi: {
@@ -31,6 +32,7 @@ vi.mock('../api/services', () => ({
     createConsultation: (...a: unknown[]) => createConsultation(...a),
     updateLand: (...a: unknown[]) => updateLand(...a),
     deleteLand: (...a: unknown[]) => deleteLand(...a),
+    deleteEvent: (...a: unknown[]) => deleteEvent(...a),
   },
 }));
 
@@ -102,8 +104,22 @@ beforeEach(() => {
   createConsultation.mockReset();
   updateLand.mockReset();
   deleteLand.mockReset();
+  deleteEvent.mockReset();
   lands.mockResolvedValue({ data: [land()] });
-  calendar.mockResolvedValue({ data: [] });
+  // A land with two rows on its calendar: one the farmer added (removable) and
+  // one the consultant wrote (not the farmer's to close or delete).
+  calendar.mockResolvedValue({
+    data: [
+      event({ id: 3, date: '2026-12-02', status: 'planned', status_label: 'برنامه‌ریزی‌شده', title: 'سمپاشی کنه‌کش' }),
+      event({
+        id: 5,
+        title: 'تنظیم دور آبیاری تابستانه',
+        status: 'planned',
+        status_label: 'برنامه‌ریزی‌شده',
+        is_consultant_note: true,
+      }),
+    ],
+  });
   consultations.mockResolvedValue({ data: [] });
   useAuthStore.setState({
     user: { id: 9, username: 'demo-farmer', full_name: 'کشاورز تستی' } as never,
@@ -305,5 +321,25 @@ describe('Farm — correcting a land', () => {
     await userEvent.click(screen.getByRole('button', { name: 'حذف گلخانه خیار ورامین' }));
 
     await waitFor(() => expect(deleteLand).toHaveBeenCalledWith(2));
+  });
+
+  it('offers to remove a planned operation the farmer typed wrong', async () => {
+    deleteEvent.mockResolvedValue({ data: { message: 'رویداد حذف شد.' } });
+    renderFarm();
+
+    const remove = await screen.findByRole('button', { name: /حذف .* از تقویم/ });
+    await userEvent.click(remove);
+
+    await waitFor(() => expect(deleteEvent).toHaveBeenCalled());
+  });
+
+  it('never offers to delete a consultant note', async () => {
+    renderFarm();
+
+    // The consultant's row is on the calendar, but removing their advice is not
+    // the farmer's call even though the server would allow it.
+    await screen.findByText(/از مشاور/);
+    const removals = screen.getAllByRole('button', { name: /حذف .* از تقویم/ });
+    expect(removals.every((button) => !button.closest('li')?.textContent?.includes('از مشاور'))).toBe(true);
   });
 });

@@ -400,6 +400,14 @@ export default function Farm() {
     },
   });
 
+  const removeEvent = useMutation({
+    mutationFn: async (eventId: number) => (await farmApi.deleteEvent(eventId)).data,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['farm-calendar'] });
+      void queryClient.invalidateQueries({ queryKey: ['farm-lands'] });
+    },
+  });
+
   const complete = useMutation({
     mutationFn: async ({ id, status }: { id: number; status: FarmCalendarEvent['status'] }) =>
       (await farmApi.updateEvent(id, { status })).data,
@@ -570,18 +578,39 @@ export default function Farm() {
                   )}
                 </div>
 
-                {/* Only a planned operation can be finished; a consultant's note
-                    is theirs to change, not the farmer's. */}
-                {event.status === 'planned' && !event.is_consultant_note && (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => complete.mutate({ id: event.id, status: 'done' })}
-                    loading={complete.isPending}
-                  >
-                    انجام شد
-                  </Button>
-                )}
+                <span className="flex items-center gap-2">
+                  {/* Only a planned operation can be finished. A consultant's
+                      note is not the farmer's to close out: the server would
+                      accept it (the land is theirs), but marking someone
+                      else's advice as done is a claim the farmer cannot make. */}
+                  {event.status === 'planned' && !event.is_consultant_note && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => complete.mutate({ id: event.id, status: 'done' })}
+                      loading={complete.isPending}
+                    >
+                      انجام شد
+                    </Button>
+                  )}
+                  {/* A planned entry the farmer typed wrong — wrong day, wrong
+                      land, wrong input — could not be removed at all, though
+                      `farmApi.deleteEvent` is served. Kept off a consultant's
+                      note for the same reason as «انجام شد»: deleting advice is
+                      the consultant's call, and their edit goes through the
+                      desk, not this page. */}
+                  {event.status === 'planned' && !event.is_consultant_note && (
+                    <button
+                      type="button"
+                      onClick={() => removeEvent.mutate(event.id)}
+                      disabled={removeEvent.isPending}
+                      aria-label={`حذف ${event.title} از تقویم`}
+                      className="text-ink-mute hover:text-danger-700 disabled:opacity-50 dark:text-white/40"
+                    >
+                      <Trash2 size={13} aria-hidden="true" />
+                    </button>
+                  )}
+                </span>
               </li>
             ))}
           </ul>
