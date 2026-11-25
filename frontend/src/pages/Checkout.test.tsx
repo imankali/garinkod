@@ -18,9 +18,10 @@ vi.mock('../api/services', () => ({
   ordersApi: { checkout: vi.fn() },
   paymentsApi: { options: vi.fn() },
   rewardsApi: { wallet: vi.fn() },
+  shippingApi: { quote: vi.fn() },
 }));
 
-import { locationsApi, ordersApi, paymentsApi, rewardsApi } from '../api/services';
+import { locationsApi, ordersApi, paymentsApi, rewardsApi, shippingApi } from '../api/services';
 import Checkout from './Checkout';
 import { createQueryClient, Providers } from '../providers';
 import { useAuthStore } from '../store/authStore';
@@ -109,6 +110,23 @@ beforeEach(() => {
           reason: 'درگاه تا زمان فعال‌سازی و تنظیم Merchant ID غیرفعال است.',
         },
       ],
+    },
+  } as never);
+  vi.mocked(shippingApi.quote).mockResolvedValue({
+    data: {
+      quotes: [
+        {
+          provider: 'flat',
+          service: 'standard',
+          label: 'ارسال استاندارد',
+          amount: 45000,
+          currency: 'IRT',
+          estimated_days_min: 2,
+          estimated_days_max: 7,
+        },
+      ],
+      authoritative_at_checkout: false,
+      note: 'مبلغ نهایی در لحظه ثبت سفارش دوباره محاسبه می‌شود.',
     },
   } as never);
   vi.mocked(rewardsApi.wallet).mockResolvedValue({
@@ -284,7 +302,24 @@ describe('Checkout loyalty points', () => {
   });
 
   it('hides the switch when the balance cannot buy a whole unit', async () => {
-    vi.mocked(rewardsApi.wallet).mockResolvedValue({
+    vi.mocked(shippingApi.quote).mockResolvedValue({
+    data: {
+      quotes: [
+        {
+          provider: 'flat',
+          service: 'standard',
+          label: 'ارسال استاندارد',
+          amount: 45000,
+          currency: 'IRT',
+          estimated_days_min: 2,
+          estimated_days_max: 7,
+        },
+      ],
+      authoritative_at_checkout: false,
+      note: 'مبلغ نهایی در لحظه ثبت سفارش دوباره محاسبه می‌شود.',
+    },
+  } as never);
+  vi.mocked(rewardsApi.wallet).mockResolvedValue({
       data: { id: 1, currency: 'IRT', balance: 0, loyalty_points: 60, updated_at: '', transactions: [] },
     } as never);
     renderCheckout();
@@ -293,5 +328,37 @@ describe('Checkout loyalty points', () => {
     // 60 points would redeem nothing; offering the switch would promise a
     // discount the checkout path cannot deliver.
     expect(screen.queryByRole('checkbox', { name: /استفاده از امتیازهای وفاداری/ })).toBeNull();
+  });
+});
+
+describe('Checkout shipping quote', () => {
+  it('asks the server for the delivery cost once a province and city are chosen', async () => {
+    renderCheckout();
+
+    await waitFor(() => expect(screen.getByRole('option', { name: 'فارس' })).toBeDefined());
+    expect(shippingApi.quote).not.toHaveBeenCalled();
+
+    await userEvent.selectOptions(screen.getByLabelText('استان'), 'فارس');
+    await waitFor(() => expect(screen.getByRole('option', { name: 'شیراز' })).toBeDefined());
+    await userEvent.selectOptions(screen.getByLabelText('شهر'), 'شیراز');
+
+    await waitFor(() => expect(shippingApi.quote).toHaveBeenCalledWith('فارس', 'شیراز'));
+    // The price and the estimate are on screen before the buyer commits.
+    expect(await screen.findByText(/ارسال استاندارد/)).toBeDefined();
+    expect(screen.getAllByText(/۴۵٬۰۰۰/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/۲ تا ۷ روز/)).toBeDefined();
+  });
+
+  it('does not present the estimate as the final charge', async () => {
+    renderCheckout();
+
+    await waitFor(() => expect(screen.getByRole('option', { name: 'فارس' })).toBeDefined());
+    await userEvent.selectOptions(screen.getByLabelText('استان'), 'فارس');
+    await waitFor(() => expect(screen.getByRole('option', { name: 'شیراز' })).toBeDefined());
+    await userEvent.selectOptions(screen.getByLabelText('شهر'), 'شیراز');
+
+    // authoritative_at_checkout is false: the page must repeat the server's
+    // caveat rather than print a total as if it were settled.
+    expect(await screen.findByText(/دوباره محاسبه می‌شود/)).toBeDefined();
   });
 });

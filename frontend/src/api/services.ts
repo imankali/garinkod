@@ -509,11 +509,19 @@ export const featureFlagsApi = {
 };
 
 export const shippingApi = {
+  /**
+   * The delivery cost for the current cart, before the buyer commits.
+   *
+   * `authoritative_at_checkout` is false when the server will recompute at
+   * submit — the page must say so rather than print the estimate as a promise.
+   * `note` carries the server's own wording for that sentence.
+   */
   quote: (province: string, city: string) =>
-    apiClient.post<{ quotes: ShippingQuote[]; authoritative_at_checkout: boolean }>(
-      '/shipping/quote/',
-      { province, city },
-    ),
+    apiClient.post<{
+      quotes: ShippingQuote[];
+      authoritative_at_checkout: boolean;
+      note?: string;
+    }>('/shipping/quote/', { province, city }),
 };
 
 export const paymentsApi = {

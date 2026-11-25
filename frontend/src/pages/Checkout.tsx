@@ -5,7 +5,7 @@ import { useNavigate, Link } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ShieldCheck } from 'lucide-react';
 
-import { locationsApi, ordersApi, paymentsApi, rewardsApi } from '../api/services';
+import { locationsApi, ordersApi, paymentsApi, rewardsApi, shippingApi } from '../api/services';
 import type { CheckoutPayload, PaymentProviderOption } from '@/types/commerce';
 import { useCartStore } from '../store/cartStore';
 import { useAuthStore } from '../store/authStore';
@@ -63,6 +63,19 @@ export default function Checkout() {
     enabled: Boolean(province),
     staleTime: 24 * 60 * 60 * 1000,
   });
+  // The cost of delivery, before the buyer commits. The endpoint computes from
+  // the *cart*, so it answers honestly for a whole basket, and it says plainly
+  // whether the number is final (`authoritative_at_checkout: false` here means
+  // it will be recomputed at submit).
+  const shipping = useQuery({
+    queryKey: ['shipping-quote', province, city],
+    queryFn: async () => (await shippingApi.quote(province, city)).data,
+    enabled: Boolean(province && city),
+    staleTime: 5 * 60 * 1000,
+  });
+  const standard = (shipping.data?.quotes ?? [])[0];
+  const shippingKnown = typeof standard?.amount === 'number';
+
   const [address, setAddress] = useState(account?.address ?? '');
   const [postal, setPostal] = useState('');
   const [notes, setNotes] = useState('');
@@ -305,7 +318,43 @@ export default function Checkout() {
               <span className="text-xs font-bold text-ink-soft dark:text-white/70">جمع کالاها</span>
               <span className="dateline text-base font-extrabold text-ink dark:text-white">{money(total)}</span>
             </div>
-            <p className="mt-1 text-2xs text-ink-mute dark:text-white/50">هزینهٔ ارسال پس از تأیید موجودی اضافه می‌شود.</p>
+            {shippingKnown ? (
+              <div className="mt-2 flex items-baseline justify-between border-t border-line pt-2 dark:border-night-line">
+                <span className="text-2xs font-bold text-ink-soft dark:text-white/70">
+                  {standard.label}
+                  {standard.estimated_days_min != null && standard.estimated_days_max != null && (
+                    <span className="dateline ms-1 text-ink-mute dark:text-white/40">
+                      ({standard.estimated_days_min.toLocaleString('fa-IR')} تا{' '}
+                      {standard.estimated_days_max.toLocaleString('fa-IR')} روز)
+                    </span>
+                  )}
+                </span>
+                <span className="dateline text-xs font-bold text-ink dark:text-white">
+                  {money(standard.amount)}
+                </span>
+              </div>
+            ) : (
+              <p className="mt-1 text-2xs text-ink-mute dark:text-white/50">
+                {shipping.isLoading
+                  ? 'در حال محاسبهٔ هزینهٔ ارسال…'
+                  : 'هزینهٔ ارسال با انتخاب استان و شهر، پیش از تأیید نهایی محاسبه می‌شود.'}
+              </p>
+            )}
+
+            {shippingKnown && (
+              <div className="mt-2 flex items-baseline justify-between border-t border-line pt-2 dark:border-night-line">
+                <span className="text-xs font-bold text-ink dark:text-white">جمع با ارسال</span>
+                <span className="dateline text-base font-extrabold text-ink dark:text-white">
+                  {money(total + (standard?.amount ?? 0) - (usePoints ? pointsDiscount : 0))}
+                </span>
+              </div>
+            )}
+
+            {shippingKnown && shipping.data?.authoritative_at_checkout === false && (
+              <p className="mt-1 text-[11px] leading-5 text-ink-mute dark:text-white/45">
+                {shipping.data.note || 'مبلغ نهایی در لحظهٔ ثبت سفارش دوباره محاسبه می‌شود.'}
+              </p>
+            )}
 
             {/* The points were always redeemable — the server has handled
                 `use_loyalty_points` from the first commit — but no screen ever

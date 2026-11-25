@@ -14,6 +14,7 @@ import { TextField } from '../components/ui/Field';
 import { Skeleton } from '../components/ui/Skeleton';
 import EmptyState from '../components/ui/EmptyState';
 import RewardsPanel from '../components/shop/RewardsPanel';
+import PushToggle from '../components/shop/PushToggle';
 import PageHead from '../components/shop/PageHead';
 
 /**
@@ -239,6 +240,8 @@ export default function Account() {
         </section>
 
         <RewardsPanel />
+
+        <PushToggle />
       </div>
     </div>
   );

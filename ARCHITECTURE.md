@@ -191,7 +191,7 @@ backfill + worker واقعاً اجرا شده‌اند.
 ### ۴.۳ پاسگاه ماندگار — `media_layout_check`
 به‌جای امید: یک system check جنگو (`shop.W200`) که هر زمان `upload_to`یی با basenameِ MEDIA_ROOT شروع شود، Warning می‌اندازد — تله‌ی دقیقِ منجر به دوباره‌زایی همین بدهی. مهاجرت اجرا و ریشه پاک می‌شود، اما پاسگاه **دائمی** می‌ماند. تست‌های `shop/tests_media_layout.py` (۷ مورد) سکوت روی پیکربندی سالم و برخاست Warning روی پیکربندی بد را قفل کرده‌اند، و رفتار عدم‌بازنویسیِ مقصد و ایدمپوتنسیِ فرمان را روی یک استوریج موقتی (tempfile) که دقیقاً شرایط حادثه را بازسازی می‌کند، آزموده‌اند.
 
-> **ماتریس تأیید نهایی این ۴ ستون:** بک‌اند 402/402 سبز (۱۵۷s) — frontend `tsc --noEmit` = 0 خطا — `eslint` = Silent-pass — `vite build` ≈ ۶.۴s — `vitest` = ۲۱۳ تست/۳۳ فایل سبز — Playwright enumerate = ۲۵۷ تست/۷ فایل — LHCI config = Valid + filesystemReports.
+> **ماتریس تأیید نهایی این ۴ ستون:** بک‌اند 402/402 سبز (۱۵۷s) — frontend `tsc --noEmit` = 0 خطا — `eslint` = Silent-pass — `vite build` ≈ ۶.۴s — `vitest` = ۲۱۷ تست/۳۴ فایل سبز — Playwright enumerate = ۲۵۷ تست/۷ فایل — LHCI config = Valid + filesystemReports.
 
 ### ۴.۴ نظر خریداران روی صفحه محصول
 
@@ -252,6 +252,13 @@ API از ابتدا شکل کامل یک نظر را سرو می‌کرد — ا
 - **باگ SEO:** sitemap آدرس‌هایی را اعلام می‌کرد که وجود نداشتند — `/marketplace`، `/blog`، `/guides`، `/farmer-sell`، `/c/<slug>`، `/sc/<slug>`، `/brand/<slug>`، `/tag/<slug>`، `/products/<slug>`، `/storefronts/<slug>`، `/services/<slug>`. مسیرهای واقعی `/catalog/:kind/:slug`، `/product/:slug`، `/magazine/:slug`، `/storefront/:slug` و `/page/:slug` هستند. `get_absolute_url` مدل‌ها هم همان آدرس‌های غلط را برمی‌گرداند و sitemap و استودیو هر دو از آن می‌خواندند. حالا تست `test_every_sitemap_path_is_a_route_the_storefront_serves` شکل‌های مسیر router را می‌شمارد؛ با برگرداندن یک آدرس به حالت قبل، تست شکست — یعنی واقعاً محافظ است.
 
 تست‌ها: `StorefrontPage.test.tsx` (۷)، `VoicesPanel.test.tsx` (۴)، `SitePage.test.tsx` (۴)؛ کل frontend **۲۱۳ تست/۳۳ فایل** و بک‌اند **۶۰۲ تست** سبز.
+
+### ۴.۹ اعلان و هزینهٔ ارسال
+
+- **Push مرورگر (`webPushApi`)** — endpoint از اولین کامیت بود و هیچ کامپوننتی صدایش نمی‌زد. قاعدهٔ اصلی `PushToggle`: اگر سرور `enabled: false` بدهد یا `public_key` خالی باشد (وضعیت فعلی نصب)، هیچ چیز رندر نمی‌شود. سوییچی که اجازهٔ اعلان مرورگر را بگیرد و بعد جایی برای ثبت نداشته باشد، آن اجازه را برای همیشه می‌سوزاند. در حالت فعال: ثبت service worker، subscribe با کلید VAPID (تبدیل base64url به بایت)، و ارسال اشتراک. خاموش‌کردن اول ردیف سرور را حذف می‌کند بعد `unsubscribe` — برعکسش یعنی سرور به endpoint مرده ادامه بدهد.
+- **هزینهٔ ارسال (`shippingApi.quote`)** — چک‌اوت تا امروز فقط می‌نوشت «هزینهٔ ارسال پس از تأیید موجودی اضافه می‌شود». حالا با انتخاب استان و شهر، مبلغ و بازهٔ تحویل پیش از تأیید نهایی نمایش داده می‌شود. پاسخ سرور `authoritative_at_checkout` و `note` دارد؛ صفحه همان جمله را تکرار می‌کند و برآورد را به‌عنوان مبلغ قطعی جا نمی‌زند. تایپ سرویس فیلد `note` را نداشت؛ اضافه شد.
+
+تست‌ها: `PushToggle.test.tsx` (۲، هر دو حالتِ «نباید رندر شود») و دو مورد در `Checkout.test.tsx`. کل frontend **۲۱۷ تست/۳۴ فایل** سبز.
 
 ---
 
