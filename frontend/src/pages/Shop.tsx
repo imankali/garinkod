@@ -1,8 +1,8 @@
 // frontend/src/pages/Shop.tsx
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { PackageSearch, SlidersHorizontal } from 'lucide-react';
 
 import { categoriesApi, productsApi } from '../api/services';
@@ -23,9 +23,12 @@ import { nums } from '../lib/price';
  * row of plain selects and links on desktop and a horizontally scrollable row
  * of chips on a phone — not a slide-over panel with twelve checkbox groups.
  *
- * Pagination is "load more": a page number row at the bottom of a catalogue
- * makes the visitor choose how much reading to do before they have seen the
- * first screen.
+ * Pagination is a real `page` parameter: the previous page stays on screen
+ * while the next one loads (`keepPreviousData`), so «بعدی» appends nothing and
+ * loses nothing — the visitor moves one screenful at a time and the scroll
+ * position is theirs to keep. Re-requesting the whole list with a bigger
+ * `page_size` looked the same and was not: it re-fetched everything already on
+ * screen, and it meant the catalogue had to cap itself at 96 products.
  */
 const ORDERINGS = [
   { value: '-created', label: 'تازه‌ترین' },
@@ -40,7 +43,8 @@ export default function Shop() {
   const category = params.get('category') ?? '';
   const ordering = params.get('ordering') ?? '-created';
   const search = params.get('search') ?? '';
-  const pageSize = Number(params.get('page_size') || 24);
+  const page = Math.max(1, Number(params.get('page') || 1) || 1);
+  const PAGE_SIZE = 24;
 
   const categories = useQuery({
     queryKey: ['categories'],
@@ -49,15 +53,19 @@ export default function Shop() {
   });
 
   const products = useQuery({
-    queryKey: ['products', { category, ordering, search, pageSize }],
+    queryKey: ['products', { category, ordering, search, page }],
     queryFn: async () =>
       (await productsApi.getAll({
         ...(category ? { category } : {}),
         ...(search ? { search } : {}),
         ordering,
-        page_size: Number.isFinite(pageSize) ? Math.min(Math.max(pageSize, 24), 96) : 24,
+        page,
+        page_size: PAGE_SIZE,
       })).data,
     staleTime: 2 * 60 * 1000,
+    // Paging does not blank the grid: the previous page is what the visitor is
+    // still looking at while the next one arrives.
+    placeholderData: keepPreviousData,
   });
 
   const activeCategory = useMemo(
@@ -74,8 +82,25 @@ export default function Shop() {
     setParams(updated, { replace: true });
   }
 
+  // Paging keeps the same pathname, so the app's scroll reset does not fire.
+  // Without this the visitor lands at the bottom of page 2 looking at the
+  // pagination row they just pressed.
+  const resultsRef = useRef<HTMLDivElement>(null);
+  const firstRun = useRef(true);
+  useEffect(() => {
+    if (firstRun.current) {
+      firstRun.current = false;
+      return;
+    }
+    resultsRef.current?.scrollIntoView({
+      block: 'start',
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+    });
+  }, [page, category, ordering, search]);
+
   const items: ProductList[] = products.data?.results ?? [];
   const total = products.data?.count ?? 0;
+  const lastPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
     <div className="shell flex flex-col gap-5 py-8">
@@ -157,21 +182,37 @@ export default function Shop() {
         />
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          <div ref={resultsRef} className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {items.map((product, index) => (
               <ProductCard key={product.id} product={product} priority={index < 4} />
             ))}
           </div>
 
-          {total > items.length && (
-            <div className="flex justify-center pt-2">
+          {lastPage > 1 && (
+            <nav
+              aria-label="صفحه‌بندی کالاها"
+              className="flex items-center justify-between gap-3 border-t border-line pt-4 dark:border-night-line"
+            >
               <Button
                 variant="secondary"
-                onClick={() => patch({ page_size: String(Math.min(total, items.length + 24)) })}
+                size="sm"
+                disabled={page <= 1}
+                onClick={() => patch({ page: page > 2 ? String(page - 1) : null })}
               >
-                نمایش کالاهای بیشتر
+                صفحهٔ قبل
               </Button>
-            </div>
+              <p className="dateline text-2xs font-bold text-ink-mute dark:text-white/45" aria-live="polite">
+                صفحهٔ {nums(page)} از {nums(lastPage)}
+              </p>
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={page >= lastPage}
+                onClick={() => patch({ page: String(page + 1) })}
+              >
+                صفحهٔ بعد
+              </Button>
+            </nav>
           )}
         </>
       )}
