@@ -22,6 +22,7 @@ const getStorefront = vi.fn();
 const myListings = vi.fn();
 const createListing = vi.fn();
 const deleteListing = vi.fn();
+const updateListing = vi.fn();
 const checkAvailability = vi.fn();
 const createStorefront = vi.fn();
 const myPosts = vi.fn();
@@ -44,6 +45,7 @@ vi.mock('../api/services', () => ({
     myListings: (...a: unknown[]) => myListings(...a),
     createListing: (...a: unknown[]) => createListing(...a),
     deleteListing: (...a: unknown[]) => deleteListing(...a),
+    updateListing: (...a: unknown[]) => updateListing(...a),
     checkStorefrontAvailability: (...a: unknown[]) => checkAvailability(...a),
     createStorefront: (...a: unknown[]) => createStorefront(...a),
   },
@@ -129,6 +131,7 @@ beforeEach(() => {
   myListings.mockReset();
   createListing.mockReset();
   deleteListing.mockReset();
+  updateListing.mockReset();
   checkAvailability.mockReset();
   createStorefront.mockReset();
   myPosts.mockReset();
@@ -390,5 +393,53 @@ describe('Studio — the story archive and highlights', () => {
 
     await screen.findByText('برداشت امروز');
     expect(screen.getByRole('button', { name: 'ساختن مجموعه' }).hasAttribute('disabled')).toBe(true);
+  });
+});
+
+describe('Studio — price and stock', () => {
+  it('saves a new price on the seller\'s own listing', async () => {
+    updateListing.mockResolvedValue({ data: listing({ price: 950000 }) });
+    getStorefront.mockResolvedValue({ data: stall });
+    myListings.mockResolvedValue({ data: [listing()] });
+    renderStudio();
+
+    await screen.findByText('پسته اکبری صادراتی');
+    await userEvent.click(screen.getByRole('button', { name: 'قیمت و موجودی' }));
+
+    const price = screen.getByLabelText('قیمت هر واحد') as HTMLInputElement;
+    expect(price.value).toBe('890000');
+    await userEvent.clear(price);
+    await userEvent.type(price, '950000');
+    await userEvent.click(screen.getByRole('button', { name: 'ذخیره' }));
+
+    await waitFor(() => expect(updateListing).toHaveBeenCalled());
+    expect(updateListing.mock.calls[0]?.[0]).toBe('پسته-رفسنجان-پسته-اکبری-صادراتی');
+    expect(updateListing.mock.calls[0]?.[1]).toMatchObject({ price: 950000 });
+  });
+
+  it('warns before saving that a published listing goes back to review', async () => {
+    getStorefront.mockResolvedValue({ data: stall });
+    myListings.mockResolvedValue({ data: [listing()] });
+    renderStudio();
+
+    await screen.findByText('پسته اکبری صادراتی');
+    await userEvent.click(screen.getByRole('button', { name: 'قیمت و موجودی' }));
+
+    // The server really does this — a PATCH on a published listing returned
+    // pending_review — so the seller reads it before the click, not after.
+    expect(screen.getByText(/برای بازبینی برمی‌گرداند/)).toBeDefined();
+  });
+
+  it('does not promise a warning when there is nothing to lose', async () => {
+    getStorefront.mockResolvedValue({ data: stall });
+    myListings.mockResolvedValue({
+      data: [listing({ id: 6, status: 'pending_review', status_label: 'در انتظار تأیید' })],
+    });
+    renderStudio();
+
+    await screen.findByText('پسته اکبری صادراتی');
+    await userEvent.click(screen.getByRole('button', { name: 'قیمت و موجودی' }));
+
+    expect(screen.queryByText(/برای بازبینی برمی‌گرداند/)).toBeNull();
   });
 });

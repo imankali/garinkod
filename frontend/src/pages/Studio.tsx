@@ -71,6 +71,100 @@ function StatusPill({ status, label }: { status: string; label: string }) {
   return <span className={cn('rounded-sm px-1.5 py-0.5 text-[10px] font-bold', tone)}>{label}</span>;
 }
 
+/**
+ * Changing the two fields that go stale: the price and what is left in stock.
+ *
+ * `updateListing` was served and uncalled. A seller could post a listing and
+ * delete it, but not move the price when the market moved or zero the stock
+ * when the harvest ran out — the two edits a stall needs every week.
+ *
+ * `status` is read-only on the serializer, so this never claims a listing is
+ * published; an edit to a published listing goes back to review on the server
+ * and the pill shows whatever came back.
+ */
+function ListingEditor({
+  listing,
+  onDone,
+}: {
+  listing: MarketplaceListing;
+  onDone: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const [price, setPrice] = useState(String(listing.price ?? ''));
+  const [quantity, setQuantity] = useState(String(Number(listing.quantity_available)));
+  const [error, setError] = useState<string | null>(null);
+
+  const save = useMutation({
+    mutationFn: async () =>
+      (
+        await agricultureApi.updateListing(listing.slug, {
+          price: Number(price.replace(/[^\d]/g, '')) || 0,
+          // The serializer types this as a decimal string, not a number.
+          quantity_available: quantity.replace(/[^\d.]/g, '') || '0',
+        })
+      ).data,
+    onSuccess: (saved) => {
+      // Read `status` back rather than assuming the listing stayed published.
+      // It does not: the server puts an edited listing back into review, which
+      // is why the form warns above the button rather than after the click.
+      queryClient.setQueryData<MarketplaceListing[]>(['my-listings'], (cached) =>
+        (cached ?? []).map((row) => (row.id === saved.id ? { ...row, ...saved } : row)),
+      );
+      void queryClient.invalidateQueries({ queryKey: ['my-listings'] });
+      onDone();
+    },
+    onError: (caught) => setError(parseApiError(caught).message),
+  });
+
+  return (
+    <form
+      className="mt-2 flex flex-wrap items-end gap-2 rounded-md border border-line bg-paper p-2 dark:border-night-line dark:bg-night-soft"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (save.isPending) return;
+        setError(null);
+        save.mutate();
+      }}
+    >
+      {listing.status === 'published' && (
+        <p className="w-full text-[11px] leading-6 text-gold-700 dark:text-gold-500">
+          تغییر قیمت یا موجودی، آگهی را برای بازبینی برمی‌گرداند و تا تأیید دوباره در فروشگاه
+          دیده نمی‌شود. اگر فقط موجودی را صفر می‌کنید، می‌توانید منتظر تأیید بمانید.
+        </p>
+      )}
+      <div className="w-28">
+        <TextField
+          label="قیمت هر واحد"
+          dir="ltr"
+          inputMode="numeric"
+          value={price}
+          onChange={(event) => setPrice(event.target.value)}
+        />
+      </div>
+      <div className="w-24">
+        <TextField
+          label="موجودی"
+          dir="ltr"
+          inputMode="decimal"
+          value={quantity}
+          onChange={(event) => setQuantity(event.target.value)}
+        />
+      </div>
+      <Button type="submit" size="sm" loading={save.isPending}>
+        ذخیره
+      </Button>
+      <Button type="button" variant="quiet" size="sm" onClick={onDone}>
+        انصراف
+      </Button>
+      {error && (
+        <p role="alert" className="w-full text-[11px] font-bold text-danger-700">
+          {error}
+        </p>
+      )}
+    </form>
+  );
+}
+
 function ApplyForm({ onApplied }: { onApplied: () => void }) {
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
@@ -698,6 +792,7 @@ export default function Studio() {
   const hasStall = Boolean(stall.data?.slug);
 
   const rows = useMemo(() => listings.data ?? [], [listings.data]);
+  const [editingSlug, setEditingSlug] = useState<string | null>(null);
 
   useEffect(() => {
     if (!hasStall) setAdding(false);
@@ -815,6 +910,14 @@ export default function Studio() {
                       )}
                     </div>
                     <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setEditingSlug(editingSlug === listing.slug ? null : listing.slug)}
+                        aria-expanded={editingSlug === listing.slug}
+                        className="text-[11px] font-bold text-brand-700 hover:underline dark:text-brand-300"
+                      >
+                        قیمت و موجودی
+                      </button>
                       <Link
                         to={`/listing/${listing.slug}`}
                         className="text-2xs font-bold text-brand-700 hover:underline dark:text-brand-300"
@@ -832,6 +935,11 @@ export default function Studio() {
                         حذف
                       </button>
                     </div>
+                    {editingSlug === listing.slug && (
+                      <div className="w-full">
+                        <ListingEditor listing={listing} onDone={() => setEditingSlug(null)} />
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>
