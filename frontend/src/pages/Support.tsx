@@ -6,6 +6,7 @@ import { Mail, MessageSquare, Phone } from 'lucide-react';
 import { siteInfoApi } from '../api/services';
 import PageHead from '../components/shop/PageHead';
 import { Skeleton } from '../components/ui/Skeleton';
+import { telHref } from '../lib/phone';
 
 /**
  * Support: how to reach a human, in the order most people need it.
@@ -45,7 +46,7 @@ export default function Support() {
               rows: (data?.phones ?? []).map((phone) => ({
                 label: 'تلفن',
                 value: phone,
-                href: `tel:${phone.replace(/[^\d+]/g, '')}`,
+                href: telHref(phone),
               })),
             },
             {

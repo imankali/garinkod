@@ -6,6 +6,7 @@ import { Clock, Mail, MapPin, MessageCircle, Phone } from 'lucide-react';
 import { siteInfoApi } from '../api/services';
 import PageHead from '../components/shop/PageHead';
 import { Skeleton } from '../components/ui/Skeleton';
+import { mailHref, telHref } from '../lib/phone';
 
 /**
  * «تماس با ما».
@@ -67,16 +68,24 @@ export default function Contact() {
                   <div>
                     <dt className="font-extrabold text-ink dark:text-white">تلفن</dt>
                     <dd className="mt-0.5 flex flex-wrap gap-x-4 gap-y-1">
-                      {(data?.phones ?? []).map((phone) => (
-                        <a
-                          key={phone}
-                          dir="ltr"
-                          href={`tel:${phone.replace(/[^\d+]/g, '')}`}
-                          className="dateline font-bold text-brand-700 transition-colors hover:text-brand-900 dark:text-brand-300"
-                        >
-                          {phone}
-                        </a>
-                      ))}
+                      {(data?.phones ?? []).map((phone) =>
+                        // A number that cannot be dialled is printed as text,
+                        // never as a link that does nothing.
+                        telHref(phone) ? (
+                          <a
+                            key={phone}
+                            dir="ltr"
+                            href={telHref(phone)}
+                            className="dateline font-bold text-brand-700 transition-colors hover:text-brand-900 dark:text-brand-300"
+                          >
+                            {phone}
+                          </a>
+                        ) : (
+                          <span key={phone} dir="ltr" className="dateline font-bold text-ink dark:text-white">
+                            {phone}
+                          </span>
+                        ),
+                      )}
                     </dd>
                   </div>
                 </div>
@@ -87,16 +96,22 @@ export default function Contact() {
                   <div>
                     <dt className="font-extrabold text-ink dark:text-white">ایمیل</dt>
                     <dd className="mt-0.5 flex flex-wrap gap-x-4 gap-y-1">
-                      {(data?.emails ?? []).map((email) => (
-                        <a
-                          key={email}
-                          dir="ltr"
-                          href={`mailto:${email}`}
-                          className="font-bold text-brand-700 transition-colors hover:text-brand-900 dark:text-brand-300"
-                        >
-                          {email}
-                        </a>
-                      ))}
+                      {(data?.emails ?? []).map((email) =>
+                        mailHref(email) ? (
+                          <a
+                            key={email}
+                            dir="ltr"
+                            href={mailHref(email)}
+                            className="font-bold text-brand-700 transition-colors hover:text-brand-900 dark:text-brand-300"
+                          >
+                            {email}
+                          </a>
+                        ) : (
+                          <span key={email} dir="ltr" className="font-bold text-ink dark:text-white">
+                            {email}
+                          </span>
+                        ),
+                      )}
                     </dd>
                   </div>
                 </div>

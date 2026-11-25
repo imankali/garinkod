@@ -72,4 +72,53 @@ describe('Footer', () => {
     expect(screen.getByRole('navigation', { name: 'خرید' })).toBeDefined();
     expect(screen.getByRole('link', { name: 'دربارهٔ ما' })).toHaveAttribute('href', '/about');
   });
+
+  it('dials a Persian-digit number instead of building an empty tel: link', async () => {
+    vi.mocked(siteInfoApi.getContact).mockResolvedValue({
+      data: {
+        address: 'تهران',
+        phones: ['۰۲۱-۴۴۵۵۶۶۷۷'],
+        emails: ['salam@example.com'],
+        provinces_note: '',
+        working_hours: '',
+        whatsapp_number: '',
+        telegram_url: '',
+        instagram_url: '',
+        eitaa_url: '',
+        map_lat: null,
+        map_lng: null,
+        map_note: '',
+      },
+    } as never);
+
+    renderFooter();
+
+    const link = await screen.findByRole('link', { name: /۴۴۵۵۶۶۷۷/ });
+    expect(link).toHaveAttribute('href', 'tel:02144556677');
+  });
+
+  it('prints a number it cannot dial rather than linking nowhere', async () => {
+    vi.mocked(siteInfoApi.getContact).mockResolvedValue({
+      data: {
+        address: 'تهران',
+        phones: ['تلفن ندارد'],
+        emails: ['not-an-address'],
+        provinces_note: '',
+        working_hours: '',
+        whatsapp_number: '',
+        telegram_url: '',
+        instagram_url: '',
+        eitea_url: '',
+        eitaa_url: '',
+        map_lat: null,
+        map_lng: null,
+        map_note: '',
+      },
+    } as never);
+
+    renderFooter();
+
+    await waitFor(() => expect(screen.getByText('تلفن ندارد')).toBeDefined());
+    expect(screen.queryByText('not-an-address')).toBeNull();
+  });
 });

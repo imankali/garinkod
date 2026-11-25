@@ -5,6 +5,7 @@ import { Link } from 'react-router';
 import { Mail, MapPin, Phone } from 'lucide-react';
 
 import { siteInfoApi } from '../../api/services';
+import { mailHref, telHref } from '../../lib/phone';
 import { FOOTER_NAV } from './nav';
 import Logo from './Logo';
 import NewsletterForm from './NewsletterForm';
@@ -49,19 +50,28 @@ export default function Footer() {
             <ul className="mt-5 space-y-2 text-xs text-brand-100/80">
               {phone && (
                 <li>
-                  <a
-                    href={`tel:${phone.replace(/[^\d+]/g, '')}`}
-                    className="inline-flex min-h-9 items-center gap-2 transition-colors hover:text-white"
-                  >
-                    <Phone size={14} aria-hidden="true" />
-                    <span dir="ltr" className="dateline">{phone}</span>
-                  </a>
+                  {telHref(phone) ? (
+                    <a
+                      href={telHref(phone)}
+                      className="inline-flex min-h-9 items-center gap-2 transition-colors hover:text-white"
+                    >
+                      <Phone size={14} aria-hidden="true" />
+                      <span dir="ltr" className="dateline">{phone}</span>
+                    </a>
+                  ) : (
+                    // Printed, not linked: a number that cannot be dialled is
+                    // still information, and `tel:` with nothing after it is not.
+                    <span className="inline-flex min-h-9 items-center gap-2">
+                      <Phone size={14} aria-hidden="true" />
+                      <span dir="ltr" className="dateline">{phone}</span>
+                    </span>
+                  )}
                 </li>
               )}
-              {email && (
+              {mailHref(email) && (
                 <li>
                   <a
-                    href={`mailto:${email}`}
+                    href={mailHref(email)}
                     className="inline-flex min-h-9 items-center gap-2 transition-colors hover:text-white"
                   >
                     <Mail size={14} aria-hidden="true" />
