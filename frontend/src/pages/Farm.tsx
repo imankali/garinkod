@@ -22,7 +22,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CalendarDays, MapPin, MessageSquare, Sprout } from 'lucide-react';
-import { Link } from 'react-router';
 
 import { farmApi } from '../api/services';
 import type { FarmLandPayload, FarmEventPayload } from '../api/services';
@@ -36,7 +35,7 @@ import { useTitle } from '../lib/useTitle';
 import PageHead from '../components/shop/PageHead';
 import Button from '../components/ui/Button';
 import EmptyState from '../components/ui/EmptyState';
-import { SelectField, TextField } from '../components/ui/Field';
+import { SelectField, TextArea, TextField } from '../components/ui/Field';
 import { Skeleton } from '../components/ui/Skeleton';
 
 const LAND_TYPES: Array<{ value: FarmLand['land_type']; label: string }> = [
@@ -49,6 +48,15 @@ const EVENT_KINDS: Array<{ value: FarmCalendarEvent['kind']; label: string }> = 
   { value: 'spraying', label: 'سم‌پاشی' },
   { value: 'fertilizing', label: 'کوددهی' },
   { value: 'irrigation', label: 'آبیاری' },
+];
+
+// Mirrors FarmConsultationRequest.SUBJECT_CHOICES on the backend.
+const SUBJECTS = [
+  { value: 'general', label: 'مشاوره عمومی' },
+  { value: 'spraying', label: 'مشاوره سم‌پاشی' },
+  { value: 'fertilizing', label: 'مشاوره کوددهی' },
+  { value: 'irrigation', label: 'مشاوره آبیاری' },
+  { value: 'pest', label: 'آفت و بیماری' },
 ];
 
 const AREA_UNITS = [
@@ -250,12 +258,100 @@ function EventForm({ lands, onDone }: { lands: FarmLand[]; onDone: () => void })
   );
 }
 
+/**
+ * Filing a consultation.
+ *
+ * `createConsultation` was the one method of `farmApi` nothing called, and the
+ * gap it left was a promise the product makes twice: the levels ladder tells
+ * every level-1 buyer they can «درخواست مشاوره کشاورزی», and the services page
+ * sells «مشاورهٔ زراعت». Neither had a form.
+ *
+ * A request is always attached to a land, because the answer depends on the
+ * crop, the soil and the province — a free-text box with no land behind it
+ * cannot be answered, only acknowledged.
+ */
+function ConsultationForm({ lands, onDone }: { lands: FarmLand[]; onDone: () => void }) {
+  const queryClient = useQueryClient();
+  const [landId, setLandId] = useState(String(lands[0]?.id ?? ''));
+  const [subject, setSubject] = useState('general');
+  const [message, setMessage] = useState('');
+
+  const create = useMutation({
+    mutationFn: async () =>
+      (
+        await farmApi.createConsultation({
+          land_id: Number(landId),
+          subject,
+          message: message.trim(),
+        })
+      ).data,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['farm-consultations'] });
+      onDone();
+    },
+  });
+
+  return (
+    <form
+      noValidate
+      className="mt-3 flex flex-col gap-3 rounded-lg border border-line p-4 dark:border-night-line"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!message.trim() || create.isPending) return;
+        create.mutate();
+      }}
+    >
+      <div className="grid gap-3 sm:grid-cols-2">
+        <SelectField label="زمین" value={landId} onChange={(event) => setLandId(event.target.value)}>
+          {lands.map((land) => (
+            <option key={land.id} value={land.id}>
+              {land.name}
+            </option>
+          ))}
+        </SelectField>
+        <SelectField label="موضوع" value={subject} onChange={(event) => setSubject(event.target.value)}>
+          {SUBJECTS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </SelectField>
+      </div>
+
+      <TextArea
+        label="چه می‌خواهید بدانید؟"
+        required
+        rows={4}
+        value={message}
+        onChange={(event) => setMessage(event.target.value)}
+        hint="محصول، مرحلهٔ رشد و آنچه تا حالا انجام داده‌اید را بنویسید تا پاسخ دقیق باشد."
+      />
+
+      {create.isError && (
+        <p role="alert" className="text-2xs font-bold text-danger-700">
+          {parseApiError(create.error).message}
+        </p>
+      )}
+
+      <div className="flex items-center gap-2">
+        <Button type="submit" loading={create.isPending}>
+          ارسال درخواست
+        </Button>
+        <Button type="button" variant="quiet" onClick={onDone}>
+          انصراف
+        </Button>
+      </div>
+    </form>
+  );
+}
+
 export default function Farm() {
   useTitle('زمین‌ها و تقویم کشت');
   const user = useAuthStore((state) => state.user);
   const queryClient = useQueryClient();
   const [addingLand, setAddingLand] = useState(false);
   const [addingEvent, setAddingEvent] = useState(false);
+  const [askingConsult, setAskingConsult] = useState(false);
 
   const lands = useQuery({
     queryKey: ['farm-lands'],
@@ -442,14 +538,23 @@ export default function Farm() {
           <h2 id="consults-title" className="text-sm font-extrabold text-ink dark:text-white">
             درخواست‌های مشاوره
           </h2>
-          <Link
-            to="/services"
-            className="inline-flex items-center gap-1 text-2xs font-bold text-brand-700 hover:underline dark:text-brand-300"
-          >
-            <MessageSquare size={12} aria-hidden="true" />
-            درخواست مشاوره
-          </Link>
+          {landList.length > 0 ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={MessageSquare}
+              onClick={() => setAskingConsult(true)}
+            >
+              درخواست مشاوره
+            </Button>
+          ) : (
+            <span className="text-[11px] text-ink-mute dark:text-white/40">
+              برای درخواست مشاوره اول یک زمین ثبت کنید.
+            </span>
+          )}
         </div>
+
+        {askingConsult && <ConsultationForm lands={landList} onDone={() => setAskingConsult(false)} />}
 
         {requests.length === 0 ? (
           <p className="mt-3 text-2xs leading-6 text-ink-mute dark:text-white/45">

@@ -9,12 +9,14 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const lands = vi.fn();
 const calendar = vi.fn();
 const consultations = vi.fn();
+const createConsultation = vi.fn();
 
 vi.mock('../api/services', () => ({
   farmApi: {
@@ -24,6 +26,7 @@ vi.mock('../api/services', () => ({
     createLand: vi.fn(),
     addEvent: vi.fn(),
     updateEvent: vi.fn(),
+    createConsultation: (...a: unknown[]) => createConsultation(...a),
   },
 }));
 
@@ -92,6 +95,7 @@ beforeEach(() => {
   lands.mockReset();
   calendar.mockReset();
   consultations.mockReset();
+  createConsultation.mockReset();
   lands.mockResolvedValue({ data: [land()] });
   calendar.mockResolvedValue({ data: [] });
   consultations.mockResolvedValue({ data: [] });
@@ -195,5 +199,55 @@ describe('Farm', () => {
     expect(await screen.findByText(/برای دیدن زمین‌ها و تقویم کشت وارد شوید/)).toBeDefined();
     // No request is made without a session.
     await waitFor(() => expect(lands).not.toHaveBeenCalled());
+  });
+});
+
+describe('Farm — filing a consultation', () => {
+  it('files a request against the chosen land with the chosen subject', async () => {
+    createConsultation.mockResolvedValue({
+      data: {
+        id: 3,
+        farmer: 9,
+        farmer_name: 'کشاورز تستی',
+        farmer_username: 'demo-farmer',
+        land: land(),
+        subject: 'pest',
+        subject_label: 'آفت و بیماری',
+        message: 'روی برگ‌های خیار لکهٔ زرد است.',
+        reply: '',
+        status: 'pending',
+        status_label: 'در انتظار بررسی',
+        replied_by: null,
+        conversation_id: null,
+        thread_message_count: 0,
+        created_at: '2026-11-25T07:00:00+03:30',
+        updated_at: '2026-11-25T07:00:00+03:30',
+      },
+    });
+
+    renderFarm();
+    await screen.findByText('گلخانه خیار ورامین');
+
+    await userEvent.click(screen.getByRole('button', { name: 'درخواست مشاوره' }));
+    await userEvent.selectOptions(screen.getByLabelText('موضوع'), 'pest');
+    await userEvent.type(screen.getByLabelText(/چه می‌خواهید بدانید/), 'روی برگ‌های خیار لکهٔ زرد است.');
+    await userEvent.click(screen.getByRole('button', { name: 'ارسال درخواست' }));
+
+    await waitFor(() => expect(createConsultation).toHaveBeenCalled());
+    // A request is always attached to a land: the answer depends on the crop.
+    expect(createConsultation.mock.calls[0]?.[0]).toEqual({
+      land_id: 2,
+      subject: 'pest',
+      message: 'روی برگ‌های خیار لکهٔ زرد است.',
+    });
+  });
+
+  it('does not offer the form before there is a land to attach it to', async () => {
+    lands.mockResolvedValue({ data: [] });
+    renderFarm();
+
+    // The backend requires land_id; a form without a land could only fail.
+    expect(await screen.findByText(/برای درخواست مشاوره اول یک زمین ثبت کنید/)).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'درخواست مشاوره' })).toBeNull();
   });
 });

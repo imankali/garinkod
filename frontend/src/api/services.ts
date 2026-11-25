@@ -504,6 +504,19 @@ export const agriApi = {
 // ========================================
 // Payment readiness, affiliate, finance and trust
 // ========================================
+
+/**
+ * Public rollout decisions — the four names in `PUBLIC_FEATURE_FLAGS`.
+ *
+ * No screen calls this, and none should: every flag it publishes is already
+ * folded into the endpoint it belongs to. `web_push` is part of
+ * `/notifications/webpush/`'s `enabled`, `external_search` is applied inside
+ * the search endpoint, and `carrier_quotes`/`privacy_analytics` describe
+ * server-side behaviour the storefront never branches on. Reading the flag on
+ * the client as well would give two sources of truth that can disagree — a
+ * button that offers push because the flag is on while the push endpoint says
+ * it cannot deliver.
+ */
 export const featureFlagsApi = {
   get: () => apiClient.get<{ flags: Record<string, boolean> }>('/features/'),
 };
@@ -569,6 +582,20 @@ export interface WithdrawalRequest {
   created_at: string;
 }
 
+// ---------------------------------------------------------------------------
+// Operator-only namespaces: financeApi, deskApi, managementApi, opsApi.
+//
+// These are staff consoles — the service desk queue (level 5), moderation and
+// the management console (6), staff appointment and system settings (7–8), the
+// operations health board, and the finance ledger. Every route is gated above
+// level 4, and levels 5–8 are all `is_staff: true` in `/api/levels/`.
+//
+// They are deliberately without a consumer in this storefront: a buyer-facing
+// SPA is the wrong place to hold a moderated queue, an audit trail or a ledger,
+// and building one here would put staff tooling behind the same session cookie
+// as the shop. They stay typed and ready for a separate staff client rather
+// than half-built inside this one.
+// ---------------------------------------------------------------------------
 export const financeApi = {
   storefront: (params?: LedgerQueryParams) =>
     apiClient.get<{
